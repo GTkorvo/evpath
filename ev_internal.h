@@ -94,6 +94,7 @@ typedef struct _event_path_data {
     IOContext root_context;
     int output_action_count;
     action **output_actions;
+    queue_item *queue_items_free_list;
     thr_mutex_t lock;
 } *event_path_data;
 

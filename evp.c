@@ -10,6 +10,9 @@
 
 static IOFormat register_format_set(CManager cm, CMFormatList list, 
 				    IOContext *context_ptr);
+static void reference_event(event_item *event);
+static void return_event(event_path_data evp, event_item *event);
+static event_item *get_free_event(event_path_data evp);
 
 
 void
@@ -81,8 +84,14 @@ static int evpath_locked(){return 1;}
 static void
 enqueue_event(CManager cm, action *act, event_item *event)
 {
-/*    event_path_data evp = cm->evp;*/
-    queue_item *item = malloc(sizeof(*item));
+    event_path_data evp = cm->evp;
+    queue_item *item;
+    if (evp->queue_items_free_list == NULL) {
+	item = malloc(sizeof(*item));
+    } else {
+	item = evp->queue_items_free_list;
+	evp->queue_items_free_list = item->next;
+    }
     item->item = event;
     event->ref_count++;
     if (act->queue_head == NULL) {
@@ -99,7 +108,7 @@ enqueue_event(CManager cm, action *act, event_item *event)
 static event_item *
 dequeue_event(CManager cm, action *act)
 {
-/*    event_path_data evp = cm->evp;*/
+    event_path_data evp = cm->evp;
     queue_item *item = act->queue_head;
     event_item *event = NULL;
     if (item == NULL) return event;
@@ -111,7 +120,8 @@ dequeue_event(CManager cm, action *act)
     } else {
 	act->queue_head = act->queue_head->next;
     }
-    free(item);
+    item->next = evp->queue_items_free_list;
+    evp->queue_items_free_list = item;;
     return event;
 }
 
@@ -268,6 +278,7 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 	act = determine_action(cm, stone, event);
     }
     CMtrace_out(cm, EVerbose, "Enqueueing event");
+    reference_event(event);
     enqueue_event(cm, act, event);
     return 1;
 }
@@ -295,6 +306,7 @@ CManager cm;
 		CMtrace_out(cm, EVerbose, "Executing terminal event");
 		(handler)(cm, event->decoded_event, client_data, NULL);
 		CMtrace_out(cm, EVerbose, "Finish terminal event");
+		return_event(evp, event);
 	    }
 	}
     }
@@ -312,11 +324,12 @@ process_output_actions(CManager cm)
 	    action *act = &evp->stone_map[s].actions[a];
 	    if ((act->action_type == Action_Output) && 
 		(act->queue_head != NULL)) {
+		event_item *event = dequeue_event(cm, act);
 		CMtrace_out(cm, EVerbose, "Writing event");
-		internal_write_event(act->o.out.conn, 
-				     act->queue_head->item->format,
+		internal_write_event(act->o.out.conn, event->format,
 				     &act->o.out.remote_stone_id, 4, 
-				     act->queue_head->item, NULL);
+				     event, NULL);
+		return_event(evp, event);
 	    }
 	}
     }	    
@@ -433,20 +446,43 @@ EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format)
     return source;
 }
 
+static event_item *
+get_free_event(event_path_data evp)
+{
+    event_item *event = malloc(sizeof(*event));
+    memset(event, 0, sizeof(event_item));
+    event->ref_count = 1;
+    return event;
+}
+
+static void
+return_event(event_path_data evp, event_item *event)
+{
+    event->ref_count--;
+    if (event->ref_count == 0) {
+	free(event);
+    }
+}
+
+static void
+reference_event(event_item *event)
+{
+    event->ref_count++;
+}
+
 extern void
 internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf, 
 			   CMConnection conn, void *buffer, int stone_id)
 {
     event_path_data evp = cm->evp;
-    event_item *event = malloc(sizeof(event_item));
-    memset(event, 0, sizeof(event_item));
-    event->ref_count = 1;
+    event_item *event = get_free_event(evp);
     event->contents = Event_Encoded_CM_Owned;
     event->encoded_event = buffer;
     event->reference_format = get_format_app_IOcontext(evp->root_context, 
 					     buffer, conn);
     event->format = NULL;
     internal_path_submit(cm, stone_id, event);
+    return_event(evp, event);
     process_local_actions(cm);
     process_output_actions(cm);
 }
@@ -454,22 +490,58 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
 void
 EVsubmit(EVsource source, void *data, attr_list attrs)
 {
-    event_item *event = malloc(sizeof(event_item));
-    memset(event, 0, sizeof(event_item));
-    event->ref_count = 1;
+    event_item *event = get_free_event(source->cm->evp);
     event->contents = Event_Unencoded_App_Owned;
     event->decoded_event = data;
     event->reference_format = source->reference_format;
     event->format = source->format;
     internal_path_submit(source->cm, source->local_stone_id, event);
+    return_event(source->cm->evp, event);
     process_local_actions(source->cm);
     process_output_actions(source->cm);
+}
+
+static void
+free_evp(CManager cm, void *not_used)
+{
+    event_path_data evp = cm->evp;
+    int s;
+    for (s = 0 ; s < evp->stone_count; s++) {
+	int a;
+	for (a = 0 ; a < evp->stone_map[s].action_count; a++) {
+	    action *act = &evp->stone_map[s].actions[a];
+	    switch(act->action_type) {
+	    case Action_Output:
+		if (act->o.out.remote_path) 
+		    free(act->o.out.remote_path);
+		break;
+	    case Action_Terminal:
+		break;
+	    case Action_Decode:
+		free_IOcontext(act->o.decode.context);
+		break;
+	    }
+	}
+    }
+    free(evp->stone_map);
+    free(evp->output_actions);
+    free_IOcontext(evp->root_context);
+    while (evp->queue_items_free_list != NULL) {
+	queue_item *tmp = evp->queue_items_free_list->next;
+	free(evp->queue_items_free_list->next);
+	evp->queue_items_free_list = tmp;
+    }
+    thr_mutex_free(evp->lock);
 }
 
 void
 EVPinit(CManager cm)
 {
-    cm->evp = malloc(sizeof( struct _event_path_data));
+    cm->evp = CMmalloc(sizeof( struct _event_path_data));
     memset(cm->evp, 0, sizeof( struct _event_path_data));
     cm->evp->root_context = create_IOcontext();
+    cm->evp->queue_items_free_list = NULL;
+    cm->evp->lock = thr_mutex_alloc();
+    internal_add_shutdown_task(cm, free_evp, NULL);
 }
+
