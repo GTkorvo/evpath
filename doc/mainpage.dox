@@ -2,9 +2,25 @@
 
  \section intro Introduction
 
- EVpath is designed to be an event transport middleware layer.
- Specifically, it is designed to allow for the easy implementation of
- overlay networks, with active data processing, routing and management at
- all points in the overlay.
+EVpath is designed to be an event transport middleware layer.
+Specifically, it is designed to allow for the easy implementation of
+overlay networks, with active data processing, routing and management at
+all points in the overlay.
 
- */
+EVpath specifically does not encompass global overlay creation,
+management or destruction functions.  Rather it focusses on providing
+efficient environment for routine transport, while providing
+interfaces necessary for external management layers.
+
+The package is built around the concept of <em>"stones"</em> (like
+stepping stones) which are linked to build end-to-end
+<em>"paths"</em>.  While the <em>"path"</em> is not an explicitly
+supported construct in EVpath, the goal is to provide all the local,
+stone-level, support necessary to accomplish their setup, monitoring,
+management, modification and tear-down.
+
+Stones in EVpath are lightweight entities that roughly correspond to
+processing points in dataflow diagrams.  Stones of different types
+perform data filtering, data transformation,
+
+*/
