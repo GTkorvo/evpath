@@ -209,7 +209,7 @@ CMget_contact_list(cm)
 CManager cm;
 {
     if (cm->contact_lists == NULL) return NULL;
-    add_ref_attr_list(cm->contact_lists[0]);
+    CMadd_ref_attr_list(cm, cm->contact_lists[0]);
     return (cm->contact_lists[0]);
 }
 
@@ -230,7 +230,7 @@ attr_list attrs;
 		   /* value pointer */ (attr_value *) (long) &chosen_net);
     }
     if ((chosen_transport == NULL) && (chosen_net == NULL)) {
-	add_ref_attr_list(cm->contact_lists[0]);
+	CMadd_ref_attr_list(cm, cm->contact_lists[0]);
 	return cm->contact_lists[0];
     }
     /* specific transport chosen */
@@ -257,7 +257,7 @@ attr_list attrs;
 		    continue;
 		}
 	    }
-	    add_ref_attr_list(cm->contact_lists[i]);
+	    CMadd_ref_attr_list(cm, cm->contact_lists[i]);
 	    return cm->contact_lists[i];
 	}
 	i++;
@@ -288,7 +288,7 @@ attr_list attrs;
 		    continue;
 		}
 	    }
-	    add_ref_attr_list(cm->contact_lists[i]);
+	    CMadd_ref_attr_list(cm, cm->contact_lists[i]);
 	    return cm->contact_lists[i];
 	}
 	i++;
@@ -614,7 +614,7 @@ CManager cm;
     i = 0;
     if (cm->contact_lists != NULL) {
 	while(cm->contact_lists[i] != NULL) {
-	    free_attr_list(cm->contact_lists[i]);
+	    CMfree_attr_list(cm, cm->contact_lists[i]);
 	    i++;
 	}
 	CMfree(cm->contact_lists);
@@ -909,7 +909,7 @@ CMConnection_set_character(CMConnection conn, attr_list attrs)
 	/*app set attr about N and repeat time. store in data->attrs automically and pass to regressive_probe_bandwidth. 
 	 */
 	data->conn = conn;
-	data->attrs = attr_copy_list(attrs);
+	data->attrs = CMattr_copy_list(conn->cm, attrs);
 	/* do one task almost immediately */
 	(void) CMadd_delayed_task(conn->cm, 0, 1000, do_bw_measure, 
 				  (void*)data);
@@ -917,7 +917,7 @@ CMConnection_set_character(CMConnection conn, attr_list attrs)
 	task = CMadd_periodic_task(conn->cm, interval_value, 0, 
 				   do_bw_measure, (void*)data);
 	if (conn->characteristics == NULL) {
-	    conn->characteristics = create_attr_list();
+	    conn->characteristics = CMcreate_attr_list(conn->cm);
 	}
 	set_attr(conn->characteristics, CM_BW_MEASURE_INTERVAL,
 	         Attr_Int4, (attr_value) interval_value);
@@ -1609,7 +1609,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     }
     data_buffer = base + attr_length;
     if (attr_length != 0) {
-	attrs = decode_attr_from_xmit(base);
+	attrs = CMdecode_attr_from_xmit(conn->cm, base);
 	if (CMtrace_on(conn->cm, CMDataVerbose)) {
 	    fprintf(stderr, "CM - Incoming read attributes -> ");
 	    dump_attr_list(attrs);
@@ -1619,7 +1619,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	CMtrace_out(cm, CMDataVerbose, "CM - Receiving event message data len %d, attr len %d, stone_id %x\n",
 	       data_length, attr_length, stone_id);
 	if (attrs == NULL){
-	    attrs = create_attr_list();
+	    attrs = CMcreate_attr_list(cm);
 	}
 	set_attr(attrs, CM_EVENT_SIZE, Attr_Int4, 
 		 (attr_value)(long)data_length);
@@ -1699,10 +1699,10 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	}
     }
     if (attrs == NULL) {
-	attrs = create_attr_list();
-	attr_merge_lists(attrs, conn->attrs);
+	attrs = CMcreate_attr_list(cm);
+	CMattr_merge_lists(cm, attrs, conn->attrs);
     } else {
-	attr_merge_lists(attrs, conn->attrs);
+	CMattr_merge_lists(cm, attrs, conn->attrs);
     }
 
     /* 
@@ -1723,7 +1723,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	cm_decode_buf = NULL;
     }
     if (attrs) {
-	free_attr_list(attrs);
+	CMfree_attr_list(cm, attrs);
 	attrs = NULL;
     }
     CMtrace_out(cm, CMDataVerbose, "CM - Finish processing - record of type %s", 
@@ -2943,7 +2943,7 @@ attr_list attrs;
     if(cofXY<0.97 && cofXY>-0.97)
 	if(bandwidth>0) bandwidth*=-1; /*if the result is not reliable, return negative bandwidth*/
   
-    if (conn->attrs == NULL) conn->attrs = create_attr_list();
+    if (conn->attrs == NULL) conn->attrs = CMcreate_attr_list(conn->cm);
 
     {
 	int ibandwidth, icof;

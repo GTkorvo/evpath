@@ -42,6 +42,7 @@ CMtrace_on(CManager cm, CMTraceType trace_type)
 	trace_val[CMTransportVerbose] = (cercs_getenv("CMTransportVerbose") != NULL);
 	trace_val[CMFormatVerbose] = (cercs_getenv("CMFormatVerbose") != NULL);
 	trace_val[CMFreeVerbose] = (cercs_getenv("CMFreeVerbose") != NULL);
+	trace_val[CMAttrVerbose] = (cercs_getenv("CMAttrVerbose") != NULL);
 	trace_val[EVerbose] = (cercs_getenv("EVerbose") != NULL);
 	if (cercs_getenv("CMVerbose") != NULL) {
 	    int i;
@@ -99,6 +100,61 @@ CMtransport_trace(CManager cm, char *format, ...)
 	printf("\n");
     }
 #endif
+}
+
+extern attr_list 
+CMint_create_attr_list(CManager cm, char *file, int line)
+{
+    attr_list list = create_attr_list();
+    CMtrace_out(cm, CMAttrVerbose, "Creating attr list %lx at %s:%d", 
+		(long)list, file, line);
+    return list;
+}
+
+extern void 
+CMint_free_attr_list(CManager cm, attr_list l, char *file, int line)
+{
+    int count = attr_list_ref_count(l);
+    CMtrace_out(cm, CMAttrVerbose, "Freeing attr list %lx at %s:%d, ref count was %d", 
+		(long)l, file, line, count);
+    free_attr_list(l);
+}
+
+
+extern attr_list 
+CMint_add_ref_attr_list(CManager cm, attr_list l, char *file, int line)
+{
+    int count;
+    if (l == NULL) return NULL;
+    count = attr_list_ref_count(l);
+    CMtrace_out(cm, CMAttrVerbose, "Adding ref attr list %lx at %s:%d, ref count now %d", 
+		(long)l, file, line, count+1);
+    return add_ref_attr_list(l);
+}
+
+extern attr_list 
+CMint_attr_copy_list(CManager cm, attr_list l, char *file, int line)
+{
+    attr_list ret = attr_copy_list(l);
+    CMtrace_out(cm, CMAttrVerbose, "Copy attr list %lx at %s:%d, new list %l", 
+		(long)l, file, line, ret);
+    return ret;
+}
+
+extern void
+CMint_attr_merge_lists(CManager cm, attr_list l1, attr_list l2, 
+		       char *file, int line)
+{
+    attr_merge_lists(l1, l2);
+}
+
+extern attr_list 
+CMint_decode_attr_from_xmit(CManager cm, void * buf, char *file, int line)
+{
+    attr_list l = decode_attr_from_xmit(buf);
+    CMtrace_out(cm, CMAttrVerbose, "decode attr list from xmit at %s:%d, new list %lx", 
+		file, line, (long)l);
+    return l;
 }
 
 extern void*

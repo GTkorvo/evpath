@@ -70,7 +70,7 @@ EVfree_stone(CManager cm, EVstone stone_num)
     for(i = 0; i < stone->action_count; i++) {
 	action *act = &stone->actions[i];
 	if (act->attrs != NULL) {
-	    free_attr_list(act->attrs);
+	    CMfree_attr_list(cm, act->attrs);
 	}
 	switch(act->action_type) {
 	case Action_Output:
@@ -546,7 +546,8 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 }
 
 static void
-update_event_length_sum(act, event)
+update_event_length_sum(cm, act, event)
+CManager cm;
 action *act; 
 event_item *event;
 {
@@ -571,7 +572,7 @@ event_item *event;
     } 
     /* also update the EV_EVENT_LSUM attrs */
     if(act->attrs == NULL){
-	act->attrs = create_attr_list();
+	act->attrs = CMcreate_attr_list(cm);
     }
     totallength = act->event_length_sum;/*1024*/ 
     set_attr(act->attrs, EV_EVENT_LSUM, Attr_Int4, (attr_value)totallength);
@@ -612,7 +613,7 @@ CManager cm;
 		EVSimpleHandlerFunc handler = term->handler;
 		void *client_data = term->client_data;
 		CMtrace_out(cm, EVerbose, "Executing terminal/filter event");
-		update_event_length_sum(act, event);
+		update_event_length_sum(cm, act, event);
 		cm->evp->current_event_item = event;
 		out = (handler)(cm, event->decoded_event, client_data,
 				event->attrs);
@@ -635,7 +636,7 @@ CManager cm;
 	    }
 	    case Action_Split: {
 		int t = 0;
-		update_event_length_sum(act, event);
+		update_event_length_sum(cm, act, event);
 		while (act->o.split_stone_targets[t] != -1) {
 		    internal_path_submit(cm, 
 					 act->o.split_stone_targets[t],
@@ -681,7 +682,7 @@ CManager cm;
 		    EVSimpleHandlerFunc handler = term->handler;
 		    void *client_data = term->client_data;
 		    CMtrace_out(cm, EVerbose, "Executing terminal/filter event");
-		    update_event_length_sum(act, event);
+		    update_event_length_sum(cm, act, event);
 		    cm->evp->current_event_item = event;
 		    out = (handler)(cm, event->decoded_event, client_data,
 				    event->attrs);
@@ -708,7 +709,7 @@ CManager cm;
 						      &action_id,
 						      &subaction_id);
 		    int t = 0;
-		    update_event_length_sum(act, event);
+		    update_event_length_sum(cm, act, event);
 		    while (act->o.split_stone_targets[t] != -1) {
 			internal_path_submit(cm, 
 					     act->o.split_stone_targets[t],
@@ -1062,7 +1063,7 @@ return_event(event_path_data evp, event_item *event)
 	    }
 	    break;
 	}
-	if (event->attrs != NULL) free_attr_list(event->attrs);
+	if (event->attrs != NULL) CMfree_attr_list(event->cm, event->attrs);
 	free(event);
     }
 }
@@ -1085,7 +1086,7 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     event->encoded_event = buffer;
     event->reference_format = get_format_app_IOcontext(evp->root_context, 
 					     buffer, conn);
-    event->attrs = attrs;
+    event->attrs = CMadd_ref_attr_list(cm, attrs);
     event->format = NULL;
     CMtrace_out(cm, EVerbose, "Event coming in from network to stone %d", 
 		stone_id);
@@ -1130,7 +1131,7 @@ EVsubmit(EVsource source, void *data, attr_list attrs)
     event->format = source->format;
     event->free_func = source->free_func;
     event->free_arg = source->free_data;
-    event->attrs = attrs;
+    event->attrs = CMadd_ref_attr_list(source->cm, attrs);
     internal_path_submit(source->cm, source->local_stone_id, event);
     return_event(source->cm->evp, event);
     while (process_local_actions(source->cm));

@@ -261,7 +261,7 @@ void *client_data;
     struct in_addr in;
     char *host_string;
     int cond;
-    attr_list contact_attrs = create_attr_list();
+    attr_list contact_attrs = CMcreate_attr_list(cm);
 
     assert(CManager_locked(cm));
 

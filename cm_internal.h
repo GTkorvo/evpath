@@ -240,7 +240,7 @@ extern void CMglobal_data_unlock();
 extern int CMglobal_data_locked();
 
 typedef enum _CMTraceType {
-    CMAlwaysTrace, CMControlVerbose, CMConnectionVerbose, CMLowLevelVerbose, CMDataVerbose, CMTransportVerbose, CMFormatVerbose, CMFreeVerbose, EVerbose,
+    CMAlwaysTrace, CMControlVerbose, CMConnectionVerbose, CMLowLevelVerbose, CMDataVerbose, CMTransportVerbose, CMFormatVerbose, CMFreeVerbose, CMAttrVerbose, EVerbose,
     CMLastTraceType /* add before this one */
 } CMTraceType;
 
@@ -309,3 +309,17 @@ extern void
 internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf, 
 			   attr_list attrs, CMConnection conn, 
 			   void *buffer, int stone_id);
+#define CMcreate_attr_list(cm) CMint_create_attr_list(cm, __FILE__, __LINE__)
+#define CMfree_attr_list(cm, l) CMint_free_attr_list(cm, l, __FILE__, __LINE__)
+#define CMadd_ref_attr_list(cm, l) CMint_add_ref_attr_list(cm, l, __FILE__, __LINE__)
+#define CMattr_copy_list(cm, l) CMint_attr_copy_list(cm, l, __FILE__, __LINE__)
+#define CMattr_merge_lists(cm, l1, l2) CMint_attr_merge_lists(cm, l1, l2, __FILE__, __LINE__)
+#define CMdecode_attr_from_xmit(cm, l) CMint_decode_attr_from_xmit(cm, l, __FILE__, __LINE__)
+
+extern attr_list CMint_create_attr_list(CManager cm, char *file, int line);
+extern void CMint_free_attr_list(CManager cm, attr_list l, char *file, int line);
+extern attr_list CMint_add_ref_attr_list(CManager cm, attr_list l, char *file, int line);
+extern attr_list CMint_attr_copy_list(CManager cm, attr_list l, char *file, int line);
+extern void CMint_attr_merge_lists(CManager cm, attr_list l1, attr_list l2, 
+					char *file, int line);
+extern attr_list CMint_decode_attr_from_xmit(CManager cm, void * buf, char *file, int line);
