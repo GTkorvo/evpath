@@ -449,8 +449,8 @@ dump_action(stone_type stone, int a, const char *indent)
 	    int i = 0;
 	    for (i=0; i < act->o.imm.subaction_count; i++) {
 		printf("      Subaction %d, ref_format %lx, handler %lx\n",
-		       i, act->o.imm.subacts[i].reference_format,
-		       act->o.imm.subacts[i].handler);
+		       i, (long)act->o.imm.subacts[i].reference_format,
+		       (long)act->o.imm.subacts[i].handler);
 	    }
 	    printf("\n");
 	}
@@ -520,6 +520,38 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     return 1;
 }
 
+static void
+update_event_length_sum(act, event)
+action *act; 
+event_item *event;
+{
+    int eventlength;
+    int totallength; 
+
+    /*update act->event_length_sum:*/
+    if (query_attr(event->attrs, CM_EVENT_SIZE, NULL,
+		   /* value pointer */ (attr_value *) & eventlength)) {
+	if (eventlength >= 0 )
+	    act->event_length_sum += eventlength; 
+	else 
+	    act->event_length_sum = -1; /*received event with undecided size, invalidate length_sum*/
+    } else {
+	/*attr CM_EVENT_SIZE doesn't exist. 
+	  two possibilities: 1. something broken. 2. event is 
+	  from application (via EVSubmit, so doesn't have a valid 
+	  CM_EVENT_SIZE attr (This is not implemented unless it is 
+	  really required by someone.)
+	*/
+	return;
+    } 
+    /* also update the EV_EVENT_LSUM attrs */
+    if(act->attrs == NULL){
+	act->attrs = create_attr_list();
+    }
+    totallength = act->event_length_sum;/*1024*/ 
+    set_attr(act->attrs, EV_EVENT_LSUM, Attr_Int4, (attr_value)totallength);
+}
+
 static
 int
 process_local_actions(cm)
@@ -555,6 +587,7 @@ CManager cm;
 		EVSimpleHandlerFunc handler = term->handler;
 		void *client_data = term->client_data;
 		CMtrace_out(cm, EVerbose, "Executing terminal/filter event");
+		update_event_length_sum(act, event);
 		cm->evp->current_event_item = event;
 		out = (handler)(cm, event->decoded_event, client_data,
 				event->attrs);
@@ -577,6 +610,7 @@ CManager cm;
 	    }
 	    case Action_Split: {
 		int t = 0;
+		update_event_length_sum(act, event);
 		while (act->o.split_stone_targets[t] != -1) {
 		    internal_path_submit(cm, 
 					 act->o.split_stone_targets[t],
@@ -622,6 +656,7 @@ CManager cm;
 		    EVSimpleHandlerFunc handler = term->handler;
 		    void *client_data = term->client_data;
 		    CMtrace_out(cm, EVerbose, "Executing terminal/filter event");
+		    update_event_length_sum(act, event);
 		    cm->evp->current_event_item = event;
 		    out = (handler)(cm, event->decoded_event, client_data,
 				    event->attrs);
@@ -648,6 +683,7 @@ CManager cm;
 						      &action_id,
 						      &subaction_id);
 		    int t = 0;
+		    update_event_length_sum(act, event);
 		    while (act->o.split_stone_targets[t] != -1) {
 			internal_path_submit(cm, 
 					     act->o.split_stone_targets[t],
