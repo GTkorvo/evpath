@@ -307,4 +307,5 @@ extern void
 internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data);
 extern void
 internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf, 
-			   CMConnection conn, void *buffer, int stone_id);
+			   attr_list attrs, CMConnection conn, 
+			   void *buffer, int stone_id);

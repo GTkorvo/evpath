@@ -1601,7 +1601,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length)
 	conn->buffer_full_point = 0;
 	conn->buffer_data_end = 0;
 	conn->partial_buffer = NULL;
-	internal_cm_network_submit(cm, cm_data_buf, conn, data_buffer, 
+	internal_cm_network_submit(cm, cm_data_buf, attrs, conn, data_buffer,
 				   stone_id);
 	cm_return_data_buf(cm_data_buf);
 	return 0;
@@ -2126,6 +2126,8 @@ attr_list attrs;
 	if (attrs != NULL) {
 	    printf("CM - write attributes are:");
 	    dump_attr_list(attrs);
+	} else {
+	    printf("CM - write attrs NULL\n");
 	}
 	printf("CM - record contents are:\n  ");
 	r = dump_limited_unencoded_IOrecord((IOFile)format->IOsubcontext, 
@@ -2193,7 +2195,8 @@ attr_list attrs;
 	    tmp_vec[0].iov_base = &header;
 	    tmp_vec[0].iov_len = sizeof(header);
 	    tmp_vec[1].iov_base = encoded_attrs;
-	    tmp_vec[1].iov_len = header[2];
+	    header[2] = attr_len;
+	    tmp_vec[1].iov_len = attr_len;
 	    memcpy(&tmp_vec[2], vec, sizeof(*tmp_vec) * vec_count);
 	    byte_count += sizeof(header) + header[2];
 	    vec_count += 2;

@@ -16,7 +16,7 @@ static event_item *get_free_event(event_path_data evp);
 static void dump_action(stone_type stone, int a, const char *indent);
 extern void print_server_ID(char *server_id);
 
-static const char *action_str[] = { "Action_Output", "Action_Terminal", "Action_Filter", "Action_Decode", "Action_Split"};
+static const char *action_str[] = { "Action_Output", "Action_Terminal", "Action_Filter", "Action_Transform", "Action_Decode", "Action_Split"};
 
 void
 EVPSubmit_encoded(CManager cm, int local_path_id, void *data, int len)
@@ -216,7 +216,7 @@ determine_action(CManager cm, stone_type stone, event_item *event)
     event_path_data evp = cm->evp;
     int i;
     int nearest_proto_action = -1;
-    CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %lx\n",
+    CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %lx",
 	   event->reference_format);
     for (i=0; i < stone->action_count; i++) {
 	if (stone->actions[i].reference_format == event->reference_format) {
@@ -449,7 +449,8 @@ CManager cm;
 		    event_item *event = dequeue_event(cm, act);
 		    CMtrace_out(cm, EVerbose, "Executing terminal/filter event");
 		    cm->evp->current_event_item = event;
-		    out = (handler)(cm, event->decoded_event, client_data, NULL);
+		    out = (handler)(cm, event->decoded_event, client_data,
+				    event->attrs);
 		    cm->evp->current_event_item = NULL;
 		    if (act->action_type == Action_Filter) {
 			if (out) {
@@ -509,7 +510,7 @@ process_output_actions(CManager cm)
 			    act->o.out.remote_stone_id);
 		internal_write_event(act->o.out.conn, event->format,
 				     &act->o.out.remote_stone_id, 4, 
-				     event, NULL);
+				     event, event->attrs);
 		return_event(evp, event);
 	    }
 	}
@@ -694,11 +695,32 @@ extern EVsource
 EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format)
 {
     EVsource source = malloc(sizeof(*source));
+    memset(source, 0, sizeof(*source));
+    source->local_stone_id = stone;
+    source->cm = cm;
+    if (data_format != NULL) {
+	source->format = CMregister_format(cm, data_format[0].format_name,
+					   data_format[0].field_list,
+					   data_format);
+	source->reference_format = register_format_set(cm, data_format, NULL);
+    };
+    return source;
+}
+
+extern EVsource
+EVcreate_submit_handle_free(CManager cm, EVstone stone, 
+			    CMFormatList data_format, 
+			    EVFreeFunction free_func, void *free_data)
+{
+    EVsource source = malloc(sizeof(*source));
+    memset(source, 0, sizeof(*source));
     source->local_stone_id = stone;
     source->cm = cm;
     source->format = CMregister_format(cm, data_format[0].format_name,
 					    data_format[0].field_list, data_format);
     source->reference_format = register_format_set(cm, data_format, NULL);
+    source->free_func = free_func;
+    source->free_data = free_data;
     return source;
 }
 
@@ -721,9 +743,12 @@ return_event(event_path_data evp, event_item *event)
 	case Event_CM_Owned:
 	    CMreturn_buffer(event->cm, event->decoded_event);
 	    break;
+	case Event_Freeable:
+	    (event->free_func)(event->decoded_event, event->free_arg);
+	    break;
 	case Event_App_Owned:
 	    if (event->free_func) {
-		(event->free_func)(event->free_arg);
+		(event->free_func)(event->free_arg, NULL);
 	    }
 	    break;
 	}
@@ -739,7 +764,8 @@ reference_event(event_item *event)
 
 extern void
 internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf, 
-			   CMConnection conn, void *buffer, int stone_id)
+			   attr_list attrs, CMConnection conn, 
+			   void *buffer, int stone_id)
 {
     event_path_data evp = cm->evp;
     event_item *event = get_free_event(evp);
@@ -748,6 +774,7 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     event->encoded_event = buffer;
     event->reference_format = get_format_app_IOcontext(evp->root_context, 
 					     buffer, conn);
+    event->attrs = attrs;
     event->format = NULL;
     CMtrace_out(cm, EVerbose, "Event coming in from network to stone %d", 
 		stone_id);
@@ -781,11 +808,18 @@ void
 EVsubmit(EVsource source, void *data, attr_list attrs)
 {
     event_item *event = get_free_event(source->cm->evp);
-    event->contents = Event_App_Owned;
+    if (source->free_func != NULL) {
+	event->contents = Event_Freeable;
+    } else {
+	event->contents = Event_App_Owned;
+    }
     event->event_encoded = 0;
     event->decoded_event = data;
     event->reference_format = source->reference_format;
     event->format = source->format;
+    event->free_func = source->free_func;
+    event->free_arg = source->free_data;
+    event->attrs = attrs;
     internal_path_submit(source->cm, source->local_stone_id, event);
     return_event(source->cm->evp, event);
     while (process_local_actions(source->cm));
@@ -912,4 +946,10 @@ void *event;
     }
     fprintf(stderr, "Event %lx not found in taken events list\n",
 	    (long) event);
+}
+
+extern IOFormat
+EVget_src_ref_format(EVsource source)
+{
+    return source->reference_format;
 }

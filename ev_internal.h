@@ -13,7 +13,7 @@ typedef struct ev_free_block_rec {
     struct free_block_rec *next;
 } *ev_free_block_rec_p;
 
-typedef enum { Event_App_Owned,  Event_CM_Owned } event_pkg_contents;
+typedef enum { Event_App_Owned,  Event_Freeable, Event_CM_Owned } event_pkg_contents;
 
 typedef struct _event_item {
     int ref_count;
@@ -34,7 +34,7 @@ typedef struct _event_item {
     EVFreeFunction free_func;
 } event_item, *event_queue;
 
-typedef enum { Action_Output = 0, Action_Terminal, Action_Filter, Action_Decode, Action_Split} action_value;
+typedef enum { Action_Output = 0, Action_Terminal, Action_Filter, Action_Transform, Action_Decode, Action_Split} action_value;
 
 typedef struct output_action_struct {
     CMConnection conn;
@@ -111,6 +111,8 @@ struct _EVSource {
     CMFormat format;
     IOFormat reference_format;
     int local_stone_id;
+    EVFreeFunction free_func;
+    void *free_data;
 };
 
 extern void EVPinit(CManager cm);

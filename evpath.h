@@ -113,6 +113,10 @@ typedef void (*CMHandlerFunc) ARGS((CManager cm,
 typedef int (*EVSimpleHandlerFunc) ARGS((CManager cm, 
 					  void *message, void *client_data,
 					  attr_list attrs));
+typedef int (*EVTransformHandlerFunc) ARGS((CManager cm, 
+					    void *message, void *output,
+					    void *client_data,
+					    attr_list attrs));
 
 /*!
  * The prototype for a CM polling handler (and others).
@@ -1414,6 +1418,12 @@ EVassoc_filter_action(CManager cm, EVstone stone,
 		      void* client_data);
 
 extern EVaction
+EVassoc_transform_action(CManager cm, EVstone stone, 
+			 CMFormatList incoming_format_list, 
+			 CMFormatList outgoing_format_list, 
+			 EVTransformHandlerFunc handler, EVstone out_stone,
+			 void* client_data);
+extern EVaction
 EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list, 
 		      EVstone remote_stone);
 
@@ -1431,14 +1441,21 @@ EVaction_remove_split_target(CManager cm, EVstone stone, EVaction action,
 extern EVsource
 EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format);
 
+typedef void (*EVFreeFunction) ARGS((void *event_data, void *client_data));
+
+extern EVsource
+EVcreate_submit_handle_free(CManager cm, EVstone stone, CMFormatList data_format,
+			    EVFreeFunction free_func, void *client_data);
+
 void
 EVsubmit(EVsource source, void *data, attr_list attrs);
-
-typedef void (*EVFreeFunction) ARGS((void *event_data));
 
 extern void
 EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
 		 attr_list attrs);
+
+extern IOFormat
+EVget_src_ref_format(EVsource source);
 
 void
 EVPsubmit_encoded(CManager cm, int local_path_id, void *data, int len);
