@@ -56,6 +56,10 @@ EVfree_stone(CManager cm, EVstone stone_num)
     stone_type stone;
 
     stone = &evp->stone_map[stone_num];
+    if (stone->periodic_handle != NULL) {
+	CMremove_task(stone->periodic_handle);
+	stone->periodic_handle = NULL;
+    }
     stone->local_id = -1;
 }
 
@@ -690,6 +694,37 @@ register_format_set(CManager cm, CMFormatList list, IOContext *context_ptr)
     }
     return format;
 }
+
+static void
+EVauto_submit_func(CManager cm, void* vstone)
+{
+    int stone_num = (long) vstone;
+    event_item *event = get_free_event(cm->evp);
+    stone_type stone = &cm->evp->stone_map[stone_num];
+    event->event_encoded = 0;
+    event->decoded_event = NULL;
+    event->reference_format = NULL;
+    event->format = NULL;
+    event->free_func = NULL;
+    event->attrs = NULL;
+    internal_path_submit(cm, stone_num, event);
+    return_event(cm->evp, event);
+    while (process_local_actions(cm));
+    process_output_actions(cm);
+}
+
+extern void
+EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
+		    int period_usec)
+{
+    CMTaskHandle handle = CMadd_periodic_task(cm, period_sec, period_usec,
+					      EVauto_submit_func, 
+					      (void*)stone_num);
+    stone_type stone = &cm->evp->stone_map[stone_num];
+    stone->periodic_handle = handle;
+}
+
+
 
 extern EVsource
 EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format)

@@ -92,6 +92,7 @@ typedef struct _stone {
     struct _proto_action *proto_actions;
     int action_count;
     struct _action *actions;
+    CMTaskHandle periodic_handle;
 } *stone_type;
     
 typedef struct _event_path_data {

@@ -1474,6 +1474,10 @@ EVPsubmit_encoded(CManager cm, int local_path_id, void *data, int len);
 void
 EVPsubmit(CManager cm, int local_path_id, void *data, IOFormat format);
 
+extern void
+EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
+		    int period_usec);
+
 extern int
 EVtake_event_buffer ARGS((CManager cm, void *event));
 
