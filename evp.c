@@ -63,6 +63,7 @@ EVfree_stone(CManager cm, EVstone stone_num)
     int i;
 
     stone = &evp->stone_map[stone_num];
+    if (stone->local_id == -1) return;
     if (stone->periodic_handle != NULL) {
 	CMremove_task(stone->periodic_handle);
 	stone->periodic_handle = NULL;
