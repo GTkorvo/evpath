@@ -12,6 +12,7 @@
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
 #endif
+#include <stdlib.h>
 
 #else
 #include "kernel/kcm.h"

@@ -717,6 +717,7 @@ EVassoc_split_action(CManager cm, EVstone stone_num,
     memset(&stone->actions[action_num], 0, 
 	   sizeof(stone->actions[0]));
     stone->actions[action_num].action_type = Action_Split;
+    stone->actions[action_num].queue = stone->queue;
     while (target_stone_list && (target_stone_list[target_count] != -1)) {
 	target_count++;
     }
