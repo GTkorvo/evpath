@@ -110,7 +110,7 @@ typedef void (*CMHandlerFunc) ARGS((CManager cm,
 				    void *message, void *client_data,
 				    attr_list attrs));
 
-typedef void (*EVSimpleHandlerFunc) ARGS((CManager cm, 
+typedef int (*EVSimpleHandlerFunc) ARGS((CManager cm, 
 					  void *message, void *client_data,
 					  attr_list attrs));
 
@@ -1406,6 +1406,12 @@ EVfree_stone(CManager cm, EVstone stone);
 extern EVaction
 EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
+
+extern EVaction
+EVassoc_filter_action(CManager cm, EVstone stone, 
+		      CMFormatList incoming_format_list, 
+		      EVSimpleHandlerFunc handler, EVstone out_stone,
+		      void* client_data);
 
 extern EVaction
 EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list, 
