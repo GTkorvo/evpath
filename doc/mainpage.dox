@@ -1,5 +1,10 @@
-/*!\mainpage the evpath main page
+/*!\mainpage The EVpath Library
 
- *\section intro Introduction
- * stuff 
+ \section intro Introduction
+
+ EVpath is designed to be an event transport middleware layer.
+ Specifically, it is designed to allow for the easy implementation of
+ overlay networks, with active data processing, routing and management at
+ all points in the overlay.
+
  */
