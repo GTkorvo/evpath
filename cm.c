@@ -104,6 +104,7 @@ CManager cm;
 		cm->control_list->has_thread = 1;
 		cm->reference_count++;
 		cm->control_list->reference_count++;
+		cm->control_list->free_reference_count++;
 	    } else {
 		/*
 		 *  Can't start a server thread yet, but lets see 
@@ -159,6 +160,7 @@ void *client_data;
 	CMtrace_out(cm, CMLowLevelVerbose,
 		    "CM - Forked comm thread %lx", server_thread);
 	cm->control_list->reference_count++;
+	cm->control_list->free_reference_count++;
 	cl->has_thread = 1;
 	cm->reference_count++;
     }
@@ -655,7 +657,7 @@ CManager cm;
 	}
 	i--;
 	for ( ; i >= 0; i--) {
-	    CMtrace_out(cm, CMFreeVerbose, "CManager calling shutdown functin %d, %lx", i, (long)shutdown_functions[i].func);
+	    CMtrace_out(cm, CMFreeVerbose, "CManager calling shutdown function %d, %lx", i, (long)shutdown_functions[i].func);
 	    shutdown_functions[i].func(cm, shutdown_functions[i].client_data);
 	    shutdown_functions[i].func = NULL;
 	}
@@ -1021,12 +1023,21 @@ CMControlList cl;
     }
 }
 
+extern int trace_val[];
+
 extern void
 CMControlList_free(cl)
 CMControlList cl;
 {
     cl->free_reference_count--;
+    if (trace_val[CMFreeVerbose]) {
+	printf("CMControlList_free, %lx, ref count now %d\n", (long)cl,
+	       cl->free_reference_count);
+    }
     if(cl->free_reference_count == 0) {
+	if (trace_val[CMFreeVerbose]) {
+	    printf("CMControlList_free freeing %lx\n", (long)cl);
+	}
 	if (cl->polling_function_list != NULL) {
 	    CMfree(cl->polling_function_list);
 	}

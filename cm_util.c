@@ -26,7 +26,7 @@
 extern int vfprintf();
 
 
-static int trace_val[CMLastTraceType] = {-1, -1, -1, -1, -1, -1, -1};
+int trace_val[CMLastTraceType] = {-1, -1, -1, -1, -1, -1, -1};
 
 extern void CMprint_version();
 
