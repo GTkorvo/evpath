@@ -1402,8 +1402,11 @@ CMget_self_ip_addr();
 /*! "CM_SNDWND" */
 #define CM_SNDWND ATL_CHAR_CONS('C', 'R', 'S', 'W')
 
-/*! "CM_ZT_ATTR" */
-#define CM_ZT_ATTR ATL_CHAR_CONS('C', 'Z', 'T', 'R')
+/*! "CM_EVENT_SIZE" */
+#define CM_EVENT_SIZE ATL_CHAR_CONS('C', 'E', 'T', 'S')
+
+/*! "EV_EVENT_LSUM" */
+#define EV_EVENT_LSUM ATL_CHAR_CONS('E', 'E', 'L', 'S')
 
 /*! "CM_PATHRATE" */
 #define CM_PATHRATE ATL_CHAR_CONS('P','T','R', 'T')

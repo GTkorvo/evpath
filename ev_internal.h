@@ -82,6 +82,8 @@ typedef struct _action {
     IOFormat reference_format;
     int requires_decoded;
     queue_ptr queue;
+    attr_list attrs;
+    double event_length_sum;  /*in KBytes*/
     union {
 	output_action_vals out;
 	decode_action_vals decode;

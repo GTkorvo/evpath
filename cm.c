@@ -515,7 +515,10 @@ CManager_create()
 				 CM_BW_MEASURE_SIZE);
 	set_attr_atom_and_string("CM_BW_MEASURE_SIZEINC",
 				 CM_BW_MEASURE_SIZEINC);
-	
+	set_attr_atom_and_string("CM_EVENT_SIZE",
+                                 CM_EVENT_SIZE);
+	set_attr_atom_and_string("EV_EVENT_LSUM",
+                                 EV_EVENT_LSUM);
     }
 
     /* initialize data structs */
@@ -1500,7 +1503,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     IOFormat format;
     CManager cm = conn->cm;
     CMincoming_format_list cm_format = NULL;
-    
+
     if (length < 4) {
 	return 4 - length;
     }
@@ -1615,6 +1618,11 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     if (event_msg) {
 	CMtrace_out(cm, CMDataVerbose, "CM - Receiving event message data len %d, attr len %d, stone_id %x\n",
 	       data_length, attr_length, stone_id);
+	if (attrs == NULL){
+	    attrs = create_attr_list();
+	}
+	set_attr(attrs, CM_EVENT_SIZE, Attr_Int4, (attr_value)data_length);
+
 	cm_data_buf = conn->partial_buffer;
 	conn->buffer_full_point = 0;
 	conn->buffer_data_end = 0;
