@@ -21,6 +21,14 @@ management, modification and tear-down.
 
 Stones in EVpath are lightweight entities that roughly correspond to
 processing points in dataflow diagrams.  Stones of different types
-perform data filtering, data transformation,
+perform data filtering, data transformation, mux and demux of data as well
+as transmission of data between processes over network links.
 
+ \section types Stone Types
+
+
+
+ \section comm Communication
+
+ \section control Control Flow
 */
