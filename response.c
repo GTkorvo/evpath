@@ -10,7 +10,7 @@
 #include "cm_internal.h"
 #include "ecl.h"
 
-typedef enum {Response_Terminal, Response_Filter, Response_Transform} response_types;
+typedef enum {Response_Filter, Response_Transform} response_types;
 
 struct terminal_spec {
     CMFormatList format_list;
@@ -512,6 +512,7 @@ add_param(ecl_parse_context parse_context, char *name, int param_num,
     ecl_add_decl_to_parse_context(name, param, parse_context);
 }
 
+#if 0
 static void
 add_param_list(ecl_parse_context parse_context, char *name, int param_num,
 	  CMFormatList list)
@@ -536,6 +537,7 @@ add_param_list(ecl_parse_context parse_context, char *name, int param_num,
 
     ecl_add_decl_to_parse_context(name, param, parse_context);
 }
+#endif
 
 static response_instance
 generate_filter_code(mrd, format)
@@ -547,7 +549,6 @@ IOFormat format;
     ecl_code code;
     ecl_parse_context parse_context = new_ecl_parse_context();
     /*    sm_ref conn_info_data_type, conn_info_param;*/
-    int i = 0;
 
     add_standard_routines(parse_context);
 
@@ -592,38 +593,3 @@ IOFormat format;
     return instance;
 }
 
-static response_instance
-generate_transform_code(mrd, format)
-struct response_spec *mrd;
-IOFormat format;
-{
-    response_instance instance = malloc(sizeof(*instance));
-
-    ecl_code code;
-    ecl_parse_context parse_context = new_ecl_parse_context();
-    /*    sm_ref conn_info_data_type, conn_info_param;*/
-    int i = 0;
-
-    add_standard_routines(parse_context);
-
-    add_param(parse_context, "input", 0, format);
-
-    add_param_list(parse_context, "output", 1, mrd->u.transform.out_format_list);
-/*    conn_info_data_type = ecl_build_type_node("output_conn_info_type",
-					      output_conn_field_list);
-    ecl_add_decl_to_parse_context("output_conn_info_type", 
-				  conn_info_data_type, parse_context);
-    conn_info_param = ecl_build_param_node("output_conn_info",
-					   conn_info_data_type, 3);
-    ecl_add_decl_to_parse_context("output_conn_info", conn_info_param,
-				  parse_context);
-*/
-    code = ecl_code_gen(mrd->u.filter.function, parse_context);
-    ecl_free_parse_context(parse_context);
-
-
-    instance->response_type = Response_Transform;
-    instance->u.filter.code = code;
-		   
-    return instance;
-}

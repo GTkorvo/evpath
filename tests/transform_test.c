@@ -150,46 +150,6 @@ int quiet = 1;
 
 static
 int
-simple_handler(cm, vevent, client_data, attrs)
-CManager cm;
-void *vevent;
-void *client_data;
-attr_list attrs;
-{
-    simple_rec_ptr event = vevent;
-    long sum = 0, scan_sum = 0;
-    sum += event->integer_field % 100;
-    sum += event->short_field % 100;
-    sum += event->long_field % 100;
-    sum += ((int) (event->nested_field.item.r * 100.0)) % 100;
-    sum += ((int) (event->nested_field.item.i * 100.0)) % 100;
-    sum += ((int) (event->double_field * 100.0)) % 100;
-    sum += event->char_field;
-    sum = sum % 100;
-    scan_sum = event->scan_sum;
-    if (sum != scan_sum) {
-	printf("Received record checksum does not match. expected %d, got %d\n",
-	       (int) sum, (int) scan_sum);
-    }
-    if ((quiet <= 0) || (sum != scan_sum)) {
-	printf("In the handler, event data is :\n");
-	printf("	integer_field = %d\n", event->integer_field);
-	printf("	short_field = %d\n", event->short_field);
-	printf("	long_field = %ld\n", event->long_field);
-	printf("	double_field = %g\n", event->double_field);
-	printf("	char_field = %c\n", event->char_field);
-	printf("Data was received with attributes : \n");
-	if (attrs) dump_attr_list(attrs);
-    }
-    if (client_data != NULL) {
-	int tmp = *((int *) client_data);
-	*((int *) client_data) = tmp + 1;
-    }
-    return 0;
-}
-
-static
-int
 output_handler(cm, vevent, client_data, attrs)
 CManager cm;
 void *vevent;
