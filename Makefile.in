@@ -72,7 +72,7 @@ LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 am_libevpath_la_OBJECTS = cm.lo cm_control.lo cm_formats.lo cm_util.lo \
 	cm_transport.lo cm_lock.lo cm_pbio.lo cm_evol.lo evp.lo \
-	version.lo
+	response.lo version.lo
 libevpath_la_OBJECTS = $(am_libevpath_la_OBJECTS)
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
@@ -242,7 +242,7 @@ EXTRA_DIST =
 lib_LTLIBRARIES = libevpath.la
 EXTRA_LTLIBRARIES = 
 libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c \
-		   cm_lock.c cm_pbio.c cm_evol.c evp.c version.c
+		   cm_lock.c cm_pbio.c cm_evol.c evp.c response.c version.c
 
 libevpath_la_LDFLAGS = $(MATH_LIB)
 libevpath_la_LIBADD = $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lIO -lecl @SOCKET_LIBS@ @KERNEL_OBJS@ -dlpreopen $(CMDIR)/libcmsockets.la -dlpreopen $(CMDIR)/libcmselect.la

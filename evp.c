@@ -7,6 +7,7 @@
 
 #include "evpath.h"
 #include "cm_internal.h"
+#include "response.h"
 
 static IOFormat register_format_set(CManager cm, CMFormatList list, 
 				    IOContext *context_ptr);
@@ -46,6 +47,9 @@ EValloc_stone(CManager cm)
     memset(stone, 0, sizeof(*stone));
     stone->local_id = stone_num;
     stone->default_action = -1;
+    stone->queue = malloc(sizeof(queue_struct));
+    stone->queue->queue_tail = stone->queue->queue_head = NULL;
+    stone->proto_actions = NULL;
     return stone_num;
 }
 
@@ -54,12 +58,22 @@ EVfree_stone(CManager cm, EVstone stone_num)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
+    int i;
 
-    stone = &evp->stone_map[stone_num];
     if (stone->periodic_handle != NULL) {
 	CMremove_task(stone->periodic_handle);
 	stone->periodic_handle = NULL;
     }
+    stone = &evp->stone_map[stone_num];
+    for(i = 0; i < stone->action_count; i++) {
+	if (stone->actions[i].action_type == Action_Immediate) {
+	    if (stone->actions[i].o.imm.mutable_response_data != NULL) {
+		response_data_free(cm, stone->actions[i].o.imm.mutable_response_data);
+	    }
+	}
+    }
+    free(stone->actions);
+    free(stone->proto_actions);
     stone->local_id = -1;
 }
 
@@ -91,6 +105,7 @@ EVassoc_terminal_action(CManager cm, EVstone stone_num,
     stone->actions = realloc(stone->actions, (action_num + 1) * 
 				   sizeof(stone->actions[0]));
     memset(&stone->actions[action_num], 0, sizeof(stone->actions[0]));
+    stone->actions[action_num].queue = stone->queue;
     stone->actions[action_num].action_type = Action_Terminal;
     stone->actions[action_num].requires_decoded = 1;
     stone->actions[action_num].reference_format = 
@@ -99,6 +114,29 @@ EVassoc_terminal_action(CManager cm, EVstone stone_num,
     return action_num;
 }
     
+
+EVaction
+EVassoc_immediate_action(CManager cm, EVstone stone_num, 
+			 char *action_spec, void *client_data)
+{
+    event_path_data evp = cm->evp;
+    int action_num;
+    stone_type stone = &evp->stone_map[stone_num];
+
+    action_num = stone->action_count++;
+    stone->actions = realloc(stone->actions, (action_num + 1) * 
+				   sizeof(stone->actions[0]));
+    memset(&stone->actions[action_num], 0, sizeof(stone->actions[0]));
+    stone->actions[action_num].queue = stone->queue;
+    stone->actions[action_num].action_type = Action_Immediate;
+    stone->actions[action_num].o.imm.subaction_count = 0;
+    stone->actions[action_num].o.imm.subacts = NULL;
+    stone->actions[action_num].o.imm.output_stone_ids = malloc(sizeof(int));
+    stone->actions[action_num].o.imm.output_stone_ids[0] = -1;
+    stone->actions[action_num].o.imm.mutable_response_data = 
+	install_response_handler(cm, stone_num, action_spec, client_data);
+    return action_num;
+}
 
 EVstone
 EVassoc_filter_action(CManager cm, EVstone stone_num, 
@@ -129,6 +167,7 @@ EVassoc_filter_action(CManager cm, EVstone stone_num,
     stone->actions = realloc(stone->actions, (action_num + 1) * 
 				   sizeof(stone->actions[0]));
     memset(&stone->actions[action_num], 0, sizeof(stone->actions[0]));
+    stone->actions[action_num].queue = stone->queue;
     stone->actions[action_num].action_type = Action_Filter;
     stone->actions[action_num].requires_decoded = 1;
     stone->actions[action_num].reference_format = 
@@ -153,13 +192,13 @@ enqueue_event(CManager cm, action *act, event_item *event)
     }
     item->item = event;
     reference_event(event);
-    if (act->queue_head == NULL) {
-	act->queue_head = item;
-	act->queue_tail = item;
+    if (act->queue->queue_head == NULL) {
+	act->queue->queue_head = item;
+	act->queue->queue_tail = item;
 	item->next = NULL;
     } else {
-	act->queue_tail->next = item;
-	act->queue_tail = item;
+	act->queue->queue_tail->next = item;
+	act->queue->queue_tail = item;
 	item->next = NULL;
     }
 }
@@ -168,15 +207,15 @@ static event_item *
 dequeue_event(CManager cm, action *act)
 {
     event_path_data evp = cm->evp;
-    queue_item *item = act->queue_head;
+    queue_item *item = act->queue->queue_head;
     event_item *event = NULL;
     if (item == NULL) return event;
     event = item->item;
-    if (act->queue_head == act->queue_tail) {
-	act->queue_head = NULL;
-	act->queue_tail = NULL;
+    if (act->queue->queue_head == act->queue->queue_tail) {
+	act->queue->queue_head = NULL;
+	act->queue->queue_tail = NULL;
     } else {
-	act->queue_head = act->queue_head->next;
+	act->queue->queue_head = act->queue->queue_head->next;
     }
     item->next = evp->queue_items_free_list;
     evp->queue_items_free_list = item;;
@@ -235,7 +274,7 @@ IOFormat incoming_format;
     act->requires_decoded = 0;
     act->action_type = Action_Decode;
     act->reference_format = incoming_format;
-    act->queue_head = act->queue_tail = NULL;
+    act->queue = stone->queue;
 
     act->o.decode.context = create_IOsubcontext(cm->evp->root_context);
     format = get_format_app_IOcontext(act->o.decode.context, 
@@ -246,61 +285,58 @@ IOFormat incoming_format;
 		    act->o.decode.target_reference_format);
 }
 
-static action *
-determine_action(CManager cm, stone_type stone, event_item *event)
+int
+EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num, 
+		    int output_index, EVstone output_stone)
+{
+    stone_type stone = &(cm->evp->stone_map[stone_num]);
+    int output_count = 0;
+    assert(stone->actions[act_num].action_type == Action_Immediate);
+    while (stone->actions[act_num].o.imm.output_stone_ids[output_count] != -1) 
+	output_count++;
+    stone->actions[act_num].o.imm.output_stone_ids = 
+	realloc(stone->actions[act_num].o.imm.output_stone_ids,
+		sizeof(int) * (output_count + 2));
+    stone->actions[act_num].o.imm.output_stone_ids[output_count] = output_stone;
+    stone->actions[act_num].o.imm.output_stone_ids[output_count] = -1;
+}
+    
+
+static int
+determine_action(CManager cm, stone_type stone, event_item *event, int *sub_id)
 {
     int i;
     int nearest_proto_action = -1;
     CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %lx",
 	   event->reference_format);
     for (i=0; i < stone->action_count; i++) {
+	if ((stone->actions[i].action_type == Action_Immediate) && 
+	    (!event->event_encoded)) {
+	    int j;
+	    immediate_action_vals *imm = &stone->actions[i].o.imm;
+	    for (j=0; j < imm->subaction_count ; j++) {
+		if (imm->subacts[i].reference_format == event->reference_format) {
+		    *sub_id = j;
+		    return i;
+		}
+	    }
+	}
 	if (stone->actions[i].reference_format == event->reference_format) {
 	    if (event->event_encoded && stone->actions[i].requires_decoded) {
 		continue;
 	    }
-	    return &stone->actions[i];
+	    return i;
 	}
     }
-/*    if ((stone->action_count != 0) || (stone->proto_action_count != 0)) {
-	printf("no prebuilt action on stone %d\n", stone->local_id);
-	}*/
-    if (stone->proto_action_count > 0) {
-	IOFormat * formatList;
-	IOcompat_formats older_format = NULL;
-	formatList =
-	    (IOFormat *) malloc((stone->proto_action_count + 1) * sizeof(IOFormat));
-	for (i = 0; i < stone->proto_action_count; i++) {
-	    formatList[i] = stone->proto_actions[i].reference_format;
-	}
-	formatList[stone->proto_action_count] = NULL;
-	nearest_proto_action = IOformat_compat_cmp(event->reference_format, 
-						   formatList,
-						   stone->proto_action_count,
-						   &older_format);
-	free(formatList);
+    if (response_determination(cm, stone, event) == 1) {
+	return determine_action(cm, stone, event, sub_id);
     }
-
-    if (nearest_proto_action == -1) {
-	if (stone->default_action != -1) {
+    if (stone->default_action != -1) {
 /*	    printf(" Returning ");
 	    dump_action(stone, stone->default_action, "   ");*/
-	    return &stone->actions[stone->default_action];
-	}
-	return NULL;
+	return stone->default_action;
     }
-    /* This format is to be bound with action nearest_proto_action */
-    if (1) {
-	if (event->event_encoded) {
-	    /* create a decode action */
-	    EVstone_install_conversion_action(cm, stone->local_id, 
-					      stone->proto_actions[nearest_proto_action].reference_format, 
-					      event->reference_format);
-/*	    printf(" Returning ");
-	    dump_action(stone, a, "   ");*/
-	    return &stone->actions[stone->action_count-1];;
-	}
-    }
-    return NULL;
+    return -1;
 }
 
 static event_item *
@@ -413,6 +449,8 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
+    int action_id;
+    int subact = -1;
     action *act = NULL;
 
     assert(evpath_locked());
@@ -420,17 +458,18 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 	return -1;
     }
     stone = &(evp->stone_map[local_path_id]);
-    act = determine_action(cm, stone, event);
-    if (act == NULL) {
+    action_id = determine_action(cm, stone, event, &subact);
+    if (action_id ==  -1) {
 	printf("No action found for event %lx submitted to stone %d\n",
 	       (long)event, local_path_id);
 	dump_stone(stone);
 	return 0;
     }
+    act = &stone->actions[action_id];
     if (act->action_type == Action_Decode) {
 	CMtrace_out(cm, EVerbose, "Decoding event");
 	event = decode_action(cm, event, act);
-	act = determine_action(cm, stone, event);
+	action_id = determine_action(cm, stone, event, &subact);
     }
     CMtrace_out(cm, EVerbose, "Enqueueing event %lx on stone %d, action %lx",
 		(long)event, local_path_id, (long)act);
@@ -449,7 +488,7 @@ CManager cm;
     for (s = 0; s < evp->stone_count; s++) {
 	for (a=0 ; a < evp->stone_map[s].action_count; a++) {
 	    action *act = &evp->stone_map[s].actions[a];
-	    if (act->queue_head != NULL) {
+	    if (act->queue->queue_head != NULL) {
 		switch (act->action_type) {
 		case Action_Terminal:
 		case Action_Filter: {
@@ -518,7 +557,7 @@ process_output_actions(CManager cm)
 	for (a=0 ; a < evp->stone_map[s].action_count; a++) {
 	    action *act = &evp->stone_map[s].actions[a];
 	    if ((act->action_type == Action_Output) && 
-		(act->queue_head != NULL)) {
+		(act->queue->queue_head != NULL)) {
 		event_item *event = dequeue_event(cm, act);
 		CMtrace_out(cm, EVerbose, "Writing event to remote stone %d",
 			    act->o.out.remote_stone_id);
@@ -544,6 +583,7 @@ EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
 				   sizeof(stone->actions[0]));
     memset(&stone->actions[action_num], 0, 
 	   sizeof(stone->actions[0]));
+    stone->actions[action_num].queue = stone->queue;
     stone->actions[action_num].action_type = Action_Output;
     stone->actions[action_num].o.out.conn = CMget_conn(cm, contact_list);
     stone->actions[action_num].o.out.remote_stone_id = remote_stone;

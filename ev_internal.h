@@ -34,7 +34,7 @@ typedef struct _event_item {
     EVFreeFunction free_func;
 } event_item, *event_queue;
 
-typedef enum { Action_Output = 0, Action_Terminal, Action_Filter, Action_Decode, Action_Split} action_value;
+typedef enum { Action_Output = 0, Action_Terminal, Action_Filter, Action_Immediate, Action_Decode, Action_Split} action_value;
 
 typedef struct output_action_struct {
     CMConnection conn;
@@ -51,20 +51,39 @@ typedef struct decode_action_struct {
     IOContext context;
 } decode_action_vals;
 
+typedef struct immediate_subaction_struct {
+    IOFormat reference_format;
+    IOContext context;
+    EVImmediateHandlerFunc handler;
+    void *client_data;
+} immediate_sub;
+
+typedef struct immediate_action_struct {
+    void *mutable_response_data;
+    int subaction_count;
+    struct immediate_subaction_struct *subacts;
+    int *output_stone_ids;
+} immediate_action_vals;
+
 typedef struct queue_item {
     event_item *item;
     struct queue_item *next;
 } queue_item;
 
+typedef struct _queue {
+    queue_item *queue_head;
+    queue_item *queue_tail;
+} queue_struct, *queue_ptr;
+
 typedef struct _action {
     action_value action_type;
     IOFormat reference_format;
     int requires_decoded;
-    queue_item *queue_head;
-    queue_item *queue_tail;
+    queue_ptr queue;
     union {
 	output_action_vals out;
 	decode_action_vals decode;
+	immediate_action_vals imm;
 	int terminal_proto_action_number;
 	int *split_stone_targets;
     }o;
@@ -89,6 +108,7 @@ typedef struct _stone {
     int local_id;
     int default_action;
     int proto_action_count;
+    queue_ptr queue;
     struct _proto_action *proto_actions;
     int action_count;
     struct _action *actions;

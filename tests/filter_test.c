@@ -298,12 +298,14 @@ do_regression_master_test()
 {
     CManager cm;
     char *args[] = {"evtest", "-c", NULL, NULL};
+    char *filter;
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
     char *string_list, *transport, *postfix;
     int message_count = 0;
-    EVstone handle;
+    EVstone term, fstone;
+    EVaction faction;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
 #else
@@ -359,12 +361,19 @@ do_regression_master_test()
     }
     srand48(1);
 
-    handle = EValloc_stone(cm);
-    EVassoc_terminal_action(cm, handle, simple_format_list, simple_handler, &message_count);
+    term = EValloc_stone(cm);
+    EVassoc_terminal_action(cm, term, simple_format_list, simple_handler, &message_count);
+    filter = create_filter_action_spec(simple_format_list, "{\
+    return input.long_field % 2;\
+}\0\0");
     
+    fstone = EValloc_stone(cm);
+    faction = EVassoc_immediate_action(cm, fstone, filter, NULL);
+    EVaction_set_output(cm, fstone, faction, 0, term);
+
     args[2] = string_list;
-    args[2] = malloc(10 + strlen(string_list));
-    sprintf(args[2], "%d:%s", handle, string_list);
+    args[2] = malloc(10 + strlen(string_list) + strlen(filter));
+    sprintf(args[2], "%d:%s", faction, string_list);
     subproc_proc = run_subprocess(args);
 
     /* give him time to start */
