@@ -1621,7 +1621,8 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	if (attrs == NULL){
 	    attrs = create_attr_list();
 	}
-	set_attr(attrs, CM_EVENT_SIZE, Attr_Int4, (attr_value)data_length);
+	set_attr(attrs, CM_EVENT_SIZE, Attr_Int4, 
+		 (attr_value)(long)data_length);
 
 	cm_data_buf = conn->partial_buffer;
 	conn->buffer_full_point = 0;
