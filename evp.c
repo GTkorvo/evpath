@@ -214,6 +214,38 @@ set_conversions(IOContext ctx, IOFormat src_format, IOFormat target_format)
     free(saved_subformat_list);
 }
 
+extern void
+EVstone_install_conversion_action(cm, stone_id, target_format, incoming_format)
+    CManager cm;
+int stone_id;
+IOFormat target_format;
+IOFormat incoming_format;
+{
+    stone_type stone = &(cm->evp->stone_map[stone_id]);
+    int a = stone->action_count++;
+    int id_len;
+    IOFormat format;
+
+    char *server_id = get_server_ID_IOformat(incoming_format,
+						     &id_len);
+/*	    printf("Creating new DECODE action\n");*/
+    stone->actions = realloc(stone->actions, 
+			     sizeof(stone->actions[0]) * (a + 1));
+    action *act = & stone->actions[a];
+    act->requires_decoded = 0;
+    act->action_type = Action_Decode;
+    act->reference_format = incoming_format;
+    act->queue_head = act->queue_tail = NULL;
+
+    act->o.decode.context = create_IOsubcontext(cm->evp->root_context);
+    format = get_format_app_IOcontext(act->o.decode.context, 
+				      server_id, NULL);
+    act->o.decode.decode_format = format;
+    act->o.decode.target_reference_format = target_format;
+    set_conversions(act->o.decode.context, format,
+		    act->o.decode.target_reference_format);
+}
+
 static action *
 determine_action(CManager cm, stone_type stone, event_item *event)
 {
@@ -261,33 +293,12 @@ determine_action(CManager cm, stone_type stone, event_item *event)
     if (1) {
 	if (event->event_encoded) {
 	    /* create a decode action */
-	    int a = stone->action_count++;
-	    int id_len;
-	    IOFormat format;
-	    char *server_id = get_server_ID_IOformat(event->reference_format,
-						     &id_len);
-	    action *act;
-/*	    printf("Creating new DECODE action\n");*/
-	    stone->actions = realloc(stone->actions, 
-				     sizeof(stone->actions[0]) * (a + 1));
-	    act = & stone->actions[a];
-	    act->requires_decoded = 0;
-	    act->action_type = Action_Decode;
-	    act->reference_format = event->reference_format;
-	    act->queue_head = act->queue_tail = NULL;
-
-
-	    act->o.decode.context = create_IOsubcontext(evp->root_context);
-	    format = get_format_app_IOcontext(act->o.decode.context, 
-					      server_id, NULL);
-	    act->o.decode.decode_format = format;
-	    act->o.decode.target_reference_format = 
-		stone->proto_actions[nearest_proto_action].reference_format;
-	    set_conversions(act->o.decode.context, format,
-			    act->o.decode.target_reference_format);
+	    EVstone_install_conversion_action(cm, stone->local_id, 
+					      stone->proto_actions[nearest_proto_action].reference_format, 
+					      event->reference_format);
 /*	    printf(" Returning ");
 	    dump_action(stone, a, "   ");*/
-	    return act;
+	    return &stone->actions[stone->action_count-1];;
 	}
     }
     return NULL;
@@ -718,7 +729,7 @@ EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec,
 {
     CMTaskHandle handle = CMadd_periodic_task(cm, period_sec, period_usec,
 					      EVauto_submit_func, 
-					      (void*)stone_num);
+					      (void*)(long)stone_num);
     stone_type stone = &cm->evp->stone_map[stone_num];
     stone->periodic_handle = handle;
 }
