@@ -80,6 +80,44 @@ enqueue_event(CManager cm, action *act, event_item *event)
     }
 }
 
+static action *
+determine_action(CManager cm, stone_type stone, event_item *event)
+{
+    event_path_data evp = cm->evp;
+    int i;
+    IOcompat_formats older_format = NULL;
+    int nearest_proto_action = -1;
+    for (i=0; i < stone->format_map_count; i++) {
+	if (stone->action[i].reference_format == event->reference_format) {
+	    return stone->map[i].action;
+	}
+    }
+    formatList =
+	(IOFormat *) malloc(stone->proto_action_count * sizeof(IOFormat));
+    for (i = 0; i < stone->proto_action__count; i++) {
+	formatList[i] = stone->reference_format;
+    }
+    nearest_proto_action = IOformat_compat_cmp(format, formatList,
+					       cm->reg_format_count,
+					       &older_format);
+    free(formatList);
+
+    if (nearest_proto_action == -1) {
+	if (stone->default_action != -1) {
+	    return &stone->actions[stone->default_action];
+	}
+	return NULL;
+    }
+    /* This format is to be bound with action nearest_proto_action */
+    if (stone->proto_actions[nearest_proto_action].requires_decoded) {
+	/* need the map? */
+	/* */
+	stone->map = realloc(stone->map, 
+			     sizeof(stone->map[0] * (stone->format_map_count + 1)));
+	
+    }
+}
+
 static
 int
 internal_path_submit(CManager cm, int local_path_id, event_item *event)
@@ -87,25 +125,13 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     event_path_data evp = cm->evp;
     stone_type stone;
     action *act = NULL;
-    int i;
 
     assert(evpath_locked());
     if (evp->stone_count < local_path_id) {
 	return -1;
     }
     stone = &(evp->stone_map[local_path_id]);
-    for (i=0; i < stone->format_map_count; i++) {
-	if (stone->map[i].format == event->format) {
-
-	    act = stone->map[i].action;
-	    break;
-	}
-    }
-    if (act == NULL) {
-	if (stone->default_action != -1) {
-	    act = &stone->actions[stone->default_action];
-	}
-    }
+    act = determine_action(cm, stone, event);
     printf("Enqueueing event\n");
     enqueue_event(cm, act, event);
     return 1;
@@ -131,7 +157,7 @@ process_output_actions(CManager cm)
 	    if ((act->action_type == Action_Output) && 
 		(act->queue_head != NULL)) {
 		internal_write_event(act->out.conn, 
-				     act->queue_head->item->format,
+				     act->queue_head->item->reference_format,
 				     &act->out.remote_stone_id, 4, 
 				     act->queue_head->item, NULL);
 	    }
@@ -245,6 +271,23 @@ EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format)
     return source;
 }
 
+extern void
+internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf, 
+			   CMConnection conn, void *buffer, int stone_id)
+{
+    event_path_data evp = cm->evp;
+    event_item *event = malloc(sizeof(event_item));
+    memset(event, 0, sizeof(event_item));
+    event->ref_count = 1;
+    event->contents = Event_Encoded_CM_Owned;
+    event->encoded_event = buffer;
+    event->reference_format = get_format_app_IOcontext(evp->root_context, 
+					     cm_data_buf->buffer, conn);
+    internal_path_submit(cm, stone_id, event);
+    process_local_actions(cm);
+    process_output_actions(cm);
+}
+
 void
 EVsubmit(EVsource source, void *data, attr_list attrs)
 {
@@ -253,7 +296,7 @@ EVsubmit(EVsource source, void *data, attr_list attrs)
     event->ref_count = 1;
     event->contents = Event_Unencoded_App_Owned;
     event->decoded_event = data;
-    event->format = source->format;
+    event->reference_format = source->reference_format;
     internal_path_submit(source->cm, source->local_stone_id, event);
     process_local_actions(source->cm);
     process_output_actions(source->cm);

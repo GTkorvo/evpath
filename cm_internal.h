@@ -299,3 +299,7 @@ CMcreate_conversion ARGS((CManager cm, CMincoming_format_list cm_format));
 extern int
 process_old_format_data ARGS((CManager cm, CMincoming_format_list cm_format,
 	   	char **decode_buff, CMbuffer *cm_decode_buffer));
+extern int
+internal_write_event(CMConnection conn, CMFormat format, 
+		     void *remote_path_id, int path_len, event_item *event,
+		     attr_list attrs);

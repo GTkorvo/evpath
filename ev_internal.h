@@ -15,7 +15,7 @@ typedef struct ev_free_block_rec {
     struct free_block_rec *next;
 } *ev_free_block_rec_p;
 
-typedef enum { Event_Unencoded_App_Owned } event_pkg_contents;
+typedef enum { Event_Unencoded_App_Owned,  Event_Encoded_CM_Owned,  Event_Unencoded_CM_Owned } event_pkg_contents;
 
 typedef struct _event_item {
     int ref_count;
@@ -24,7 +24,7 @@ typedef struct _event_item {
     int event_len;
     void *decoded_event;
     IOEncodeVector encoded_eventv;
-    IOFormat format;
+    IOFormat reference_format;
     ev_free_block_rec_p block_rec;
     attr_list attrs;
 } event_item, *event_queue;
@@ -47,6 +47,7 @@ typedef struct queue_item {
 
 typedef struct _action {
     action_value action_type;
+    IOFormat reference_format;
     queue_item *queue_head;
     queue_item *queue_tail;
     union {
@@ -62,6 +63,7 @@ struct terminal_proto_vals {
 typedef struct _proto_action {
     action_value action_type;
     CMFormatList input_format_requirements;
+    IOFormat reference_format;
     union {
 	struct terminal_proto_vals term;
     };
@@ -94,6 +96,9 @@ typedef struct _event_path_data {
 
 struct _EVSource {
     CManager cm;
-    IOFormat format;
+    CMFormat format;
+    IOFormat reference_format;
     int local_stone_id;
 };
+
+extern void EVPinit(CManager cm);

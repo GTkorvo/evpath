@@ -26,7 +26,6 @@
 #include "cm_internal.h"
 #include "cm_transport.h"
 
-
 #if defined(HAVE_GETDOMAINNAME) && !defined(GETDOMAINNAME_DEFINED)
 extern int getdomainname ARGS((char *name, int namelen));
 #endif
@@ -1449,6 +1448,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length)
     attr_list attrs = NULL;
     int data_length, attr_length = 0, i, decoded_length;
     int header_len;
+    int stone_id;
     char *decode_buffer = NULL, *data_buffer;
     IOFormat format;
     CManager cm = conn->cm;
@@ -1493,16 +1493,16 @@ CMact_on_data(CMConnection conn, char *buffer, int length)
 	if (!event_msg) {
 	    header_len = 12;/* magic plus two 4-byte sizes (attrs + data) */
 	    padding = 4;	/* maintain 8 byte alignment for data */
+	    if (conn->buffer_data_end == 4) {
+		cm_extend_data_buf(cm, conn->partial_buffer, 8);
+		memcpy((char*)conn->partial_buffer->buffer + 4, 
+		       conn->partial_buffer->buffer, 4); /* duplicate magic */
+		conn->buffer_data_end = 8;
+		conn->buffer_full_point = 8;
+	    }
 	} else {
 	    header_len = 16;
 	    padding = 0;
-	}
-	if (conn->buffer_data_end == 4) {
-	    cm_extend_data_buf(cm, conn->partial_buffer, 8);
-	    memcpy((char*)conn->partial_buffer->buffer + 4, 
-		   conn->partial_buffer->buffer, 4); /* duplicate magic */
-	    conn->buffer_data_end = 8;
-	    conn->buffer_full_point = 8;
 	}
     } else {
 	header_len = 8; /* magic plus 4-byte size */
@@ -1536,6 +1536,17 @@ CMact_on_data(CMConnection conn, char *buffer, int length)
 	data_length &= 0xffffff;
 	data_length -= 8;  /* subtract off header size */
     }
+    if (event_msg) {
+	if (byte_swap) {
+	    ((char*)&stone_id)[0] = base[11];
+	    ((char*)&stone_id)[1] = base[10];
+	    ((char*)&stone_id)[2] = base[9];
+	    ((char*)&stone_id)[3] = base[8];
+	} else {
+	    stone_id = ((int *) base)[2];
+	}
+    }	
+
     if (length < header_len + padding + data_length + attr_length) {
 	return header_len + padding + data_length + attr_length - 
 	    length;
@@ -1555,20 +1566,12 @@ CMact_on_data(CMConnection conn, char *buffer, int length)
 	}
     }
     if (event_msg) {
-	int stone_id;
-	if (byte_swap) {
-	    ((char*)&stone_id)[0] = base[11];
-	    ((char*)&stone_id)[1] = base[10];
-	    ((char*)&stone_id)[2] = base[9];
-	    ((char*)&stone_id)[3] = base[8];
-	} else {
-	    stone_id = ((int *) base)[2];
-	}
-	printf("Receiving event message data len %d, attr len %d, stone_id %d\n",
+	CMtrace_out(cm, CMDataVerbose, "CM - Receiving event message data len %d, attr len %d, stone_id %x\n",
 	       data_length, attr_length, stone_id);
+	internal_cm_network_submit(cm, conn->partial_buffer, conn,
+				   data_buffer, stone_id);
 	return 0;
-    }	
-
+    }
     format = get_format_app_IOcontext(conn->cm->IOcontext, data_buffer, conn);
     if (format == NULL) {
 	fprintf(stderr, "invalid format in incoming buffer\n");
@@ -2046,7 +2049,7 @@ event_item *event;
 attr_list attrs;
 {
     IOEncodeVector vec;
-    int data_length = 0, vec_count = 0, actual, attr_len;
+    int data_length = 0, vec_count = 0, actual, attr_len = 0;
     int do_write = 1;
     void *encoded_attrs = NULL;
     int attrs_present = 0;
@@ -2130,11 +2133,10 @@ attr_list attrs;
 	header[1] = data_length;
 	if (path_len != 4) {
 	    header[0] = 0x434d4700;
-	    header[3] = path_len;
+	    header[3] = (path_len + 7) & -8;
 	} else {
 	    header[0] = 0x434d4C00;  /* 4 byte chan ID */
 	    header[3] = *((int*)remote_path_id);
-	    header[1] += (path_len + 7) & -8;
 	}
 	if (attrs == NULL) {
 	    IOEncodeVector assign_vec = tmp_vec;
