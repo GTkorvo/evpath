@@ -69,12 +69,12 @@ add_IOfieldlist_to_string(char *str, char *format_name, IOFieldList list)
     return str;
 }
 
-static char *
+/*static char *
 add_IOformat_to_string(char *str, IOFormat ioformat)
 {
     return add_IOfieldlist_to_string(str, name_of_IOformat(ioformat),
 				     field_list_of_IOformat(ioformat));
-}
+}*/
 
 static char *
 get_str(char *str, const char **name_p)
@@ -94,7 +94,6 @@ get_str(char *str, const char **name_p)
 static char *
 parse_IOformat_from_string(char *str, char **format_name, IOFieldList *list_p)
 {
-    int index, i;
     char *name;
     IOFieldList list;
     *format_name = NULL;
@@ -177,6 +176,7 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	    EVregister_format_set(cm, list, NULL);
 	return (void*)response;
     }
+    return NULL;
 }
 
 
@@ -227,6 +227,7 @@ filter_wrapper(CManager cm, struct _event_item *event, void *client_data,
     } else {
 	CMtrace_out(cm, EVerbose, "Filter function returned %d, NOT submitting\n", ret);
     }
+    return ret;
 }
 
 static response_instance
@@ -238,7 +239,7 @@ response_determination(CManager cm, stone_type stone, event_item *event)
     int nearest_proto_action = -1;
     int return_value = 0;
     IOFormat conversion_target_format = NULL;
-    int i, format_count, action_num;
+    int i, format_count, action_num = -1;
     IOFormat * formatList;
     IOcompat_formats older_format = NULL;
 
@@ -301,7 +302,7 @@ response_determination(CManager cm, stone_type stone, event_item *event)
     return return_value;
 }
 
-int
+void
 response_data_free(){}
 
 
@@ -343,7 +344,7 @@ IOFormat format;
     ecl_code code;
     sm_ref input_type, input_param;
     ecl_parse_context parse_context = new_ecl_parse_context();
-    sm_ref conn_info_data_type, conn_info_param;
+    /*    sm_ref conn_info_data_type, conn_info_param;*/
     int i = 0;
 
     add_standard_routines(parse_context);
@@ -379,7 +380,7 @@ IOFormat format;
     ecl_free_parse_context(parse_context);
 
 
-    instance->response_type == Response_Filter;
+    instance->response_type = Response_Filter;
     instance->u.filter.code = code;
     return instance;
 }

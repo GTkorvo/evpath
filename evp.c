@@ -61,11 +61,11 @@ EVfree_stone(CManager cm, EVstone stone_num)
     stone_type stone;
     int i;
 
+    stone = &evp->stone_map[stone_num];
     if (stone->periodic_handle != NULL) {
 	CMremove_task(stone->periodic_handle);
 	stone->periodic_handle = NULL;
     }
-    stone = &evp->stone_map[stone_num];
     for(i = 0; i < stone->action_count; i++) {
 	if (stone->actions[i].action_type == Action_Immediate) {
 	    if (stone->actions[i].o.imm.mutable_response_data != NULL) {
@@ -296,8 +296,11 @@ int
 EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num, 
 		    int output_index, EVstone output_stone)
 {
-    stone_type stone = &(cm->evp->stone_map[stone_num]);
+    stone_type stone;
     int output_count = 0;
+    if (stone_num > cm->evp->stone_count) return 0;
+    stone = &(cm->evp->stone_map[stone_num]);
+    if (act_num > stone->action_count) return 0;
     assert(stone->actions[act_num].action_type == Action_Immediate);
     while (stone->actions[act_num].o.imm.output_stone_ids[output_count] != -1) 
 	output_count++;
@@ -306,6 +309,7 @@ EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num,
 		sizeof(int) * (output_count + 2));
     stone->actions[act_num].o.imm.output_stone_ids[output_count] = output_stone;
     stone->actions[act_num].o.imm.output_stone_ids[output_count+1] = -1;
+    return 1;
 }
     
 
@@ -313,7 +317,6 @@ static int
 determine_action(CManager cm, stone_type stone, event_item *event, int *sub_id)
 {
     int i;
-    int nearest_proto_action = -1;
     CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %lx",
 	   event->reference_format);
     for (i=0; i < stone->action_count; i++) {
@@ -430,6 +433,9 @@ dump_action(stone_type stone, int a, const char *indent)
 	    }
 	    printf("\n");
 	}
+	break;
+    case Action_Immediate: 
+	printf("Fill this in \n");
 	break;
     }
 }
@@ -612,6 +618,7 @@ CManager cm;
 		case Action_Output:
 		  /* handled elsewhere */
 		  break;
+		case Action_Immediate:
 		case Action_Decode:
 		  assert(0);   /* handled elsewhere, shouldn't appear here */
 		  break;
@@ -665,6 +672,7 @@ EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
     act->o.imm.subacts[sub_num].handler = func;
     act->o.imm.subacts[sub_num].client_data = client_data;
     act->o.imm.subacts[sub_num].reference_format = reference_format;
+    return sub_num;
 }
 
 
@@ -1034,6 +1042,11 @@ free_evp(CManager cm, void *not_used)
 		break;
 	    case Action_Split:
 		free(act->o.split_stone_targets);
+		break;
+	    case Action_Immediate:
+	        /* GSE  Need to free subact data and mutable response data */
+	        free(act->o.imm.subacts);
+		free(act->o.imm.output_stone_ids);
 		break;
 	    }
 	}
