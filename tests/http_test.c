@@ -275,9 +275,9 @@ char **args;
 {
 #ifdef HAVE_WINDOWS_H
     int child;
-    child = _spawnv(_P_NOWAIT, "./evtest.exe", args);
+    child = _spawnv(_P_NOWAIT, "./http_test.exe", args);
     if (child == -1) {
-	printf("failed for evtest\n");
+	printf("failed for http_test\n");
 	perror("spawnv");
     }
     return child;
@@ -285,7 +285,7 @@ char **args;
     pid_t child = fork();
     if (child == 0) {
 	/* I'm the child */
-	execv("./evtest", args);
+	execv("./http_test", args);
     }
     return child;
 #endif
@@ -295,7 +295,7 @@ static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"evtest", "-c", NULL, NULL};
+    char *args[] = {"http_test", "-c", NULL, NULL};
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;

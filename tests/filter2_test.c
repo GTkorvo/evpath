@@ -438,7 +438,7 @@ char **args;
     int child;
     child = _spawnv(_P_NOWAIT, "./filter2_test.exe", args);
     if (child == -1) {
-	printf("failed for evtest\n");
+	printf("failed for filter2_test\n");
 	perror("spawnv");
     }
     return child;
@@ -458,7 +458,7 @@ static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"evtest", "-c", NULL, NULL, NULL};
+    char *args[] = {"filter2_test", "-c", NULL, NULL, NULL};
     char *filter;
     int exit_state;
     int forked = 0;

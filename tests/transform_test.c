@@ -349,7 +349,7 @@ char **args;
     int child;
     child = _spawnv(_P_NOWAIT, "./transform_test.exe", args);
     if (child == -1) {
-	printf("failed for evtest\n");
+	printf("failed for transform_test\n");
 	perror("spawnv");
     }
     return child;
@@ -369,7 +369,7 @@ static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"evtest", "-c", NULL, NULL};
+    char *args[] = {"transform_test", "-c", NULL, NULL};
     char *filter;
     int exit_state;
     int forked = 0;
