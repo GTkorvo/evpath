@@ -110,7 +110,7 @@ enqueue_event(CManager cm, action *act, event_item *event)
 	evp->queue_items_free_list = item->next;
     }
     item->item = event;
-    event->ref_count++;
+    reference_event(event);
     if (act->queue_head == NULL) {
 	act->queue_head = item;
 	act->queue_tail = item;
@@ -313,7 +313,7 @@ dump_action(stone_type stone, int a, const char *indent)
     switch(act->action_type) {
     case Action_Output:
 	printf("  Target: connection %lx, remote_stone_id %d, new %d, write_pending %d\n",
-	       act->o.out.conn, act->o.out.remote_stone_id, 
+	       (long)(void*)act->o.out.conn, act->o.out.remote_stone_id, 
 	       act->o.out.new, act->o.out.write_pending);
 	break;
     case Action_Terminal:
@@ -422,6 +422,12 @@ CManager cm;
 		    }
 		    return_event(evp, event);
 		  }
+		case Action_Output:
+		  /* handled elsewhere */
+		  break;
+		case Action_Decode:
+		  assert(0);   /* handled elsewhere, shouldn't appear here */
+		  break;
 		}
 	    }
 	}
@@ -507,7 +513,7 @@ EVaction_add_split_target(CManager cm, EVstone stone_num,
     event_path_data evp = cm->evp;
     stone_type stone = &evp->stone_map[stone_num];
     EVstone *target_stone_list;
-    int target_count = 0, i;
+    int target_count = 0;
     if (stone->actions[action_num].action_type != Action_Split ) {
 	printf("Not split action\n");
 	return 0;
@@ -531,7 +537,7 @@ EVaction_remove_split_target(CManager cm, EVstone stone_num,
     event_path_data evp = cm->evp;
     stone_type stone = &evp->stone_map[stone_num];
     EVstone *target_stone_list;
-    int target_count = 0, i;
+    int target_count = 0;
     if (stone->actions[action_num].action_type != Action_Split ) {
 	printf("Not split action\n");
     }
