@@ -12,3 +12,5 @@ check-local:
 noinst_PROGRAMS = evtest bulktest http_test filter_test
 
 LDADD = ../libevpath.la
+
+LDFLAGS = -static
