@@ -1515,6 +1515,12 @@ EVtake_event_buffer ARGS((CManager cm, void *event));
 extern void
 EVreturn_event_buffer ARGS((CManager cm, void *event));
 
+char *
+create_filter_action_spec(CMFormatList format_list, char *function);
+
+char *
+create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function);
+
 #ifdef	__cplusplus
 }
 #endif
