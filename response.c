@@ -293,6 +293,7 @@ create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_l
 					format_list[i].field_list);
     }
 
+    format_count = 0;
     while(out_format_list[format_count].format_name != NULL) format_count++;
     str = realloc(str, strlen(str) + 30);
     sprintf(str + strlen(str), "  Output Format Count %d\n", format_count);
