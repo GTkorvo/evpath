@@ -184,7 +184,6 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	for (i=0; i < format_count; i++) {
 	    str = parse_IOformat_from_string(str, &list[i].format_name,
 					     &list[i].field_list);
-	    localize_field_list(list[i].field_list, cm->evp->root_context);
 	}
 	function = malloc(strlen(str) + 1);
 	strcpy(function, str);
@@ -208,7 +207,6 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	for (i=0; i < format_count; i++) {
 	    str = parse_IOformat_from_string(str, &in_list[i].format_name,
 					     &in_list[i].field_list);
-	    localize_field_list(in_list[i].field_list, cm->evp->root_context);
 	}
 	in_list[format_count].format_name = NULL;
 	in_list[format_count].field_list = NULL;
@@ -221,7 +219,6 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	for (i=0; i < format_count; i++) {
 	    str = parse_IOformat_from_string(str, &out_list[i].format_name,
 					     &out_list[i].field_list);
-	    localize_field_list(out_list[i].field_list, cm->evp->root_context);
 	}
 	out_list[format_count].format_name = NULL;
 	out_list[format_count].field_list = NULL;
