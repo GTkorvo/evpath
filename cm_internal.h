@@ -308,7 +308,7 @@ internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data);
 extern void
 internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf, 
 			   attr_list attrs, CMConnection conn, 
-			   void *buffer, int stone_id);
+			   void *buffer, int length, int stone_id);
 #define CMcreate_attr_list(cm) CMint_create_attr_list(cm, __FILE__, __LINE__)
 #define CMfree_attr_list(cm, l) CMint_free_attr_list(cm, l, __FILE__, __LINE__)
 #define CMadd_ref_attr_list(cm, l) CMint_add_ref_attr_list(cm, l, __FILE__, __LINE__)

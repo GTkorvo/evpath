@@ -1629,7 +1629,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	conn->buffer_data_end = 0;
 	conn->partial_buffer = NULL;
 	internal_cm_network_submit(cm, cm_data_buf, attrs, conn, data_buffer,
-				   stone_id);
+				   data_length, stone_id);
 	cm_return_data_buf(cm_data_buf);
 	return 0;
     }

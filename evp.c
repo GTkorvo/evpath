@@ -399,12 +399,14 @@ decode_action(CManager cm, event_item *event, action *act)
 	    return event;
 	} else {
 	    int decoded_length = this_IOrecord_length(act->o.decode.context, 
-						      event->encoded_event, 	
-					      event->event_len);
+						      event->encoded_event,
+						      event->event_len);
 	    CMbuffer cm_decode_buf = cm_get_data_buf(cm, decoded_length);
 	    void *decode_buffer = cm_decode_buf->buffer;
+	    if (event->event_len == -1) printf("BAD LENGTH\n");
 	    decode_to_buffer_IOcontext(act->o.decode.context, 
 				       event->encoded_event, decode_buffer);
+	    CMtake_buffer(cm, decode_buffer);
 /*	    cm_return_data_buf(conn->partial_buffer);*/
 	    event->decoded_event = decode_buffer;
 	    event->event_encoded = 0;
@@ -1041,6 +1043,7 @@ get_free_event(event_path_data evp)
     event_item *event = malloc(sizeof(*event));
     memset(event, 0, sizeof(event_item));
     event->ref_count = 1;
+    event->event_len = -1;
     return event;
 }
 
@@ -1077,12 +1080,13 @@ reference_event(event_item *event)
 extern void
 internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf, 
 			   attr_list attrs, CMConnection conn, 
-			   void *buffer, int stone_id)
+			   void *buffer, int length, int stone_id)
 {
     event_path_data evp = cm->evp;
     event_item *event = get_free_event(evp);
     event->contents = Event_CM_Owned;
     event->event_encoded = 1;
+    event->event_len = length;
     event->encoded_event = buffer;
     event->reference_format = get_format_app_IOcontext(evp->root_context, 
 					     buffer, conn);
