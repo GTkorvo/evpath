@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include "config.h"
 
-static char *CM_version = "CM Version 2.0.169 -- Thu Aug 26 15:40:21 EDT 2004\n";
+static char *CM_version = "CM Version 2.0.170 -- Tue Aug 31 12:53:01 EDT 2004\n";
 
 void CMprint_version(){
     printf("%s",CM_version);
