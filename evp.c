@@ -16,7 +16,7 @@ static event_item *get_free_event(event_path_data evp);
 static void dump_action(stone_type stone, int a, const char *indent);
 extern void print_server_ID(char *server_id);
 
-static const char *action_str[] = { "Action_Output", "Action_Terminal", "Action_Filter", "Action_Transform", "Action_Decode", "Action_Split"};
+static const char *action_str[] = { "Action_Output", "Action_Terminal", "Action_Filter", "Action_Decode", "Action_Split"};
 
 void
 EVPSubmit_encoded(CManager cm, int local_path_id, void *data, int len)
@@ -830,9 +830,9 @@ static void
 free_evp(CManager cm, void *not_used)
 {
     event_path_data evp = cm->evp;
+    int s;
     cm->evp = NULL;
     if (evp == NULL) return;
-    int s;
     for (s = 0 ; s < evp->stone_count; s++) {
 	int a;
 	for (a = 0 ; a < evp->stone_map[s].action_count; a++) {

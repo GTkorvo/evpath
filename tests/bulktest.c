@@ -349,7 +349,7 @@ do_regression_master_test()
     char *args[] = {"bulktest", "-c", NULL, NULL, NULL, NULL, NULL, NULL};
     int exit_state;
     int forked = 0;
-    attr_list contact_list, listen_list = NULL;;
+    attr_list contact_list, listen_list = NULL;
     char *string_list, *transport, *postfix;
     char size_str[4];
     char vec_str[4];
