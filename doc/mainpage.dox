@@ -26,6 +26,28 @@ as transmission of data between processes over network links.
 
  \section types Stone Types
 
+Connected collections of stones (or paths) specify a particular flow
+path of data, typically a directed acyclic graph, across a complete
+distributed system.  Before detailing the various types of stones,
+we'll examine some sample applications that drove the development of
+EVPath.  For example, one might use stones to build an overlay network
+to distribute data from the data source to the sinks, as is shown below:
+\image html overlay.jpg 
+\image latex overlay.pdf
+
+We can also imagine that each of those sinks might actually want a
+slightly customized version of the event stream (with sink i
+customizing it's stream with function i) and that an efficient
+implementation of event delivery would place those filter functions as
+close to the source as possible to avoid transmitting data that is
+only to be discarded later.
+\image html func1.jpg 
+\image latex func1.pdf
+
+A yet more efficient implementation, armed with knowledge of the nature of
+functions 1 through 4 might use that knowledge to introduce combined
+filter functions, for example using filter FC to eliminate data that
+would be rejected by both filters F3 anf F4 before it is sent.
 
 
  \section comm Communication
