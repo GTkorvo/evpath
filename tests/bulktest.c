@@ -188,6 +188,7 @@ char **argv;
 {
     CManager cm;
     int regression_master = 1;
+    int forked = 0;
 
     while (argv[1] && (argv[1][0] == '-')) {
 	if (strcmp(&argv[1][1], "size") == 0) {
@@ -226,7 +227,14 @@ char **argv;
 	return do_regression_master_test();
     }
     cm = CManager_create();
-    (void) CMfork_comm_thread(cm);
+    forked = CMfork_comm_thread(cm);
+    if (quiet <= 0) {
+	if (forked) {
+	    printf("Forked a communication thread\n");
+	} else {
+	    printf("Doing non-threaded communication handling\n");
+	}
+    }
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
@@ -248,6 +256,7 @@ char **argv;
 	contact_list = CMget_contact_list(cm);
 	if (contact_list) {
 	    string_list = attr_list_to_string(contact_list);
+	    free_attr_list(contact_list);
 	} else {
 	    /* must be multicast, hardcode a contact list */
 #define HELLO_PORT 12345
@@ -300,7 +309,6 @@ char **argv;
 	    EVsubmit(source_handle, data, attrs);
 	}
 	if (quiet <= 0) printf("Write %d messages\n", MSG_COUNT);
-	free_attr_list(attrs);
     }
     CManager_close(cm);
     return 0;
@@ -333,12 +341,19 @@ char **args;
     }
     return child;
 #else
+#if 1
     pid_t child = fork();
     if (child == 0) {
 	/* I'm the child */
 	execv("./bulktest", args);
     }
     return child;
+#else
+    int count = 0;
+    printf("Would have run \"");
+    while (args[count] != NULL) printf("%s ", args[count++]);
+    printf("\"\n");
+#endif
 #endif
 }
 
@@ -402,8 +417,6 @@ do_regression_master_test()
 	string_list = attr_list_to_string(contact_list);
 	free_attr_list(contact_list);
     }	
-    string_list = attr_list_to_string(contact_list);
-    free_attr_list(contact_list);
     args[2] = "-size";
     sprintf(&size_str[0], "%d", size);
     args[3] = size_str;
@@ -447,7 +460,8 @@ do_regression_master_test()
 	    printf(",");
 	    fflush(stdout);
 	}
-	CMsleep(cm, 1);
+	CMsleep(cm, 50);	done++;
+
 	result = waitpid(subproc_proc, &exit_state, WNOHANG);
 	if (result == -1) {
 	    perror("waitpid");

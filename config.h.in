@@ -12,7 +12,7 @@
 /* Place where cm transport libraries are built */
 #undef CM_LIBRARY_BUILD_DIR
 
-/* Place where cm transport libraries will be installed */
+/* Place where cm transport libraries are installed */
 #undef CM_LIBRARY_INSTALL_DIR
 
 /* define if sys/socket.h declares connect */
@@ -39,26 +39,14 @@
 /* define if struct hostent is declared in netdb.h or winsock.h */
 #undef HAS_STRUCT_HOSTENT
 
-/* Define to 1 if you have the `atexit' function. */
-#undef HAVE_ATEXIT
-
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
 
 /* Define if fd_set has element fds_bits */
 #undef HAVE_FDS_BITS
 
-/* Define to 1 if you have the `fork' function. */
-#undef HAVE_FORK
-
 /* Define to 1 if you have the <gen_thread.h> header file. */
 #undef HAVE_GEN_THREAD_H
-
-/* Define to 1 if you have the `getdomainname' function. */
-#undef HAVE_GETDOMAINNAME
-
-/* Define to 1 if you have the `getlogin' function. */
-#undef HAVE_GETLOGIN
 
 /* Define to 1 if you have the <hostLib.h> header file. */
 #undef HAVE_HOSTLIB_H
@@ -75,23 +63,14 @@
 /* Define to 1 if you have the <math.h> header file. */
 #undef HAVE_MATH_H
 
-/* Define to 1 if you have the `memcpy' function. */
-#undef HAVE_MEMCPY
-
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
 /* Define to 1 if you have the <netdb.h> header file. */
 #undef HAVE_NETDB_H
 
-/* Define to 1 if you have the `on_exit' function. */
-#undef HAVE_ON_EXIT
-
 /* Define to 1 if you have the <pwd.h> header file. */
 #undef HAVE_PWD_H
-
-/* Define to 1 if you have the `SetTimer' function. */
-#undef HAVE_SETTIMER
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
@@ -141,9 +120,6 @@
 /* Define to 1 if you have the <windows.h> header file. */
 #undef HAVE_WINDOWS_H
 
-/* Define to 1 if you have the `writev' function. */
-#undef HAVE_WRITEV
-
 /* define if listen is declared in sys/socket.h */
 #undef LISTEN_DEFINED
 
@@ -173,12 +149,6 @@
 
 /* define if unistd.h declares read */
 #undef READ_DEFINED
-
-/* Upon what host the redirection server will run */
-#undef REDIRECT_SERVER_HOST
-
-/* Unto what DNS domains the redirection server should limit its service */
-#undef REDIRECT_SERVICE_DOMAIN
 
 /* define if unistd.h or sys/select.h declares select */
 #undef SELECT_DEFINED

@@ -42,7 +42,7 @@ build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS =
 noinst_PROGRAMS =
-DIST_COMMON = README $(am__configure_deps) $(include_HEADERS) \
+DIST_COMMON = $(am__configure_deps) $(include_HEADERS) \
 	$(noinst_HEADERS) $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/config.h.in $(top_srcdir)/configure ChangeLog \
 	config/config.guess config/config.sub config/install-sh \
@@ -121,11 +121,10 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
-BUILD_RUDP_FALSE = @BUILD_RUDP_FALSE@
-BUILD_RUDP_TRUE = @BUILD_RUDP_TRUE@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
+CMDIR = @CMDIR@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CSH = @CSH@
@@ -159,9 +158,6 @@ KERNEL_VERSION = @KERNEL_VERSION@
 LDFLAGS = @LDFLAGS@
 LIBLTDL = @LIBLTDL@
 LIBOBJS = @LIBOBJS@
-LIBRUDP = @LIBRUDP@
-LIBRUDPDEP = @LIBRUDPDEP@
-LIBRUDPDEP2 = @LIBRUDPDEP2@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LIBTOOL_DEPS = @LIBTOOL_DEPS@
@@ -249,7 +245,7 @@ libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c \
 		   cm_lock.c cm_pbio.c cm_evol.c evp.c version.c
 
 libevpath_la_LDFLAGS = $(MATH_LIB)
-libevpath_la_LIBADD = $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lIO -lecl @SOCKET_LIBS@ @KERNEL_OBJS@
+libevpath_la_LIBADD = $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lIO -lecl @SOCKET_LIBS@ @KERNEL_OBJS@ -dlpreopen $(CMDIR)/libcmsockets.la -dlpreopen $(CMDIR)/libcmselect.la
 libevpath_la_DEPENDENCIES = $(LIBLTDL) $(LTLIBS) @KERNEL_OBJS@
 include_HEADERS = evpath.h
 AM_CPPFLAGS = 
