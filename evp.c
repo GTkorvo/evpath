@@ -435,7 +435,7 @@ dump_action(stone_type stone, int a, const char *indent)
 	}
 	break;
     case Action_Immediate: 
-	printf("Fill this in \n");
+	printf("   Immediate action\n");
 	break;
     }
 }
@@ -474,6 +474,11 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     if (action_id ==  -1) {
 	printf("No action found for event %lx submitted to stone %d\n",
 	       (long)event, local_path_id);
+	if (stone->actions[0].action_type == Action_Terminal) {
+	    dump_unencoded_IOrecord(iofile_of_IOformat(event->reference_format),
+				    event->reference_format,
+				    event->decoded_event);
+	}
 	dump_stone(stone);
 	return 0;
     }
