@@ -42,6 +42,7 @@ CMtrace_on(CManager cm, CMTraceType trace_type)
 	trace_val[CMTransportVerbose] = (cercs_getenv("CMTransportVerbose") != NULL);
 	trace_val[CMFormatVerbose] = (cercs_getenv("CMFormatVerbose") != NULL);
 	trace_val[CMFreeVerbose] = (cercs_getenv("CMFreeVerbose") != NULL);
+	trace_val[EVerbose] = (cercs_getenv("EVerbose") != NULL);
 	if (cercs_getenv("CMVerbose") != NULL) {
 	    int i;
 	    for (i=0; i<CMLastTraceType; i++)

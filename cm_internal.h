@@ -240,7 +240,7 @@ extern void CMglobal_data_unlock();
 extern int CMglobal_data_locked();
 
 typedef enum _CMTraceType {
-    CMAlwaysTrace, CMControlVerbose, CMConnectionVerbose, CMLowLevelVerbose, CMDataVerbose, CMTransportVerbose, CMFormatVerbose, CMFreeVerbose,
+    CMAlwaysTrace, CMControlVerbose, CMConnectionVerbose, CMLowLevelVerbose, CMDataVerbose, CMTransportVerbose, CMFormatVerbose, CMFreeVerbose, EVerbose,
     CMLastTraceType /* add before this one */
 } CMTraceType;
 
