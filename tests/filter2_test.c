@@ -1,3 +1,12 @@
+/*
+ *   Filter2_test differs from filter_test in that it checks to see if we
+ *   can filter out events without changing them.  I.E. it submits two
+ *   different types of events on the source side, passes them through a
+ *   dynamically-generated filter (that should customize itself for each)
+ *   and then expects the to arrive at two different handlers.
+ */
+
+
 #include "config.h"
 
 #include <stdio.h>
@@ -53,6 +62,23 @@ typedef struct _simple_rec {
     int scan_sum;
 } simple_rec, *simple_rec_ptr;
 
+typedef struct _bigger_rec {
+    int extra_field;
+    int integer_field;
+    short short_field;
+    long long_field;
+    nested nested_field;
+    double double_field;
+    char char_field;
+    int scan_sum;
+} bigger_rec, *bigger_rec_ptr;
+
+static IOField filter_field_list[] =
+{
+    {"integer_field", "integer",
+     sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
+    {NULL, NULL, 0, 0}};
+
 static IOField simple_field_list[] =
 {
     {"integer_field", "integer",
@@ -72,6 +98,27 @@ static IOField simple_field_list[] =
     {NULL, NULL, 0, 0}
 };
 
+static IOField bigger_field_list[] =
+{
+    {"extra_field", "integer",
+     sizeof(int), IOOffset(bigger_rec_ptr, extra_field)},
+    {"integer_field", "integer",
+     sizeof(int), IOOffset(bigger_rec_ptr, integer_field)},
+    {"short_field", "integer",
+     sizeof(short), IOOffset(bigger_rec_ptr, short_field)},
+    {"long_field", "integer",
+     sizeof(long), IOOffset(bigger_rec_ptr, long_field)},
+    {"nested_field", "nested",
+     sizeof(nested), IOOffset(bigger_rec_ptr, nested_field)},
+    {"double_field", "float",
+     sizeof(double), IOOffset(bigger_rec_ptr, double_field)},
+    {"char_field", "char",
+     sizeof(char), IOOffset(bigger_rec_ptr, char_field)},
+    {"scan_sum", "integer",
+     sizeof(int), IOOffset(bigger_rec_ptr, scan_sum)},
+    {NULL, NULL, 0, 0}
+};
+
 static CMFormatRec simple_format_list[] =
 {
     {"simple", simple_field_list},
@@ -80,16 +127,17 @@ static CMFormatRec simple_format_list[] =
     {NULL, NULL}
 };
 
-static IOField filter_field_list[] =
-{
-    {"integer_field", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
-    {NULL, NULL, 0, 0}
-};
-
 static CMFormatRec filter_format_list[] =
 {
-    {"simple", filter_field_list},
+    {"filter", filter_field_list},
+    {NULL, NULL}
+};
+
+static CMFormatRec bigger_format_list[] =
+{
+    {"bigger", bigger_field_list},
+    {"complex", complex_field_list},
+    {"nested", nested_field_list},
     {NULL, NULL}
 };
 
@@ -99,6 +147,34 @@ generate_record(event)
 simple_rec_ptr event;
 {
     long sum = 0;
+    event->integer_field = (int) lrand48() % 100;
+    sum += event->integer_field % 100;
+    event->short_field = ((short) lrand48());
+    sum += event->short_field % 100;
+    event->long_field = ((long) lrand48());
+    sum += event->long_field % 100;
+
+    event->nested_field.item.r = drand48();
+    sum += ((int) (event->nested_field.item.r * 100.0)) % 100;
+    event->nested_field.item.i = drand48();
+    sum += ((int) (event->nested_field.item.i * 100.0)) % 100;
+
+    event->double_field = drand48();
+    sum += ((int) (event->double_field * 100.0)) % 100;
+    event->char_field = lrand48() % 128;
+    sum += event->char_field;
+    sum = sum % 100;
+    event->scan_sum = (int) sum;
+}
+
+static
+void 
+generate_bigger_record(event)
+bigger_rec_ptr event;
+{
+    long sum = 0;
+    event->extra_field = (int) lrand48() % 100;
+    sum += event->extra_field % 100;
     event->integer_field = (int) lrand48() % 100;
     sum += event->integer_field % 100;
     event->short_field = ((short) lrand48());
@@ -146,6 +222,48 @@ attr_list attrs;
     }
     if ((quiet <= 0) || (sum != scan_sum)) {
 	printf("In the handler, event data is :\n");
+	printf("	integer_field = %d\n", event->integer_field);
+	printf("	short_field = %d\n", event->short_field);
+	printf("	long_field = %ld\n", event->long_field);
+	printf("	double_field = %g\n", event->double_field);
+	printf("	char_field = %c\n", event->char_field);
+	printf("Data was received with attributes : \n");
+	if (attrs) dump_attr_list(attrs);
+    }
+    if (client_data != NULL) {
+	int tmp = *((int *) client_data);
+	*((int *) client_data) = tmp + 1;
+    }
+    return 0;
+}
+
+static
+int
+bigger_handler(cm, vevent, client_data, attrs)
+CManager cm;
+void *vevent;
+void *client_data;
+attr_list attrs;
+{
+    bigger_rec_ptr event = vevent;
+    long sum = 0, scan_sum = 0;
+    sum += event->extra_field % 100;
+    sum += event->integer_field % 100;
+    sum += event->short_field % 100;
+    sum += event->long_field % 100;
+    sum += ((int) (event->nested_field.item.r * 100.0)) % 100;
+    sum += ((int) (event->nested_field.item.i * 100.0)) % 100;
+    sum += ((int) (event->double_field * 100.0)) % 100;
+    sum += event->char_field;
+    sum = sum % 100;
+    scan_sum = event->scan_sum;
+    if (sum != scan_sum) {
+	printf("Received record checksum does not match. expected %d, got %d\n",
+	       (int) sum, (int) scan_sum);
+    }
+    if ((quiet <= 0) || (sum != scan_sum)) {
+	printf("In bigger handler, event data is :\n");
+	printf("	extra_field = %d\n", event->extra_field);
 	printf("	integer_field = %d\n", event->integer_field);
 	printf("	short_field = %d\n", event->short_field);
 	printf("	long_field = %ld\n", event->long_field);
@@ -240,6 +358,7 @@ char **argv;
 	}	
 	term = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, term, simple_format_list, simple_handler, NULL);
+	EVassoc_terminal_action(cm, term, bigger_format_list, bigger_handler, NULL);
 	filter = create_filter_action_spec(simple_format_list, "{\
     return input.long_field % 2;\
 }\0\0");
@@ -251,11 +370,10 @@ char **argv;
 	printf("Contact list \"%d:%s\"\n", fstone, string_list);
 	CMsleep(cm, 120);
     } else {
-	simple_rec data;
 	attr_list attrs;
 	int remote_stone, stone = 0;
 	int count;
-	EVsource source_handle;
+	EVsource source_handle, bigger_handle;
 	if (argc == 2) {
 	    attr_list contact_list;
 	    char *list_str;
@@ -270,13 +388,24 @@ char **argv;
 	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
 	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
 	source_handle = EVcreate_submit_handle(cm, stone, simple_format_list);
-	if (quiet <= 0) printf("submitting %d\n", data.integer_field);
+	bigger_handle = EVcreate_submit_handle(cm, stone, bigger_format_list);
 	count = repeat_count;
 	while (count != 0) {
-	    generate_record(&data);
-	    if (quiet <=0) {printf("submitting %ld\n", data.long_field);}
-	    EVsubmit(source_handle, &data, attrs);
-	    if ((data.long_field%2 == 1) && (count != -1)) {
+	    long l = 0;
+	    if ((count % 2 ) == 1) {
+		simple_rec data;
+		generate_record(&data);
+		if (quiet <=0) {printf("submitting %ld\n", data.long_field);}
+		EVsubmit(source_handle, &data, attrs);
+		l = data.long_field;
+	    } else {
+		bigger_rec data;
+		generate_bigger_record(&data);
+		if (quiet <=0) {printf("submitting bigger %ld\n", data.long_field);}
+		EVsubmit(bigger_handle, &data, attrs);
+		l = data.long_field;
+	    }
+	    if (((l%2) == 1) && (count != -1)) {
 		count--;
 	    }
 	}
@@ -307,7 +436,7 @@ char **args;
 {
 #ifdef HAVE_WINDOWS_H
     int child;
-    child = _spawnv(_P_NOWAIT, "./filter_test.exe", args);
+    child = _spawnv(_P_NOWAIT, "./filter2_test.exe", args);
     if (child == -1) {
 	printf("failed for evtest\n");
 	perror("spawnv");
@@ -319,7 +448,7 @@ char **args;
     child = fork();
     if (child == 0) {
 	/* I'm the child */
-	execv("./filter_test", args);
+	execv("./filter2_test", args);
     }
     return child;
 #endif
@@ -329,13 +458,13 @@ static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"evtest", "-c", NULL, NULL};
+    char *args[] = {"evtest", "-c", NULL, NULL, NULL};
     char *filter;
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
     char *string_list, *transport, *postfix;
-    int message_count = 0;
+    int message_count = 0, count;
     EVstone term, fstone;
     EVaction faction;
 #ifdef HAVE_WINDOWS_H
@@ -395,7 +524,8 @@ do_regression_master_test()
 
     term = EValloc_stone(cm);
     EVassoc_terminal_action(cm, term, simple_format_list, simple_handler, &message_count);
-    filter = create_filter_action_spec(simple_format_list, "{\
+    EVassoc_terminal_action(cm, term, bigger_format_list, bigger_handler, &message_count);
+    filter = create_filter_action_spec(filter_format_list, "{\
     return input.long_field % 2;\
 }\0\0");
     
@@ -403,9 +533,10 @@ do_regression_master_test()
     faction = EVassoc_immediate_action(cm, fstone, filter, NULL);
     EVaction_set_output(cm, fstone, faction, 0, term);
 
-    args[2] = string_list;
-    args[2] = malloc(10 + strlen(string_list) + strlen(filter));
-    sprintf(args[2], "%d:%s", fstone, string_list);
+    count = 2;
+    if (quiet <= 0) args[count++] = "-v";
+    args[count] = malloc(10 + strlen(string_list) + strlen(filter));
+    sprintf(args[count], "%d:%s", fstone, string_list);
     subproc_proc = run_subprocess(args);
 
     /* give him time to start */

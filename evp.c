@@ -17,8 +17,9 @@ static void return_event(event_path_data evp, event_item *event);
 static event_item *get_free_event(event_path_data evp);
 static void dump_action(stone_type stone, int a, const char *indent);
 extern void print_server_ID(char *server_id);
+static void dump_stone(stone_type stone);
 
-static const char *action_str[] = { "Action_Output", "Action_Terminal", "Action_Filter", "Action_Decode", "Action_Split"};
+static const char *action_str[] = { "Action_Output", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Decode", "Action_Split"};
 
 void
 EVPSubmit_encoded(CManager cm, int local_path_id, void *data, int len)
@@ -103,6 +104,8 @@ EVassoc_terminal_action(CManager cm, EVstone stone_num,
 	    EVregister_format_set(cm, format_list, NULL);
     }	
     action_num = stone->action_count++;
+    CMtrace_out(cm, EVerbose, "Adding Terminal action %d to stone %d",
+		action_num, stone_num);
     stone->actions = realloc(stone->actions, (action_num + 1) * 
 				   sizeof(stone->actions[0]));
     memset(&stone->actions[action_num], 0, sizeof(stone->actions[0]));
@@ -125,9 +128,12 @@ EVassoc_immediate_action(CManager cm, EVstone stone_num,
     stone_type stone = &evp->stone_map[stone_num];
 
     action_num = stone->action_count++;
+    CMtrace_out(cm, EVerbose, "Adding Immediate action %d to stone %d",
+		action_num, stone_num);
     stone->actions = realloc(stone->actions, (action_num + 1) * 
 				   sizeof(stone->actions[0]));
     memset(&stone->actions[action_num], 0, sizeof(stone->actions[0]));
+    stone->actions[action_num].requires_decoded = 1;
     stone->actions[action_num].queue = stone->queue;
     stone->actions[action_num].action_type = Action_Immediate;
     stone->actions[action_num].o.imm.subaction_count = 0;
@@ -275,6 +281,8 @@ IOFormat incoming_format;
     char *server_id = get_server_ID_IOformat(incoming_format,
 						     &id_len);
 /*	    printf("Creating new DECODE action\n");*/
+    CMtrace_out(cm, EVerbose, "Adding Conversion action %d to stone %d",
+		a, stone_id);
     stone->actions = realloc(stone->actions, 
 			     sizeof(stone->actions[0]) * (a + 1));
     action *act = & stone->actions[a];
@@ -325,7 +333,7 @@ determine_action(CManager cm, stone_type stone, event_item *event, int *sub_id)
 	    int j;
 	    immediate_action_vals *imm = &stone->actions[i].o.imm;
 	    for (j=0; j < imm->subaction_count ; j++) {
-		if (imm->subacts[i].reference_format == event->reference_format) {
+		if (imm->subacts[j].reference_format == event->reference_format) {
 		    *sub_id = j;
 		    return i;
 		}
@@ -366,8 +374,8 @@ decode_action(CManager cm, event_item *event, action *act)
 	    return event;
 	} else {
 	    int decoded_length = this_IOrecord_length(act->o.decode.context, 
-						      event->encoded_event, 
-						      event->event_len);
+						      event->encoded_event, 	
+					      event->event_len);
 	    CMbuffer cm_decode_buf = cm_get_data_buf(cm, decoded_length);
 	    void *decode_buffer = cm_decode_buf->buffer;
 	    decode_to_buffer_IOcontext(act->o.decode.context, 
@@ -436,6 +444,16 @@ dump_action(stone_type stone, int a, const char *indent)
 	break;
     case Action_Immediate: 
 	printf("   Immediate action\n");
+	dump_mrd(act->o.imm.mutable_response_data);
+	{
+	    int i = 0;
+	    for (i=0; i < act->o.imm.subaction_count; i++) {
+		printf("      Subaction %d, ref_format %lx, handler %lx\n",
+		       i, act->o.imm.subacts[i].reference_format,
+		       act->o.imm.subacts[i].handler);
+	    }
+	    printf("\n");
+	}
 	break;
     }
 }
@@ -474,10 +492,15 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     if (action_id ==  -1) {
 	printf("No action found for event %lx submitted to stone %d\n",
 	       (long)event, local_path_id);
-	if (stone->actions[0].action_type == Action_Terminal) {
-	    dump_unencoded_IOrecord(iofile_of_IOformat(event->reference_format),
-				    event->reference_format,
-				    event->decoded_event);
+	if ((stone->actions[0].action_type == Action_Terminal) ||
+	    CMtrace_on(cm, EVerbose)) {
+	    if (event->decoded_event != NULL) {
+		dump_unencoded_IOrecord(iofile_of_IOformat(event->reference_format),
+					event->reference_format,
+					event->decoded_event);
+	    } else {
+		dump_encoded_as_XML(evp->root_context, event->encoded_event);
+	    }
 	}
 	dump_stone(stone);
 	return 0;
@@ -488,8 +511,11 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 	event = decode_action(cm, event, act);
 	action_id = determine_action(cm, stone, event, &subact);
     }
-    CMtrace_out(cm, EVerbose, "Enqueueing event %lx on stone %d, action %lx",
-		(long)event, local_path_id, (long)act);
+    if (CMtrace_on(cm, EVerbose)) {
+	printf("Enqueueing event %lx on stone %d, action %lx",
+	       (long)event, local_path_id, (long)act);
+	dump_action(stone, action_id, "    ");
+    }
     enqueue_event(cm, local_path_id, action_id, subact, event);
     return 1;
 }
@@ -508,6 +534,16 @@ CManager cm;
 	    event_item *event = dequeue_event(cm, evp->stone_map[s].queue, 
 					      &action_id, &subaction_id);
 	    action *act = &evp->stone_map[s].actions[action_id];
+#ifdef NOTDEF
+	    if (act->action_type == Action_Decode) {
+		CMtrace_out(cm, EVerbose, "Decoding event  %lx, stone %d, act %d",
+			    event, s, action_id);
+		event = decode_action(cm, event, act);
+		action_id = determine_action(cm, &evp->stone_map[s], 
+					     event, &subaction_id);
+		act = &evp->stone_map[s].actions[action_id];
+	    }
+#endif
 	    switch(act->action_type) {
 	    case Action_Terminal:
 	    case Action_Filter: {
@@ -549,6 +585,7 @@ CManager cm;
 		    more_pending++;
 		}
 		return_event(evp, event);
+		break;
 	    }
 	    case Action_Immediate: {
 		EVImmediateHandlerFunc func;
@@ -688,6 +725,8 @@ EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
     event_path_data evp = cm->evp;
     stone_type stone = &evp->stone_map[stone_num];
     int action_num = stone->action_count++;
+    CMtrace_out(cm, EVerbose, "Adding output action %d to stone %d",
+		action_num, stone_num);
     stone->actions = realloc(stone->actions, 
 				   (action_num + 1) * 
 				   sizeof(stone->actions[0]));
@@ -711,6 +750,8 @@ EVassoc_split_action(CManager cm, EVstone stone_num,
     stone_type stone = &evp->stone_map[stone_num];
     int action_num = stone->action_count++;
     int target_count = 0, i;
+    CMtrace_out(cm, EVerbose, "Adding Split action %d to stone %d",
+		action_num, stone_num);
     stone->actions = realloc(stone->actions, 
 				   (action_num + 1) * 
 				   sizeof(stone->actions[0]));

@@ -1456,12 +1456,6 @@ EVassoc_filter_action(CManager cm, EVstone stone,
 		      void* client_data);
 
 extern EVaction
-EVassoc_transform_action(CManager cm, EVstone stone, 
-			 CMFormatList incoming_format_list, 
-			 CMFormatList outgoing_format_list, 
-			 EVTransformHandlerFunc handler, EVstone out_stone,
-			 void* client_data);
-extern EVaction
 EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list, 
 		      EVstone remote_stone);
 

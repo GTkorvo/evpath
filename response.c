@@ -362,6 +362,33 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 static response_instance
 generate_filter_code(struct response_spec *mrd, IOFormat format);
 
+static IOFormat
+localize_format(CManager cm, IOFormat format)
+{
+    IOFormat *formats = get_subformats_IOformat(format);
+    int format_count = 0, i;
+    CMFormatList list;
+    while(formats[format_count] != NULL) format_count++;
+    list = malloc(sizeof(list[0]) * (format_count + 1));
+    for (i=0; i < format_count; i++) {
+	list[format_count - i - 1].format_name = strdup(name_of_IOformat(formats[i]));
+	list[format_count - i - 1].field_list = get_local_field_list(formats[i]);
+    }
+    return EVregister_format_set(cm, list, NULL);
+}    
+    
+void
+dump_mrd(void *mrdv)
+{
+    struct response_spec *mrd = (struct response_spec *) mrdv;
+    switch (mrd->response_type) {
+    case Response_Filter:
+	printf("Reponse Filter, code is %s\n",
+	       mrd->u.filter.function);
+	break;
+    }
+}
+
 int
 response_determination(CManager cm, stone_type stone, event_item *event)
 {
@@ -393,10 +420,10 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 	}
     }
     formatList[format_count] = NULL;
-    nearest_proto_action = IOformat_compat_cmp(event->reference_format, 
-					       formatList,
-					       format_count,
-					       &older_format);
+    nearest_proto_action = IOformat_compat_cmp2(event->reference_format, 
+						formatList,
+						format_count,
+						&older_format);
     free(formatList);
     if (nearest_proto_action != -1) {
 	if (nearest_proto_action < stone->proto_action_count) {
@@ -414,7 +441,12 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 				stone->actions[i].o.imm.mutable_response_data;
 			    switch(mrd->response_type) {
 			    case Response_Filter:
-				conversion_target_format = mrd->u.filter.reference_format;
+				if (event->event_encoded) {
+				    conversion_target_format = 
+					localize_format(cm, event->reference_format);
+				} else {
+				    conversion_target_format = event->reference_format;
+				}
 				break;
 			    case Response_Transform:
 				conversion_target_format = mrd->u.transform.reference_input_format;
@@ -496,15 +528,15 @@ add_param(ecl_parse_context parse_context, char *name, int param_num,
     sm_ref type, param;
     while (formats[i] != NULL) {
 	sm_ref typ;
+	IOFieldList fl = get_local_field_list(formats[i]);
 	/* step through input formats */
-	typ = ecl_build_type_node(name_of_IOformat(formats[i]),
-				  field_list_of_IOformat(formats[i]));
+	typ = ecl_build_type_node(name_of_IOformat(formats[i]), fl);
 	ecl_add_decl_to_parse_context(name_of_IOformat(formats[i]), typ,
 				      parse_context);
 	i++;
     }
     sprintf(tname, "%s_type", name);
-    type = ecl_build_type_node(tname, field_list_of_IOformat(formats[i-1]));
+    type = ecl_build_type_node(tname, get_local_field_list(formats[i-1]));
     ecl_add_decl_to_parse_context(tname, type, parse_context);
 
     param = ecl_build_param_node(name, type, param_num);

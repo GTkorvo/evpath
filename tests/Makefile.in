@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-SOURCES = bulktest.c evtest.c filter_test.c http_test.c transform_test.c
+SOURCES = bulktest.c evtest.c filter2_test.c filter_test.c http_test.c transform_test.c
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -39,7 +39,8 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 noinst_PROGRAMS = evtest$(EXEEXT) bulktest$(EXEEXT) http_test$(EXEEXT) \
-	filter_test$(EXEEXT) transform_test$(EXEEXT)
+	filter_test$(EXEEXT) filter2_test$(EXEEXT) \
+	transform_test$(EXEEXT)
 subdir = tests
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -60,6 +61,10 @@ evtest_SOURCES = evtest.c
 evtest_OBJECTS = evtest.$(OBJEXT)
 evtest_LDADD = $(LDADD)
 evtest_DEPENDENCIES = ../libevpath.la
+filter2_test_SOURCES = filter2_test.c
+filter2_test_OBJECTS = filter2_test.$(OBJEXT)
+filter2_test_LDADD = $(LDADD)
+filter2_test_DEPENDENCIES = ../libevpath.la
 filter_test_SOURCES = filter_test.c
 filter_test_OBJECTS = filter_test.$(OBJEXT)
 filter_test_LDADD = $(LDADD)
@@ -83,10 +88,10 @@ LTCOMPILE = $(LIBTOOL) --mode=compile --tag=CC $(CC) $(DEFS) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link --tag=CC $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = bulktest.c evtest.c filter_test.c http_test.c \
+SOURCES = bulktest.c evtest.c filter2_test.c filter_test.c http_test.c \
 	transform_test.c
-DIST_SOURCES = bulktest.c evtest.c filter_test.c http_test.c \
-	transform_test.c
+DIST_SOURCES = bulktest.c evtest.c filter2_test.c filter_test.c \
+	http_test.c transform_test.c
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -216,7 +221,7 @@ sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 AUTOMAKE_OPTIONS = no-dependencies foreign
 OLD_TESTS = cmtest cmping take_test
-TESTS = evtest bulktest http_test filter_test transform_test
+TESTS = evtest bulktest http_test filter_test filter2_test transform_test
 LDADD = ../libevpath.la
 all: all-am
 
@@ -264,6 +269,9 @@ bulktest$(EXEEXT): $(bulktest_OBJECTS) $(bulktest_DEPENDENCIES)
 evtest$(EXEEXT): $(evtest_OBJECTS) $(evtest_DEPENDENCIES) 
 	@rm -f evtest$(EXEEXT)
 	$(LINK) $(evtest_LDFLAGS) $(evtest_OBJECTS) $(evtest_LDADD) $(LIBS)
+filter2_test$(EXEEXT): $(filter2_test_OBJECTS) $(filter2_test_DEPENDENCIES) 
+	@rm -f filter2_test$(EXEEXT)
+	$(LINK) $(filter2_test_LDFLAGS) $(filter2_test_OBJECTS) $(filter2_test_LDADD) $(LIBS)
 filter_test$(EXEEXT): $(filter_test_OBJECTS) $(filter_test_DEPENDENCIES) 
 	@rm -f filter_test$(EXEEXT)
 	$(LINK) $(filter_test_LDFLAGS) $(filter_test_OBJECTS) $(filter_test_LDADD) $(LIBS)
