@@ -1,0 +1,245 @@
+dnl Process this file with autoconf to create configure.
+
+AC_INIT
+AC_CONFIG_SRCDIR([cm.c])
+AM_INIT_AUTOMAKE(cmdemo,0.1)
+AM_CONFIG_HEADER(config.h)
+AC_CANONICAL_HOST
+kernel_build=false
+AC_ARG_ENABLE(kernel-build,[Build for inclusion in the kernel],
+[
+case "${host_os}" in
+linux-gnu*)
+	AC_MSG_WARN("building linux kernel")
+	CPPFLAGS="$CPPFLAGS -DMODULE -DLINUX"
+	if test $ac_cv_prog_gcc = yes; then
+		CFLAGS="-fomit-frame-pointer -g -O2"
+	fi
+	KERNEL_OBJS="kcm.lo env.lo libltdl/ltdl.lo presym.lo"
+	KERNEL_VERSION=`awk -F\" '/REL/ {print $$2}' /usr/include/linux/version.h`
+	KERNEL_TARGET_MOD="kernel_"
+	AC_DEFINE([__KERNEL__],1,[Define this if compiling for linux kernel])
+	kernel_build=true
+	enable_shared=no
+	;;
+*)
+	AC_MSG_WARN("--enable-kernel-build ignored on non Linux platforms")
+	;;
+esac
+])
+AM_CONDITIONAL(KERNEL, test x$kernel_build = xtrue)
+AC_SUBST(KERNEL_OBJS)
+AC_SUBST(KERNEL_VERSION)
+AC_SUBST(KERNEL_TARGET_MOD)
+
+AC_PROG_CC
+AC_COMPILE_WARNINGS
+
+CERCS_SET_ARCHIVE
+CERCS_LIB_PREFIX(cm, libcm.la)
+ARCH=$cercs_cv_archive
+
+AM_MAINTAINER_MODE
+AC_C_CONST
+AC_HAS_STRUCT_HOSTENT
+AC_STRUCT_FDS_BITS
+AC_TYPE_PID_T
+AC_ACCEPT_DEFINED
+AC_BIND_DEFINED
+AC_BZERO_DEFINED
+AC_CONNECT_DEFINED
+AC_FPRINTF_DEFINED
+AC_GETHOSTNAME_DEFINED
+AC_GETDOMAINNAME_DEFINED
+AC_GETPEERNAME_DEFINED
+AC_GETSOCKNAME_DEFINED
+AC_GETTIMEOFDAY_DEFINED
+AC_LISTEN_DEFINED
+AC_PRINTF_DEFINED
+AC_PUTENV_DEFINED
+AC_SELECT_DEFINED
+AC_SETSOCKOPT_DEFINED
+AC_SETRLIMIT_DEFINED
+AC_READ_DEFINED
+AC_SPRINTF_DEFINED
+AC_SSCANF_DEFINED
+AC_STRDUP_DEFINED
+AC_WRITE_DEFINED
+AC_SENDTO_DEFINED
+AC_EXEEXT
+
+AC_CHECK_HEADERS(string.h unistd.h strings.h memory.h malloc.h sys/select.h \
+sys/time.h sys/times.h netdb.h sys/un.h sys/uio.h streams/un.h \
+pwd.h sys/resource.h hostLib.h windows.h sys/sockio.h) 
+
+DEMO_LIBS="-lIO $DEMO_LIBS"
+case "$host_os" in
+ cygwin* | mingw* | pw32*)
+   SOCKET_LIBS="-lwsock32 -luser32 -ladvapi32"
+   DEMO_LIBS="-lIO $DEMO_LIBS $SOCKET_LIBS";;
+esac
+
+dnl Enable building of the convenience library
+dnl and set LIBLTDL accordingly
+AC_LIBLTDL_CONVENIENCE
+dnl Substitute INCLTDL and LIBLTDL in the Makefiles
+AC_SUBST(INCLTDL)
+AC_SUBST(LIBLTDL)
+dnl Check for dlopen support
+AC_LIBTOOL_DLOPEN
+dnl Configure libtool
+AC_LIBTOOL_WIN32_DLL
+AM_PROG_LIBTOOL
+test -n "$LIBTOOL" && LIBTOOL="$LIBTOOL --silent"
+
+dnl Configure libltdl
+AC_CONFIG_SUBDIRS(libltdl)
+AC_CHECK_PROGS(TAGS, etags ctags, echo)
+AC_CHECK_PROGS(MAKEDEPEND, makedepend, :)
+
+AC_SUBST(LIBTOOL_DEPS)
+
+if ${CONFIG_SHELL} ./libtool --features | grep "enable static" >/dev/null; then
+  STATIC=-static
+else
+  STATIC=
+fi
+AC_SUBST(STATIC)
+
+AC_CHECK_HEADERS(math.h)
+
+LIB_PRE=lib
+LIB_POST=.a
+case "$host_os" in
+ cygwin* | mingw* | pw32*)
+   LIB_PRE=
+   LIB_POST=.lib
+;;
+esac
+checkBoth=0
+AC_CHECK_FUNC(connect, checkSocket=0, checkSocket=1)
+if test "$checkSocket" = 1; then
+    AC_CHECK_LIB(socket, connect, LIBS="$LIBS -lsocket", checkBoth=1)
+    if test "$checkBoth" = 1; then
+        oldLibs=$LIBS
+        LIBS="$LIBS -lsocket -lnsl"
+        AC_CHECK_FUNC(accept, checkNsl=0, [LIBS=$oldLibs])
+    fi
+   AC_CHECK_FUNC(gethostbyname, , AC_CHECK_LIB(nsl, getdomainname, [LIBS="$LIBS -lnsl"]))
+fi
+AC_CHECK_LIB(m,sqrt,[MATH_LIB=-lm])
+AC_SUBST(MATH_LIB)
+AC_CHECK_FUNC(inet_aton,,[LIBS="$LIBS -lresolv"])
+CERCS_REQUIRE_PACKAGE(pbio, io.h, libIO.la)
+CERCS_REQUIRE_PACKAGE(gen_thread, gen_thread.h,libgen_thread.la)
+CERCS_REQUIRE_PACKAGE(cercs_env, cercs_env.h,libcercs_env.la)
+CERCS_REQUIRE_PACKAGE(ecl, ecl.h, libecl.la)
+if test -n "$cercs_cv_gen_thread_link_dir"; then
+LDFLAGS="$LDFLAGS -L$cercs_cv_gen_thread_link_dir"
+fi
+if test -n "$cercs_cv_cercs_env_link_dir"; then
+LDFLAGS="$LDFLAGS -L$cercs_cv_cercs_env_link_dir"
+fi
+if test -n "$cercs_cv_ecl_link_dir"; then
+LDFLAGS="$LDFLAGS -L$cercs_cv_ecl_link_dir"
+fi
+AC_CHECK_HEADERS(gen_thread.h)
+
+CERCS_REQUIRE_PACKAGE(atl,atl.h,libatl.la)
+dnl can't use CHECK_LIB on libtool libraries, just add it to LTLIBS
+LTLIBS="$cercs_cv_atl_link_dir/libatl.la $LTLIBS"
+
+
+cmlibdir=`(
+                   test "x$prefix" = xNONE && prefix="$ac_default_prefix"
+                   test "x$exec_prefix" = xNONE && exec_prefix="${prefix}"
+                   eval echo \""$libdir"\"
+               )`
+test -n "$ac_cv_prog_PATHPROG" && cmlibdir=`$ac_cv_prog_PATHPROG $cmlibdir | tr '\134' /`
+AC_DEFINE_UNQUOTED(CM_LIBRARY_INSTALL_DIR,["$cmlibdir"],[Place where cm transport libraries will be installed])
+cmbuilddir=`pwd`
+test -n "$ac_cv_prog_PATHPROG" && cmbuilddir=`$ac_cv_prog_PATHPROG $cmbuilddir | tr '\134' /`
+AC_DEFINE_UNQUOTED(CM_LIBRARY_BUILD_DIR,["$cmbuilddir"],[Place where cm transport libraries are built])
+
+AC_SUBST(LTLIBS)
+AC_SUBST(DEMO_LIBS)
+AC_SUBST(SOCKET_LIBS)
+AC_CHECK_FUNCS(fork memcpy on_exit atexit getdomainname SetTimer getlogin writev)
+AC_CHECK_LIB(pthread,pthread_create)
+if test x$ac_cv_lib_pthread_pthread_create = xyes ; then
+AC_CHECK_HEADER(pthread.h,
+[DEMO_LIBS="$DEMO_LIBS -lpthread"
+AC_DEFINE(USE_PTHREADS,1,[Define this if Pthreads should be used for running
+tests])
+LIBRUDP=libcmrudp.la
+LIBRUDPDEP=['"-dlopen" libcmrudp.la']
+LIBRUDPDEP2="-dlopen libcmrudp.la"
+AC_SUBST(LIBRUDP)
+AC_SUBST(LIBRUDPDEP)
+AC_SUBST(LIBRUDPDEP2)
+USE_PTHREADS="yes"
+],,)
+fi
+
+dnl CERCS_REQUIRE_OTHER_PACKAGE(fore_atm,ans.h,libans.a)
+dnl AC_CHECK_LIB(ans,atmnsap_addr,[LIBATM=libcmatm.la
+dnl LIBATMDEP=['"-dlopen" libcmatm.la']
+dnl LIBATMDEP2="-dlopen libcmatm.la"
+dnl AC_SUBST(LIBATM)
+dnl AC_SUBST(LIBATMDEP)
+dnl AC_SUBST(LIBATMDEP2)
+dnl ],,)
+
+AM_CONDITIONAL(BUILD_RUDP, test x$USE_PTHREADS = xyes)
+
+AC_ARG_WITH(redirect_server, [  --with-redirect-server=HOST    Which host will run the redirect server.],REDIRECT_SERVER_HOST=$withval)
+
+if test "x$REDIRECT_SERVER_HOST" = "x"; then
+   hostname=`hostname`
+   domainname=""
+   host_no_domain=`hostname|sed 's/\..*//g'`
+   if test "$hostname" != "$host_no_domain"; then
+      # A fully qualified hostname?
+      domainname=`hostname|sed "s/$host_no_domain.//"`
+      hostname=$host_no_domain
+   fi
+   if test x"$domainname" = "x"; then
+	if eval dnsdomainname 2>/dev/null 1>/dev/null; then
+	    # dnsdomainname command, try it
+	    domainname=`dnsdomainname`
+	fi
+   fi
+   if test x"$domainname" = "x"; then
+	if eval domainname 2>/dev/null 1>/dev/null; then
+	    domainname=`domainname`
+	fi
+   fi
+   if test x"$hostname" = "x"; then
+	hostname="localhost"
+   fi
+   if test x"$domainname" = "x"; then
+      # domainname is still not set, try this
+      domainname=[`nslookup $hostname 2>/dev/null | grep Name: | sed 's/.*: *[^.]*.//g'`]
+   fi
+
+   highdomain=`echo $domainname | sed 's/\./\\
+./g' | tail -2 `
+    highdomain=`echo $highdomain | sed 's/ //g'`
+   if test "x$highdomain" = "x.gatech.edu"; then
+      REDIRECT_SERVER_HOST="redirecthost.cercs.gatech.edu";
+      REDIRECT_SERVICE_DOMAIN="gt.atl.ga.us:gatech.edu";
+   else
+      if test "x$domainname" != "x"; then
+          REDIRECT_SERVER_HOST=$hostname.$domainname
+      else
+          REDIRECT_SERVER_HOST=$hostname
+      fi
+   fi
+fi
+AC_ARG_WITH(service_domain, [  --with-service-domain=DOMAINNAME	What domain the server will serve.],REDIRECT_SERVER_DOMAIN=$withval)
+AC_DEFINE_UNQUOTED(REDIRECT_SERVER_HOST, "$REDIRECT_SERVER_HOST",[Upon what host the redirection server will run])
+AC_DEFINE_UNQUOTED(REDIRECT_SERVICE_DOMAIN, "$REDIRECT_SERVICE_DOMAIN",[Unto what DNS domains the redirection server should limit its service])
+
+dnl Output the makefile
+AC_CONFIG_FILES([Makefile tests/Makefile])
+AC_OUTPUT
