@@ -303,3 +303,5 @@ extern int
 internal_write_event(CMConnection conn, CMFormat format, 
 		     void *remote_path_id, int path_len, event_item *event,
 		     attr_list attrs);
+extern void
+internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data);

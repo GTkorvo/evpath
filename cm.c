@@ -643,28 +643,30 @@ CManager cm;
 	CMConnection_close(cm->connections[0]);
     }
     i = 0;
-    CMtrace_out(cm, CMFreeVerbose, "CMControlList close CL=%lx current reference count %d", 
-		(long) cl, cl->reference_count);
+    CMtrace_out(cm, CMFreeVerbose, "CMControlList close CL=%lx reference count will be %d", 
+		(long) cl, cl->reference_count - 1);
     CMControlList_close(cl);
     while ((cm->shutdown_functions != NULL) &&
 	   (cm->shutdown_functions[i].func != NULL)) {
 	cm->shutdown_functions[i].func(cm, cm->shutdown_functions[i].client_data);
+	if (cm->shutdown_functions) cm->shutdown_functions[i].func = NULL;
 	i++;
-	cm->shutdown_functions[i].func = NULL;
     }
     CMfree(cm->shutdown_functions);
     cm->shutdown_functions = NULL;
+    CMtrace_out(cm, CMFreeVerbose, "Freeing control list %lx", cl);
     CMControlList_free(cl);
 
     cm->reference_count--;
     CMtrace_out(cm, CMFreeVerbose, "CManager %lx ref count now %d", 
 		(long) cm, cm->reference_count);
     if (cm->reference_count == 0) {
+	CMtrace_out(cm, CMFreeVerbose, "Freeing CManager %lx", cl);
 	CManager_free(cm);
     }
 }
 
-static void
+extern void
 internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data)
 {
     int func_count = 0;
@@ -672,7 +674,9 @@ internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data)
 	cm->shutdown_functions = 
 	    CMmalloc(sizeof(cm->shutdown_functions[0]) * 2);
     } else {
-	while (cm->shutdown_functions[func_count].func != NULL) func_count++;
+	while (cm->shutdown_functions[func_count].func != NULL) {
+	    func_count++;
+	}
 	cm->shutdown_functions = 
 	    CMrealloc(cm->shutdown_functions,
 		      sizeof(cm->shutdown_functions[0]) * (func_count +2));
@@ -995,6 +999,10 @@ CMControlList cl;
     void *status;
     cl->reference_count--;
     cl->closed = 1;
+    if ((cl->has_thread > 0) && (cl->server_thread != thr_thread_self())){
+	    (cl->wake_select)((void*)&CMstatic_trans_svcs,
+			      &cl->select_data);
+    }	
     if (cl->reference_count == 0) {
         if ((cl->has_thread > 0) && (cl->server_thread != thr_thread_self())){
 	    (cl->stop_select)((void*)&CMstatic_trans_svcs,
@@ -1116,6 +1124,17 @@ attr_list attrs;
     return NULL;
 }
 
+static void
+dump_CMConnection(CMConnection conn)
+{
+    printf("CMConnection %lx, reference count %d, closed %d\n\tattrs : ", 
+	   (long) conn, conn->ref_count, conn->closed);
+    dump_attr_list(conn->attrs);
+    printf("\tbuffer_full_point %d, current buffer_end %d\n", 
+	   conn->buffer_full_point, conn->buffer_data_end);
+    printf("\twrite_pending %d\n", conn->write_pending);
+}
+
 CMConnection
 CMinitiate_conn(cm, attrs)
 CManager cm;
@@ -1125,6 +1144,9 @@ attr_list attrs;
     if (!cm->initialized) CMinitialize(cm);
     CManager_lock(cm);
     conn = CMinternal_initiate_conn(cm, attrs);
+    if (CMtrace_on(cm, CMConnectionVerbose)) {
+	dump_CMConnection(conn);
+    }
     CManager_unlock(cm);
     return conn;
 }
@@ -1142,22 +1164,29 @@ CManager cm;
 attr_list attrs;
 {
     int i;
-    CMConnection conn;
+    CMConnection conn = NULL;
     assert(CManager_locked(cm));
     if (CMtrace_on(cm, CMConnectionVerbose)) {
 	printf("In CMinternal_get_conn, attrs ");
 	if (attrs) dump_attr_list(attrs); else printf("\n");
     }
     for (i=0; i<cm->connection_count; i++) {
-	conn = cm->connections[i];
-	if (conn->trans->connection_eq(cm, &CMstatic_trans_svcs,
-				       conn->trans, attrs,
-				       conn->transport_data)) {
-	    conn->ref_count++;
-	    return conn;
+	CMConnection tmp = cm->connections[i];
+	if (tmp->trans->connection_eq(cm, &CMstatic_trans_svcs,
+				       tmp->trans, attrs,
+				       tmp->transport_data)) {
+	    tmp->ref_count++;
+	    conn = tmp;
 	}
     }
-    conn = CMinternal_initiate_conn(cm, attrs);
+    if (conn == NULL) {
+	conn = CMinternal_initiate_conn(cm, attrs);
+	conn->ref_count++;
+    }
+    if (CMtrace_on(cm, CMConnectionVerbose)) {
+	printf("CMinternal_get_conn returning ");
+	dump_CMConnection(conn);
+    }
     return conn;
 }
 
@@ -3048,6 +3077,7 @@ static void
 select_shutdown(CManager cm, void *shutdown_funcv)
 {
     SelectInitFunc shutdown_function = (SelectInitFunc)shutdown_funcv;
+    CMtrace_out(cm, CMFreeVerbose, "calling select shutdown function");
     shutdown_function(&CMstatic_trans_svcs, cm, &cm->control_list->select_data);
 }
 
