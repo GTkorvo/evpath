@@ -150,6 +150,7 @@ attr_list attrs;
 
 static int do_regression_master_test();
 static int regression = 1;
+static int repeat_count = 10;
 
 int
 main(argc, argv)
@@ -240,6 +241,7 @@ char **argv;
 	simple_rec data;
 	attr_list attrs;
 	int remote_stone, stone = 0;
+	int count;
 	EVsource source_handle;
 	if (argc == 2) {
 	    attr_list contact_list;
@@ -250,14 +252,21 @@ char **argv;
 	    stone = EValloc_stone(cm);
 	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
 	}
-	generate_record(&data);
 	attrs = create_attr_list();
 #define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
 	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
 	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
 	source_handle = EVcreate_submit_handle(cm, stone, simple_format_list);
 	if (quiet <= 0) printf("submitting %d\n", data.integer_field);
-	EVsubmit(source_handle, &data, attrs);
+	count = repeat_count;
+	while (count != 0) {
+	    generate_record(&data);
+	    if (quiet <=0) {printf("submitting %ld\n", data.long_field);}
+	    EVsubmit(source_handle, &data, attrs);
+	    if ((data.long_field%2 == 1) && (count != -1)) {
+		count--;
+	    }
+	}
 	CMsleep(cm, 1);
 	free_attr_list(attrs);
     }
@@ -285,7 +294,7 @@ char **args;
 {
 #ifdef HAVE_WINDOWS_H
     int child;
-    child = _spawnv(_P_NOWAIT, "./evtest.exe", args);
+    child = _spawnv(_P_NOWAIT, "./filter_test.exe", args);
     if (child == -1) {
 	printf("failed for evtest\n");
 	perror("spawnv");
@@ -297,7 +306,7 @@ char **args;
     child = fork();
     if (child == 0) {
 	/* I'm the child */
-	execv("./evtest", args);
+	execv("./filter_test", args);
     }
     return child;
 #endif
@@ -422,6 +431,6 @@ do_regression_master_test()
 #endif
     free(string_list);
     CManager_close(cm);
-    if (message_count != 1) printf("Message count == %d\n", message_count);
-    return !(message_count == 1);
+    if (message_count != repeat_count) printf("Message count == %d\n", message_count);
+    return !(message_count == repeat_count);
 }
