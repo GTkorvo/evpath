@@ -73,13 +73,13 @@ add_IOfieldlist_to_string(char *str, char *format_name, IOFieldList list)
     int index, field_count = 0;
     int len = strlen(str);
     char *tmp_str;
-    len += strlen(format_name) + 5 + 30;
+    len += strlen(format_name) + 5 + 35;
     str = realloc(str, len);
     while(list[field_count].field_name != NULL) field_count++;
     tmp_str = str + strlen(str); 
     sprintf(tmp_str, "IOFormat \"%s\" FieldCount %d\n", format_name, field_count);
     for (index = 0; index < field_count; index++) {
-	len += strlen(list[index].field_name) + 5 + 30;
+	len += strlen(list[index].field_name) +strlen(list[index].field_type) + 50;
 	str = realloc(str, len);
 	tmp_str = str + strlen(str); 
 	sprintf(tmp_str, "    IOField \"%s\" \"%s\" %d %d\n",
@@ -374,6 +374,7 @@ localize_format(CManager cm, IOFormat format)
 	list[format_count - i - 1].format_name = strdup(name_of_IOformat(formats[i]));
 	list[format_count - i - 1].field_list = get_local_field_list(formats[i]);
     }
+    free(formats);
     return EVregister_format_set(cm, list, NULL);
 }    
     
@@ -546,6 +547,7 @@ add_param(ecl_parse_context parse_context, char *name, int param_num,
     param = ecl_build_param_node(name, type, param_num);
 
     ecl_add_decl_to_parse_context(name, param, parse_context);
+    free(formats);
 }
 
 #if 0
