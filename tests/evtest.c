@@ -109,7 +109,7 @@ simple_rec_ptr event;
 int quiet = 1;
 
 static
-void
+int
 simple_handler(cm, vevent, client_data, attrs)
 CManager cm;
 void *vevent;
@@ -145,6 +145,7 @@ attr_list attrs;
 	int tmp = *((int *) client_data);
 	*((int *) client_data) = tmp + 1;
     }
+    return 0;
 }
 
 static int do_regression_master_test();
