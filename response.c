@@ -386,6 +386,10 @@ dump_mrd(void *mrdv)
 	printf("Reponse Filter, code is %s\n",
 	       mrd->u.filter.function);
 	break;
+    case Response_Transform:
+	printf("Reponse Transform, code is %s\n",
+	       mrd->u.transform.function);
+	break;
     }
 }
 

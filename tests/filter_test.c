@@ -240,7 +240,7 @@ char **argv;
 	}	
 	term = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, term, simple_format_list, simple_handler, NULL);
-	filter = create_filter_action_spec(simple_format_list, "{\
+	filter = create_filter_action_spec(filter_format_list, "{\
     return input.long_field % 2;\
 }\0\0");
 	
@@ -395,7 +395,7 @@ do_regression_master_test()
 
     term = EValloc_stone(cm);
     EVassoc_terminal_action(cm, term, simple_format_list, simple_handler, &message_count);
-    filter = create_filter_action_spec(simple_format_list, "{\
+    filter = create_filter_action_spec(filter_format_list, "{\
     return input.long_field % 2;\
 }\0\0");
     
