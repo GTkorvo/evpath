@@ -1394,18 +1394,33 @@ struct _EVSource;
  * EVStone is an opaque handle.  
  */
 typedef int EVstone;
+typedef int EVaction;
 typedef struct _EVSource *EVsource;
 
 extern EVstone
 EValloc_stone(CManager cm);
 
 extern void
+EVfree_stone(CManager cm, EVstone stone);
+
+extern EVaction
 EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
 
+extern EVaction
+EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list, 
+		      EVstone remote_stone);
+
+extern EVaction
+EVassoc_split_action(CManager cm, EVstone stone, EVstone *target_list);
+
+extern int
+EVaction_add_split_target(CManager cm, EVstone stone, EVaction action,
+			  EVstone target_stone);
+
 extern void
-EVassoc_output_action(CManager cm, EVstone stone, CMFormatList format_list, 
-		      attr_list contact_list, EVstone remote_stone);
+EVaction_remove_split_target(CManager cm, EVstone stone, EVaction action,
+			  EVstone target_stone);
 
 extern EVsource
 EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format);

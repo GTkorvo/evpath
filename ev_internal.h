@@ -30,7 +30,7 @@ typedef struct _event_item {
     attr_list attrs;
 } event_item, *event_queue;
 
-typedef enum { Action_Output, Action_Terminal, Action_Decode} action_value;
+typedef enum { Action_Output = 0, Action_Terminal, Action_Decode, Action_Split} action_value;
 
 typedef struct output_action_struct {
     CMConnection conn;
@@ -62,6 +62,7 @@ typedef struct _action {
 	output_action_vals out;
 	decode_action_vals decode;
 	int terminal_proto_action_number;
+	int *split_stone_targets;
     }o;
 } action;
 

@@ -182,7 +182,7 @@ char **argv;
 	return do_regression_master_test();
     }
     cm = CManager_create();
-    (void) CMfork_comm_thread(cm);
+/*    (void) CMfork_comm_thread(cm);*/
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
@@ -237,7 +237,7 @@ char **argv;
 	    list_str = strchr(argv[1], ':') + 1;
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
-	    EVassoc_output_action(cm, stone, NULL, contact_list, remote_stone);
+	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
 	}
 	generate_record(&data);
 	attrs = create_attr_list();

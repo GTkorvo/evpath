@@ -13,7 +13,10 @@ static IOFormat register_format_set(CManager cm, CMFormatList list,
 static void reference_event(event_item *event);
 static void return_event(event_path_data evp, event_item *event);
 static event_item *get_free_event(event_path_data evp);
+static void dump_action(stone_type stone, int a, const char *indent);
+extern void print_server_ID(char *server_id);
 
+static const char *action_str[] = { "Action_Output", "Action_Terminal", "Action_Decode", "Action_Split"};
 
 void
 EVPSubmit_encoded(CManager cm, int local_path_id, void *data, int len)
@@ -47,6 +50,16 @@ EValloc_stone(CManager cm)
 }
 
 void
+EVfree_stone(CManager cm, EVstone stone_num)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone;
+
+    stone = &evp->stone_map[stone_num];
+    stone->local_id = -1;
+}
+
+EVstone
 EVassoc_terminal_action(CManager cm, EVstone stone_num, 
 			CMFormatList format_list, EVSimpleHandlerFunc handler,
 			void *client_data)
@@ -65,8 +78,11 @@ EVassoc_terminal_action(CManager cm, EVstone stone_num,
     stone->proto_actions[proto_action_num].action_type = Action_Terminal;
     stone->proto_actions[proto_action_num].t.term.handler = handler;
     stone->proto_actions[proto_action_num].t.term.client_data = client_data;
-    stone->proto_actions[proto_action_num].reference_format = 
-	register_format_set(cm, format_list, NULL);
+    stone->proto_actions[proto_action_num].reference_format = NULL;
+    if (format_list != NULL) {
+	stone->proto_actions[proto_action_num].reference_format = 
+	    register_format_set(cm, format_list, NULL);
+    }	
     action_num = stone->action_count++;
     stone->actions = realloc(stone->actions, (action_num + 1) * 
 				   sizeof(stone->actions[0]));
@@ -76,6 +92,7 @@ EVassoc_terminal_action(CManager cm, EVstone stone_num,
     stone->actions[action_num].reference_format = 
 	stone->proto_actions[proto_action_num].reference_format;
     stone->actions[action_num].o.terminal_proto_action_number = proto_action_num;
+    return action_num;
 }
     
 
@@ -113,7 +130,6 @@ dequeue_event(CManager cm, action *act)
     event_item *event = NULL;
     if (item == NULL) return event;
     event = item->item;
-    event->ref_count++;
     if (act->queue_head == act->queue_tail) {
 	act->queue_head = NULL;
 	act->queue_tail = NULL;
@@ -162,6 +178,8 @@ determine_action(CManager cm, stone_type stone, event_item *event)
     event_path_data evp = cm->evp;
     int i;
     int nearest_proto_action = -1;
+    CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %lx\n",
+	   event->reference_format);
     for (i=0; i < stone->action_count; i++) {
 	if (stone->actions[i].reference_format == event->reference_format) {
 	    if ((event->contents == Event_Encoded_CM_Owned) &&
@@ -171,6 +189,9 @@ determine_action(CManager cm, stone_type stone, event_item *event)
 	    return &stone->actions[i];
 	}
     }
+/*    if ((stone->action_count != 0) || (stone->proto_action_count != 0)) {
+	printf("no prebuilt action on stone %d\n", stone->local_id);
+	}*/
     if (stone->proto_action_count > 0) {
 	IOFormat * formatList;
 	IOcompat_formats older_format = NULL;
@@ -189,6 +210,8 @@ determine_action(CManager cm, stone_type stone, event_item *event)
 
     if (nearest_proto_action == -1) {
 	if (stone->default_action != -1) {
+/*	    printf(" Returning ");
+	    dump_action(stone, stone->default_action, "   ");*/
 	    return &stone->actions[stone->default_action];
 	}
 	return NULL;
@@ -203,9 +226,11 @@ determine_action(CManager cm, stone_type stone, event_item *event)
 	    char *server_id = get_server_ID_IOformat(event->reference_format,
 						     &id_len);
 	    action *act;
+/*	    printf("Creating new DECODE action\n");*/
 	    stone->actions = realloc(stone->actions, 
 				     sizeof(stone->actions[0]) * (a + 1));
 	    act = & stone->actions[a];
+	    act->requires_decoded = 0;
 	    act->action_type = Action_Decode;
 	    act->reference_format = event->reference_format;
 	    act->queue_head = act->queue_tail = NULL;
@@ -219,9 +244,12 @@ determine_action(CManager cm, stone_type stone, event_item *event)
 		stone->proto_actions[nearest_proto_action].reference_format;
 	    set_conversions(act->o.decode.context, format,
 			    act->o.decode.target_reference_format);
+/*	    printf(" Returning ");
+	    dump_action(stone, a, "   ");*/
 	    return act;
 	}
     }
+    return NULL;
 }
 
 static event_item *
@@ -258,6 +286,72 @@ decode_action(CManager cm, event_item *event, action *act)
     }
 }
 
+static void
+dump_proto_action(stone_type stone, int a, const char *indent)
+{
+    proto_action *proto = &stone->proto_actions[a];
+    printf("Proto-Action %d - %s\n", a, action_str[proto->action_type]);
+}
+
+static void
+dump_action(stone_type stone, int a, const char *indent)
+{
+    action *act = &stone->actions[a];
+    printf("Action %d - %s  ", a, action_str[act->action_type]);
+    if (act->requires_decoded) {
+	printf("requires decoded\n");
+    } else {
+	printf("accepts encoded\n");
+    }
+    printf("  reference format :");
+    if (act->reference_format) {
+	int id_len;
+	print_server_ID(get_server_ID_IOformat(act->reference_format, &id_len));
+    } else {
+	printf(" NULL\n");
+    }
+    switch(act->action_type) {
+    case Action_Output:
+	printf("  Target: connection %lx, remote_stone_id %d, new %d, write_pending %d\n",
+	       act->o.out.conn, act->o.out.remote_stone_id, 
+	       act->o.out.new, act->o.out.write_pending);
+	break;
+    case Action_Terminal:
+	printf("  Terminal proto action number %d\n",
+	       act->o.terminal_proto_action_number);
+	break;
+    case Action_Decode:
+	printf("   Decoding action\n");
+	break;
+    case Action_Split:
+	printf("    Split target stones: ");
+	{
+	    int i = 0;
+	    while (act->o.split_stone_targets[i] != -1) {
+		printf(" %d", act->o.split_stone_targets[i]); i++;
+	    }
+	    printf("\n");
+	}
+	break;
+    }
+}
+
+static void
+dump_stone(stone_type stone)
+{
+    int i;
+    printf("Stone %lx, local ID %d, default action %d\n",
+	   (long)stone, stone->local_id, stone->default_action);
+    printf("  proto_action_count %d:\n", stone->proto_action_count);
+    for (i=0; i< stone->proto_action_count; i++) {
+	dump_proto_action(stone, i, "    ");
+    }
+    printf("  action_count %d:\n", stone->action_count);
+    for (i=0; i< stone->action_count; i++) {
+	dump_action(stone, i, "    ");
+    }
+}
+
 static
 int
 internal_path_submit(CManager cm, int local_path_id, event_item *event)
@@ -272,13 +366,19 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     }
     stone = &(evp->stone_map[local_path_id]);
     act = determine_action(cm, stone, event);
+    if (act == NULL) {
+	printf("No action found for event %lx submitted to stone %d\n",
+	       (long)event, local_path_id);
+	dump_stone(stone);
+	return 0;
+    }
     if (act->action_type == Action_Decode) {
 	CMtrace_out(cm, EVerbose, "Decoding event");
 	event = decode_action(cm, event, act);
 	act = determine_action(cm, stone, event);
     }
-    CMtrace_out(cm, EVerbose, "Enqueueing event");
-    reference_event(event);
+    CMtrace_out(cm, EVerbose, "Enqueueing event %lx on stone %d, action %lx",
+		(long)event, local_path_id, (long)act);
     enqueue_event(cm, act, event);
     return 1;
 }
@@ -289,27 +389,44 @@ process_local_actions(cm)
 CManager cm;
 {
     event_path_data evp = cm->evp;
-    int s, a;
+    int s, a, more_pending = 0;
     CMtrace_out(cm, EVerbose, "Process local actions");
     for (s = 0; s < evp->stone_count; s++) {
 	for (a=0 ; a < evp->stone_map[s].action_count; a++) {
 	    action *act = &evp->stone_map[s].actions[a];
-	    if ((act->action_type == Action_Terminal) && 
-		(act->queue_head != NULL)) {
-		/* the data should already be in the right format */
-		int proto = act->o.terminal_proto_action_number;
-		struct terminal_proto_vals *term = 
-		    &evp->stone_map[s].proto_actions[proto].t.term;
-		EVSimpleHandlerFunc handler = term->handler;
-		void *client_data = term->client_data;
-		event_item *event = dequeue_event(cm, act);
-		CMtrace_out(cm, EVerbose, "Executing terminal event");
-		(handler)(cm, event->decoded_event, client_data, NULL);
-		CMtrace_out(cm, EVerbose, "Finish terminal event");
-		return_event(evp, event);
+	    if (act->queue_head != NULL) {
+		switch (act->action_type) {
+		case Action_Terminal: {
+		    /* the data should already be in the right format */
+		    int proto = act->o.terminal_proto_action_number;
+		    struct terminal_proto_vals *term = 
+			&evp->stone_map[s].proto_actions[proto].t.term;
+		    EVSimpleHandlerFunc handler = term->handler;
+		    void *client_data = term->client_data;
+		    event_item *event = dequeue_event(cm, act);
+		    CMtrace_out(cm, EVerbose, "Executing terminal event");
+		    (handler)(cm, event->decoded_event, client_data, NULL);
+		    CMtrace_out(cm, EVerbose, "Finish terminal event");
+		    return_event(evp, event);
+		    break;
+		  }
+		case Action_Split: {
+		    int t = 0;
+		    event_item *event = dequeue_event(cm, act);
+		    while (act->o.split_stone_targets[t] != -1) {
+			internal_path_submit(cm, 
+					     act->o.split_stone_targets[t],
+					     event);
+			t++;
+			more_pending++;
+		    }
+		    return_event(evp, event);
+		  }
+		}
 	    }
 	}
     }
+    return more_pending;
 }
 
 static
@@ -336,9 +453,9 @@ process_output_actions(CManager cm)
     return 1;
 }
 
-extern void
-EVassoc_output_action(CManager cm, EVstone stone_num, CMFormatList format_list, 
-		      attr_list contact_list, EVstone remote_stone)
+extern EVaction
+EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
+		      EVstone remote_stone)
 {
     event_path_data evp = cm->evp;
     stone_type stone = &evp->stone_map[stone_num];
@@ -352,6 +469,83 @@ EVassoc_output_action(CManager cm, EVstone stone_num, CMFormatList format_list,
     stone->actions[action_num].o.out.conn = CMget_conn(cm, contact_list);
     stone->actions[action_num].o.out.remote_stone_id = remote_stone;
     stone->default_action = action_num;
+    return action_num;
+}
+
+extern EVaction
+EVassoc_split_action(CManager cm, EVstone stone_num, 
+		     EVstone *target_stone_list)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_num];
+    int action_num = stone->action_count++;
+    int target_count = 0, i;
+    stone->actions = realloc(stone->actions, 
+				   (action_num + 1) * 
+				   sizeof(stone->actions[0]));
+    memset(&stone->actions[action_num], 0, 
+	   sizeof(stone->actions[0]));
+    stone->actions[action_num].action_type = Action_Split;
+    while (target_stone_list && (target_stone_list[target_count] != -1)) {
+	target_count++;
+    }
+    stone->actions[action_num].o.split_stone_targets = 
+	malloc((target_count + 1) * sizeof(EVstone));
+    for (i=0; i < target_count; i++) {
+	stone->actions[action_num].o.split_stone_targets[i] = 
+	    target_stone_list[i];
+    }
+    stone->actions[action_num].o.split_stone_targets[i] = -1;
+    stone->default_action = action_num;
+    return action_num;
+}
+
+extern int
+EVaction_add_split_target(CManager cm, EVstone stone_num, 
+			  EVaction action_num, EVstone new_stone_target)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_num];
+    EVstone *target_stone_list;
+    int target_count = 0, i;
+    if (stone->actions[action_num].action_type != Action_Split ) {
+	printf("Not split action\n");
+	return 0;
+    }
+    target_stone_list = stone->actions[action_num].o.split_stone_targets;
+    while (target_stone_list && (target_stone_list[target_count] != -1)) {
+	target_count++;
+    }
+    target_stone_list = realloc(target_stone_list, 
+				(target_count + 2) * sizeof(EVstone));
+    target_stone_list[target_count] = new_stone_target;
+    target_stone_list[target_count+1] = -1;
+    stone->actions[action_num].o.split_stone_targets = target_stone_list;
+    return 1;
+}
+
+extern void
+EVaction_remove_split_target(CManager cm, EVstone stone_num, 
+			  EVaction action_num, EVstone stone_target)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_num];
+    EVstone *target_stone_list;
+    int target_count = 0, i;
+    if (stone->actions[action_num].action_type != Action_Split ) {
+	printf("Not split action\n");
+    }
+    target_stone_list = stone->actions[action_num].o.split_stone_targets;
+    if (!target_stone_list) return;
+    while (target_stone_list[target_count] != stone_target) {
+	target_count++;
+    }
+    while (target_stone_list[target_count+1] != -1 ) {
+	/* move them down, overwriting target */
+	target_stone_list[target_count] = target_stone_list[target_count+1];
+	target_count++;
+    }
+    target_stone_list[target_count] = -1;
 }
 
 static int
@@ -421,7 +615,6 @@ register_format_set(CManager cm, CMFormatList list, IOContext *context_ptr)
 				 list[0].field_list, NULL, 
 				 tmp_context);
     server_id = get_server_ID_IOformat(format, &id_len);
-
     if (context_ptr == NULL) {
 	/* replace original ref with ref in base context */
 	format = get_format_app_IOcontext(evp->root_context, server_id, NULL);
@@ -440,9 +633,8 @@ EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format)
     source->local_stone_id = stone;
     source->cm = cm;
     source->format = CMregister_format(cm, data_format[0].format_name,
-				       data_format[0].field_list, data_format);
-    CMcomplete_format_registration(source->format, 0);
-    source->reference_format = source->format->format;
+					    data_format[0].field_list, data_format);
+    source->reference_format = register_format_set(cm, data_format, NULL);
     return source;
 }
 
@@ -483,7 +675,7 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     event->format = NULL;
     internal_path_submit(cm, stone_id, event);
     return_event(evp, event);
-    process_local_actions(cm);
+    while (process_local_actions(cm));
     process_output_actions(cm);
 }
 
@@ -497,7 +689,7 @@ EVsubmit(EVsource source, void *data, attr_list attrs)
     event->format = source->format;
     internal_path_submit(source->cm, source->local_stone_id, event);
     return_event(source->cm->evp, event);
-    process_local_actions(source->cm);
+    while (process_local_actions(source->cm));
     process_output_actions(source->cm);
 }
 
@@ -519,6 +711,9 @@ free_evp(CManager cm, void *not_used)
 		break;
 	    case Action_Decode:
 		free_IOcontext(act->o.decode.context);
+		break;
+	    case Action_Split:
+		free(act->o.split_stone_targets);
 		break;
 	    }
 	}
