@@ -249,7 +249,6 @@ IOFormat incoming_format;
 static action *
 determine_action(CManager cm, stone_type stone, event_item *event)
 {
-    event_path_data evp = cm->evp;
     int i;
     int nearest_proto_action = -1;
     CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %lx",
