@@ -25,11 +25,12 @@ typedef struct _event_item {
     void *decoded_event;
     IOEncodeVector encoded_eventv;
     IOFormat reference_format;
+    CMFormat format;
     ev_free_block_rec_p block_rec;
     attr_list attrs;
 } event_item, *event_queue;
 
-typedef enum { Action_Output, Action_Terminal} action_value;
+typedef enum { Action_Output, Action_Terminal, Action_Decode} action_value;
 
 typedef struct output_action_struct {
     CMConnection conn;
@@ -40,6 +41,12 @@ typedef struct output_action_struct {
     int write_pending;
 } output_action_vals;
 
+typedef struct decode_action_struct {
+    IOFormat decode_format; /* has conversion registered */
+    IOFormat target_reference_format;
+    IOContext context;
+} decode_action_vals;
+
 typedef struct queue_item {
     event_item *item;
     struct queue_item *next;
@@ -48,15 +55,18 @@ typedef struct queue_item {
 typedef struct _action {
     action_value action_type;
     IOFormat reference_format;
+    int requires_decoded;
     queue_item *queue_head;
     queue_item *queue_tail;
     union {
 	output_action_vals out;
-    };
+	decode_action_vals decode;
+	int terminal_proto_action_number;
+    }o;
 } action;
 
 struct terminal_proto_vals {
-    void *handler;
+    EVSimpleHandlerFunc handler;
     void *client_data;
 };
 
@@ -66,13 +76,8 @@ typedef struct _proto_action {
     IOFormat reference_format;
     union {
 	struct terminal_proto_vals term;
-    };
+    }t;
 } proto_action;
-
-typedef struct _format_map_entry {
-    IOFormat format;
-    struct _action *action;
-} format_map_entry;
 
 typedef struct _stone {
     int local_id;
@@ -81,8 +86,6 @@ typedef struct _stone {
     struct _proto_action *proto_actions;
     int action_count;
     struct _action *actions;
-    int format_map_count;
-    struct _format_map_entry *map;
 } *stone_type;
     
 typedef struct _event_path_data {

@@ -511,9 +511,6 @@ check-local:
 	@if CMTransport=udp ./evtest$(EXEEXT) ; then\
 	 echo "PASS: evtest(udp)";\
 	else echo "FAIL: evtest(udp)"; fi
-	@if CMTransport=udp ./evping$(EXEEXT) ; then\
-	 echo "PASS: evping(udp)";\
-	else echo "FAIL: evping(udp)"; fi
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

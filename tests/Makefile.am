@@ -8,9 +8,6 @@ check-local:
 	@if CMTransport=udp ./evtest$(EXEEXT) ; then\
 	 echo "PASS: evtest(udp)";\
 	else echo "FAIL: evtest(udp)"; fi
-	@if CMTransport=udp ./evping$(EXEEXT) ; then\
-	 echo "PASS: evping(udp)";\
-	else echo "FAIL: evping(udp)"; fi
 
 noinst_PROGRAMS = evtest
 

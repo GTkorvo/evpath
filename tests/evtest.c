@@ -74,9 +74,9 @@ static IOField simple_field_list[] =
 
 static CMFormatRec simple_format_list[] =
 {
+    {"simple", simple_field_list},
     {"complex", complex_field_list},
     {"nested", nested_field_list},
-    {"simple", simple_field_list},
     {NULL, NULL}
 };
 
@@ -110,9 +110,8 @@ int quiet = 1;
 
 static
 void
-simple_handler(cm, conn, vevent, client_data, attrs)
+simple_handler(cm, vevent, client_data, attrs)
 CManager cm;
-CMConnection conn;
 void *vevent;
 void *client_data;
 attr_list attrs;
@@ -133,14 +132,14 @@ attr_list attrs;
 	       (int) sum, (int) scan_sum);
     }
     if ((quiet <= 0) || (sum != scan_sum)) {
-	printf("In the handler, connection is %lx, event data is :\n", (long)conn);
+	printf("In the handler, event data is :\n");
 	printf("	integer_field = %d\n", event->integer_field);
 	printf("	short_field = %d\n", event->short_field);
 	printf("	long_field = %ld\n", event->long_field);
 	printf("	double_field = %g\n", event->double_field);
 	printf("	char_field = %c\n", event->char_field);
 	printf("Data was received with attributes : \n");
-	dump_attr_list(attrs);
+	if (attrs) dump_attr_list(attrs);
     }
     if (client_data != NULL) {
 	int tmp = *((int *) client_data);
@@ -157,7 +156,6 @@ int argc;
 char **argv;
 {
     CManager cm;
-    CMConnection conn = NULL;
     int regression_master = 1;
 
     while (argv[1] && (argv[1][0] == '-')) {
@@ -219,7 +217,7 @@ char **argv;
 		     (attr_value) HELLO_PORT);
 	    add_attr(contact_list, CM_TRANSPORT, Attr_String,
 		     (attr_value) "multicast");
-	    conn = CMinitiate_conn(cm, contact_list);
+/*	    conn = CMinitiate_conn(cm, contact_list);*/
 	    string_list = attr_list_to_string(contact_list);
 	    free_attr_list(contact_list);
 	}	
@@ -236,15 +234,10 @@ char **argv;
 	    attr_list contact_list;
 	    char *list_str;
 	    sscanf(argv[1], "%d:", &remote_stone);
-	    list_str = index(argv[1], ':') + 1;
+	    list_str = strchr(argv[1], ':') + 1;
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
 	    EVassoc_output_action(cm, stone, NULL, contact_list, remote_stone);
-	    if (conn == NULL) {
-		printf("connection, attr list was :");
-		dump_attr_list(contact_list);
-		printf("\n");
-	    }
 	}
 	generate_record(&data);
 	attrs = create_attr_list();
@@ -266,7 +259,7 @@ static void
 fail_and_die(signal)
 int signal;
 {
-    fprintf(stderr, "CMtest failed to complete in reasonable time\n");
+    fprintf(stderr, "EVtest failed to complete in reasonable time\n");
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
     }
@@ -280,9 +273,9 @@ char **args;
 {
 #ifdef HAVE_WINDOWS_H
     int child;
-    child = _spawnv(_P_NOWAIT, "./cmtest.exe", args);
+    child = _spawnv(_P_NOWAIT, "./evtest.exe", args);
     if (child == -1) {
-	printf("failed for cmtest\n");
+	printf("failed for evtest\n");
 	perror("spawnv");
     }
     return child;
@@ -290,7 +283,7 @@ char **args;
     pid_t child = fork();
     if (child == 0) {
 	/* I'm the child */
-	execv("./cmtest", args);
+	execv("./evtest", args);
     }
     return child;
 #endif
@@ -300,7 +293,7 @@ static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"cmtest", "-c", NULL, NULL};
+    char *args[] = {"evtest", "-c", NULL, NULL};
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
@@ -352,7 +345,6 @@ do_regression_master_test()
 	string_list = attr_list_to_string(contact_list);
 	free_attr_list(contact_list);
     }	
-    args[2] = string_list;
 
     if (quiet <= 0) {
 	if (forked) {
@@ -365,6 +357,10 @@ do_regression_master_test()
 
     handle = EValloc_stone(cm);
     EVassoc_terminal_action(cm, handle, simple_format_list, simple_handler, &message_count);
+    
+    args[2] = string_list;
+    args[2] = malloc(10 + strlen(string_list));
+    sprintf(args[2], "%d:%s", handle, string_list);
     subproc_proc = run_subprocess(args);
 
     /* give him time to start */

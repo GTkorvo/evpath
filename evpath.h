@@ -110,6 +110,10 @@ typedef void (*CMHandlerFunc) ARGS((CManager cm,
 				    void *message, void *client_data,
 				    attr_list attrs));
 
+typedef void (*EVSimpleHandlerFunc) ARGS((CManager cm, 
+					  void *message, void *client_data,
+					  attr_list attrs));
+
 /*!
  * The prototype for a CM polling handler (and others).
  *
@@ -1397,7 +1401,7 @@ EValloc_stone(CManager cm);
 
 extern void
 EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list, 
-			void *handler, void* client_data);
+			EVSimpleHandlerFunc handler, void* client_data);
 
 extern void
 EVassoc_output_action(CManager cm, EVstone stone, CMFormatList format_list, 
