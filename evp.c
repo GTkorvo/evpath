@@ -9,7 +9,8 @@
 #include "cm_internal.h"
 #include "response.h"
 
-static IOFormat register_format_set(CManager cm, CMFormatList list, 
+extern 
+IOFormat EVregister_format_set(CManager cm, CMFormatList list, 
 				    IOContext *context_ptr);
 static void reference_event(event_item *event);
 static void return_event(event_path_data evp, event_item *event);
@@ -99,7 +100,7 @@ EVassoc_terminal_action(CManager cm, EVstone stone_num,
     stone->proto_actions[proto_action_num].reference_format = NULL;
     if (format_list != NULL) {
 	stone->proto_actions[proto_action_num].reference_format = 
-	    register_format_set(cm, format_list, NULL);
+	    EVregister_format_set(cm, format_list, NULL);
     }	
     action_num = stone->action_count++;
     stone->actions = realloc(stone->actions, (action_num + 1) * 
@@ -161,7 +162,7 @@ EVassoc_filter_action(CManager cm, EVstone stone_num,
     stone->proto_actions[proto_action_num].reference_format = NULL;
     if (format_list != NULL) {
 	stone->proto_actions[proto_action_num].reference_format = 
-	    register_format_set(cm, format_list, NULL);
+	    EVregister_format_set(cm, format_list, NULL);
     }	
     action_num = stone->action_count++;
     stone->actions = realloc(stone->actions, (action_num + 1) * 
@@ -180,10 +181,12 @@ EVassoc_filter_action(CManager cm, EVstone stone_num,
 static int evpath_locked(){return 1;}
 
 static void
-enqueue_event(CManager cm, action *act, event_item *event)
+enqueue_event(CManager cm, int stone_id, int action_id, int sub_act, event_item *event)
 {
     event_path_data evp = cm->evp;
     queue_item *item;
+    stone_type stone = &evp->stone_map[stone_id];
+    action *act = &stone->actions[action_id];
     if (evp->queue_items_free_list == NULL) {
 	item = malloc(sizeof(*item));
     } else {
@@ -191,6 +194,8 @@ enqueue_event(CManager cm, action *act, event_item *event)
 	evp->queue_items_free_list = item->next;
     }
     item->item = event;
+    item->action_id = action_id;
+    item->subaction_id = sub_act;
     reference_event(event);
     if (act->queue->queue_head == NULL) {
 	act->queue->queue_head = item;
@@ -204,18 +209,20 @@ enqueue_event(CManager cm, action *act, event_item *event)
 }
 
 static event_item *
-dequeue_event(CManager cm, action *act)
+dequeue_event(CManager cm, queue_ptr q, int *act_p, int *subact_p)
 {
     event_path_data evp = cm->evp;
-    queue_item *item = act->queue->queue_head;
+    queue_item *item = q->queue_head;
     event_item *event = NULL;
     if (item == NULL) return event;
     event = item->item;
-    if (act->queue->queue_head == act->queue->queue_tail) {
-	act->queue->queue_head = NULL;
-	act->queue->queue_tail = NULL;
+    *act_p = item->action_id;
+    *subact_p = item->subaction_id;
+    if (q->queue_head == q->queue_tail) {
+	q->queue_head = NULL;
+	q->queue_tail = NULL;
     } else {
-	act->queue->queue_head = act->queue->queue_head->next;
+	q->queue_head = q->queue_head->next;
     }
     item->next = evp->queue_items_free_list;
     evp->queue_items_free_list = item;;
@@ -254,8 +261,8 @@ set_conversions(IOContext ctx, IOFormat src_format, IOFormat target_format)
 }
 
 extern void
-EVstone_install_conversion_action(cm, stone_id, target_format, incoming_format)
-    CManager cm;
+EVassoc_conversion_action(cm, stone_id, target_format, incoming_format)
+CManager cm;
 int stone_id;
 IOFormat target_format;
 IOFormat incoming_format;
@@ -298,7 +305,7 @@ EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num,
 	realloc(stone->actions[act_num].o.imm.output_stone_ids,
 		sizeof(int) * (output_count + 2));
     stone->actions[act_num].o.imm.output_stone_ids[output_count] = output_stone;
-    stone->actions[act_num].o.imm.output_stone_ids[output_count] = -1;
+    stone->actions[act_num].o.imm.output_stone_ids[output_count+1] = -1;
 }
     
 
@@ -443,7 +450,6 @@ dump_stone(stone_type stone)
     }
 }
 
-static
 int
 internal_path_submit(CManager cm, int local_path_id, event_item *event)
 {
@@ -473,7 +479,7 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     }
     CMtrace_out(cm, EVerbose, "Enqueueing event %lx on stone %d, action %lx",
 		(long)event, local_path_id, (long)act);
-    enqueue_event(cm, act, event);
+    enqueue_event(cm, local_path_id, action_id, subact, event);
     return 1;
 }
 
@@ -486,6 +492,71 @@ CManager cm;
     int s, a, more_pending = 0;
     CMtrace_out(cm, EVerbose, "Process local actions");
     for (s = 0; s < evp->stone_count; s++) {
+	while (evp->stone_map[s].queue->queue_head != NULL) {
+	    int action_id, subaction_id;
+	    event_item *event = dequeue_event(cm, evp->stone_map[s].queue, 
+					      &action_id, &subaction_id);
+	    action *act = &evp->stone_map[s].actions[action_id];
+	    switch(act->action_type) {
+	    case Action_Terminal:
+	    case Action_Filter: {
+		/* the data should already be in the right format */
+		int proto = act->o.terminal_proto_action_number;
+		int out;
+		struct terminal_proto_vals *term = 
+		    &evp->stone_map[s].proto_actions[proto].t.term;
+		EVSimpleHandlerFunc handler = term->handler;
+		void *client_data = term->client_data;
+		CMtrace_out(cm, EVerbose, "Executing terminal/filter event");
+		cm->evp->current_event_item = event;
+		out = (handler)(cm, event->decoded_event, client_data,
+				event->attrs);
+		cm->evp->current_event_item = NULL;
+		if (act->action_type == Action_Filter) {
+		    if (out) {
+			CMtrace_out(cm, EVerbose, "Filter passed event to stone %d, submitting", term->target_stone_id);
+			internal_path_submit(cm, 
+					     term->target_stone_id,
+					     event);
+		    } else {
+			CMtrace_out(cm, EVerbose, "Filter discarded event");
+		    }			    
+		    more_pending++;
+		} else {
+		    CMtrace_out(cm, EVerbose, "Finish terminal event");
+		}
+		return_event(evp, event);
+		break;
+	    }
+	    case Action_Split: {
+		int t = 0;
+		while (act->o.split_stone_targets[t] != -1) {
+		    internal_path_submit(cm, 
+					 act->o.split_stone_targets[t],
+					 event);
+		    t++;
+		    more_pending++;
+		}
+		return_event(evp, event);
+	    }
+	    case Action_Immediate: {
+		EVImmediateHandlerFunc func;
+		void *client_data;
+		int *out_stones;
+		/* data is already in the right format */
+		func = act->o.imm.subacts[subaction_id].handler;
+		client_data = act->o.imm.subacts[subaction_id].client_data;
+		out_stones = act->o.imm.output_stone_ids;
+		func(cm, event, client_data, event->attrs, out_stones);
+		return_event(evp, event);
+		more_pending++;   /* maybe??? */
+		break;
+	    }
+	    default:
+		assert(FALSE);
+	    }
+	}
+
 	for (a=0 ; a < evp->stone_map[s].action_count; a++) {
 	    action *act = &evp->stone_map[s].actions[a];
 	    if (act->queue->queue_head != NULL) {
@@ -493,13 +564,15 @@ CManager cm;
 		case Action_Terminal:
 		case Action_Filter: {
 		    /* the data should already be in the right format */
+		    int action_id, subaction_id;
+		    event_item *event = dequeue_event(cm, act->queue, 
+						      &action_id, &subaction_id);
 		    int proto = act->o.terminal_proto_action_number;
 		    int out;
 		    struct terminal_proto_vals *term = 
 			&evp->stone_map[s].proto_actions[proto].t.term;
 		    EVSimpleHandlerFunc handler = term->handler;
 		    void *client_data = term->client_data;
-		    event_item *event = dequeue_event(cm, act);
 		    CMtrace_out(cm, EVerbose, "Executing terminal/filter event");
 		    cm->evp->current_event_item = event;
 		    out = (handler)(cm, event->decoded_event, client_data,
@@ -522,8 +595,11 @@ CManager cm;
 		    break;
 		}
 		case Action_Split: {
+		    int action_id, subaction_id;
+		    event_item *event = dequeue_event(cm, act->queue, 
+						      &action_id,
+						      &subaction_id);
 		    int t = 0;
-		    event_item *event = dequeue_event(cm, act);
 		    while (act->o.split_stone_targets[t] != -1) {
 			internal_path_submit(cm, 
 					     act->o.split_stone_targets[t],
@@ -558,7 +634,9 @@ process_output_actions(CManager cm)
 	    action *act = &evp->stone_map[s].actions[a];
 	    if ((act->action_type == Action_Output) && 
 		(act->queue->queue_head != NULL)) {
-		event_item *event = dequeue_event(cm, act);
+		int action_id, subact_id;
+		event_item *event = dequeue_event(cm, act->queue, &action_id, 
+						  &subact_id);
 		CMtrace_out(cm, EVerbose, "Writing event to remote stone %d",
 			    act->o.out.remote_stone_id);
 		internal_write_event(act->o.out.conn, event->format,
@@ -572,6 +650,25 @@ process_output_actions(CManager cm)
 }
 
 extern EVaction
+EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
+			   EVImmediateHandlerFunc func, void *client_data, 
+			   IOFormat reference_format)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_id];
+    action *act = &stone->actions[act_num];
+    int sub_num = act->o.imm.subaction_count++;
+    
+    assert(act->action_type == Action_Immediate);
+    act->o.imm.subacts = realloc(act->o.imm.subacts, 
+				 (sub_num + 1) * sizeof(immediate_sub));
+    act->o.imm.subacts[sub_num].handler = func;
+    act->o.imm.subacts[sub_num].client_data = client_data;
+    act->o.imm.subacts[sub_num].reference_format = reference_format;
+}
+
+
+extern EVaction
 EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
 		      EVstone remote_stone)
 {
@@ -583,7 +680,9 @@ EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
 				   sizeof(stone->actions[0]));
     memset(&stone->actions[action_num], 0, 
 	   sizeof(stone->actions[0]));
-    stone->actions[action_num].queue = stone->queue;
+    stone->actions[action_num].queue = malloc(sizeof(queue_struct));
+    stone->actions[action_num].queue->queue_tail = 
+	stone->actions[action_num].queue->queue_head = NULL;
     stone->actions[action_num].action_type = Action_Output;
     stone->actions[action_num].o.out.conn = CMget_conn(cm, contact_list);
     stone->actions[action_num].o.out.remote_stone_id = remote_stone;
@@ -716,8 +815,8 @@ CMFormatList sub_list;
     return 1;
 }
 
-static IOFormat
-register_format_set(CManager cm, CMFormatList list, IOContext *context_ptr)
+extern IOFormat
+EVregister_format_set(CManager cm, CMFormatList list, IOContext *context_ptr)
 {
     event_path_data evp = cm->evp;
     char *server_id;
@@ -786,7 +885,7 @@ EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format)
 	source->format = CMregister_format(cm, data_format[0].format_name,
 					   data_format[0].field_list,
 					   data_format);
-	source->reference_format = register_format_set(cm, data_format, NULL);
+	source->reference_format = EVregister_format_set(cm, data_format, NULL);
     };
     return source;
 }
@@ -802,7 +901,7 @@ EVcreate_submit_handle_free(CManager cm, EVstone stone,
     source->cm = cm;
     source->format = CMregister_format(cm, data_format[0].format_name,
 					    data_format[0].field_list, data_format);
-    source->reference_format = register_format_set(cm, data_format, NULL);
+    source->reference_format = EVregister_format_set(cm, data_format, NULL);
     source->free_func = free_func;
     source->free_data = free_data;
     return source;

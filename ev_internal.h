@@ -67,6 +67,8 @@ typedef struct immediate_action_struct {
 
 typedef struct queue_item {
     event_item *item;
+    int action_id;
+    int subaction_id;
     struct queue_item *next;
 } queue_item;
 
@@ -137,3 +139,8 @@ struct _EVSource {
 };
 
 extern void EVPinit(CManager cm);
+extern IOFormat
+EVregister_format_set(CManager cm, CMFormatList list, IOContext *context_ptr);
+
+extern int
+internal_path_submit(CManager cm, int local_path_id, event_item *event);

@@ -190,7 +190,9 @@ char **argv;
 	char *transport = NULL;
 	char *postfix = NULL;
 	char *string_list;
-	EVstone stone;
+	char *filter;
+	EVstone term, fstone;
+	EVaction faction;
 	if ((transport = getenv("CMTransport")) != NULL) {
 	    if (listen_list == NULL) listen_list = create_attr_list();
 	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
@@ -222,9 +224,17 @@ char **argv;
 	    string_list = attr_list_to_string(contact_list);
 	    free_attr_list(contact_list);
 	}	
-	stone = EValloc_stone(cm);
-	EVassoc_terminal_action(cm, stone, simple_format_list, simple_handler, NULL);
-	printf("Contact list \"%d:%s\"\n", stone, string_list);
+	term = EValloc_stone(cm);
+	EVassoc_terminal_action(cm, term, simple_format_list, simple_handler, NULL);
+	filter = create_filter_action_spec(simple_format_list, "{\
+    return input.long_field % 2;\
+}\0\0");
+	
+	fstone = EValloc_stone(cm);
+	faction = EVassoc_immediate_action(cm, fstone, filter, NULL);
+	EVaction_set_output(cm, fstone, faction, 0, term);
+	
+	printf("Contact list \"%d:%s\"\n", fstone, string_list);
 	CMsleep(cm, 120);
     } else {
 	simple_rec data;
@@ -373,7 +383,7 @@ do_regression_master_test()
 
     args[2] = string_list;
     args[2] = malloc(10 + strlen(string_list) + strlen(filter));
-    sprintf(args[2], "%d:%s", faction, string_list);
+    sprintf(args[2], "%d:%s", fstone, string_list);
     subproc_proc = run_subprocess(args);
 
     /* give him time to start */
