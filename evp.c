@@ -830,6 +830,8 @@ static void
 free_evp(CManager cm, void *not_used)
 {
     event_path_data evp = cm->evp;
+    cm->evp = NULL;
+    if (evp == NULL) return;
     int s;
     for (s = 0 ; s < evp->stone_count; s++) {
 	int a;
