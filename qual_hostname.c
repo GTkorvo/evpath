@@ -57,12 +57,13 @@ CMtrans_services svc;
 	for (p = host->h_addr_list; *p != 0; p++) {
 	    struct in_addr *in = *(struct in_addr **) p;
 	    if (ntohl(in->s_addr) != INADDR_LOOPBACK) {
-		svc->trace_out(NULL, "CMSocket - Get self IP addr %lx, net %d.%d.%d.%d",
-			       ntohl(in->s_addr),
-			       *((unsigned char *) &in->s_addr),
-			       *(((unsigned char *) &in->s_addr) + 1),
-			       *(((unsigned char *) &in->s_addr) + 2),
-			       *(((unsigned char *) &in->s_addr) + 3));
+		if (svc)
+		    svc->trace_out(NULL, "CMSocket - Get self IP addr %lx, net %d.%d.%d.%d",
+				   ntohl(in->s_addr),
+				   *((unsigned char *) &in->s_addr),
+				   *(((unsigned char *) &in->s_addr) + 1),
+				   *(((unsigned char *) &in->s_addr) + 2),
+				   *(((unsigned char *) &in->s_addr) + 3));
 		return (ntohl(in->s_addr));
 	    }
 	}
@@ -92,18 +93,21 @@ CMtrans_services svc;
 	    ioctl(ss, SIOCGIFFLAGS, ifr);
 	    sai = (struct sockaddr_in *) &(ifr->ifr_addr);
 	    if (ifr->ifr_flags & IFF_LOOPBACK) {
-		svc->trace_out(NULL, "CMSocket - Get self IP addr %lx, rejected, loopback",
-			       ntohl(sai->sin_addr.s_addr));
+		if (svc)
+		    svc->trace_out(NULL, "CMSocket - Get self IP addr %lx, rejected, loopback",
+				   ntohl(sai->sin_addr.s_addr));
 		continue;
 	    }
 	    if (!(ifr->ifr_flags & IFF_UP)) {
-		svc->trace_out(NULL, "CMSocket - Get self IP addr %lx, rejected, not UP",
-			       ntohl(sai->sin_addr.s_addr));
+		if (svc)
+		    svc->trace_out(NULL, "CMSocket - Get self IP addr %lx, rejected, not UP",
+				   ntohl(sai->sin_addr.s_addr));
 		continue;
 	    }
 	    if (!(ifr->ifr_flags & IFF_RUNNING)) {
-		svc->trace_out(NULL, "CMSocket - Get self IP addr %lx, rejected, not RUNNING",
-			       ntohl(sai->sin_addr.s_addr));
+		if (svc)
+		    svc->trace_out(NULL, "CMSocket - Get self IP addr %lx, rejected, not RUNNING",
+				   ntohl(sai->sin_addr.s_addr));
 		continue;
 	    }
 	    /*
@@ -116,12 +120,13 @@ CMtrans_services svc;
 	    if (sai->sin_addr.s_addr == INADDR_LOOPBACK)
 		continue;
 	    rv = ntohl(sai->sin_addr.s_addr);
-	    svc->trace_out(NULL, "CMSocket - Get self IP addr DHCP %lx, net %d.%d.%d.%d",
-			   ntohl(sai->sin_addr.s_addr),
-			   *((unsigned char *) &sai->sin_addr.s_addr),
-			   *(((unsigned char *) &sai->sin_addr.s_addr) + 1),
-			   *(((unsigned char *) &sai->sin_addr.s_addr) + 2),
-			   *(((unsigned char *) &sai->sin_addr.s_addr) + 3));
+	    if (svc)
+		svc->trace_out(NULL, "CMSocket - Get self IP addr DHCP %lx, net %d.%d.%d.%d",
+			       ntohl(sai->sin_addr.s_addr),
+			       *((unsigned char *) &sai->sin_addr.s_addr),
+			       *(((unsigned char *) &sai->sin_addr.s_addr) + 1),
+			       *(((unsigned char *) &sai->sin_addr.s_addr) + 2),
+			       *(((unsigned char *) &sai->sin_addr.s_addr) + 3));
 	    break;
 	}
     }
@@ -134,9 +139,11 @@ CMtrans_services svc;
      */
     if (rv == 0) {
 	char *c = cercs_getenv("CM_LAST_RESORT_IP_ADDR");
-	svc->trace_out(NULL, "CMSocket - Get self IP addr at last resort");
+	if (svc)
+	    svc->trace_out(NULL, "CMSocket - Get self IP addr at last resort");
 	if (c != NULL) {
-	    svc->trace_out(NULL, "CMSocket - Translating last resort %s", c);
+	    if (svc)
+		svc->trace_out(NULL, "CMSocket - Translating last resort %s", c);
 	    rv = inet_addr(c);
 	}
     }
@@ -161,7 +168,7 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 #ifdef HAVE_GETDOMAINNAME
 	int end = strlen(buf);
 	buf[end] = '.';
-	getdomainname((&buf[end]) + 1, len - strlen(buf));
+	getdomainname((&buf[end]) + 1, len - end - 1);
 	if (buf[end + 1] == 0) {
 	    char *tmp_name;
 	    buf[end] = 0;
