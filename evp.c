@@ -68,12 +68,35 @@ EVfree_stone(CManager cm, EVstone stone_num)
 	stone->periodic_handle = NULL;
     }
     for(i = 0; i < stone->action_count; i++) {
-	if (stone->actions[i].action_type == Action_Immediate) {
-	    if (stone->actions[i].o.imm.mutable_response_data != NULL) {
-		response_data_free(cm, stone->actions[i].o.imm.mutable_response_data);
+	action *act = &stone->actions[i];
+	if (act->attrs != NULL) {
+	    free_attr_list(act->attrs);
+	}
+	switch(act->action_type) {
+	case Action_Output:
+	    if (act->o.out.remote_path) 
+		free(act->o.out.remote_path);
+	    break;
+	case Action_Terminal:
+	    break;
+	case Action_Filter:
+	    break;
+	case Action_Decode:
+	    free_IOcontext(act->o.decode.context);
+	    break;
+	case Action_Split:
+	    free(act->o.split_stone_targets);
+	    break;
+	case Action_Immediate:
+	    if (act->o.imm.mutable_response_data != NULL) {
+		response_data_free(cm, act->o.imm.mutable_response_data);
 	    }
+	    free(act->o.imm.subacts);
+	    free(act->o.imm.output_stone_ids);
+	    break;
 	}
     }
+    free(stone->queue);
     free(stone->actions);
     free(stone->proto_actions);
     stone->local_id = -1;
@@ -231,7 +254,7 @@ dequeue_event(CManager cm, queue_ptr q, int *act_p, int *subact_p)
 	q->queue_head = q->queue_head->next;
     }
     item->next = evp->queue_items_free_list;
-    evp->queue_items_free_list = item;;
+    evp->queue_items_free_list = item;
     return event;
 }
 
@@ -264,6 +287,7 @@ set_conversions(IOContext ctx, IOFormat src_format, IOFormat target_format)
 	subformat_list++;
     }
     free(saved_subformat_list);
+    free(target_subformat_list);
 }
 
 extern void
@@ -286,6 +310,7 @@ IOFormat incoming_format;
     stone->actions = realloc(stone->actions, 
 			     sizeof(stone->actions[0]) * (a + 1));
     action *act = & stone->actions[a];
+    memset(act, 0, sizeof(*act));
     act->requires_decoded = 0;
     act->action_type = Action_Decode;
     act->reference_format = incoming_format;
@@ -724,9 +749,20 @@ process_output_actions(CManager cm)
 						  &subact_id);
 		CMtrace_out(cm, EVerbose, "Writing event to remote stone %d",
 			    act->o.out.remote_stone_id);
-		internal_write_event(act->o.out.conn, event->format,
-				     &act->o.out.remote_stone_id, 4, 
-				     event, event->attrs);
+		if (event->format) {
+		    internal_write_event(act->o.out.conn, event->format,
+					 &act->o.out.remote_stone_id, 4, 
+					 event, event->attrs);
+		} else {
+		    struct _CMFormat tmp_format;
+		    tmp_format.format = event->reference_format;
+		    tmp_format.format_name = name_of_IOformat(event->reference_format);
+		    tmp_format.IOsubcontext = (IOContext) iofile_of_IOformat(event->reference_format);
+		    tmp_format.registration_pending = 0;
+		    internal_write_event(act->o.out.conn, &tmp_format,
+					 &act->o.out.remote_stone_id, 4, 
+					 event, event->attrs);
+		}
 		return_event(evp, event);
 	    }
 	}
@@ -1026,6 +1062,7 @@ return_event(event_path_data evp, event_item *event)
 	    }
 	    break;
 	}
+	if (event->attrs != NULL) free_attr_list(event->attrs);
 	free(event);
     }
 }
@@ -1105,41 +1142,17 @@ free_evp(CManager cm, void *not_used)
 {
     event_path_data evp = cm->evp;
     int s;
+    for (s = 0 ; s < evp->stone_count; s++) {
+	EVfree_stone(cm, s);
+    }
     cm->evp = NULL;
     if (evp == NULL) return;
-    for (s = 0 ; s < evp->stone_count; s++) {
-	int a;
-	for (a = 0 ; a < evp->stone_map[s].action_count; a++) {
-	    action *act = &evp->stone_map[s].actions[a];
-	    switch(act->action_type) {
-	    case Action_Output:
-		if (act->o.out.remote_path) 
-		    free(act->o.out.remote_path);
-		break;
-	    case Action_Terminal:
-		break;
-	    case Action_Filter:
-		break;
-	    case Action_Decode:
-		free_IOcontext(act->o.decode.context);
-		break;
-	    case Action_Split:
-		free(act->o.split_stone_targets);
-		break;
-	    case Action_Immediate:
-	        /* GSE  Need to free subact data and mutable response data */
-	        free(act->o.imm.subacts);
-		free(act->o.imm.output_stone_ids);
-		break;
-	    }
-	}
-    }
     free(evp->stone_map);
     free(evp->output_actions);
     free_IOcontext(evp->root_context);
     while (evp->queue_items_free_list != NULL) {
 	queue_item *tmp = evp->queue_items_free_list->next;
-	free(evp->queue_items_free_list->next);
+	free(evp->queue_items_free_list);
 	evp->queue_items_free_list = tmp;
     }
     thr_mutex_free(evp->lock);
