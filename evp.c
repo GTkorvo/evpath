@@ -382,6 +382,14 @@ determine_action(CManager cm, stone_type stone, event_item *event, int *sub_id)
     return -1;
 }
 
+/*   GSE
+ *   Need to seriously augment buffer handling.  In particular, we have to
+ *   formalize the handling of event buffers.  Make sure we have all the
+ *   situations covered, try to keep both encoded and decoded versions of
+ *   events where possible.  Try to augment testing because many cases are
+ *   not covered in homogeneous regression testing (our normal mode).
+ */
+
 static event_item *
 decode_action(CManager cm, event_item *event, action *act)
 {
@@ -407,7 +415,6 @@ decode_action(CManager cm, event_item *event, action *act)
 	    decode_to_buffer_IOcontext(act->o.decode.context, 
 				       event->encoded_event, decode_buffer);
 	    CMtake_buffer(cm, decode_buffer);
-/*	    cm_return_data_buf(conn->partial_buffer);*/
 	    event->decoded_event = decode_buffer;
 	    event->event_encoded = 0;
 	    event->reference_format = act->o.decode.target_reference_format;
@@ -558,7 +565,7 @@ event_item *event;
 
     /*update act->event_length_sum:*/
     if (query_attr(event->attrs, CM_EVENT_SIZE, NULL,
-		   /* value pointer */ (attr_value *) & eventlength)) {
+		   /* value pointer */ (attr_value *) (long)& eventlength)) {
 	if (eventlength >= 0 )
 	    act->event_length_sum += eventlength; 
 	else 
