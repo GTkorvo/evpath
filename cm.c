@@ -635,26 +635,32 @@ CManager_close(cm)
 CManager cm;
 {
     CMControlList cl = cm->control_list;
-    int i;
 
     CMtrace_out(cm, CMFreeVerbose, "CManager %lx closing", (long) cm);
     while (cm->connection_count != 0) {
 	/* connections are moved down as they are closed... */
 	CMConnection_close(cm->connections[0]);
     }
-    i = 0;
-    CMtrace_out(cm, CMFreeVerbose, "CMControlList close CL=%lx reference count will be %d", 
+
+    CMtrace_out(cm, CMFreeVerbose, "CMControlList close CL=%lx current reference count will be %d", 
 		(long) cl, cl->reference_count - 1);
     CMControlList_close(cl);
-    while ((cm->shutdown_functions != NULL) &&
-	   (cm->shutdown_functions[i].func != NULL)) {
-	cm->shutdown_functions[i].func(cm, cm->shutdown_functions[i].client_data);
-	if (cm->shutdown_functions) cm->shutdown_functions[i].func = NULL;
-	i++;
+    if (cm->shutdown_functions != NULL) {
+	int i = 0;
+	func_entry *shutdown_functions = cm->shutdown_functions;
+	cm->shutdown_functions = NULL;
+
+	while (shutdown_functions[i].func != NULL) {
+	    i++;
+	}
+	i--;
+	for ( ; i >= 0; i--) {
+	    CMtrace_out(cm, CMFreeVerbose, "CManager calling shutdown functin %d, %lx", i, (long)shutdown_functions[i].func);
+	    shutdown_functions[i].func(cm, shutdown_functions[i].client_data);
+	    shutdown_functions[i].func = NULL;
+	}
+	CMfree(shutdown_functions);
     }
-    CMfree(cm->shutdown_functions);
-    cm->shutdown_functions = NULL;
-    CMtrace_out(cm, CMFreeVerbose, "Freeing control list %lx", cl);
     CMControlList_free(cl);
 
     cm->reference_count--;
@@ -950,7 +956,7 @@ CMConnection conn;
 	CManager_unlock(conn->cm);
 	return;
     }
-    if (conn->ref_count > 0) return;   /*  BAD! */
+    if (conn->ref_count < 0) return;   /*  BAD! */
     conn->closed = 1;
     CManager_unlock(conn->cm);
     CMconn_fail_conditions(conn);
@@ -3139,6 +3145,7 @@ CManager cm;
 				    polling_function,
 				    (void*)&(cl->select_data));
     cl->select_initialized = 1;
+    CMtrace_out(cm, CMFreeVerbose, "CManager adding select shutdown function, %lx",(long)shutdown_function);
     internal_add_shutdown_task(cm, select_shutdown, (void*)shutdown_function);
     CMControlList_unlock(cl);
 }
