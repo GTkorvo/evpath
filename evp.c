@@ -700,7 +700,6 @@ EVauto_submit_func(CManager cm, void* vstone)
 {
     int stone_num = (long) vstone;
     event_item *event = get_free_event(cm->evp);
-    stone_type stone = &cm->evp->stone_map[stone_num];
     event->event_encoded = 0;
     event->decoded_event = NULL;
     event->reference_format = NULL;
