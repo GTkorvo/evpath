@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-SOURCES = evtest.c
+SOURCES = bulktest.c evtest.c
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -37,7 +37,7 @@ NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
 host_triplet = @host@
-noinst_PROGRAMS = evtest$(EXEEXT)
+noinst_PROGRAMS = evtest$(EXEEXT) bulktest$(EXEEXT)
 subdir = tests
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -50,9 +50,14 @@ mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 PROGRAMS = $(noinst_PROGRAMS)
+bulktest_SOURCES = bulktest.c
+bulktest_OBJECTS = bulktest.$(OBJEXT)
+bulktest_LDADD = $(LDADD)
+bulktest_DEPENDENCIES = ../libevpath.la
 evtest_SOURCES = evtest.c
 evtest_OBJECTS = evtest.$(OBJEXT)
 evtest_LDADD = $(LDADD)
+evtest_DEPENDENCIES = ../libevpath.la
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp =
 am__depfiles_maybe =
@@ -64,8 +69,8 @@ LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = evtest.c
-DIST_SOURCES = evtest.c
+SOURCES = bulktest.c evtest.c
+DIST_SOURCES = bulktest.c evtest.c
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -114,7 +119,7 @@ KERNEL_OBJS = @KERNEL_OBJS@
 KERNEL_TARGET_MOD = @KERNEL_TARGET_MOD@
 KERNEL_TRUE = @KERNEL_TRUE@
 KERNEL_VERSION = @KERNEL_VERSION@
-LDFLAGS = -L.. -levpath
+LDFLAGS = @LDFLAGS@
 LIBLTDL = @LIBLTDL@
 LIBOBJS = @LIBOBJS@
 LIBRUDP = @LIBRUDP@
@@ -196,9 +201,9 @@ subdirs = @subdirs@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 AUTOMAKE_OPTIONS = no-dependencies foreign
-OLD_TESTS = cmtest cmping bulktest take_test
-TESTS = evtest
-DEPENDENCIES = ../libevpath.la
+OLD_TESTS = cmtest cmping take_test
+TESTS = evtest bulktest
+LDADD = ../libevpath.la
 all: all-am
 
 .SUFFIXES:
@@ -239,6 +244,9 @@ clean-noinstPROGRAMS:
 	  echo " rm -f $$p $$f"; \
 	  rm -f $$p $$f ; \
 	done
+bulktest$(EXEEXT): $(bulktest_OBJECTS) $(bulktest_DEPENDENCIES) 
+	@rm -f bulktest$(EXEEXT)
+	$(LINK) $(bulktest_LDFLAGS) $(bulktest_OBJECTS) $(bulktest_LDADD) $(LIBS)
 evtest$(EXEEXT): $(evtest_OBJECTS) $(evtest_DEPENDENCIES) 
 	@rm -f evtest$(EXEEXT)
 	$(LINK) $(evtest_LDFLAGS) $(evtest_OBJECTS) $(evtest_LDADD) $(LIBS)

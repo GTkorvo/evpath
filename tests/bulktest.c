@@ -1,4 +1,4 @@
-#include "config.h"
+#include "../config.h"
 
 #include <stdio.h>
 #include <atl.h>
@@ -8,9 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#include "cm.h"
+#include <arpa/inet.h>
+#include "evpath.h"
 #include "gen_thread.h"
-#include "libltdl/ltdl.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -84,12 +84,12 @@ static IOField simple_field_list[] =
      sizeof(int), IOOffset(simple_rec_ptr, vec_count)},
     {"vecs", "EventVecElem[vec_count]", sizeof(struct _io_encode_vec), 
      IOOffset(simple_rec_ptr, vecs)},
-    {NULL, NULL, 0, 0},
     {NULL, NULL, 0, 0}
 };
 
 static CMFormatRec simple_format_list[] =
 {
+    {"simple", simple_field_list},
     {"complex", complex_field_list},
     {"nested", nested_field_list},
     {"EventVecElem", event_vec_elem_fields},
@@ -138,9 +138,8 @@ static int msg_count = 0;
 
 static
 void
-simple_handler(cm, conn, vevent, client_data, attrs)
+simple_handler(cm, vevent, client_data, attrs)
 CManager cm;
-CMConnection conn;
 void *vevent;
 void *client_data;
 attr_list attrs;
@@ -170,7 +169,7 @@ attr_list attrs;
 	printf("	double_field = %g\n", event->double_field);
 	printf("	char_field = %c\n", event->char_field);
 	printf("Data was received with attributes : \n");
-	dump_attr_list(attrs);
+	if (attrs) dump_attr_list(attrs);
     }
     if (client_data != NULL) {
 	int tmp = *((int *) client_data);
@@ -187,8 +186,6 @@ int argc;
 char **argv;
 {
     CManager cm;
-    CMConnection conn = NULL;
-    CMFormat format;
     int regression_master = 1;
 
     while (argv[1] && (argv[1][0] == '-')) {
@@ -233,17 +230,43 @@ char **argv;
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
 	char *transport = NULL;
+	char *postfix = NULL;
+	char *string_list;
+	EVstone stone;
 	if ((transport = getenv("CMTransport")) != NULL) {
-	    listen_list = create_attr_list();
+	    if (listen_list == NULL) listen_list = create_attr_list();
 	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		     (attr_value) strdup(transport));
 	}
+	if ((postfix = getenv("CMNetworkPostfix")) != NULL) {
+	    if (listen_list == NULL) listen_list = create_attr_list();
+	    add_attr(listen_list, CM_NETWORK_POSTFIX, Attr_String,
+		     (attr_value) strdup(postfix));
+	}
 	CMlisten_specific(cm, listen_list);
 	contact_list = CMget_contact_list(cm);
-	printf("Contact list \"%s\"\n", attr_list_to_string(contact_list));
-	format = CMregister_format(cm, "simple", simple_field_list,
-				   simple_format_list);
-	CMregister_handler(format, simple_handler, NULL);
+	if (contact_list) {
+	    string_list = attr_list_to_string(contact_list);
+	} else {
+	    /* must be multicast, hardcode a contact list */
+#define HELLO_PORT 12345
+#define HELLO_GROUP "225.0.0.37"
+	    int addr;
+	    (void) inet_aton(HELLO_GROUP, (struct in_addr *)&addr);
+	    contact_list = create_attr_list();
+	    add_attr(contact_list, CM_MCAST_ADDR, Attr_Int4,
+		     (attr_value) (long)addr);
+	    add_attr(contact_list, CM_MCAST_PORT, Attr_Int4,
+		     (attr_value) HELLO_PORT);
+	    add_attr(contact_list, CM_TRANSPORT, Attr_String,
+		     (attr_value) "multicast");
+/*	    conn = CMinitiate_conn(cm, contact_list);*/
+	    string_list = attr_list_to_string(contact_list);
+	    free_attr_list(contact_list);
+	}	
+	stone = EValloc_stone(cm);
+	EVassoc_terminal_action(cm, stone, simple_format_list, simple_handler, NULL);
+	printf("Contact list \"%d:%s\"\n", stone, string_list);
 	while(msg_count != MSG_COUNT) {
 	    CMsleep(cm, 20);
 	    printf("Received %d messages\n", msg_count);
@@ -252,41 +275,28 @@ char **argv;
 	simple_rec_ptr data;
 	attr_list attrs;
 	int i;
+	int remote_stone, stone = 0;
+	EVsource source_handle;
 	if (argc == 2) {
 	    attr_list contact_list;
-	    contact_list = attr_list_from_string(argv[1]);
-	    conn = CMinitiate_conn(cm, contact_list);
-	    if (conn == NULL) {
-		printf("No connection, attr list was :");
-		dump_attr_list(contact_list);
-		printf("\n");
-		exit(1);
-	    }
+	    char *list_str;
+	    sscanf(argv[1], "%d:", &remote_stone);
+	    list_str = strchr(argv[1], ':') + 1;
+	    contact_list = attr_list_from_string(list_str);
+	    stone = EValloc_stone(cm);
+	    EVassoc_output_action(cm, stone, NULL, contact_list, remote_stone);
 	}
 	data = malloc(sizeof(simple_rec));
-	format = CMregister_format(cm, "simple", simple_field_list,
-				   simple_format_list);
 	generate_record(data);
 	attrs = create_attr_list();
 #define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
 	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
 	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
+	source_handle = EVcreate_submit_handle(cm, stone, simple_format_list);
 	for (i=0; i < MSG_COUNT; i++) {
-	    int block = 0;
-	    if (CMConnection_write_would_block(conn)) {
-		if (quiet <= 0) printf("Going to block\n");
-		block = 1;
-	    } else {
-		if (quiet <= 0) {
-		    printf(".");
-		    fflush(stdout);
-		}
-	    }
-	    CMwrite_attr(conn, format, data, attrs);
-	    if (block) {
-		if (quiet <= 0) printf("going again\n");
-		block = 0;
-	    }
+	    data->integer_field++;
+	    data->long_field--;
+	    EVsubmit(source_handle, data, attrs);
 	}
 	if (quiet <= 0) printf("Write %d messages\n", MSG_COUNT);
 	free_attr_list(attrs);
@@ -301,7 +311,7 @@ static void
 fail_and_die(signal)
 int signal;
 {
-    fprintf(stderr, "CMtest failed to complete in reasonable time\n");
+    fprintf(stderr, "bulktest failed to complete in reasonable time\n");
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
     }
@@ -317,7 +327,7 @@ char **args;
     int child;
     child = _spawnv(_P_NOWAIT, "./bulktest.exe", args);
     if (child == -1) {
-	printf("failed for cmtest\n");
+	printf("failed for bulktest\n");
 	perror("spawnv");
     }
     return child;
@@ -338,11 +348,11 @@ do_regression_master_test()
     char *args[] = {"bulktest", "-c", NULL, NULL, NULL, NULL, NULL, NULL};
     int exit_state;
     int forked = 0;
-    attr_list contact_list;
-    char *string_list;
+    attr_list contact_list, listen_list = NULL;;
+    char *string_list, *transport, *postfix;
     char size_str[4];
     char vec_str[4];
-    CMFormat format;
+    EVstone handle;
     int message_count = 0;
     int expected_count = MSG_COUNT;
     int done = 0;
@@ -359,8 +369,38 @@ do_regression_master_test()
 #endif
     cm = CManager_create();
     forked = CMfork_comm_thread(cm);
-    CMlisten(cm);
+    if ((transport = getenv("CMTransport")) != NULL) {
+	listen_list = create_attr_list();
+	add_attr(listen_list, CM_TRANSPORT, Attr_String,
+		 (attr_value) strdup(transport));
+    }
+    if ((postfix = getenv("CMNetworkPostfix")) != NULL) {
+	if (listen_list == NULL) listen_list = create_attr_list();
+	add_attr(listen_list, CM_NETWORK_POSTFIX, Attr_String,
+		 (attr_value) strdup(postfix));
+    }
+    CMlisten_specific(cm, listen_list);
     contact_list = CMget_contact_list(cm);
+    if (contact_list) {
+	string_list = attr_list_to_string(contact_list);
+	free_attr_list(contact_list);
+    } else {
+	/* must be multicast, hardcode a contact list */
+#define HELLO_PORT 12345
+#define HELLO_GROUP "225.0.0.37"
+	int addr;
+	(void) inet_aton(HELLO_GROUP, (struct in_addr *)&addr);
+	contact_list = create_attr_list();
+	add_attr(contact_list, CM_MCAST_ADDR, Attr_Int4,
+		 (attr_value) (long)addr);
+	add_attr(contact_list, CM_MCAST_PORT, Attr_Int4,
+		 (attr_value) HELLO_PORT);
+	add_attr(contact_list, CM_TRANSPORT, Attr_String,
+		 (attr_value) "multicast");
+	(void) CMinitiate_conn(cm, contact_list);
+	string_list = attr_list_to_string(contact_list);
+	free_attr_list(contact_list);
+    }	
     string_list = attr_list_to_string(contact_list);
     free_attr_list(contact_list);
     args[2] = "-size";
@@ -369,7 +409,7 @@ do_regression_master_test()
     args[4] = "-vecs";
     sprintf(&vec_str[0], "%d", vecs);
     args[5] = vec_str;
-    args[6] = string_list;
+    args[6] = malloc(strlen(string_list) + 10);
 
     if (quiet <= 0) {
 	if (forked) {
@@ -380,9 +420,9 @@ do_regression_master_test()
     }
     srand48(1);
 
-    format = CMregister_format(cm, "simple", simple_field_list,
-			       simple_format_list);
-    CMregister_handler(format, simple_handler, &message_count);
+    handle = EValloc_stone(cm);
+    EVassoc_terminal_action(cm, handle, simple_format_list, simple_handler, &message_count);
+    sprintf(args[6], "%d:%s", handle, string_list);
     subproc_proc = run_subprocess(args);
 
     if (quiet <= 0) {
@@ -435,6 +475,7 @@ do_regression_master_test()
 	    CMsleep(cm, 1);
 	}
     }
+    free(args[6]);
     free(string_list);
     CManager_close(cm);
     if (message_count != expected_count) {
