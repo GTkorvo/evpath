@@ -125,7 +125,7 @@ parse_IOformat_from_string(char *str, char **format_name, IOFieldList *list_p)
 	str = get_str(str, (const char **)&name);
 	str += strlen(" FieldCount ");
 	if (sscanf(str, "%d", &field_count) == 1) {
-	    while(isdigit(*str)) str++;
+	    while(isdigit((int)*str)) str++;
 	}
 	str++;
 	list = malloc(sizeof(*list) * (field_count + 1));
@@ -136,11 +136,11 @@ parse_IOformat_from_string(char *str, char **format_name, IOFieldList *list_p)
 	    str = get_str(str, &(list[index].field_type));
 	    str++;
 	    if (sscanf(str, "%d", &list[index].field_size) == 1) {
-		while(isdigit(*str)) str++;
+		while(isdigit((int)*str)) str++;
 	    }
 	    str++;
 	    if (sscanf(str, "%d", &list[index].field_offset) == 1) {
-		while(isdigit(*str)) str++;
+		while(isdigit((int)*str)) str++;
 	    }
 	    str = strchr(str, '\n') + 1;
 	}
