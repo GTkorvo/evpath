@@ -338,11 +338,21 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
     void *out_event = malloc(instance->u.transform.out_size);
     int(*func)(void *, void*, attr_list) = 
 	(int(*)(void *, void*, attr_list))instance->u.transform.code->func;
+    if (CMtrace_on(cm, EVerbose)) {
+	printf("Input Transform Event is :\n");
+	dump_limited_unencoded_IOrecord(iofile_of_IOformat(event->reference_format),
+					event->reference_format,
+					event->decoded_event, 10240);
+    }
     ret = func(event->decoded_event, out_event, attrs);
     if (ret) {
 	struct _EVSource s;
-	CMtrace_out(cm, EVerbose, "Filter function returned %d, submitting further\n", ret);
-	
+	if (CMtrace_on(cm, EVerbose)) {
+	    IOFormat f = instance->u.transform.out_format;
+	    printf(" Transform function returned %d, submitting further\n", ret);
+	    dump_limited_unencoded_IOrecord(iofile_of_IOformat(f), f, 
+					    out_event, 10240);
+	}
 	s.local_stone_id = out_stones[0];
 	s.cm = cm;
 	s.format = NULL;
