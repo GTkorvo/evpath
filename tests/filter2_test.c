@@ -443,6 +443,7 @@ char **args;
     }
     return child;
 #else
+#ifndef NOTDEF
     pid_t child;
     if (quiet <=0) {printf("Forking subprocess\n");}
     child = fork();
@@ -451,6 +452,14 @@ char **args;
 	execv("./filter2_test", args);
     }
     return child;
+#else 
+    int i = 0;
+    printf("Would have run:  ");
+    while (args[i] != NULL) printf(" %s", args[i++]);
+    printf("\n");
+
+    return 5;
+#endif
 #endif
 }
 

@@ -314,6 +314,7 @@ char **args;
     }
     return child;
 #else
+#ifndef NOTDEF
     pid_t child;
     if (quiet <=0) {printf("Forking subprocess\n");}
     child = fork();
@@ -322,6 +323,10 @@ char **args;
 	execv("./filter_test", args);
     }
     return child;
+#else
+    printf("nothing doing  %s %s\n", args[1], args[2]);
+    sleep(20);
+#endif
 #endif
 }
 
