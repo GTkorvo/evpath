@@ -15,7 +15,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #endif
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 #else
 #include <asm/uaccess.h>
 #include <linux/in.h>
