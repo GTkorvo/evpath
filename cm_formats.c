@@ -9,7 +9,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 
 #else
 #include "kernel/kcm.h"

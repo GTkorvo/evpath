@@ -1597,8 +1597,13 @@ CMact_on_data(CMConnection conn, char *buffer, int length)
     if (event_msg) {
 	CMtrace_out(cm, CMDataVerbose, "CM - Receiving event message data len %d, attr len %d, stone_id %x\n",
 	       data_length, attr_length, stone_id);
-	internal_cm_network_submit(cm, conn->partial_buffer, conn,
-				   data_buffer, stone_id);
+	cm_data_buf = conn->partial_buffer;
+	conn->buffer_full_point = 0;
+	conn->buffer_data_end = 0;
+	conn->partial_buffer = NULL;
+	internal_cm_network_submit(cm, cm_data_buf, conn, data_buffer, 
+				   stone_id);
+	cm_return_data_buf(cm_data_buf);
 	return 0;
     }
     format = get_format_app_IOcontext(conn->cm->IOcontext, data_buffer, conn);

@@ -220,8 +220,7 @@ determine_action(CManager cm, stone_type stone, event_item *event)
 	   event->reference_format);
     for (i=0; i < stone->action_count; i++) {
 	if (stone->actions[i].reference_format == event->reference_format) {
-	    if ((event->contents == Event_Encoded_CM_Owned) &&
-		stone->actions[i].requires_decoded) {
+	    if (event->event_encoded && stone->actions[i].requires_decoded) {
 		continue;
 	    }
 	    return &stone->actions[i];
@@ -256,7 +255,7 @@ determine_action(CManager cm, stone_type stone, event_item *event)
     }
     /* This format is to be bound with action nearest_proto_action */
     if (1) {
-	if (event->contents == Event_Encoded_CM_Owned) {
+	if (event->event_encoded) {
 	    /* create a decode action */
 	    int a = stone->action_count++;
 	    int id_len;
@@ -293,7 +292,7 @@ determine_action(CManager cm, stone_type stone, event_item *event)
 static event_item *
 decode_action(CManager cm, event_item *event, action *act)
 {
-    if (event->contents == Event_Encoded_CM_Owned) {
+    if (event->event_encoded) {
 	if (decode_in_place_possible(act->o.decode.decode_format)) {
 	    void *decode_buffer;
 	    if (!decode_in_place_IOcontext(act->o.decode.context,
@@ -303,7 +302,7 @@ decode_action(CManager cm, event_item *event, action *act)
 		return 0;
 	    }
 	    event->decoded_event = decode_buffer;
-	    event->contents = Event_Unencoded_CM_Owned;
+	    event->event_encoded = 0;
 	    return event;
 	} else {
 	    int decoded_length = this_IOrecord_length(act->o.decode.context, 
@@ -315,7 +314,7 @@ decode_action(CManager cm, event_item *event, action *act)
 				       event->encoded_event, decode_buffer);
 /*	    cm_return_data_buf(conn->partial_buffer);*/
 	    event->decoded_event = decode_buffer;
-	    event->contents = Event_Unencoded_CM_Owned;
+	    event->event_encoded = 0;
 	    event->reference_format = act->o.decode.target_reference_format;
 	    return event;
 	}
@@ -449,7 +448,9 @@ CManager cm;
 		    void *client_data = term->client_data;
 		    event_item *event = dequeue_event(cm, act);
 		    CMtrace_out(cm, EVerbose, "Executing terminal/filter event");
+		    cm->evp->current_event_item = event;
 		    out = (handler)(cm, event->decoded_event, client_data, NULL);
+		    cm->evp->current_event_item = NULL;
 		    if (act->action_type == Action_Filter) {
 			if (out) {
 			    CMtrace_out(cm, EVerbose, "Filter passed event to stone %d, submitting", term->target_stone_id);
@@ -715,6 +716,17 @@ return_event(event_path_data evp, event_item *event)
 {
     event->ref_count--;
     if (event->ref_count == 0) {
+	/* return event memory */
+	switch (event->contents) {
+	case Event_CM_Owned:
+	    CMreturn_buffer(event->cm, event->decoded_event);
+	    break;
+	case Event_App_Owned:
+	    if (event->free_func) {
+		(event->free_func)(event->free_arg);
+	    }
+	    break;
+	}
 	free(event);
     }
 }
@@ -731,24 +743,46 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
 {
     event_path_data evp = cm->evp;
     event_item *event = get_free_event(evp);
-    event->contents = Event_Encoded_CM_Owned;
+    event->contents = Event_CM_Owned;
+    event->event_encoded = 1;
     event->encoded_event = buffer;
     event->reference_format = get_format_app_IOcontext(evp->root_context, 
 					     buffer, conn);
     event->format = NULL;
     CMtrace_out(cm, EVerbose, "Event coming in from network to stone %d", 
 		stone_id);
+    CMtake_buffer(cm, buffer);
+    event->cm = cm;
     internal_path_submit(cm, stone_id, event);
     return_event(evp, event);
     while (process_local_actions(cm));
     process_output_actions(cm);
 }
 
+extern void
+EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func, 
+		 attr_list attrs)
+{
+    event_item *event = get_free_event(source->cm->evp);
+    event->contents = Event_App_Owned;
+    event->event_encoded = 0;
+    event->decoded_event = data;
+    event->reference_format = source->reference_format;
+    event->format = source->format;
+    event->free_func = free_func;
+    event->free_arg = data;
+    internal_path_submit(source->cm, source->local_stone_id, event);
+    return_event(source->cm->evp, event);
+    while (process_local_actions(source->cm));
+    process_output_actions(source->cm);
+}
+    
 void
 EVsubmit(EVsource source, void *data, attr_list attrs)
 {
     event_item *event = get_free_event(source->cm->evp);
-    event->contents = Event_Unencoded_App_Owned;
+    event->contents = Event_App_Owned;
+    event->event_encoded = 0;
     event->decoded_event = data;
     event->reference_format = source->reference_format;
     event->format = source->format;
@@ -807,3 +841,75 @@ EVPinit(CManager cm)
     internal_add_shutdown_task(cm, free_evp, NULL);
 }
 
+    
+extern int
+EVtake_event_buffer(CManager cm, void *event)
+{
+    queue_item *item;
+    event_item *cur = cm->evp->current_event_item;
+    event_path_data evp = cm->evp;
+
+    if (cur == NULL) {
+	fprintf(stderr,
+		"No event handler with takeable buffer executing on this CM.\n");
+	return 0;
+    }
+    if (!((cur->decoded_event <= event) &&
+	  ((char *) event <= ((char *) cur->decoded_event + cur->event_len)))){
+	fprintf(stderr,
+		"Event address (%lx) in EVtake_event_buffer does not match currently executing event on this CM.\n",
+		(long) event);
+	return 0;
+    }
+/*    if (cur->block_rec == NULL) {
+	static int take_event_warning = 0;
+	if (take_event_warning == 0) {
+	    fprintf(stderr,
+		    "Warning:  EVtake_event_buffer called on an event submitted with \n    EVsubmit_event(), EVsubmit_typed_event() or EVsubmit_eventV() .\n    This violates ECho event data memory handling requirements.  See \n    http://www.cc.gatech.edu/systems/projects/ECho/event_memory.html\n");
+	    take_event_warning++;
+	}
+	return 0;
+    }
+*/
+    if (evp->queue_items_free_list == NULL) {
+	item = malloc(sizeof(*item));
+    } else {
+	item = evp->queue_items_free_list;
+	evp->queue_items_free_list = item->next;
+    }
+    item->item = cur;
+    reference_event(cm->evp->current_event_item);
+    item->next = evp->taken_events_list;
+    evp->taken_events_list = item;
+    return 1;
+}
+
+void
+EVreturn_event_buffer(cm, event)
+CManager cm;
+void *event;
+{
+    event_path_data evp = cm->evp;
+    queue_item *tmp, *last = NULL;
+    /* search through list for event and then dereference it */
+
+    tmp = evp->taken_events_list;
+    while (tmp != NULL) {
+	if ((tmp->item->decoded_event <= event) &&
+	    ((char *) event <= ((char *) tmp->item->decoded_event + tmp->item->event_len))) {
+	    if (last == NULL) {
+		evp->taken_events_list = tmp->next;
+	    } else {
+		last->next = tmp->next;
+	    }
+	    return_event(cm->evp, event);
+	    tmp->next = evp->queue_items_free_list;
+	    evp->queue_items_free_list = tmp;
+	    return;
+	}
+	last = tmp;
+	tmp = tmp->next;
+    }
+    fprintf(stderr, "Event %lx not found in taken events list\n",
+	    (long) event);
+}

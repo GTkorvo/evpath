@@ -4,21 +4,20 @@
 
 typedef struct ev_free_block_rec {
     int ref_count;
-/*    EControlContext ec;*/
+    CManager cm;
     void *free_arg;
     void *block;
-/*    EventFreeFunction free_func;*/
     IOFormat ioformat;
 /*    EControlContext locking_context;*/
-    IOBuffer iobuffer;
     attr_list attrs;
     struct free_block_rec *next;
 } *ev_free_block_rec_p;
 
-typedef enum { Event_Unencoded_App_Owned,  Event_Encoded_CM_Owned,  Event_Unencoded_CM_Owned } event_pkg_contents;
+typedef enum { Event_App_Owned,  Event_CM_Owned } event_pkg_contents;
 
 typedef struct _event_item {
     int ref_count;
+    int event_encoded;
     event_pkg_contents contents;
     void *encoded_event;
     int event_len;
@@ -26,8 +25,13 @@ typedef struct _event_item {
     IOEncodeVector encoded_eventv;
     IOFormat reference_format;
     CMFormat format;
-    ev_free_block_rec_p block_rec;
     attr_list attrs;
+
+    /* used for malloc/free */
+    CMbuffer buffer;
+    CManager cm;
+    void *free_arg;
+    EVFreeFunction free_func;
 } event_item, *event_queue;
 
 typedef enum { Action_Output = 0, Action_Terminal, Action_Filter, Action_Decode, Action_Split} action_value;
@@ -97,6 +101,8 @@ typedef struct _event_path_data {
     int output_action_count;
     action **output_actions;
     queue_item *queue_items_free_list;
+    event_item *current_event_item;
+    queue_item *taken_events_list;
     thr_mutex_t lock;
 } *event_path_data;
 

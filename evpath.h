@@ -1434,11 +1434,23 @@ EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format);
 void
 EVsubmit(EVsource source, void *data, attr_list attrs);
 
+typedef void (*EVFreeFunction) ARGS((void *event_data));
+
+extern void
+EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
+		 attr_list attrs);
+
 void
 EVPsubmit_encoded(CManager cm, int local_path_id, void *data, int len);
 
 void
 EVPsubmit(CManager cm, int local_path_id, void *data, IOFormat format);
+
+extern int
+EVtake_event_buffer ARGS((CManager cm, void *event));
+
+extern void
+EVreturn_event_buffer ARGS((CManager cm, void *event));
 
 #ifdef	__cplusplus
 }
