@@ -2,13 +2,13 @@
 AUTOMAKE_OPTIONS = no-dependencies foreign
 
 OLD_TESTS = cmtest cmping take_test
-TESTS = evtest bulktest
+TESTS = evtest bulktest http_test
 
 check-local:
 	@if CMTransport=udp ./evtest$(EXEEXT) ; then\
 	 echo "PASS: evtest(udp)";\
 	else echo "FAIL: evtest(udp)"; fi
 
-noinst_PROGRAMS = evtest bulktest
+noinst_PROGRAMS = evtest bulktest http_test
 
 LDADD = ../libevpath.la

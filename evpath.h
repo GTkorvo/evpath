@@ -806,7 +806,18 @@ CMregister_non_CM_message_handler ARGS((int header, CMNonCMHandler handler));
  */
 extern CMtrans_services
 CMget_static_trans_services ARGS(());
- 
+
+  /*!
+   * return the pointer to a CMConnection's transport data.
+   *
+   * Think of this structure as the cross-product of a transport and CMConnection.
+   * Transport functions use this structure to store per-connection data.
+   *
+   * \return returns the pointer to the transport data structure.
+   */
+extern void*
+CMget_transport_data ARGS((CMConnection conn));
+
 /*!
  * add a task (function) to be executed occasionally.
  *

@@ -48,6 +48,8 @@ void CMdo_performance_response ARGS((CMConnection conn, int length,
 					    int func, int byte_swap,
 					    char *buffer));
 
+void CMhttp_handler ARGS((CMConnection conn, char* buffer, int length));
+
 static void
 CMpoll_forever(cm)
 CManager cm;
@@ -1482,8 +1484,7 @@ CMConnection conn;
 }
 
 static int
-CMact_on_data(CMConnection conn, char *buffer, int length)
-{
+CMact_on_data(CMConnection conn, char *buffer, int length){
     char *base = buffer;
     int byte_swap = 0;
     int get_attrs = 0;
@@ -3238,3 +3239,10 @@ CMget_static_trans_services ARGS(())
 {
   return &CMstatic_trans_svcs;
 }
+
+extern void*
+CMget_transport_data (CMConnection conn)
+{
+  return conn->transport_data;
+}
+
