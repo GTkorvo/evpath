@@ -100,7 +100,12 @@ EVfree_stone(CManager cm, EVstone stone_num)
     free(stone->queue);
     free(stone->actions);
     free(stone->proto_actions);
+    stone->queue = NULL;
     stone->local_id = -1;
+    stone->proto_action_count = 0;
+    stone->proto_actions = NULL;
+    stone->action_count = 0;
+    stone->actions = NULL;
 }
 
 EVstone
@@ -597,6 +602,7 @@ CManager cm;
     int s, a, more_pending = 0;
     CMtrace_out(cm, EVerbose, "Process local actions");
     for (s = 0; s < evp->stone_count; s++) {
+	if (evp->stone_map[s].local_id == -1) continue;
 	while (evp->stone_map[s].queue->queue_head != NULL) {
 	    int action_id, subaction_id;
 	    event_item *event = dequeue_event(cm, evp->stone_map[s].queue, 
