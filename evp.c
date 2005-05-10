@@ -40,7 +40,7 @@ EVstone
 EValloc_stone(CManager cm)
 {
     event_path_data evp = cm->evp;
-    int stone_num = evp->stone_count++;
+    int stone_num = evp->stone_count;
     stone_type stone;
 
     evp->stone_map = realloc(evp->stone_map, 
@@ -52,6 +52,7 @@ EValloc_stone(CManager cm)
     stone->queue = malloc(sizeof(queue_struct));
     stone->queue->queue_tail = stone->queue->queue_head = NULL;
     stone->proto_actions = NULL;
+    evp->stone_count++;
     return stone_num;
 }
 
@@ -116,7 +117,7 @@ EVassoc_terminal_action(CManager cm, EVstone stone_num,
     event_path_data evp = cm->evp;
     int action_num;
     stone_type stone = &evp->stone_map[stone_num];
-    int proto_action_num = stone->proto_action_count++;
+    int proto_action_num = stone->proto_action_count;
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (proto_action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
@@ -144,6 +145,7 @@ EVassoc_terminal_action(CManager cm, EVstone stone_num,
     stone->actions[action_num].reference_format = 
 	stone->proto_actions[proto_action_num].reference_format;
     stone->actions[action_num].o.terminal_proto_action_number = proto_action_num;
+    stone->proto_action_count++;
     return action_num;
 }
     
@@ -156,7 +158,7 @@ EVassoc_immediate_action(CManager cm, EVstone stone_num,
     int action_num;
     stone_type stone = &evp->stone_map[stone_num];
 
-    action_num = stone->action_count++;
+    action_num = stone->action_count;
     CMtrace_out(cm, EVerbose, "Adding Immediate action %d to stone %d",
 		action_num, stone_num);
     stone->actions = realloc(stone->actions, (action_num + 1) * 
@@ -171,6 +173,7 @@ EVassoc_immediate_action(CManager cm, EVstone stone_num,
     stone->actions[action_num].o.imm.output_stone_ids[0] = -1;
     stone->actions[action_num].o.imm.mutable_response_data = 
 	install_response_handler(cm, stone_num, action_spec, client_data);
+    stone->action_count++;
     return action_num;
 }
 
@@ -182,7 +185,7 @@ EVassoc_filter_action(CManager cm, EVstone stone_num,
     event_path_data evp = cm->evp;
     int action_num;
     stone_type stone = &evp->stone_map[stone_num];
-    int proto_action_num = stone->proto_action_count++;
+    int proto_action_num = stone->proto_action_count;
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (proto_action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
@@ -209,6 +212,7 @@ EVassoc_filter_action(CManager cm, EVstone stone_num,
     stone->actions[action_num].reference_format = 
 	stone->proto_actions[proto_action_num].reference_format;
     stone->actions[action_num].o.terminal_proto_action_number = proto_action_num;
+    stone->proto_action_count++;
     return action_num;
 }
     
@@ -304,7 +308,7 @@ IOFormat target_format;
 IOFormat incoming_format;
 {
     stone_type stone = &(cm->evp->stone_map[stone_id]);
-    int a = stone->action_count++;
+    int a = stone->action_count;
     int id_len;
     IOFormat format;
 
@@ -329,6 +333,7 @@ IOFormat incoming_format;
     act->o.decode.target_reference_format = target_format;
     set_conversions(act->o.decode.context, format,
 		    act->o.decode.target_reference_format);
+    stone->action_count++;
 }
 
 int
@@ -795,7 +800,7 @@ EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
     event_path_data evp = cm->evp;
     stone_type stone = &evp->stone_map[stone_id];
     action *act = &stone->actions[act_num];
-    int sub_num = act->o.imm.subaction_count++;
+    int sub_num = act->o.imm.subaction_count;
     
     assert(act->action_type == Action_Immediate);
     act->o.imm.subacts = realloc(act->o.imm.subacts, 
@@ -803,6 +808,7 @@ EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
     act->o.imm.subacts[sub_num].handler = func;
     act->o.imm.subacts[sub_num].client_data = client_data;
     act->o.imm.subacts[sub_num].reference_format = reference_format;
+    act->o.imm.subaction_count++;
     return sub_num;
 }
 
@@ -813,7 +819,18 @@ EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
 {
     event_path_data evp = cm->evp;
     stone_type stone = &evp->stone_map[stone_num];
-    int action_num = stone->action_count++;
+    int action_num = stone->action_count;
+    CMConnection conn = CMget_conn(cm, contact_list);
+
+    if (conn == NULL) {
+	printf("EVassoc_output_action - failed to contact host at contact point \n\t");
+	if (contact_list != NULL) {
+	    dump_attr_list(contact_list);
+	} else {
+	    printf("NULL\n");
+	}
+	return -1;
+    }
     CMtrace_out(cm, EVerbose, "Adding output action %d to stone %d",
 		action_num, stone_num);
     stone->actions = realloc(stone->actions, 
@@ -825,9 +842,10 @@ EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
     stone->actions[action_num].queue->queue_tail = 
 	stone->actions[action_num].queue->queue_head = NULL;
     stone->actions[action_num].action_type = Action_Output;
-    stone->actions[action_num].o.out.conn = CMget_conn(cm, contact_list);
+    stone->actions[action_num].o.out.conn = conn;
     stone->actions[action_num].o.out.remote_stone_id = remote_stone;
     stone->default_action = action_num;
+    stone->action_count++;
     return action_num;
 }
 
@@ -837,7 +855,7 @@ EVassoc_split_action(CManager cm, EVstone stone_num,
 {
     event_path_data evp = cm->evp;
     stone_type stone = &evp->stone_map[stone_num];
-    int action_num = stone->action_count++;
+    int action_num = stone->action_count;
     int target_count = 0, i;
     CMtrace_out(cm, EVerbose, "Adding Split action %d to stone %d",
 		action_num, stone_num);
@@ -859,6 +877,7 @@ EVassoc_split_action(CManager cm, EVstone stone_num,
     }
     stone->actions[action_num].o.split_stone_targets[i] = -1;
     stone->default_action = action_num;
+    stone->action_count++;
     return action_num;
 }
 
