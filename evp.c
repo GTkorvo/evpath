@@ -44,7 +44,7 @@ EValloc_stone(CManager cm)
     stone_type stone;
 
     evp->stone_map = realloc(evp->stone_map, 
-			     (evp->stone_count + 1) * sizeof(evp->stone_map[0])));
+			     (evp->stone_count + 1) * sizeof(evp->stone_map[0]));
     stone = &evp->stone_map[stone_num];
     memset(stone, 0, sizeof(*stone));
     stone->local_id = stone_num;
