@@ -1203,11 +1203,17 @@ attr_list attrs;
     }
     if (conn == NULL) {
 	conn = CMinternal_initiate_conn(cm, attrs);
-	conn->ref_count++;
+	if (conn != NULL) {
+	    conn->ref_count++;
+	}
     }
     if (CMtrace_on(cm, CMConnectionVerbose)) {
 	printf("CMinternal_get_conn returning ");
-	dump_CMConnection(conn);
+	if (conn != NULL) {
+	    dump_CMConnection(conn);
+	} else {
+	    printf("NULL\n");
+	}
     }
     return conn;
 }
