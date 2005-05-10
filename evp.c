@@ -44,7 +44,7 @@ EValloc_stone(CManager cm)
     stone_type stone;
 
     evp->stone_map = realloc(evp->stone_map, 
-			     (evp->stone_count * sizeof(evp->stone_map[0])));
+			     (evp->stone_count + 1) * sizeof(evp->stone_map[0])));
     stone = &evp->stone_map[stone_num];
     memset(stone, 0, sizeof(*stone));
     stone->local_id = stone_num;
@@ -133,7 +133,7 @@ EVassoc_terminal_action(CManager cm, EVstone stone_num,
 	stone->proto_actions[proto_action_num].reference_format = 
 	    EVregister_format_set(cm, format_list, NULL);
     }	
-    action_num = stone->action_count++;
+    action_num = stone->action_count;
     CMtrace_out(cm, EVerbose, "Adding Terminal action %d to stone %d",
 		action_num, stone_num);
     stone->actions = realloc(stone->actions, (action_num + 1) * 
@@ -146,6 +146,7 @@ EVassoc_terminal_action(CManager cm, EVstone stone_num,
 	stone->proto_actions[proto_action_num].reference_format;
     stone->actions[action_num].o.terminal_proto_action_number = proto_action_num;
     stone->proto_action_count++;
+    stone->action_count++;
     return action_num;
 }
     
@@ -202,7 +203,7 @@ EVassoc_filter_action(CManager cm, EVstone stone_num,
 	stone->proto_actions[proto_action_num].reference_format = 
 	    EVregister_format_set(cm, format_list, NULL);
     }	
-    action_num = stone->action_count++;
+    action_num = stone->action_count;
     stone->actions = realloc(stone->actions, (action_num + 1) * 
 				   sizeof(stone->actions[0]));
     memset(&stone->actions[action_num], 0, sizeof(stone->actions[0]));
@@ -213,6 +214,7 @@ EVassoc_filter_action(CManager cm, EVstone stone_num,
 	stone->proto_actions[proto_action_num].reference_format;
     stone->actions[action_num].o.terminal_proto_action_number = proto_action_num;
     stone->proto_action_count++;
+    stone->action_count++;
     return action_num;
 }
     
