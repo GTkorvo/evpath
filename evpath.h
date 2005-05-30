@@ -1005,7 +1005,7 @@ void CMrun_network ARGS((CManager cm));
  * then that connection should be specified as the dep parameter in this
  * call.  If there is no such reliance, dep can be NULL.
  */
-int CMCondition_get ARGS((CManager cm, CMConnection dep));
+extern int CMCondition_get ARGS((CManager cm, CMConnection dep));
 
 /*!
  * wait for a CM condition value.
@@ -1030,7 +1030,7 @@ int CMCondition_get ARGS((CManager cm, CMConnection dep));
  * CMCondition_wait() and should not be used in any subsequent call
  * (including calls to CMCondition_get_client_data(), etc.).
  */
-int CMCondition_wait ARGS((CManager cm, int condition));
+extern int CMCondition_wait ARGS((CManager cm, int condition));
 
 /*!
  * signal a CM condition value.
@@ -1043,7 +1043,7 @@ int CMCondition_wait ARGS((CManager cm, int condition));
  * satisfy a particualr condition variable has occurred and any waiting
  * thread should awaken.
  */
-void CMCondition_signal ARGS((CManager cm, int condition));
+extern void CMCondition_signal ARGS((CManager cm, int condition));
 
 /*!
  * set the client_data associated with a condition value.
@@ -1067,7 +1067,7 @@ void CMCondition_signal ARGS((CManager cm, int condition));
  * the request to ensure that the response doesn't arrive before the client
  * data is set.
  */
-void CMCondition_set_client_data ARGS((CManager cm, int condition,
+extern void CMCondition_set_client_data ARGS((CManager cm, int condition,
 				       void *client_data));
 /*!
  * get the client_data associated with a condition value.
@@ -1087,7 +1087,7 @@ void CMCondition_set_client_data ARGS((CManager cm, int condition,
  * condition value is considered 'free'd upon return from CMCondition_wait()
  * and should not be used in any subsequent call.
  */
-void *CMCondition_get_client_data ARGS((CManager cm, int condition));
+extern void *CMCondition_get_client_data ARGS((CManager cm, int condition));
 
 /*!
  * test whether or not a particular condition has been signaled.
@@ -1101,7 +1101,7 @@ void *CMCondition_get_client_data ARGS((CManager cm, int condition));
  * \warning This call should not be used on a condition after
  * a CMCondition_wait() has been performed.
  */
-int CMCondition_has_signaled ARGS((CManager cm, int condition));
+extern int CMCondition_has_signaled ARGS((CManager cm, int condition));
 /*!
  * test whether or not a particular condition has failed.
  *
@@ -1114,7 +1114,7 @@ int CMCondition_has_signaled ARGS((CManager cm, int condition));
  * \warning This call should not be used on a condition after
  * a CMCondition_wait() has been performed.
  */
-int CMCondition_has_failed ARGS((CManager cm, int condition));
+extern int CMCondition_has_failed ARGS((CManager cm, int condition));
 
 /** @defgroup malloc CM memory allocation functions
  *
@@ -1486,7 +1486,7 @@ extern EVsource
 EVcreate_submit_handle_free(CManager cm, EVstone stone, CMFormatList data_format,
 			    EVFreeFunction free_func, void *client_data);
 
-void
+extern void
 EVsubmit(EVsource source, void *data, attr_list attrs);
 
 extern void
@@ -1496,10 +1496,10 @@ EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
 extern IOFormat
 EVget_src_ref_format(EVsource source);
 
-void
+extern void
 EVPsubmit_encoded(CManager cm, int local_path_id, void *data, int len);
 
-void
+extern void
 EVPsubmit(CManager cm, int local_path_id, void *data, IOFormat format);
 
 extern void
@@ -1512,10 +1512,10 @@ EVtake_event_buffer ARGS((CManager cm, void *event));
 extern void
 EVreturn_event_buffer ARGS((CManager cm, void *event));
 
-char *
+extern char *
 create_filter_action_spec(CMFormatList format_list, char *function);
 
-char *
+extern char *
 create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function);
 
 #ifdef	__cplusplus
