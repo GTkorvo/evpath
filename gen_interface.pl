@@ -104,7 +104,7 @@ EOF
 	}
 
 	$_ = $return_type{$subr};
-	if (/^\W*void\W*$/) {
+	if (/^\s*void\s*$/) {
 	    $return_type{$subr} = "void";
 	}
 	if ($return_type{$subr} ne "void") {
