@@ -6,6 +6,10 @@
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
 #endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+#include <stdlib.h>
 #include <io.h>
 #include <atl.h>
 #include "evpath.h"
