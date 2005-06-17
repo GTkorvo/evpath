@@ -30,15 +30,15 @@ transport_entry transport;
 {
     int num_trans;
     if (cm->transports == NULL) {
-	cm->transports = CMmalloc(sizeof(transport_entry) * 2);
+	cm->transports = INT_CMmalloc(sizeof(transport_entry) * 2);
 	num_trans = 0;
     } else {
 	num_trans = 0;
 	while(cm->transports[num_trans] != NULL) num_trans++;
-	cm->transports = CMrealloc(cm->transports,
+	cm->transports = INT_CMrealloc(cm->transports,
 				   sizeof(transport_entry) * (num_trans +2));
     }
-    cm->transports[num_trans] = CMmalloc(sizeof(struct _transport_item));
+    cm->transports[num_trans] = INT_CMmalloc(sizeof(struct _transport_item));
     *(cm->transports[num_trans]) = *transport;
     cm->transports[num_trans + 1] = NULL;
     transport = cm->transports[num_trans];
@@ -57,8 +57,6 @@ const char *trans_name;
     char *libname;
     lt_dlhandle handle;	
 
-    assert(CMglobal_data_locked());  /* must be already locked */
-
     while ((trans_list != NULL) && (*trans_list != NULL)) {
 	if (strcmp((*trans_list)->trans_name, trans_name) == 0) {
 	    transport_entry trans = add_transport_to_cm(cm, *trans_list);
@@ -72,16 +70,16 @@ const char *trans_name;
 	i++;
     }
     if (global_transports != NULL) {
-      global_transports = CMrealloc(global_transports, 
+      global_transports = INT_CMrealloc(global_transports, 
 				    sizeof(global_transports) * (i + 2));
     } else {
-        global_transports = CMmalloc(sizeof(global_transports) * (i+2));
+        global_transports = INT_CMmalloc(sizeof(global_transports) * (i+2));
     }
     global_transports[i] = 
-	transport = CMmalloc(sizeof(struct _transport_item));
+	transport = INT_CMmalloc(sizeof(struct _transport_item));
     global_transports[i+1] = NULL;
 
-    libname = CMmalloc(strlen(trans_name) + strlen("libcm") + strlen(".la") 
+    libname = INT_CMmalloc(strlen(trans_name) + strlen("libcm") + strlen(".la") 
 		       + 1);
     
     strcpy(libname, "libcm");
@@ -109,7 +107,7 @@ const char *trans_name;
     if (!handle) {
 	return 0;
     }
-    CMfree(libname);
+    INT_CMfree(libname);
     CMtrace_out(cm, CMTransportVerbose, "Loaded transport.");
     transport->trans_name = strdup(trans_name);
     transport->cm = cm;

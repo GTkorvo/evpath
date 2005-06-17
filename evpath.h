@@ -1432,9 +1432,9 @@ extern EVaction
 EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
 
-extern EVaction
+/*extern EVaction
 EVassoc_queued_action(CManager cm, EVstone stone, char *queue_spec, 
-		      void *client_data);
+void *client_data);*/
 
 extern EVaction
 EVassoc_immediate_action(CManager cm, EVstone stone, char *queue_spec, 
@@ -1497,12 +1497,6 @@ extern IOFormat
 EVget_src_ref_format(EVsource source);
 
 extern void
-EVPsubmit_encoded(CManager cm, int local_path_id, void *data, int len);
-
-extern void
-EVPsubmit(CManager cm, int local_path_id, void *data, IOFormat format);
-
-extern void
 EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
 		    int period_usec);
 
@@ -1512,9 +1506,11 @@ EVtake_event_buffer ARGS((CManager cm, void *event));
 extern void
 EVreturn_event_buffer ARGS((CManager cm, void *event));
 
+/*NOLOCK*/
 extern char *
 create_filter_action_spec(CMFormatList format_list, char *function);
 
+/*NOLOCK*/
 extern char *
 create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function);
 

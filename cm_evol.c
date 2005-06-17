@@ -58,7 +58,7 @@ IOFormat format;
     if (nearest_format == -1)
 	return NULL;
 
-    cm->in_formats = CMrealloc(cm->in_formats,
+    cm->in_formats = INT_CMrealloc(cm->in_formats,
 			       sizeof(struct _CMincoming_format) *
 			       (cm->in_format_count + 1));
     cm->in_formats[cm->in_format_count].format = format;

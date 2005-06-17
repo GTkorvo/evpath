@@ -55,14 +55,13 @@ int condition;
 
 
 extern int
-CMCondition_get(cm, conn)
+INT_CMCondition_get(cm, conn)
 CManager cm;
 CMConnection conn;
 {
     CMControlList cl = cm->control_list;
-    CMCondition cond = CMmalloc(sizeof(CMCondition_s));
+    CMCondition cond = INT_CMmalloc(sizeof(CMCondition_s));
     set_debug_flag(cm);
-    CMControlList_lock(cl);
     cond->next = cl->condition_list;
     cl->condition_list = cond;
     cond->condition_num = cl->next_condition_num++;
@@ -78,7 +77,6 @@ CMConnection conn;
     if (gen_thr_initialized()) {
 	cond->cond_condition = thr_condition_alloc();
     }
-    CMControlList_unlock(cl);
     return cond->condition_num;
 }
 
@@ -112,7 +110,6 @@ CMConnection conn;
     CMControlList cl = conn->cm->control_list;
     CMCondition cond_list;
     set_debug_flag(conn->cm);
-    CMControlList_lock(cl);
     cond_list = cl->condition_list;
     while(cond_list != NULL) {
 	if (cond_list->conn == conn) {
@@ -121,7 +118,6 @@ CMConnection conn;
 	}
 	cond_list = cond_list->next;
     }
-    CMControlList_unlock(cl);
 }
 
 void
@@ -155,12 +151,12 @@ int condition;
 	if (cond->cond_condition) {
 	    thr_condition_free(cond->cond_condition);
 	}
-	CMfree(cond);
+	INT_CMfree(cond);
     }
 }
 
 extern int
-CMCondition_has_signaled(cm, condition)
+INT_CMCondition_has_signaled(cm, condition)
 CManager cm;
 int condition;
 {
@@ -169,17 +165,14 @@ int condition;
     CMControlList cl = cm->control_list;
     set_debug_flag(cm);
 
-    CMControlList_lock(cl);
-    
     cond = CMCondition_find(cl, condition);
     retval = cond->signaled;
     
-    CMControlList_unlock(cl);
     return retval;
 }
 
 extern int
-CMCondition_has_failed(cm, condition)
+INT_CMCondition_has_failed(cm, condition)
 CManager cm;
 int condition;
 {
@@ -188,17 +181,14 @@ int condition;
     CMControlList cl = cm->control_list;
     set_debug_flag(cm);
 
-    CMControlList_lock(cl);
-    
     cond = CMCondition_find(cl, condition);
     retval = cond->failed;
     
-    CMControlList_unlock(cl);
     return retval;
 }
 
 extern int
-CMCondition_wait(cm, condition)
+INT_CMCondition_wait(cm, condition)
 CManager cm;
 int condition;
 {
@@ -206,11 +196,11 @@ int condition;
     CMControlList cl = cm->control_list;
     int result;
 
+    assert(CManager_locked(cm));
     set_debug_flag(cm);
     if (cm_control_debug_flag) {
 	printf("CMLowLevel Waiting for CMcondition %d\n", condition);
     }
-    CMControlList_lock(cl);
     if (cm_control_debug_flag) {
 	printf("CMLowLevel locked cl\n");
     }
@@ -220,14 +210,12 @@ int condition;
 	if (cm_control_debug_flag) {
 	    printf("CMcondition %d already signalled\n", condition);
 	}
-	CMControlList_unlock(cl);
 	return 1;
     }
     if (cond->failed) {
 	if (cm_control_debug_flag) {
 	    printf("CMcondition %d already failed\n", condition);
 	}
-	CMControlList_unlock(cl);
 	return 0;
     }
     cond->waiting++;
@@ -241,9 +229,9 @@ int condition;
 		if (cm_control_debug_flag) {
 		    printf("CMLowLevel  Polling for CMcondition %d\n", condition);
 		}
-		CMControlList_unlock(cl);
+		CManager_unlock(cm);
 		CMcontrol_list_wait(cl);
-		CMControlList_lock(cl);
+		CManager_lock(cm);
 	    }
 	    if (cm_control_debug_flag) {
 		printf("CMLowLevel  after Polling for CMcondition %d\n", condition);
@@ -266,7 +254,9 @@ int condition;
 		printf("CMLowLevel Waiting for CMcondition %d, thr_cond %lx\n", 
 		       condition, (long)cond->cond_condition);
 	    }
-	    thr_condition_wait(cond->cond_condition, cl->list_mutex);
+	    cm->locked--;
+	    thr_condition_wait(cond->cond_condition, cm->exchange_lock);
+	    cm->locked++;
 	    if (cm_control_debug_flag) {
 		printf("CMLowLevel After wait for CMcondition %d, thr_cond %lx\n", 
 		       condition, (long)cond->cond_condition);
@@ -278,9 +268,9 @@ int condition;
 	    if (cm_control_debug_flag) {
 		printf("CMLowLevel polling for CMcondition %d\n", condition);
 	    }
-	    CMControlList_unlock(cl);
+	    CManager_unlock(cm);
 	    CMcontrol_list_wait(cl);
-	    CMControlList_lock(cl);
+	    CManager_lock(cm);
 	}
     } else {
 	/* some other thread is the server thread */
@@ -292,7 +282,9 @@ int condition;
 	    printf("CMLowLevel Waiting for CMcondition %d, thr_cond %lx\n", 
 		   condition, (long)cond->cond_condition);
 	}
-	thr_condition_wait(cond->cond_condition, cl->list_mutex);
+	cm->locked--;
+	thr_condition_wait(cond->cond_condition, cm->exchange_lock);
+	cm->locked++;
 	if (cm_control_debug_flag) {
 	    printf("CMLowLevel After wait for CMcondition %d, thr_cond %lx\n", 
 		   condition, (long)cond->cond_condition);
@@ -300,7 +292,6 @@ int condition;
     }
     result = cond->signaled;
     CMCondition_destroy(cl, condition);
-    CMControlList_unlock(cl);
     if (cm_control_debug_flag) {
 	printf("CMLowLevel Return from wait CMcondition %d\n", condition);
     }
@@ -308,23 +299,24 @@ int condition;
 }
 
 extern void
-CMCondition_signal(cm, condition)
+INT_CMCondition_signal(cm, condition)
 CManager cm;
 int condition;
 {
     CMCondition cond;
     CMControlList cl = cm->control_list;
+    if(!CManager_locked(cm)) {
+	printf("Not LOCKED!\n");
+    }
     set_debug_flag(cm);
-    CMControlList_lock(cl);
     cond = CMCondition_find(cl, condition);
     cond->signaled = 1;
     CMCondition_trigger(cond, cl);
     if (cl->has_thread == 0) cm->abort_read_ahead = 1;
-    CMControlList_unlock(cl);
 }
 
 extern void
-CMCondition_set_client_data(cm, condition, client_data)
+INT_CMCondition_set_client_data(cm, condition, client_data)
 CManager cm;
 int condition;
 void *client_data;
@@ -332,14 +324,12 @@ void *client_data;
     CMCondition cond;
     CMControlList cl = cm->control_list;
     set_debug_flag(cm);
-    CMControlList_lock(cl);
     cond = CMCondition_find(cl, condition);
     cond->client_data = client_data;
-    CMControlList_unlock(cl);
 }
 
 extern void *
-CMCondition_get_client_data(cm, condition)
+INT_CMCondition_get_client_data(cm, condition)
 CManager cm;
 int condition;
 {
@@ -347,9 +337,7 @@ int condition;
     void *client_data;
     CMControlList cl = cm->control_list;
     set_debug_flag(cm);
-    CMControlList_lock(cl);
     cond = CMCondition_find(cl, condition);
     client_data = cond->client_data;
-    CMControlList_unlock(cl);
     return client_data;
 }

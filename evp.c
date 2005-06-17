@@ -37,7 +37,7 @@ EVPSubmit_general(CManager cm, int local_path_id, event_item *event)
 }
 
 EVstone
-EValloc_stone(CManager cm)
+INT_EValloc_stone(CManager cm)
 {
     event_path_data evp = cm->evp;
     int stone_num = evp->stone_count;
@@ -57,7 +57,7 @@ EValloc_stone(CManager cm)
 }
 
 void
-EVfree_stone(CManager cm, EVstone stone_num)
+INT_EVfree_stone(CManager cm, EVstone stone_num)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
@@ -66,13 +66,13 @@ EVfree_stone(CManager cm, EVstone stone_num)
     stone = &evp->stone_map[stone_num];
     if (stone->local_id == -1) return;
     if (stone->periodic_handle != NULL) {
-	CMremove_task(stone->periodic_handle);
+	INT_CMremove_task(stone->periodic_handle);
 	stone->periodic_handle = NULL;
     }
     for(i = 0; i < stone->action_count; i++) {
 	action *act = &stone->actions[i];
 	if (act->attrs != NULL) {
-	    CMfree_attr_list(cm, act->attrs);
+	    INT_CMfree_attr_list(cm, act->attrs);
 	}
 	switch(act->action_type) {
 	case Action_Output:
@@ -110,7 +110,7 @@ EVfree_stone(CManager cm, EVstone stone_num)
 }
 
 EVstone
-EVassoc_terminal_action(CManager cm, EVstone stone_num, 
+INT_EVassoc_terminal_action(CManager cm, EVstone stone_num, 
 			CMFormatList format_list, EVSimpleHandlerFunc handler,
 			void *client_data)
 {
@@ -152,7 +152,7 @@ EVassoc_terminal_action(CManager cm, EVstone stone_num,
     
 
 EVaction
-EVassoc_immediate_action(CManager cm, EVstone stone_num, 
+INT_EVassoc_immediate_action(CManager cm, EVstone stone_num, 
 			 char *action_spec, void *client_data)
 {
     event_path_data evp = cm->evp;
@@ -179,7 +179,7 @@ EVassoc_immediate_action(CManager cm, EVstone stone_num,
 }
 
 EVstone
-EVassoc_filter_action(CManager cm, EVstone stone_num, 
+INT_EVassoc_filter_action(CManager cm, EVstone stone_num, 
 		      CMFormatList format_list, EVSimpleHandlerFunc handler,
 		      EVstone out_stone_num, void *client_data)
 {
@@ -303,7 +303,7 @@ set_conversions(IOContext ctx, IOFormat src_format, IOFormat target_format)
 }
 
 extern void
-EVassoc_conversion_action(cm, stone_id, target_format, incoming_format)
+INT_EVassoc_conversion_action(cm, stone_id, target_format, incoming_format)
 CManager cm;
 int stone_id;
 IOFormat target_format;
@@ -339,7 +339,7 @@ IOFormat incoming_format;
 }
 
 int
-EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num, 
+INT_EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num, 
 		    int output_index, EVstone output_stone)
 {
     stone_type stone;
@@ -427,7 +427,7 @@ decode_action(CManager cm, event_item *event, action *act)
 	    if (event->event_len == -1) printf("BAD LENGTH\n");
 	    decode_to_buffer_IOcontext(act->o.decode.context, 
 				       event->encoded_event, decode_buffer);
-	    CMtake_buffer(cm, decode_buffer);
+	    INT_CMtake_buffer(cm, decode_buffer);
 	    event->decoded_event = decode_buffer;
 	    event->event_encoded = 0;
 	    event->reference_format = act->o.decode.target_reference_format;
@@ -531,6 +531,7 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     action *act = NULL;
 
     assert(evpath_locked());
+    assert(CManager_locked(cm));
     if (evp->stone_count < local_path_id) {
 	return -1;
     }
@@ -795,7 +796,7 @@ process_output_actions(CManager cm)
 }
 
 extern EVaction
-EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
+INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
 			   EVImmediateHandlerFunc func, void *client_data, 
 			   IOFormat reference_format)
 {
@@ -816,16 +817,16 @@ EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
 
 
 extern EVaction
-EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
+INT_EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
 		      EVstone remote_stone)
 {
     event_path_data evp = cm->evp;
     stone_type stone = &evp->stone_map[stone_num];
     int action_num = stone->action_count;
-    CMConnection conn = CMget_conn(cm, contact_list);
+    CMConnection conn = INT_CMget_conn(cm, contact_list);
 
     if (conn == NULL) {
-	printf("EVassoc_output_action - failed to contact host at contact point \n\t");
+	printf("INT_EVassoc_output_action - failed to contact host at contact point \n\t");
 	if (contact_list != NULL) {
 	    dump_attr_list(contact_list);
 	} else {
@@ -852,7 +853,7 @@ EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
 }
 
 extern EVaction
-EVassoc_split_action(CManager cm, EVstone stone_num, 
+INT_EVassoc_split_action(CManager cm, EVstone stone_num, 
 		     EVstone *target_stone_list)
 {
     event_path_data evp = cm->evp;
@@ -884,7 +885,7 @@ EVassoc_split_action(CManager cm, EVstone stone_num,
 }
 
 extern int
-EVaction_add_split_target(CManager cm, EVstone stone_num, 
+INT_EVaction_add_split_target(CManager cm, EVstone stone_num, 
 			  EVaction action_num, EVstone new_stone_target)
 {
     event_path_data evp = cm->evp;
@@ -908,7 +909,7 @@ EVaction_add_split_target(CManager cm, EVstone stone_num,
 }
 
 extern void
-EVaction_remove_split_target(CManager cm, EVstone stone_num, 
+INT_EVaction_remove_split_target(CManager cm, EVstone stone_num, 
 			  EVaction action_num, EVstone stone_target)
 {
     event_path_data evp = cm->evp;
@@ -1027,10 +1028,10 @@ EVauto_submit_func(CManager cm, void* vstone)
 }
 
 extern void
-EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
+INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
 		    int period_usec)
 {
-    CMTaskHandle handle = CMadd_periodic_task(cm, period_sec, period_usec,
+    CMTaskHandle handle = INT_CMadd_periodic_task(cm, period_sec, period_usec,
 					      EVauto_submit_func, 
 					      (void*)(long)stone_num);
     stone_type stone = &cm->evp->stone_map[stone_num];
@@ -1040,14 +1041,14 @@ EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec,
 
 
 extern EVsource
-EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format)
+INT_EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format)
 {
     EVsource source = malloc(sizeof(*source));
     memset(source, 0, sizeof(*source));
     source->local_stone_id = stone;
     source->cm = cm;
     if (data_format != NULL) {
-	source->format = CMregister_format(cm, data_format[0].format_name,
+	source->format = INT_CMregister_format(cm, data_format[0].format_name,
 					   data_format[0].field_list,
 					   data_format);
 	source->reference_format = EVregister_format_set(cm, data_format, NULL);
@@ -1056,7 +1057,7 @@ EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format)
 }
 
 extern EVsource
-EVcreate_submit_handle_free(CManager cm, EVstone stone, 
+INT_EVcreate_submit_handle_free(CManager cm, EVstone stone, 
 			    CMFormatList data_format, 
 			    EVFreeFunction free_func, void *free_data)
 {
@@ -1064,7 +1065,7 @@ EVcreate_submit_handle_free(CManager cm, EVstone stone,
     memset(source, 0, sizeof(*source));
     source->local_stone_id = stone;
     source->cm = cm;
-    source->format = CMregister_format(cm, data_format[0].format_name,
+    source->format = INT_CMregister_format(cm, data_format[0].format_name,
 					    data_format[0].field_list, data_format);
     source->reference_format = EVregister_format_set(cm, data_format, NULL);
     source->free_func = free_func;
@@ -1090,7 +1091,7 @@ return_event(event_path_data evp, event_item *event)
 	/* return event memory */
 	switch (event->contents) {
 	case Event_CM_Owned:
-	    CMreturn_buffer(event->cm, event->decoded_event);
+	    INT_CMreturn_buffer(event->cm, event->decoded_event);
 	    break;
 	case Event_Freeable:
 	    (event->free_func)(event->decoded_event, event->free_arg);
@@ -1101,7 +1102,7 @@ return_event(event_path_data evp, event_item *event)
 	    }
 	    break;
 	}
-	if (event->attrs != NULL) CMfree_attr_list(event->cm, event->attrs);
+	if (event->attrs != NULL) INT_CMfree_attr_list(event->cm, event->attrs);
 	free(event);
     }
 }
@@ -1129,7 +1130,7 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     event->format = NULL;
     CMtrace_out(cm, EVerbose, "Event coming in from network to stone %d", 
 		stone_id);
-    CMtake_buffer(cm, buffer);
+    INT_CMtake_buffer(cm, buffer);
     event->cm = cm;
     internal_path_submit(cm, stone_id, event);
     return_event(evp, event);
@@ -1138,7 +1139,7 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
 }
 
 extern void
-EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func, 
+INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func, 
 		 attr_list attrs)
 {
     event_item *event = get_free_event(source->cm->evp);
@@ -1156,7 +1157,7 @@ EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
 }
     
 void
-EVsubmit(EVsource source, void *data, attr_list attrs)
+INT_EVsubmit(EVsource source, void *data, attr_list attrs)
 {
     event_item *event = get_free_event(source->cm->evp);
     if (source->free_func != NULL) {
@@ -1183,7 +1184,7 @@ free_evp(CManager cm, void *not_used)
     event_path_data evp = cm->evp;
     int s;
     for (s = 0 ; s < evp->stone_count; s++) {
-	EVfree_stone(cm, s);
+	INT_EVfree_stone(cm, s);
     }
     cm->evp = NULL;
     if (evp == NULL) return;
@@ -1201,7 +1202,7 @@ free_evp(CManager cm, void *not_used)
 void
 EVPinit(CManager cm)
 {
-    cm->evp = CMmalloc(sizeof( struct _event_path_data));
+    cm->evp = INT_CMmalloc(sizeof( struct _event_path_data));
     memset(cm->evp, 0, sizeof( struct _event_path_data));
     cm->evp->root_context = create_IOcontext();
     cm->evp->queue_items_free_list = NULL;
@@ -1211,7 +1212,7 @@ EVPinit(CManager cm)
 
     
 extern int
-EVtake_event_buffer(CManager cm, void *event)
+INT_EVtake_event_buffer(CManager cm, void *event)
 {
     queue_item *item;
     event_item *cur = cm->evp->current_event_item;
@@ -1225,7 +1226,7 @@ EVtake_event_buffer(CManager cm, void *event)
     if (!((cur->decoded_event <= event) &&
 	  ((char *) event <= ((char *) cur->decoded_event + cur->event_len)))){
 	fprintf(stderr,
-		"Event address (%lx) in EVtake_event_buffer does not match currently executing event on this CM.\n",
+		"Event address (%lx) in INT_EVtake_event_buffer does not match currently executing event on this CM.\n",
 		(long) event);
 	return 0;
     }
@@ -1233,7 +1234,7 @@ EVtake_event_buffer(CManager cm, void *event)
 	static int take_event_warning = 0;
 	if (take_event_warning == 0) {
 	    fprintf(stderr,
-		    "Warning:  EVtake_event_buffer called on an event submitted with \n    EVsubmit_event(), EVsubmit_typed_event() or EVsubmit_eventV() .\n    This violates ECho event data memory handling requirements.  See \n    http://www.cc.gatech.edu/systems/projects/ECho/event_memory.html\n");
+		    "Warning:  INT_EVtake_event_buffer called on an event submitted with \n    INT_EVsubmit_event(), INT_EVsubmit_typed_event() or INT_EVsubmit_eventV() .\n    This violates ECho event data memory handling requirements.  See \n    http://www.cc.gatech.edu/systems/projects/ECho/event_memory.html\n");
 	    take_event_warning++;
 	}
 	return 0;
@@ -1253,7 +1254,7 @@ EVtake_event_buffer(CManager cm, void *event)
 }
 
 void
-EVreturn_event_buffer(cm, event)
+INT_EVreturn_event_buffer(cm, event)
 CManager cm;
 void *event;
 {
@@ -1283,7 +1284,7 @@ void *event;
 }
 
 extern IOFormat
-EVget_src_ref_format(EVsource source)
+INT_EVget_src_ref_format(EVsource source)
 {
     return source->reference_format;
 }

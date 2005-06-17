@@ -170,7 +170,7 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	    str = parse_IOformat_from_string(str, &list[i].format_name,
 					     &list[i].field_list);
 	}
-/*	EVassoc_terminal_action(cm, stone_id, list, local_data, NULL);*/
+/*	INT_EVassoc_terminal_action(cm, stone_id, list, local_data, NULL);*/
     }
     if (strncmp("Filter Action", str, strlen("Filter Action")) == 0) {
 	struct response_spec *response = malloc(sizeof(struct response_spec));
@@ -259,7 +259,7 @@ create_terminal_action_spec(CMFormatList format_list)
 }
 
 char *
-create_filter_action_spec(CMFormatList format_list, char *function)
+INT_create_filter_action_spec(CMFormatList format_list, char *function)
 {
     int format_count = 0;
     int i;
@@ -277,7 +277,7 @@ create_filter_action_spec(CMFormatList format_list, char *function)
 }
 
 char *
-create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function)
+INT_create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function)
 {
     int format_count = 0;
     int i;
@@ -359,7 +359,7 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	s.reference_format = instance->u.transform.out_format;
 	s.free_func = transform_free_wrapper;
 	s.free_data = instance;
-	EVsubmit(&s, out_event, NULL);
+	INT_EVsubmit(&s, out_event, NULL);
     } else {
 	CMtrace_out(cm, EVerbose, "Filter function returned %d, NOT submitting\n", ret);
 	transform_free_wrapper(out_event, instance);
@@ -475,11 +475,11 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 		if (instance == 0) return 0;
 		switch(mrd->response_type) {
 		case Response_Filter:
-		    EVassoc_mutated_imm_action(cm, stone->local_id, action_num, 
+		    INT_EVassoc_mutated_imm_action(cm, stone->local_id, action_num, 
 					       filter_wrapper, instance, 
 					       conversion_target_format);
 		case Response_Transform:
-		    EVassoc_mutated_imm_action(cm, stone->local_id, action_num, 
+		    INT_EVassoc_mutated_imm_action(cm, stone->local_id, action_num, 
 					       transform_wrapper, instance, 
 					       conversion_target_format);
 		}
@@ -489,7 +489,7 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 	}
 	if (event->event_encoded && (conversion_target_format != NULL)) {
 	    /* create a decode action */
-	    EVassoc_conversion_action(cm, stone->local_id, 
+	    INT_EVassoc_conversion_action(cm, stone->local_id, 
 				      conversion_target_format, 
 				      event->reference_format);
 /*	    printf(" Returning ");

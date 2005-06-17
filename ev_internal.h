@@ -146,3 +146,4 @@ EVregister_format_set(CManager cm, CMFormatList list, IOContext *context_ptr);
 
 extern int
 internal_path_submit(CManager cm, int local_path_id, event_item *event);
+extern void INT_EVsubmit(EVsource source, void *data, attr_list attrs);

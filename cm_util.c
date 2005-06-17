@@ -158,7 +158,7 @@ CMint_decode_attr_from_xmit(CManager cm, void * buf, char *file, int line)
 }
 
 extern void*
-CMrealloc(ptr, size)
+INT_CMrealloc(ptr, size)
 void *ptr;
 int size;
 {
@@ -171,14 +171,14 @@ int size;
 }
 
 extern void*
-CMmalloc(size)
+INT_CMmalloc(size)
 int size;
 {
     return malloc(size);
 }
 
 extern void
-CMfree(ptr)
+INT_CMfree(ptr)
 void *ptr;
 {
     free(ptr);

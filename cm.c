@@ -32,13 +32,13 @@ extern int getdomainname ARGS((char *name, int namelen));
 
 static void CMinitialize ARGS((CManager cm));
 
-struct CMtrans_services_s CMstatic_trans_svcs = {CMmalloc, CMrealloc, CMfree, 
+struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, INT_CMfree, 
 					       CM_fd_add_select, 
 					       CM_fd_write_select, 
 					       CM_fd_remove_select, 
 					       CMtransport_trace,
 					       CMConnection_create,
-					       CMadd_shutdown_task,
+					       INT_CMadd_shutdown_task,
 					       cm_get_data_buf,
 					       cm_return_data_buf};
 static void CMControlList_close ARGS((CMControlList cl));
@@ -54,23 +54,27 @@ static void
 CMpoll_forever(cm)
 CManager cm;
 {
+    /* don't hold locks while polling forever */
     CMControlList cl = cm->control_list;
+    CManager_lock(cm);
+    CManager_unlock(cm);
     while(!cl->closed) {
 	CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Forever - thread %lx doing wait", (long)thr_thread_self());
 	if (CMcontrol_list_wait(cl) == -1) {
 	    CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Forever - doing close and exit");
-	    CManager_close(cm);
+	    INT_CManager_close(cm);
 	    exit(1);
 	}
     }
     CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Forever - doing close");
-    CManager_close(cm);
+    CManager_lock(cm);
+    INT_CManager_close(cm);
     if (cl->has_thread > 0 && cl->server_thread == thr_thread_self())
         thr_thread_exit(NULL);
 }
 
 extern void
-CMrun_network(cm)
+INT_CMrun_network(cm)
 CManager cm;
 {
     cm->control_list->server_thread = thr_thread_self();
@@ -85,13 +89,12 @@ CM_test_thread_func()
 }
 
 int
-CMfork_comm_thread(cm)
+INT_CMfork_comm_thread(cm)
 CManager cm;
 {
     /* if we're on a kernel-level-threads package, for the thread and 
        return 1, else return 0; */
     if (gen_thr_is_kernel()) {
-	CMControlList_lock(cm->control_list);
 	if (cm->control_list->has_thread == 0) {
 	    if (cm->control_list->network_blocking_function.func) {
 		thr_thread_t server_thread = 
@@ -127,7 +130,6 @@ CManager cm;
 		cm->control_list->has_thread = -1; /* should fork one */
 	    }
 	}
-	CMControlList_unlock(cm->control_list);
 	return 1;
     }
     CMtrace_out(cm, CMLowLevelVerbose,
@@ -144,7 +146,6 @@ CMPollFunc bfunc;
 CMPollFunc pfunc;
 void *client_data;
 {
-    assert(CMControlList_locked(cl));
     assert(cl->network_blocking_function.func == NULL);
     cl->network_blocking_function.func = bfunc;
     cl->network_blocking_function.client_data = client_data;
@@ -179,7 +180,7 @@ CMControlList cl;
 }
 
 extern void
-CMpoll_network(cm)
+INT_CMpoll_network(cm)
 CManager cm;
 {
     CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Network");
@@ -193,11 +194,11 @@ attr_list attrs;
 {
     int list_size = 0;
     if (cm->contact_lists == NULL) {
-	cm->contact_lists = CMmalloc(sizeof(attr_list) *2);
+	cm->contact_lists = INT_CMmalloc(sizeof(attr_list) *2);
 	list_size = 0;
     } else {
 	while(cm->contact_lists[list_size] != NULL) list_size++;
-	cm->contact_lists = CMrealloc(cm->contact_lists, 
+	cm->contact_lists = INT_CMrealloc(cm->contact_lists, 
 				      sizeof(attr_list) * (list_size + 2));
     }
     cm->contact_lists[list_size] = attrs;
@@ -205,7 +206,7 @@ attr_list attrs;
 }
 
 attr_list
-CMget_contact_list(cm)
+INT_CMget_contact_list(cm)
 CManager cm;
 {
     if (cm->contact_lists == NULL) return NULL;
@@ -214,7 +215,7 @@ CManager cm;
 }
 
 extern attr_list
-CMget_specific_contact_list(cm, attrs)
+INT_CMget_specific_contact_list(cm, attrs)
 CManager cm;
 attr_list attrs;
 {
@@ -263,7 +264,7 @@ attr_list attrs;
 	i++;
     }
     /* chosen transport not listened? */
-    CMlisten_specific(cm, attrs);
+    INT_CMlisten_specific(cm, attrs);
     /* try again */
     while (cm->contact_lists && (cm->contact_lists[i] != NULL)) {
 	char *this_transport = NULL, *this_postfix = NULL;
@@ -298,10 +299,10 @@ attr_list attrs;
 }
 
 int
-CMlisten(cm)
+INT_CMlisten(cm)
      CManager cm;
 {
-  return CMlisten_specific (cm, NULL);
+  return INT_CMlisten_specific (cm, NULL);
 }
 
 extern int
@@ -321,16 +322,12 @@ attr_list listen_info;
         CMtrace_out(cm, CMConnectionVerbose,
 		    "CM - Listening only on transport \"%s\"",
 		    choosen_transport);
-	CManager_unlock(cm);
-	CMglobal_data_lock();
 	if (load_transport(cm, choosen_transport) == 0) {
 	    CMtrace_out(cm, CMConnectionVerbose,
 			"Failed to load transport \"%s\".  Revert to default.\n",
 			choosen_transport);
 	    choosen_transport = NULL;
 	}
-	CMglobal_data_unlock();
-	CManager_lock(cm);
     }
     trans_list = cm->transports;
     while ((trans_list != NULL) && (*trans_list != NULL)) {
@@ -355,15 +352,13 @@ attr_list listen_info;
 }
 
 int
-CMlisten_specific(cm, listen_info)
+INT_CMlisten_specific(cm, listen_info)
 CManager cm;
 attr_list listen_info;
 {
     int success = 0;
     if (!cm->initialized) CMinitialize(cm);
-    CManager_lock(cm);
     success = CMinternal_listen(cm, listen_info);
-    CManager_unlock(cm);
     return (success != 0);
 }
 
@@ -381,7 +376,6 @@ CManager cm;
 {
     char **transport_names = CMglobal_alternate_transports;
     char *def = cercs_getenv("CMDefaultTransport");
-    CMglobal_data_lock();
     if (def != NULL) CMglobal_default_transport = def;
     if (CMglobal_default_transport) {
 	if (load_transport(cm, CMglobal_default_transport) == 0) {
@@ -394,7 +388,6 @@ CManager cm;
 	transport_names++;
     }
     cm->initialized++;
-    CMglobal_data_unlock();
 }
 
 extern
@@ -403,21 +396,16 @@ CMcontrol_list_poll(cl)
 CMControlList cl;
 {
     func_entry *poll_list = cl->polling_function_list;
-    CMControlList_lock(cl);
     while ((poll_list != NULL) && (poll_list->func != NULL)){
 	int consistency_number = cl->cl_consistency_number;
 
-	CMControlList_unlock(cl);
 	poll_list->func(poll_list->cm, poll_list->client_data);
 	/* do function */
-	CMControlList_lock(cl);
 	if (consistency_number != cl->cl_consistency_number) {
-	    CMControlList_unlock(cl);
 	    return 1;
 	}
 	poll_list++;
     }
-    CMControlList_unlock(cl);
     return 1;
 }
 
@@ -431,27 +419,25 @@ void *client_data;
 {
     func_entry *poll_list;
     int count = 0;
-    CMControlList_lock(cl);
     poll_list = cl->polling_function_list;
     while ((poll_list != NULL) && (poll_list->func != NULL)) {
 	count++;
     }
     if (poll_list != NULL) {
-	poll_list = CMrealloc(poll_list, sizeof(func_entry) * (count+2));
+	poll_list = INT_CMrealloc(poll_list, sizeof(func_entry) * (count+2));
     } else {
-	poll_list = CMmalloc(sizeof(func_entry)*2);
+	poll_list = INT_CMmalloc(sizeof(func_entry)*2);
     }
     poll_list[count].cm = cm;
     poll_list[count].func = func;
     poll_list[count].client_data = client_data;
     poll_list[count+1].func = NULL;
     cl->polling_function_list = poll_list;
-    CMControlList_unlock(cl);
 }
     
 extern
 void
-CMadd_poll(cm, func, client_data)
+INT_CMadd_poll(cm, func, client_data)
 CManager cm;
 CMPollFunc func;
 void *client_data;
@@ -459,16 +445,12 @@ void *client_data;
     CMControlList_add_poll(cm->control_list, cm, func, client_data);
 }
 
-struct _CMTaskHandle {
-    CManager cm;
-    periodic_task_handle task;
-};
-
 extern
 int
 CMcontrol_list_wait(cl)
 CMControlList cl;
 {
+    /* associated CM should *not* be locked */
     if ((cl->server_thread != 0) &&
 	(cl->server_thread != thr_thread_self())) {
 	/* What?  We're polling, but we're not the server thread? */
@@ -484,13 +466,14 @@ CMControlList cl;
     CMcontrol_list_poll(cl);
     return 1;
 }
-extern CMControlList CMControlList_create();
+
+static CMControlList CMControlList_create();
 
 extern
 CManager
-CManager_create()
+INT_CManager_create()
 {
-    CManager cm = (CManager) CMmalloc(sizeof(CManager_s));
+    CManager cm = (CManager) INT_CMmalloc(sizeof(CManager_s));
     int atom_init = 0;
 
     if (cm == NULL)
@@ -536,22 +519,22 @@ CManager_create()
     cm->context_lock = thr_mutex_alloc();
 
     cm->in_format_count = 0;
-    cm->in_formats = CMmalloc(1);
+    cm->in_formats = INT_CMmalloc(1);
 
     cm->reg_format_count = 0;
-    cm->reg_formats = CMmalloc(1);
+    cm->reg_formats = INT_CMmalloc(1);
 
     cm->pending_request_max = 1;
-    cm->pbio_requests = CMmalloc(sizeof(struct _pending_format_requests));
+    cm->pbio_requests = INT_CMmalloc(sizeof(struct _pending_format_requests));
     cm->pbio_requests[0].server_id = NULL;
     cm->pbio_requests[0].id_length = 0;
     cm->pbio_requests[0].condition = 0;
     cm->pbio_requests[0].top_request = 0;
 
     cm->connection_count = 0;
-    cm->connections = CMmalloc(1);
+    cm->connections = INT_CMmalloc(1);
     cm->reg_user_format_count = 0;
-    cm->reg_user_formats = CMmalloc(1);
+    cm->reg_user_formats = INT_CMmalloc(1);
     cm->taken_buffer_list = NULL;
     cm->cm_buffer_list = NULL;
 
@@ -573,31 +556,31 @@ CManager cm;
     if (cm->transports) {
 	int i = 0;
 	while (cm->transports[i] != NULL) {
-	    CMfree(cm->transports[i]);
+	    INT_CMfree(cm->transports[i]);
 	    i++;
 	}
-	CMfree(cm->transports);
+	INT_CMfree(cm->transports);
     }
 
-    CMfree(cm->in_formats);
+    INT_CMfree(cm->in_formats);
 
     for (i=0 ; i < cm->reg_format_count; i++) {
 	free_IOsubcontext(cm->reg_formats[i]->IOsubcontext);
-	CMfree(cm->reg_formats[i]->format_name);
-	CMfree(cm->reg_formats[i]);
+	INT_CMfree(cm->reg_formats[i]->format_name);
+	INT_CMfree(cm->reg_formats[i]);
     }
-    CMfree(cm->reg_formats);
+    INT_CMfree(cm->reg_formats);
 
     /*
      *  Applications are expected to free the user contexts that 
      *  they request.  If they do this, there will be no user formats to
      *  free at this point.  (Doing so might result in double freeing.)
      */
-    CMfree(cm->reg_user_formats);
+    INT_CMfree(cm->reg_user_formats);
 
-    CMfree(cm->pbio_requests);
+    INT_CMfree(cm->pbio_requests);
 
-    CMfree(cm->connections);
+    INT_CMfree(cm->connections);
     /*
      * GSE why o why
      * a bug a cannot find.  If I leave the free in place, bad things happen
@@ -614,31 +597,31 @@ CManager cm;
     i = 0;
     if (cm->contact_lists != NULL) {
 	while(cm->contact_lists[i] != NULL) {
-	    CMfree_attr_list(cm, cm->contact_lists[i]);
+	    INT_CMfree_attr_list(cm, cm->contact_lists[i]);
 	    i++;
 	}
-	CMfree(cm->contact_lists);
+	INT_CMfree(cm->contact_lists);
     }
     list = cm->taken_buffer_list;
     while (list != NULL) {
 	CMbuffer next = list->next;
 	/* don't free the taken buffers */
-	CMfree(list);
+	INT_CMfree(list);
 	list = next;
     }
     list = cm->cm_buffer_list;
     while (list != NULL) {
 	CMbuffer next = list->next;
-	CMfree(list->buffer);
-	CMfree(list);
+	INT_CMfree(list->buffer);
+	INT_CMfree(list);
 	list = next;
     }
-    if (cm->shutdown_functions) CMfree(cm->shutdown_functions);
-    CMfree(cm);
+    if (cm->shutdown_functions) INT_CMfree(cm->shutdown_functions);
+    INT_CMfree(cm);
 }
 
 extern void
-CManager_close(cm)
+INT_CManager_close(cm)
 CManager cm;
 {
     CMControlList cl = cm->control_list;
@@ -646,7 +629,7 @@ CManager cm;
     CMtrace_out(cm, CMFreeVerbose, "CManager %lx closing", (long) cm);
     while (cm->connection_count != 0) {
 	/* connections are moved down as they are closed... */
-	CMConnection_close(cm->connections[0]);
+	INT_CMConnection_close(cm->connections[0]);
     }
 
     CMtrace_out(cm, CMFreeVerbose, "CMControlList close CL=%lx current reference count will be %d", 
@@ -666,7 +649,7 @@ CManager cm;
 	    shutdown_functions[i].func(cm, shutdown_functions[i].client_data);
 	    shutdown_functions[i].func = NULL;
 	}
-	CMfree(shutdown_functions);
+	INT_CMfree(shutdown_functions);
     }
     CMControlList_free(cl);
 
@@ -675,7 +658,10 @@ CManager cm;
 		(long) cm, cm->reference_count);
     if (cm->reference_count == 0) {
 	CMtrace_out(cm, CMFreeVerbose, "Freeing CManager %lx", cl);
+	CManager_unlock(cm);
 	CManager_free(cm);
+    } else {
+	CManager_unlock(cm);
     }
 }
 
@@ -685,13 +671,13 @@ internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data)
     int func_count = 0;
     if (cm->shutdown_functions == NULL) {
 	cm->shutdown_functions = 
-	    CMmalloc(sizeof(cm->shutdown_functions[0]) * 2);
+	    INT_CMmalloc(sizeof(cm->shutdown_functions[0]) * 2);
     } else {
 	while (cm->shutdown_functions[func_count].func != NULL) {
 	    func_count++;
 	}
 	cm->shutdown_functions = 
-	    CMrealloc(cm->shutdown_functions,
+	    INT_CMrealloc(cm->shutdown_functions,
 		      sizeof(cm->shutdown_functions[0]) * (func_count +2));
     }
     cm->shutdown_functions[func_count].func = func;
@@ -701,23 +687,19 @@ internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data)
 }
 
 extern void
-CMadd_shutdown_task(CManager cm, CMPollFunc func, void *client_data)
+INT_CMadd_shutdown_task(CManager cm, CMPollFunc func, void *client_data)
 {
-    CManager_lock(cm);
     internal_add_shutdown_task(cm, func, client_data);
-    CManager_unlock(cm);
 }
 
 static void
 add_conn_to_CM(CManager cm, CMConnection conn)
 {
-    CManager_lock(cm);
     cm->connections = 
-	CMrealloc(cm->connections, 
+	INT_CMrealloc(cm->connections, 
 		  (cm->connection_count + 1) * sizeof(cm->connections[0]));
     cm->connections[cm->connection_count] = conn;
     cm->connection_count++;
-    CManager_unlock(cm);
 }
 
 static void
@@ -725,7 +707,6 @@ remove_conn_from_CM(CManager cm, CMConnection conn)
 {
     int i;
     int found = 0;
-    CManager_lock(cm);
     for (i=0; i < cm->connection_count; i++) {
 	if (cm->connections[i] == conn) {
 	    found++;
@@ -739,13 +720,12 @@ remove_conn_from_CM(CManager cm, CMConnection conn)
     } else {
 	cm->connection_count--;
     }
-    CManager_unlock(cm);
 }
 
-extern CMControlList
+static CMControlList
 CMControlList_create()
 {
-    CMControlList new_list = (CMControlList) CMmalloc(sizeof(CMControlList_s));
+    CMControlList new_list = (CMControlList) INT_CMmalloc(sizeof(CMControlList_s));
     new_list->select_initialized = 0;
     new_list->select_data = NULL;
     new_list->add_select = NULL;
@@ -775,7 +755,7 @@ attr_list conn_attrs;
 {
     int first = 1;
     int non_block_default = -1;
-    CMConnection conn = CMmalloc(sizeof(struct _CMConnection));
+    CMConnection conn = INT_CMmalloc(sizeof(struct _CMConnection));
     if (first) {
 	char *value = cercs_getenv("CMNonBlockWrite");
 	first = 0;
@@ -814,7 +794,7 @@ attr_list conn_attrs;
 }
 
 extern attr_list
-CMConnection_get_attrs(conn)
+INT_CMConnection_get_attrs(conn)
 CMConnection conn;
 {
     return conn->attrs;
@@ -837,7 +817,7 @@ do_bw_measure(CManager cm, void *client_data)
 {
     double bw;
     bw_measure_data data = (bw_measure_data) client_data;
-    bw=CMregressive_probe_bandwidth(data->conn, data->size, data->attrs);
+    bw=INT_CMregressive_probe_bandwidth(data->conn, data->size, data->attrs);
 
     /*Initialization phase*/
     if(bw<0 && data->successful_run<5){
@@ -860,7 +840,7 @@ do_bw_measure(CManager cm, void *client_data)
 }    
 
 extern int
-CMConnection_set_character(CMConnection conn, attr_list attrs)
+INT_CMConnection_set_character(CMConnection conn, attr_list attrs)
 {
     long interval_value;
     if (attrs == NULL) return 0;
@@ -888,7 +868,7 @@ CMConnection_set_character(CMConnection conn, attr_list attrs)
 	    query_attr(conn->characteristics, CM_BW_MEASURE_TASK,
 		       /* type pointer */ NULL, 
 		       (attr_value*)(long)&prior_task);
-	    if (prior_task) CMremove_task(prior_task);
+	    if (prior_task) INT_CMremove_task(prior_task);
 	}
 	data = malloc(sizeof(*data));
 	data->size=data->size_inc=-1;
@@ -911,10 +891,10 @@ CMConnection_set_character(CMConnection conn, attr_list attrs)
 	data->conn = conn;
 	data->attrs = CMattr_copy_list(conn->cm, attrs);
 	/* do one task almost immediately */
-	(void) CMadd_delayed_task(conn->cm, 0, 1000, do_bw_measure, 
+	(void) INT_CMadd_delayed_task(conn->cm, 0, 1000, do_bw_measure, 
 				  (void*)data);
 	/* schedule tasks periodically */
-	task = CMadd_periodic_task(conn->cm, interval_value, 0, 
+	task = INT_CMadd_periodic_task(conn->cm, interval_value, 0, 
 				   do_bw_measure, (void*)data);
 	if (conn->characteristics == NULL) {
 	    conn->characteristics = CMcreate_attr_list(conn->cm);
@@ -930,7 +910,7 @@ CMConnection_set_character(CMConnection conn, attr_list attrs)
 }
 
 extern CMConnection 
-CMget_indexed_conn(cm,i)
+INT_CMget_indexed_conn(cm,i)
 CManager cm;
 int i;
 {
@@ -939,33 +919,30 @@ int i;
 	    return cm->connections[i];
 	} else {
 	    CMtrace_out(cm, CMConnectionVerbose,
-			"cm->connection[%d] is NULL. CMget_indexed_conn\n", i);
+			"cm->connection[%d] is NULL. INT_CMget_indexed_conn\n", i);
 	    return NULL;
 	}
     } else {
 	CMtrace_out(cm, CMConnectionVerbose,
-		    "Invalid index. i=%d. CMget_indexed_conn\n", i);
+		    "Invalid index. i=%d. INT_CMget_indexed_conn\n", i);
 	return NULL;
     }
 }
 
 void
-CMConnection_close(conn)
+INT_CMConnection_close(conn)
 CMConnection conn;
 {
-    CManager_lock(conn->cm);
     conn->ref_count--;
     CMtrace_out(conn->cm, CMFreeVerbose, "CMConnection close conn=%lx ref count now %d", 
 		(long) conn, conn->ref_count);
     if (conn->ref_count > 0) {
 	CMtrace_out(conn->cm, CMConnectionVerbose, "CM - Dereference connection %lx",
 		    (void*)conn);
-	CManager_unlock(conn->cm);
 	return;
     }
     if (conn->ref_count < 0) return;   /*  BAD! */
     conn->closed = 1;
-    CManager_unlock(conn->cm);
     CMconn_fail_conditions(conn);
     CMtrace_out(conn->cm, CMConnectionVerbose, "CM - Shut down connection %lx\n",
 		(void*)conn);
@@ -974,7 +951,7 @@ CMConnection conn;
     thr_mutex_free(conn->write_lock);
     thr_mutex_free(conn->read_lock);
     free_IOsubcontext(conn->IOsubcontext);
-    CMfree(conn->downloaded_formats);
+    INT_CMfree(conn->downloaded_formats);
     conn->foreign_data_handler = NULL;
     free_IOBuffer(conn->io_out_buffer);
     free_AttrBuffer(conn->attr_encode_buffer);
@@ -986,15 +963,15 @@ CMConnection conn;
 	query_attr(conn->characteristics, CM_BW_MEASURE_TASK,
 		   /* type pointer */ NULL, 
 		   (attr_value*)(long)&prior_task);
-	if (prior_task) CMremove_task(prior_task);
+	if (prior_task) INT_CMremove_task(prior_task);
 	conn->close_handler(conn->cm, conn, conn->close_client_data);
 
     }
-    CMfree(conn);
+    INT_CMfree(conn);
 }
 
 void
-CMconn_register_close_handler(conn, func, client_data)
+INT_CMconn_register_close_handler(conn, func, client_data)
 CMConnection conn;
 CMCloseHandlerFunc func;
 void *client_data;
@@ -1044,10 +1021,10 @@ CMControlList cl;
 	    printf("CMControlList_free freeing %lx\n", (long)cl);
 	}
 	if (cl->polling_function_list != NULL) {
-	    CMfree(cl->polling_function_list);
+	    INT_CMfree(cl->polling_function_list);
 	}
 	thr_mutex_free(cl->list_mutex);
-	CMfree(cl);
+	INT_CMfree(cl);
     }
 }
 
@@ -1064,7 +1041,7 @@ CMget_qual_hostname(char *buf, int len)
 }
 
 extern int
-CMget_self_ip_addr()
+INT_CMget_self_ip_addr()
 {
     return get_self_ip_addr(&CMstatic_trans_svcs);
 }
@@ -1074,17 +1051,15 @@ CMConnection
 try_conn_init(CManager cm, transport_entry trans, attr_list attrs)
 {
     CMConnection conn;
-    CManager_unlock(cm);
     conn = trans->initiate_conn(cm, &CMstatic_trans_svcs,
 				trans, attrs);
-    CManager_lock(cm);
     if (conn != NULL) {
 	if (CMtrace_on(conn->cm, CMConnectionVerbose)) {
 	    char *attr_str = attr_list_to_string(attrs);
 	    CMtrace_out(conn->cm, CMConnectionVerbose, 
 			"CM - Establish connection %lx - %s", (void*)conn,
 			attr_str);
-	    CMfree(attr_str);
+	    INT_CMfree(attr_str);
 	}
     }
     return conn;
@@ -1104,8 +1079,6 @@ attr_list attrs;
 	query_attr(attrs, CM_TRANSPORT, /* type pointer */ NULL,
 		   /* value pointer */ (attr_value *) (long) &choosen_transport);
     }
-    CManager_unlock(cm);
-    CMglobal_data_lock();
     if (choosen_transport != NULL) {
 	if (load_transport(cm, choosen_transport) == 0) {
 	    CMtrace_out(cm, CMConnectionVerbose,
@@ -1114,12 +1087,10 @@ attr_list attrs;
 	    choosen_transport = NULL;
 	}
     }
-    CMglobal_data_unlock();
-    CManager_lock(cm);
     trans_list = cm->transports;
     if (choosen_transport == NULL) {
         CMtrace_out(cm, CMConnectionVerbose,
-		    "CMinitiate_conn no transport attr found");
+		    "INT_CMinitiate_conn no transport attr found");
 
 	while ((trans_list != NULL) && (*trans_list != NULL)) {
 	    CMConnection conn;
@@ -1129,7 +1100,7 @@ attr_list attrs;
 	}
     } else {
         CMtrace_out(cm, CMConnectionVerbose,
-		    "CMinitiate_conn looking for transport \"%s\"", 
+		    "INT_CMinitiate_conn looking for transport \"%s\"", 
 		    choosen_transport);
 	while ((trans_list != NULL) && (*trans_list != NULL)) {
 	    if (strcmp((*trans_list)->trans_name, choosen_transport) == 0) {
@@ -1138,7 +1109,7 @@ attr_list attrs;
 	    trans_list++;
 	}
         CMtrace_out(cm, CMConnectionVerbose,
-		    "CMinitiate_conn transport \"%s\" not found - no connection", 
+		    "INT_CMinitiate_conn transport \"%s\" not found - no connection", 
 		    choosen_transport);
 	return NULL;
     }
@@ -1158,23 +1129,21 @@ dump_CMConnection(CMConnection conn)
 }
 
 CMConnection
-CMinitiate_conn(cm, attrs)
+INT_CMinitiate_conn(cm, attrs)
 CManager cm;
 attr_list attrs;
 {
     CMConnection conn;
     if (!cm->initialized) CMinitialize(cm);
-    CManager_lock(cm);
     conn = CMinternal_initiate_conn(cm, attrs);
     if (CMtrace_on(cm, CMConnectionVerbose)) {
 	dump_CMConnection(conn);
     }
-    CManager_unlock(cm);
     return conn;
 }
 
 void
-CMConnection_add_reference(conn)
+INT_CMConnection_add_reference(conn)
 CMConnection conn;
 {
     conn->ref_count++;
@@ -1219,37 +1188,31 @@ attr_list attrs;
 }
 
 CMConnection
-CMget_conn(cm, attrs)
+INT_CMget_conn(cm, attrs)
 CManager cm;
 attr_list attrs;
 {
     CMConnection conn;
     if (!cm->initialized) CMinitialize(cm);
-    CManager_lock(cm);
     conn = CMinternal_get_conn(cm, attrs);
-    CManager_unlock(cm);
     return conn;
 }
 
 int
-CMcontact_self_check(cm, attrs)
+INT_CMcontact_self_check(cm, attrs)
 CManager cm;
 attr_list attrs;
 {
     transport_entry *trans_list;
     if (!cm->initialized) CMinitialize(cm);
-    CManager_lock(cm);
     trans_list = cm->transports;
     while ((trans_list != NULL) && (*trans_list != NULL)) {
 	int result = 0;
-	CManager_unlock(cm);
 	result = (*trans_list)->self_check(cm, &CMstatic_trans_svcs, 
 					   *trans_list, attrs);
 	if (result) return result;
 	trans_list++;
-	CManager_lock(cm);
     }
-    CManager_unlock(cm);
     return 0;
 }
 
@@ -1261,7 +1224,7 @@ cm_get_data_buf(CManager cm, int length)
     while (tmp != NULL) {
 	if (!tmp->in_use_by_cm) {
 	    if (tmp->size < length) {
-		char *t = CMrealloc(tmp->buffer, length);
+		char *t = INT_CMrealloc(tmp->buffer, length);
 		if (t == NULL) {
 		    return NULL;
 		}
@@ -1273,8 +1236,8 @@ cm_get_data_buf(CManager cm, int length)
 	}
 	tmp = tmp->next;
     }
-    tmp = CMmalloc(sizeof(*tmp));
-    tmp->buffer = CMmalloc(length);
+    tmp = INT_CMmalloc(sizeof(*tmp));
+    tmp->buffer = INT_CMmalloc(length);
     tmp->size = length;
     tmp->in_use_by_cm = 1;
     tmp->next = cm->cm_buffer_list;
@@ -1287,7 +1250,7 @@ extern CMbuffer
 cm_extend_data_buf(CManager cm, CMbuffer tmp, int length)  
 {
     if (tmp->size < length) {
-	char *t = CMrealloc(tmp->buffer, length);
+	char *t = INT_CMrealloc(tmp->buffer, length);
 	if (t == NULL) {
 	    return NULL;
 	}
@@ -1377,6 +1340,7 @@ CMConnection conn;
     char *buffer = NULL;
     int length;
 
+    CManager_lock(cm);
     if (first) {
 	char *tmp;
 	first = 0;
@@ -1396,9 +1360,11 @@ CMConnection conn;
 
  start_read:
     if (conn->closed) {
+	CManager_unlock(cm);
 	return;
     }
     if (conn->foreign_data_handler != NULL) {
+	CManager_unlock(cm);
 	((void(*)())conn->foreign_data_handler)(conn);
 	return;
     }
@@ -1430,7 +1396,8 @@ CMConnection conn;
 	    if (actual == -1) {
 		CMtrace_out(cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d", actual);
-		CMConnection_close(conn);
+		INT_CMConnection_close(conn);
+		CManager_unlock(cm);
 		return;
 	    }
 	    conn->buffer_data_end += actual;
@@ -1438,6 +1405,7 @@ CMConnection conn;
 		/* partial read */
 		CMtrace_out(cm, CMLowLevelVerbose, 
 			    "CMdata read partial, got %d", actual);
+		CManager_unlock(cm);
 		return;
 	    }
 	    buffer = conn->partial_buffer->buffer;
@@ -1446,10 +1414,14 @@ CMConnection conn;
 	    buffer = trans->read_block_func(&CMstatic_trans_svcs, 
 					    conn->transport_data,
 					    &length);
-	    if (length == 0) return;
+	    if (length == 0) {
+		CManager_unlock(cm);
+		return;
+	    }
 	    if (buffer == NULL) {
 		CMtrace_out(cm, CMLowLevelVerbose, "CMdata read_block failed");
-		CMConnection_close(conn);
+		INT_CMConnection_close(conn);
+		CManager_unlock(cm);
 		return;
 	    }
 	    CMtrace_out(cm, CMLowLevelVerbose, "CMdata read_block returned %d bytes of data", length);
@@ -1479,6 +1451,7 @@ CMConnection conn;
 	cm->abort_read_ahead = 0;
 	CMtrace_out(cm, CMDataVerbose, 
 		    "CM - readahead not tried, aborted for condition signal");
+	CManager_unlock(cm);
 	return;
     }	
     if ((read_msg_count > read_ahead_msg_limit) || 
@@ -1486,6 +1459,7 @@ CMConnection conn;
 	CMtrace_out(cm, CMDataVerbose, 
 		    "CM - readahead not tried, fairness, read %d msgs, %d bytes",
 		    read_msg_count, read_byte_count);
+	CManager_unlock(cm);
 	return;
     } else {
 	goto start_read;
@@ -1540,7 +1514,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	/*  otherwise give up */
 	if (CMdo_non_CM_handler(conn, *(int*)buffer, buffer, length) == 0) {
 	    printf("Unknown message on connection %lx, %x\n", (long) conn, *(int*)buffer);
-	    CMConnection_close(conn);
+	    INT_CMConnection_close(conn);
 	}	    
 	return 0;
     }
@@ -1719,8 +1693,10 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     conn->buffer_data_end = 0;
     conn->partial_buffer = NULL;
 
+    CManager_unlock(cm);
     cm_format->handler(cm, conn, decode_buffer, cm_format->client_data,
 		       attrs);
+    CManager_lock(cm);
     if (cm_data_buf) {
 	cm_return_data_buf(cm_data_buf);
     }
@@ -1729,7 +1705,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	cm_decode_buf = NULL;
     }
     if (attrs) {
-	CMfree_attr_list(cm, attrs);
+	INT_CMfree_attr_list(cm, attrs);
 	attrs = NULL;
     }
     CMtrace_out(cm, CMDataVerbose, "CM - Finish processing - record of type %s", 
@@ -1738,57 +1714,50 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 }
 
 void *
-CMtake_buffer(cm, data)
+INT_CMtake_buffer(cm, data)
 CManager cm;
 void *data;
 {
-    CManager_lock(cm);
     if (cm_user_take_data_buf(cm, data) == 0) {
 	/*
 	 * someday we may get here if we have transports that allocate 
 	 * their own buffers.  How to support?  Maybe do a copy and 
 	 * return the copy...?
 	 */
-	fprintf(stderr, "Error: CMtake_buffer called with record not associated with cm\n");
-	CManager_unlock(cm);
+	fprintf(stderr, "Error: INT_CMtake_buffer called with record not associated with cm\n");
 	return NULL;
     } else {
-	CManager_unlock(cm);
 	return data;
     }
 }
 
 extern void
-CMreturn_buffer(cm, data)
+INT_CMreturn_buffer(cm, data)
 CManager cm;
 void *data;
 {
-    CManager_lock(cm);
     if (cm_user_return_data_buf(cm, data) == 0) {
 	/*
 	 * someday we may get here if we have transports that allocate 
 	 * their own buffers.  How to support?  Maybe do a copy and 
 	 * return the copy...?
 	 */
-	fprintf(stderr, "Error: CMreturn_buffer called with record not associated with cm\n");
+	fprintf(stderr, "Error: INT_CMreturn_buffer called with record not associated with cm\n");
     }
-    CManager_unlock(cm);
 }
 
 extern int
-CMtry_return_buffer(cm, data)
+INT_CMtry_return_buffer(cm, data)
 CManager cm;
 void *data;
 {
     int ret;
-    CManager_lock(cm);
     ret = cm_user_return_data_buf(cm, data);
-    CManager_unlock(cm);
     return ret;
 }
 
 void
-CMregister_handler(format, handler, client_data)
+INT_CMregister_handler(format, handler, client_data)
 CMFormat format;
 CMHandlerFunc handler;
 void *client_data;
@@ -1798,12 +1767,12 @@ void *client_data;
 }
 
 extern int
-CMwrite(conn, format, data)
+INT_CMwrite(conn, format, data)
 CMConnection conn;
 CMFormat format;
 void *data;
 {
-    return CMwrite_attr(conn, format, data, NULL);
+    return INT_CMwrite_attr(conn, format, data, NULL);
 }
 
 extern void CMWriteQueuedData(trans, conn)
@@ -1876,7 +1845,6 @@ CMConnection conn;
     conn->trans->set_write_notify(conn->trans, &CMstatic_trans_svcs, 
 				  conn->transport_data, 0);
     CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write");
-    CMConn_write_unlock(conn);
 }
 
 static void
@@ -1939,16 +1907,18 @@ wait_for_pending_write(conn)
 CMConnection conn;
 {
     CMControlList cl = conn->cm->control_list;
+    CManager_unlock(conn->cm);
     if (!cl->has_thread) {
 	while(conn->write_pending) {
 	    CMcontrol_list_wait(cl);
 	}
     }
+    CManager_lock(conn->cm);
 }
 	
     
 extern int
-CMwrite_attr(conn, format, data, attrs)
+INT_CMwrite_attr(conn, format, data, attrs)
 CMConnection conn;
 CMFormat format;
 void *data;
@@ -1962,11 +1932,9 @@ attr_list attrs;
     void *encoded_attrs = NULL;
     int attrs_present = 0;
 
-    CMConn_write_lock(conn);
     /* ensure conn is open */
     if (conn->closed != 0) {
 	CMtrace_out(conn->cm, CMDataVerbose, "Not writing data to closed connection");
-	CMConn_write_unlock(conn);
 	return 0;
     }
     if (conn->write_pending) {
@@ -1978,7 +1946,6 @@ attr_list attrs;
     if (format->format == NULL) {
 	printf("Format registration has failed for format \"%s\" - write aborted\n",
 	       format->format_name);
-	CMConn_write_unlock(conn);
 	return 0;
     }
     CMformat_preload(conn, format);
@@ -2037,7 +2004,7 @@ attr_list attrs;
 	IOEncodeVector tmp_vec = &static_vec[0];
 	int byte_count = length;/* sum lengths */
 	if (vec_count >= sizeof(static_vec)/ sizeof(static_vec[0])) {
-	    tmp_vec = CMmalloc((vec_count+1) * sizeof(*tmp_vec));
+	    tmp_vec = INT_CMmalloc((vec_count+1) * sizeof(*tmp_vec));
 	}
 	if (attrs == NULL) {
 	    tmp_vec[0].iov_base = &no_attr_header;
@@ -2091,17 +2058,15 @@ attr_list attrs;
 					      tmp_vec, vec_count);
 	}
 	if (tmp_vec != &static_vec[0]) {
-	    CMfree(tmp_vec);
+	    INT_CMfree(tmp_vec);
 	}
 	if (actual != vec_count) {
 	    /* fail */
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			"Writev failed, expected %d, only wrote %d", vec_count, actual);
-	    CMConn_write_unlock(conn);
 	    return 0;
 	}
     }
-    CMConn_write_unlock(conn);
     CMtrace_out(conn->cm, CMLowLevelVerbose, "Writev success");
     return 1;
 }
@@ -2121,11 +2086,9 @@ attr_list attrs;
     void *encoded_attrs = NULL;
     int attrs_present = 0;
 
-    CMConn_write_lock(conn);
     /* ensure conn is open */
     if (conn->closed != 0) {
 	CMtrace_out(conn->cm, CMDataVerbose, "Not writing data to closed connection");
-	CMConn_write_unlock(conn);
 	return 0;
     }
     if (conn->write_pending) {
@@ -2137,7 +2100,6 @@ attr_list attrs;
     if (format->format == NULL) {
 	printf("Format registration has failed for format \"%s\" - write aborted\n",
 	       format->format_name);
-	CMConn_write_unlock(conn);
 	return 0;
     }
     CMformat_preload(conn, format);
@@ -2197,7 +2159,7 @@ attr_list attrs;
 	int byte_count = data_length;/* sum lengths */
 	int header[4] = {0x434d4C00, 0, 0, 0};  /* CML\0 in first entry */
 	if (vec_count >= sizeof(static_vec)/ sizeof(static_vec[0])) {
-	    tmp_vec = CMmalloc((vec_count+1) * sizeof(*tmp_vec));
+	    tmp_vec = INT_CMmalloc((vec_count+1) * sizeof(*tmp_vec));
 	}
 	header[1] = data_length;
 	if (path_len != 4) {
@@ -2268,17 +2230,15 @@ attr_list attrs;
 					      tmp_vec, vec_count);
 	}
 	if (tmp_vec != &static_vec[0]) {
-	    CMfree(tmp_vec);
+	    INT_CMfree(tmp_vec);
 	}
 	if (actual != vec_count) {
 	    /* fail */
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			"Writev failed, expected %d, only wrote %d", vec_count, actual);
-	    CMConn_write_unlock(conn);
 	    return 0;
 	}
     }
-    CMConn_write_unlock(conn);
     CMtrace_out(conn->cm, CMLowLevelVerbose, "Writev success");
     return 1;
 }
@@ -2297,7 +2257,7 @@ init_non_blocking_conn(CMConnection conn)
 }
 
 extern int
-CMConnection_write_would_block(CMConnection conn)
+INT_CMConnection_write_would_block(CMConnection conn)
 {
     if (conn->do_non_blocking_write == -1) {
 	init_non_blocking_conn(conn);
@@ -2306,7 +2266,7 @@ CMConnection_write_would_block(CMConnection conn)
 }
 
 extern void
-CMregister_write_callback(CMConnection conn, CMWriteCallbackFunc handler,
+INT_CMregister_write_callback(CMConnection conn, CMWriteCallbackFunc handler,
 			  void *client_data)
 {
     if (conn->do_non_blocking_write == -1) {
@@ -2372,11 +2332,11 @@ char *buffer;
 	/* last half of latency probe arriving, probe completion*/
 	{
 	    int cond = *(int*)buffer;  /* first entry should be condition */
-	    chr_time *timer = CMCondition_get_client_data(conn->cm, cond);
+	    chr_time *timer = INT_CMCondition_get_client_data(conn->cm, cond);
 	    
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - latency probe response, condition %d\n", cond);
 	    chr_timer_stop(timer);
-	    CMCondition_signal(conn->cm, cond);
+	    INT_CMCondition_signal(conn->cm, cond);
 	}
 	break;
     case CMPerfBandwidthInit:
@@ -2414,7 +2374,7 @@ char *buffer;
 	    int cond = *(int*)buffer;  /* first entry should be condition */
 	    int time;
 	    char *chr_time, tmp;
-	    int *result_p = CMCondition_get_client_data(conn->cm, cond);
+	    int *result_p = INT_CMCondition_get_client_data(conn->cm, cond);
 	    
 	    time = ((int*)buffer)[1];/* second entry should be condition */
 	    if (byte_swap) {
@@ -2428,7 +2388,7 @@ char *buffer;
 	    }
 	    *result_p = time;
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - bandwidth probe response, condition %d\n", cond);
-	    CMCondition_signal(conn->cm, cond);
+	    INT_CMCondition_signal(conn->cm, cond);
 	}
 	break;
     case CMRegressivePerfBandwidthInit:
@@ -2468,7 +2428,7 @@ char *buffer;
 	    int cond = *(int*)buffer;  /* first entry should be condition */
 	    int time;
 	    char *chr_time, tmp;
-	    int *result_p = CMCondition_get_client_data(conn->cm, cond);
+	    int *result_p = INT_CMCondition_get_client_data(conn->cm, cond);
 	    
 	    time = ((int*)buffer)[1];/* second entry should be condition */
 	    if (byte_swap) {
@@ -2482,7 +2442,7 @@ char *buffer;
 	    }
 	    *result_p = time;
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - bandwidth probe response, condition %d\n", cond);
-	    CMCondition_signal(conn->cm, cond);
+	    INT_CMCondition_signal(conn->cm, cond);
 	}
 	break;
 	
@@ -2501,7 +2461,7 @@ attr_list attrs;
     chr_time round_trip_time;
     int actual;
 
-    cond = CMCondition_get(conn->cm, conn);
+    cond = INT_CMCondition_get(conn->cm, conn);
 
     if (size < 12) size = 12;
     if (max_block_size == 0) {
@@ -2524,8 +2484,7 @@ attr_list attrs;
     ((int*)block)[1] = size | (CMPerfProbe<<24);
     ((int*)block)[2] = cond;   /* condition value in third entry */
     
-    CMCondition_set_client_data( conn->cm, cond, &round_trip_time);
-    CMConn_write_lock(conn);
+    INT_CMCondition_set_client_data( conn->cm, cond, &round_trip_time);
 
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Initiating latency probe of %d bytes\n", size);
     chr_timer_start(&round_trip_time);
@@ -2533,17 +2492,16 @@ attr_list attrs;
     actual = conn->trans->write_func(&CMstatic_trans_svcs, 
 				     conn->transport_data, 
 				     block, size);
-    CMConn_write_unlock(conn);
     if (actual != size) return -1;
 
-    CMCondition_wait(conn->cm, cond);
+    INT_CMCondition_wait(conn->cm, cond);
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completed latency probe - result %g microseconds\n", chr_time_to_microsecs(&round_trip_time));
     return (long) chr_time_to_microsecs(&round_trip_time);
 }
 
 /* return units are microseconds */
 extern long
-CMprobe_latency(conn, size, attrs)
+INT_CMprobe_latency(conn, size, attrs)
 CMConnection conn;
 int size;
 attr_list attrs;
@@ -2563,7 +2521,7 @@ attr_list attrs;
 
 /* return units are Kbytes/sec */
 extern long
-CMprobe_bandwidth(conn, size, attrs)
+INT_CMprobe_bandwidth(conn, size, attrs)
 CMConnection conn;
 int size;
 attr_list attrs;
@@ -2577,7 +2535,7 @@ attr_list attrs;
     int actual;
     double bandwidth;
 
-    cond = CMCondition_get(conn->cm, conn);
+    cond = INT_CMCondition_get(conn->cm, conn);
 
     if (size < 16) size = 16;
     if (repeat_count == 0) repeat_count = 1;
@@ -2601,30 +2559,34 @@ attr_list attrs;
     ((int*)block)[1] = size | (CMPerfBandwidthInit<<24);
     ((int*)block)[2] = cond;   /* condition value in third entry */
     
-    CMCondition_set_client_data( conn->cm, cond, &microsecs_to_receive);
-    CMConn_write_lock(conn);
+    INT_CMCondition_set_client_data( conn->cm, cond, &microsecs_to_receive);
 
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Initiating bandwidth probe of %d bytes, %d messages\n", size, repeat_count);
     actual = conn->trans->write_func(&CMstatic_trans_svcs, 
 				     conn->transport_data, 
 				     block, size);
-    if (actual != size) { CMConn_write_unlock(conn); return -1; }
+    if (actual != size) { 
+	return -1;
+    }
 
     ((int*)block)[1] = size | (CMPerfBandwidthBody<<24);
     for (i=0; i <(repeat_count-1); i++) {
 	actual = conn->trans->write_func(&CMstatic_trans_svcs, 
 					 conn->transport_data, 
 					 block, size);
-	if (actual != size) { CMConn_write_unlock(conn); return -1; }
+	if (actual != size) {
+	    return -1;
+	}
     }
     ((int*)block)[1] = size | (CMPerfBandwidthEnd <<24);
     actual = conn->trans->write_func(&CMstatic_trans_svcs, 
 				     conn->transport_data, 
 				     block, size);
-    if (actual != size) { CMConn_write_unlock(conn); return -1; }
+    if (actual != size) {
+	return -1;
+    }
 
-    CMCondition_wait(conn->cm, cond);
-    CMConn_write_unlock(conn);
+    INT_CMCondition_wait(conn->cm, cond);
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completed bandwidth probe - result %d microseconds\n", microsecs_to_receive);
     bandwidth = ((double) size * (double)repeat_count * 1000.0) / 
 	(double)microsecs_to_receive;
@@ -2814,7 +2776,7 @@ DelaySizeMtx *inputmtx;
 
 /* return units are Mbps */
 extern double
-CMregressive_probe_bandwidth(conn, size, attrs)
+INT_CMregressive_probe_bandwidth(conn, size, attrs)
 CMConnection conn;
 int size;
 attr_list attrs;
@@ -2844,7 +2806,7 @@ attr_list attrs;
 	
 	query_attr(attrs, CM_REBWM_REPT, /* type pointer */ NULL,
 		   /* value pointer */ (attr_value *) (long) &repeat_count);
-	CMtrace_out(conn->cm, CMLowLevelVerbose, "CMregressive_probe_bandwidth: get from attr, N: %d, repeat_count: %d\n", N, repeat_count);
+	CMtrace_out(conn->cm, CMLowLevelVerbose, "INT_CMregressive_probe_bandwidth: get from attr, N: %d, repeat_count: %d\n", N, repeat_count);
 	if(N<6) N=6;
 	if(repeat_count<3) repeat_count=3;
     } else {
@@ -2877,36 +2839,40 @@ attr_list attrs;
     dsm.MsgSize=malloc(sizeof(int)*N);
     
     for(i =0; i<N; i++){
-	cond = CMCondition_get(conn->cm, conn);
+	cond = INT_CMCondition_get(conn->cm, conn);
 	((int*)block)[2] = cond;   /* condition value in third entry */
-	CMCondition_set_client_data( conn->cm, cond, &microsecs_to_receive);
+	INT_CMCondition_set_client_data( conn->cm, cond, &microsecs_to_receive);
 
 	/* size in second entry, high byte gives CMPerf operation */
 	((int*)block)[1] = size | (CMRegressivePerfBandwidthInit<<24);
 	((int*)block)[3] = size;
 
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Initiating bandwidth probe of %d bytes, %d messages\n", size, repeat_count);
-	CMConn_write_lock(conn);	
 	actual = conn->trans->write_func(&CMstatic_trans_svcs, 
 					 conn->transport_data, 
 					 block, size);
-	if (actual != size) { CMConn_write_unlock(conn); return -1; }
+	if (actual != size) {
+	    return -1;
+	}
 
 	((int*)block)[1] = size | (CMRegressivePerfBandwidthBody<<24);
 	for (j=0; j <(repeat_count-1); j++) {
 	    actual = conn->trans->write_func(&CMstatic_trans_svcs, 
 					     conn->transport_data, 
 					     block, size);
-	    if (actual != size) { CMConn_write_unlock(conn); return -1; }
+	    if (actual != size) {
+		return -1;
+	    }
 	}
 	((int*)block)[1] = size | (CMRegressivePerfBandwidthEnd <<24);
 	actual = conn->trans->write_func(&CMstatic_trans_svcs, 
 					 conn->transport_data, 
 					 block, size);
-	if (actual != size) { CMConn_write_unlock(conn); return -1; }
+	if (actual != size) {
+	    return -1;
+	}
 
-	CMConn_write_unlock(conn);
-	if (CMCondition_wait(conn->cm, cond) == 0) {
+	if (INT_CMCondition_wait(conn->cm, cond) == 0) {
 	    return 0.0;
 	}
 	bandwidth = ((double) size * (double)repeat_count * 1000.0) / 
@@ -2939,7 +2905,7 @@ attr_list attrs;
     covXY=EXY-ave_delay*ave_size;
     cofXY=covXY/(sqrt(var_delay)*sqrt(var_size));
     
-     CMtrace_out(conn->cm, CMLowLevelVerbose,"CMregressive_probe_bandwidth: ave_delay: %f, ave_size: %f, var_delay: %f, var_size: %f, EXY: %f, covXY: %f, cofXY: %f\n", ave_delay, ave_size, var_delay, var_size, EXY, covXY, cofXY);
+     CMtrace_out(conn->cm, CMLowLevelVerbose,"INT_CMregressive_probe_bandwidth: ave_delay: %f, ave_size: %f, var_delay: %f, var_size: %f, EXY: %f, covXY: %f, cofXY: %f\n", ave_delay, ave_size, var_delay, var_size, EXY, covXY, cofXY);
     
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Regressive Estimated bandwidth- %f Mbps, size: %d\n", bandwidth, size);
 
@@ -3015,13 +2981,13 @@ int fd;
 }
 
 extern CMTaskHandle
-CMadd_periodic(cm, period, func, client_data)
+INT_CMadd_periodic(cm, period, func, client_data)
 CManager cm;
 long period;
 CMPollFunc func;
 void *client_data;
 {
-    CMTaskHandle handle = CMmalloc(sizeof(*handle));
+    CMTaskHandle handle = INT_CMmalloc(sizeof(*handle));
     if (!cm->control_list->select_initialized) {
 	CM_init_select(cm->control_list, cm);
     }
@@ -3039,14 +3005,14 @@ void *client_data;
 }
 
 extern CMTaskHandle
-CMadd_periodic_task(cm, period_sec, period_usec, func, client_data)
+INT_CMadd_periodic_task(cm, period_sec, period_usec, func, client_data)
 CManager cm;
 int period_sec;
 int period_usec;
 CMPollFunc func;
 void *client_data;
 {
-    CMTaskHandle handle = CMmalloc(sizeof(*handle));
+    CMTaskHandle handle = INT_CMmalloc(sizeof(*handle));
     if (!cm->control_list->select_initialized) {
 	CM_init_select(cm->control_list, cm);
     }
@@ -3065,7 +3031,7 @@ void *client_data;
 }
 
 extern void
-CMremove_periodic(handle)
+INT_CMremove_periodic(handle)
 CMTaskHandle handle;
 {
     CManager cm = handle->cm;
@@ -3076,7 +3042,7 @@ CMTaskHandle handle;
 }
 
 extern void
-CMremove_task(handle)
+INT_CMremove_task(handle)
 CMTaskHandle handle;
 {
     CManager cm = handle->cm;
@@ -3087,14 +3053,14 @@ CMTaskHandle handle;
 }
 
 extern CMTaskHandle
-CMadd_delayed_task(cm, delay_sec, delay_usec, func, client_data)
+INT_CMadd_delayed_task(cm, delay_sec, delay_usec, func, client_data)
 CManager cm;
 int delay_sec;
 int delay_usec;
 CMPollFunc func;
 void *client_data;
 {
-    CMTaskHandle handle = CMmalloc(sizeof(*handle));
+    CMTaskHandle handle = INT_CMmalloc(sizeof(*handle));
     if (!cm->control_list->select_initialized) {
 	CM_init_select(cm->control_list, cm);
     }
@@ -3133,7 +3099,6 @@ CManager cm;
     SelectInitFunc shutdown_function;
     lt_dlhandle handle;	
 
-    CMControlList_lock(cl);
     if (lt_dlinit() != 0) {
 	fprintf (stderr, "error during initialization: %s\n", lt_dlerror());
 	return;
@@ -3174,7 +3139,6 @@ CManager cm;
     cl->select_initialized = 1;
     CMtrace_out(cm, CMFreeVerbose, "CManager adding select shutdown function, %lx",(long)shutdown_function);
     internal_add_shutdown_task(cm, select_shutdown, (void*)shutdown_function);
-    CMControlList_unlock(cl);
 }
 
 static void
@@ -3182,31 +3146,33 @@ wake_function(cm, cond)
 CManager cm;
 void *cond;
 {
-    CMCondition_signal(cm, (int)(long)cond);
+    CManager_lock(cm);
+    INT_CMCondition_signal(cm, (int)(long)cond);
+    CManager_unlock(cm);
 }
 
 extern void
-CMsleep(cm, sec)
+INT_CMsleep(cm, sec)
 CManager cm;
 int sec;
 {
-    int cond = CMCondition_get(cm, NULL);
+    int cond = INT_CMCondition_get(cm, NULL);
     CMTaskHandle handle = 
-	CMadd_delayed_task(cm, sec, 0, wake_function, (void*)(long)cond);
-    CMfree(handle);
-    CMCondition_wait(cm, cond);
+	INT_CMadd_delayed_task(cm, sec, 0, wake_function, (void*)(long)cond);
+    INT_CMfree(handle);
+    INT_CMCondition_wait(cm, cond);
 }
 
 extern void
-CMusleep(cm, usec)
+INT_CMusleep(cm, usec)
 CManager cm;
 int usec;
 {
-    int cond = CMCondition_get(cm, NULL);
+    int cond = INT_CMCondition_get(cm, NULL);
     CMTaskHandle handle = 
-	CMadd_delayed_task(cm, 0, usec, wake_function, (void*)(long)cond);
-    CMfree(handle);
-    CMCondition_wait(cm, cond);
+	INT_CMadd_delayed_task(cm, 0, usec, wake_function, (void*)(long)cond);
+    INT_CMfree(handle);
+    INT_CMCondition_wait(cm, cond);
 }
 
 typedef struct foreign_handler_struct {
@@ -3218,16 +3184,16 @@ static handler_list foreign_handler_list;
 static int foreign_handler_count = 0;
 
 extern void
-CMregister_non_CM_message_handler(header, handler)
+INT_CMregister_non_CM_message_handler(header, handler)
 int header;
 CMNonCMHandler handler;
 {
     if (foreign_handler_count > 0) {
-	foreign_handler_list = CMrealloc(foreign_handler_list, 
+	foreign_handler_list = INT_CMrealloc(foreign_handler_list, 
 					 sizeof(foreign_handler_list[0]) * 
 					 (foreign_handler_count + 1));
     } else {
-	foreign_handler_list = CMmalloc(sizeof(foreign_handler_list[0]));
+	foreign_handler_list = INT_CMmalloc(sizeof(foreign_handler_list[0]));
     }
     foreign_handler_list[foreign_handler_count].header = header;
     foreign_handler_list[foreign_handler_count].handler = handler;
@@ -3250,13 +3216,13 @@ CMdo_non_CM_handler(CMConnection conn, int header, char *buffer, int length)
 }
 
 extern CMtrans_services
-CMget_static_trans_services ARGS(())
+INT_CMget_static_trans_services ARGS(())
 {
   return &CMstatic_trans_svcs;
 }
 
 extern void*
-CMget_transport_data (CMConnection conn)
+INT_CMget_transport_data (CMConnection conn)
 {
   return conn->transport_data;
 }

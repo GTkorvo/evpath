@@ -96,13 +96,13 @@ inet_ntoa(struct in_addr ina)
  *	subroutine, which returns the server_format_rep.
  *
  * In order to make the above happen with reasonable locking, we have
- * separated the locking from several routines (such as CMget_conn()) to
+ * separated the locking from several routines (such as INT_CMget_conn()) to
  * create internal versions that assume the CManager is already locked.  The
  * care taken with locking also means that some ways of using CM that used
  * to work will no longer.  As far as I know, the only
  * backwards-incompatible changes are in the use of user_contexts and
- * user_formats.  Previously once you'd done a CMget_user_type_context to
- * get an IOContext, or CMregister_user_format to get an IOFormat, you could
+ * user_formats.  Previously once you'd done a INT_CMget_user_type_context to
+ * get an IOContext, or INT_CMregister_user_format to get an IOFormat, you could
  * pretty much use the basic PBIO routines on those items.  That is no
  * longer true.  In particular, you can't use get_format_IOcontext(),
  * set_IOconversion_IOcontext(), get_subformats_IOcontext(), or
@@ -225,14 +225,14 @@ int condition;
 		    format_id_length) == 0)) {
 	    char **server_rep_ptr;
 	    server_rep_ptr = 
-		CMCondition_get_client_data(cm, 
+		INT_CMCondition_get_client_data(cm, 
 					    cm->pbio_requests[i].condition);
 	    if (cm->pbio_requests[i].top_request == 1) {
 		*server_rep_ptr = server_rep;
 	    } else {
 		*server_rep_ptr = NULL;
 	    }
-	    CMCondition_signal(cm, cm->pbio_requests[i].condition);
+	    INT_CMCondition_signal(cm, cm->pbio_requests[i].condition);
 	    cm->pbio_requests[i].id_length = 0;
 	    cm->pbio_requests[i].server_id = NULL;
 	    cm->pbio_requests[i].top_request = 0;
@@ -276,8 +276,8 @@ void *client_data;
     }
 #endif
 
-    cond = CMCondition_get(cm, conn);
-    CMCondition_set_client_data(cm, cond, &server_rep);
+    cond = INT_CMCondition_get(cm, conn);
+    INT_CMCondition_set_client_data(cm, cond, &server_rep);
 
     if (request_in_pending(cm, format_ID, format_ID_length) == -1) {
         add_request_to_pending(cm, format_ID, format_ID_length, cond);
@@ -315,7 +315,7 @@ void *client_data;
     }
     CMtrace_out(cm, CMFormatVerbose, "CMpbio waiting on condition %d", cond);
     CManager_unlock(cm);
-    if (CMCondition_wait(cm, cond) != 1) {
+    if (INT_CMCondition_wait(cm, cond) != 1) {
 	CMtrace_out(cm, CMFormatVerbose, "CMpbio Connection failed %lx",
 		    conn);
 	return NULL;
@@ -330,13 +330,13 @@ extern int CMpbio_get_port_callback(client_data)
 void *client_data;
 {
     CManager cm = (CManager) client_data;
-    attr_list contact_attrs = CMget_contact_list(cm);
+    attr_list contact_attrs = INT_CMget_contact_list(cm);
     int int_port_num;
 
     if (contact_attrs == NULL) {
 	CMinternal_listen(cm, NULL);
     }
-    contact_attrs = CMget_contact_list(cm);
+    contact_attrs = INT_CMget_contact_list(cm);
     if (!query_attr(contact_attrs, CM_IP_PORT, /* type pointer */ NULL,
 		    /* value pointer */ (attr_value *) (long) &int_port_num)) {
 	CMtrace_out(cm, CMFormatVerbose, "CMpbio port callback found no IP_PORT attribute");
@@ -390,7 +390,7 @@ int cond;
 				      conn->transport_data, 
 				      &vec[0], 2);
     if (actual != 2) {
-	CMConnection_close(conn);
+	INT_CMConnection_close(conn);
 	return 0;
     }
     return 1;
@@ -428,7 +428,7 @@ int cond;
 				      conn->transport_data, 
 				      &vec[0], 2);
     if (actual != 2) {
-	CMConnection_close(conn);
+	INT_CMConnection_close(conn);
 	return 0;
     }
     return 1;
@@ -470,7 +470,7 @@ CMConnection conn;
 				      conn->transport_data, 
 				      &vec[0], 3);
     if (actual != 3) {
-	CMConnection_close(conn);
+	INT_CMConnection_close(conn);
 	return 0;
     }
     return 1;
@@ -501,8 +501,8 @@ CManager cm;
 	CMtrace_out(cm, CMFormatVerbose, 
 		    "\nUsing external PBIO format server\n");
     }
-    CMregister_non_CM_message_handler(0x5042494f, CM_pbio_query);
-    CMregister_non_CM_message_handler(0x4f494250, CM_pbio_query);
+    INT_CMregister_non_CM_message_handler(0x5042494f, CM_pbio_query);
+    INT_CMregister_non_CM_message_handler(0x4f494250, CM_pbio_query);
 }
 
 static int
@@ -516,7 +516,7 @@ int length;
 	if (trans->read_to_buffer_func(&CMstatic_trans_svcs, 
 				       conn->transport_data, buffer, length, 0)
 	    != length) {
-	    CMConnection_close(conn);
+	    INT_CMConnection_close(conn);
 	    return 0;
 	}
     } else {
@@ -526,7 +526,7 @@ int length;
 				      conn->transport_data,
 				      &actual);
 	if (actual < length) {
-	    CMConnection_close(conn);
+	    INT_CMConnection_close(conn);
 	    return 0;
 	}
 	memcpy(buffer, tmp_buffer, length);
@@ -577,7 +577,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 	    if (actual != 4) {
 		CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d", actual);
-		CMConnection_close(conn);
+		INT_CMConnection_close(conn);
 		return;
 	    }
 	    incoming_length = &tmp_length;
@@ -604,7 +604,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 	    if (actual != (sizeof(tmp_msg) - 8)) {
 		CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d", actual);
-		CMConnection_close(conn);
+		INT_CMConnection_close(conn);
 		return;
 	    }
 	    msg = &tmp_msg;
@@ -627,7 +627,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 	CMtrace_out(conn->cm, CMFormatVerbose, 
 		    "CMpbio Inconsistent length information, incoming %d, pay1 %d, pay2 %d", 
 		    *incoming_length, msg->payload1_length, msg->payload2_length);
-	CMConnection_close(conn);
+	INT_CMConnection_close(conn);
 	return;
     }
     CMtrace_out(conn->cm, CMFormatVerbose, 
@@ -645,7 +645,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 	if (msg->payload1_length > sizeof(tmp_format_id)) {
 	    CMtrace_out(conn->cm, CMFormatVerbose, 
 			"CMpbio Huge incoming payload on query - ignoring");
-	    CMConnection_close(conn);
+	    INT_CMConnection_close(conn);
 	}
 	if (length < used_length + msg->payload1_length) {
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, 
@@ -654,7 +654,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 	    if (conn_read_to_buffer(conn, &tmp_format_id[0], 
 				    msg->payload1_length) != 1) {
 		CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio Read Failed");
-		CMConnection_close(conn);
+		INT_CMConnection_close(conn);
 	    }
 	    format_id = &tmp_format_id[0];
 	    length += msg->payload1_length;
@@ -694,7 +694,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 	free(subformats);
 	if (CMpbio_send_format_response(ioformat, conn, msg->cond) != 1) {
 	    CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio - Write Failed");
-	    CMConnection_close(conn);
+	    INT_CMConnection_close(conn);
 	}
 	break;
     }
@@ -710,7 +710,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 	    if (conn_read_to_buffer(conn, server_rep, 
 				    msg->payload1_length) != 1) {
 		CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio Read Failed");
-		CMConnection_close(conn);
+		INT_CMConnection_close(conn);
 	    }
 	    length += msg->payload1_length;
 	} else {
@@ -735,7 +735,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 	    if (conn_read_to_buffer(conn, format_ID, 
 				    msg->payload1_length) != 1) {
 		CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio Read Failed");
-		CMConnection_close(conn);
+		INT_CMConnection_close(conn);
 	    }
 	    length += msg->payload1_length;
 	} else {
@@ -749,7 +749,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 	    if (conn_read_to_buffer(conn, server_rep, 
 				    msg->payload2_length) != 1) {
 		CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio Read Failed");
-		CMConnection_close(conn);
+		INT_CMConnection_close(conn);
 	    }
 	    length += msg->payload2_length;
 	} else {
@@ -782,7 +782,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 	    buffer = malloc(length);
 	    if (conn_read_to_buffer(conn, buffer, length) != 1) {
 		CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio Read Failed");
-		CMConnection_close(conn);
+		INT_CMConnection_close(conn);
 	    }
 	    /* ignore message */
 	    free(buffer);

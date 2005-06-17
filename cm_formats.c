@@ -26,7 +26,7 @@ static void add_format_to_cm ARGS((CManager cm, CMFormat format));
 static void add_user_format_to_cm ARGS((CManager cm, CMFormat format));
 
 CMFormat
-CMlookup_format(cm, field_list)
+INT_CMlookup_format(cm, field_list)
 CManager cm;
 IOFieldList field_list;
 {
@@ -40,7 +40,7 @@ IOFieldList field_list;
 }
 
 IOFormat
-CMlookup_user_format(cm, field_list)
+INT_CMlookup_user_format(cm, field_list)
 CManager cm;
 IOFieldList field_list;
 {
@@ -54,14 +54,14 @@ IOFieldList field_list;
 }
 
 IOContext
-CMget_user_type_context(cm)
+INT_CMget_user_type_context(cm)
 CManager cm;
 {
     return create_IOsubcontext(cm->IOcontext);
 }
 
 void
-CMfree_user_type_context(cm, context)
+INT_CMfree_user_type_context(cm, context)
 CManager cm;
 IOContext context;
 {
@@ -70,7 +70,6 @@ IOContext context;
     int new_count = 0;
     int dead_count = 0;
 
-    CManager_lock(cm);
 
     for (i=0; i < cm->reg_user_format_count; i++) {
         if (cm->reg_user_formats[i]->IOsubcontext == context) {
@@ -79,28 +78,27 @@ IOContext context;
     }
 
     new_count = cm->reg_user_format_count - dead_count;
-    tmp_user_formats = CMmalloc (sizeof (CMFormat) * new_count);
+    tmp_user_formats = INT_CMmalloc (sizeof (CMFormat) * new_count);
     
     for (i=0, j=0; i < cm->reg_user_format_count; i++) {
 	if (cm->reg_user_formats[i]->IOsubcontext != context) {
 	    tmp_user_formats[j++] = cm->reg_user_formats[i];
 	} else {
-	    CMfree(cm->reg_user_formats[i]->format_name);
-	    CMfree(cm->reg_user_formats[i]);
+	    INT_CMfree(cm->reg_user_formats[i]->format_name);
+	    INT_CMfree(cm->reg_user_formats[i]);
 	}
     }
 
     free_IOcontext (context);
-    CMfree (cm->reg_user_formats);
+    INT_CMfree (cm->reg_user_formats);
 
     cm->reg_user_format_count = new_count;
     cm->reg_user_formats = tmp_user_formats;
 
-    CManager_unlock (cm);
 }
 
 CMFormat
-CMregister_format(cm, format_name, field_list, subformat_list)
+INT_CMregister_format(cm, format_name, field_list, subformat_list)
 CManager cm;
 char *format_name;
 IOFieldList field_list;
@@ -111,11 +109,10 @@ CMFormatList subformat_list;
     if ((field_list == NULL) || (format_name == NULL) || (cm == NULL)) 
 	return NULL;
 
-    CManager_lock(cm);
-    format = CMmalloc(sizeof(struct _CMFormat));
+    format = INT_CMmalloc(sizeof(struct _CMFormat));
     
     format->cm = cm;
-    format->format_name = CMmalloc(strlen(format_name) + 1);
+    format->format_name = INT_CMmalloc(strlen(format_name) + 1);
     strcpy(format->format_name, format_name);
     /*  create a new subcontext (to localize name resolution) */
     format->IOsubcontext = create_IOsubcontext(cm->IOcontext);
@@ -129,12 +126,11 @@ CMFormatList subformat_list;
     format->registration_pending = 1;
 
     add_format_to_cm(cm, format);
-    CManager_unlock(cm);
     return format;
 }
 
 CMFormat
-CMregister_opt_format(cm, format_name, field_list, subformat_list, opt_info)
+INT_CMregister_opt_format(cm, format_name, field_list, subformat_list, opt_info)
 CManager cm;
 char *format_name;
 IOFieldList field_list;
@@ -142,14 +138,14 @@ CMFormatList subformat_list;
 IOOptInfo *opt_info;
 {
     CMFormat format;
-    format = CMregister_format(cm, format_name, field_list, subformat_list);
+    format = INT_CMregister_format(cm, format_name, field_list, subformat_list);
     if(format) {
 	format->opt_info = opt_info;
     }
     return format;
 }
 
-void *CMcreate_compat_info(format, xform_code, len_p)
+void *INT_CMcreate_compat_info(format, xform_code, len_p)
 CMFormat format;
 char *xform_code;
 int *len_p;
@@ -214,7 +210,6 @@ CMcomplete_format_registration(format, lock)
 CMFormat format;
 int lock;
 {
-    if (lock) CManager_lock(format->cm);
     
     if (CMregister_subformats(format->IOsubcontext, format->field_list,
 			      format->subformat_list) != 1) {
@@ -236,11 +231,10 @@ int lock;
 	return;
     }
     format->registration_pending = 0;
-    if (lock) CManager_unlock(format->cm);
 }
 
 IOFormat
-CMregister_user_format(cm, type_context, format_name, field_list, 
+INT_CMregister_user_format(cm, type_context, format_name, field_list, 
 		       subformat_list)
 CManager cm;
 IOContext type_context;
@@ -254,11 +248,10 @@ CMFormatList subformat_list;
 	|| (cm == NULL) || (type_context == NULL)) 
 	return NULL;
 
-    CManager_lock(cm);
-    format = CMmalloc(sizeof(struct _CMFormat));
+    format = INT_CMmalloc(sizeof(struct _CMFormat));
     
     format->cm = cm;
-    format->format_name = CMmalloc(strlen(format_name) + 1);
+    format->format_name = INT_CMmalloc(strlen(format_name) + 1);
     strcpy(format->format_name, format_name);
     /*  create a new subcontext (to localize name resolution) */
     format->IOsubcontext = type_context;
@@ -273,11 +266,10 @@ CMFormatList subformat_list;
     CMcomplete_format_registration(format, 0);
     if (format->format != NULL) {
 	add_user_format_to_cm(cm,format);
-	CManager_unlock(cm);
 	return format->format;
     } else {
-	CMfree(format->format_name);
-	CMfree(format);
+	INT_CMfree(format->format_name);
+	INT_CMfree(format);
 	return NULL;
     }
 }
@@ -319,7 +311,7 @@ CMFormat format;
     if (i == cm->reg_format_count) {
 	insert_before = i;
     }
-    cm->reg_formats = CMrealloc(cm->reg_formats, sizeof(CMFormat) * 
+    cm->reg_formats = INT_CMrealloc(cm->reg_formats, sizeof(CMFormat) * 
 				(cm->reg_format_count + 1));
     for (i = cm->reg_format_count; i > insert_before; i--) {
 	/* move this up */
@@ -365,7 +357,7 @@ CMFormat format;
     if (i == cm->reg_user_format_count) {
 	insert_before = i;
     }
-    cm->reg_user_formats = CMrealloc(cm->reg_user_formats, sizeof(CMFormat) * 
+    cm->reg_user_formats = INT_CMrealloc(cm->reg_user_formats, sizeof(CMFormat) * 
 				(cm->reg_user_format_count + 1));
     for (i = cm->reg_user_format_count; i > insert_before; i--) {
 	/* move this up */
@@ -382,7 +374,7 @@ free_CMFormat(format)
 CMFormat format;
 {
     free_IOsubcontext(format->IOsubcontext);
-    CMfree(format);
+    INT_CMfree(format);
 }
 
 extern CMincoming_format_list
@@ -464,7 +456,7 @@ IOFormat format;
 						sizeof(char*));
     set_conversion_IOcontext(cm->IOcontext, format, native_field_list,
 					 native_struct_size);
-    cm->in_formats = CMrealloc(cm->in_formats, 
+    cm->in_formats = INT_CMrealloc(cm->in_formats, 
 			       sizeof(struct _CMincoming_format) * 
 			       (cm->in_format_count + 1));
     cm->in_formats[cm->in_format_count].format = format;
@@ -476,60 +468,52 @@ IOFormat format;
 }
 
 extern IOFormat 
-CMget_IOformat_by_name(cm, context, name)
+INT_CMget_IOformat_by_name(cm, context, name)
 CManager cm;
 IOContext context;
 char *name;
 {
     IOFormat ret;
-    CManager_lock(cm);
     ret = get_IOformat_by_name_IOcontext(context, name);
-    CManager_unlock(cm);
     return ret;
 }
 
 extern IOFormat 
-CMget_format_IOcontext(cm, context, buffer)
+INT_CMget_format_IOcontext(cm, context, buffer)
 CManager cm;
 IOContext context;
 void *buffer;
 {
     IOFormat ret;
-    CManager_lock(cm);
     ret = get_format_IOcontext(context, buffer);
-    CManager_unlock(cm);
     return ret;
 }
 
 extern IOFormat 
-CMget_format_app_IOcontext(cm, context, buffer, app_context)
+INT_CMget_format_app_IOcontext(cm, context, buffer, app_context)
 CManager cm;
 IOContext context;
 void *buffer;
 void *app_context;
 {
     IOFormat ret;
-    CManager_lock(cm);
     ret = get_format_app_IOcontext(context, buffer, app_context);
-    CManager_unlock(cm);
     return ret;
 }
 
 extern IOFormat *
-CMget_subformats_IOcontext(cm, context, buffer)
+INT_CMget_subformats_IOcontext(cm, context, buffer)
 CManager cm;
 IOContext context;
 void *buffer;
 {
     IOFormat *ret;
-    CManager_lock(cm);
     ret = get_subformats_IOcontext(context, buffer);
-    CManager_unlock(cm);
     return ret;
 }
 
 extern void
-CMset_conversion_IOcontext(cm, context, format, field_list,
+INT_CMset_conversion_IOcontext(cm, context, format, field_list,
 			   native_struct_size)
 CManager cm;
 IOContext context;
@@ -537,10 +521,8 @@ IOFormat format;
 IOFieldList field_list;
 int native_struct_size;
 {
-    CManager_lock(cm);
     set_conversion_IOcontext(context, format, field_list,
 			     native_struct_size);
-    CManager_unlock(cm);
 }
 
 extern int CMself_hosted_formats;

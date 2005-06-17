@@ -15,8 +15,9 @@ EXTRA_LTLIBRARIES =
 LIBS=@LIBS@
 LTLIBS=@LTLIBS@
 
-libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c \
-		   cm_lock.c cm_pbio.c cm_evol.c evp.c response.c version.c
+libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c\
+		       cm_lock.c cm_pbio.c cm_evol.c evp.c response.c \
+		       cm_interface.c version.c
 
 libevpath_la_LDFLAGS = $(MATH_LIB)
 libevpath_la_LIBADD =  $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lIO -lecl @SOCKET_LIBS@ @KERNEL_OBJS@ -dlpreopen $(CMDIR)/libcmsockets.la -dlpreopen $(CMDIR)/libcmselect.la
@@ -27,6 +28,9 @@ include_HEADERS = evpath.h
 AM_CPPFLAGS =
 
 noinst_HEADERS = assert.h cm_internal.h  ev_internal.h
+
+cm_interface.c: evpath.h gen_interface.pl
+	perl ./gen_interface.pl
 
 if KERNEL
 bin_PROGRAMS = 
