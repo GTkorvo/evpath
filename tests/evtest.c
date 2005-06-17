@@ -402,6 +402,7 @@ do_regression_master_test()
     }
 #endif
     free(string_list);
+    EVfree_stone(cm, handle);
     CManager_close(cm);
     if (message_count != 1) printf("Message count == %d\n", message_count);
     return !(message_count == 1);
