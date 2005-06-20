@@ -709,8 +709,10 @@ CManager cm;
 		    CMtrace_out(cm, EVerbose, "Executing terminal/filter event");
 		    update_event_length_sum(cm, act, event);
 		    cm->evp->current_event_item = event;
+		    CManager_unlock(cm);
 		    out = (handler)(cm, event->decoded_event, client_data,
 				    event->attrs);
+		    CManager_lock(cm);
 		    cm->evp->current_event_item = NULL;
 		    if (act->action_type == Action_Filter) {
 			if (out) {
