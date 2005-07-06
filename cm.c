@@ -57,7 +57,7 @@ CManager cm;
     /* don't hold locks while polling forever */
     CMControlList cl = cm->control_list;
     int should_exit = 0;
-    CManager_lock(cm);
+//    CManager_lock(cm);
     CManager_unlock(cm);
     if (cl->has_thread > 0 && cl->server_thread == thr_thread_self())
 	should_exit++;
