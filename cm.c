@@ -81,6 +81,7 @@ CManager cm;
 {
     cm->control_list->server_thread = thr_thread_self();
     cm->control_list->has_thread = 1;
+    CManager_unlock(cm);
     CMpoll_forever(cm);
 }
 
