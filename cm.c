@@ -42,6 +42,7 @@ struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, IN
 					       cm_get_data_buf,
 					       cm_return_data_buf};
 static void CMControlList_close ARGS((CMControlList cl));
+static int CMcontrol_list_poll ARGS((CMControlList cl));
 int CMdo_non_CM_handler ARGS((CMConnection conn, int header,
 			      char *buffer, int length));
 void CMdo_performance_response ARGS((CMConnection conn, int length,
@@ -172,22 +173,17 @@ void *client_data;
     }
 }
 
-extern
-void
-CMcontrol_list_poll_network(cl)
-CMControlList cl;
-{
-    cl->network_polling_function.func((void*)&CMstatic_trans_svcs,
-				      cl->network_polling_function.client_data);
-    CMcontrol_list_poll(cl);
-}
-
 extern void
 INT_CMpoll_network(cm)
 CManager cm;
 {
+    CMControlList cl = cm->control_list;
     CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Network");
-    CMcontrol_list_poll_network(cm->control_list);
+    cl->network_polling_function.func((void*)&CMstatic_trans_svcs,
+				      cl->network_polling_function.client_data);
+    CManager_lock(cm);
+    CMcontrol_list_poll(cl);
+    CManager_unlock(cm);
 }
 
 static void
@@ -393,8 +389,7 @@ CManager cm;
     cm->initialized++;
 }
 
-extern
-int
+static int
 CMcontrol_list_poll(cl)
 CMControlList cl;
 {

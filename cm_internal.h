@@ -280,7 +280,6 @@ extern void free_CMFormat ARGS((CMFormat format));
 
 extern void CMcomplete_format_registration ARGS((CMFormat format, int lock));
 extern int CMcontrol_list_wait ARGS((CMControlList cl));
-extern int CMcontrol_list_poll ARGS((CMControlList cl));
 extern int load_transport ARGS((CManager cm, const char *trans_name));
 
 extern int CMinternal_listen ARGS((CManager cm, attr_list listen_info));
