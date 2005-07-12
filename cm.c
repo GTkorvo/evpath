@@ -1118,6 +1118,10 @@ attr_list attrs;
 static void
 dump_CMConnection(CMConnection conn)
 {
+    if (conn == NULL) {
+	printf("CMConnection NULL\n");
+	return;
+    }
     printf("CMConnection %lx, reference count %d, closed %d\n\tattrs : ", 
 	   (long) conn, conn->ref_count, conn->closed);
     dump_attr_list(conn->attrs);
@@ -1135,7 +1139,12 @@ attr_list attrs;
     if (!cm->initialized) CMinitialize(cm);
     conn = CMinternal_initiate_conn(cm, attrs);
     if (CMtrace_on(cm, CMConnectionVerbose)) {
-	dump_CMConnection(conn);
+	printf("CMinitiate_conn returning ");
+	if (conn != NULL) {
+	    dump_CMConnection(conn);
+	} else {
+	    printf("NULL\n");
+	}
     }
     return conn;
 }
