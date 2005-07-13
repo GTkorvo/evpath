@@ -186,6 +186,7 @@ struct _CMConnection {
     thr_mutex_t read_lock;
     IOBuffer io_out_buffer;
     int closed;
+    int failed;
 
     CMFormat *downloaded_formats;
 

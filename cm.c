@@ -770,6 +770,7 @@ attr_list conn_attrs;
     conn->write_lock = thr_mutex_alloc();
     conn->read_lock = thr_mutex_alloc();
     conn->closed = 0;
+    conn->failed = 0;
     conn->downloaded_formats = NULL;
     conn->IOsubcontext = create_IOsubcontext(trans->cm->IOcontext);
     conn->foreign_data_handler = NULL;
@@ -927,6 +928,8 @@ int i;
     }
 }
 
+static void CMConnection_failed (CMConnection conn);
+
 void
 INT_CMConnection_dereference(conn)
 CMConnection conn;
@@ -939,11 +942,11 @@ CMConnection conn;
     }
     if (conn->ref_count < 0) return;   /*  BAD! */
     conn->closed = 1;
-    CMconn_fail_conditions(conn);
     CMtrace_out(conn->cm, CMConnectionVerbose, "CM - Shut down connection %lx\n",
 		(void*)conn);
-    remove_conn_from_CM(conn->cm, conn);
-    conn->trans->shutdown_conn(&CMstatic_trans_svcs, conn->transport_data);
+    if (conn->failed == 0) {
+	CMConnection_failed(conn);
+    }
     thr_mutex_free(conn->write_lock);
     thr_mutex_free(conn->read_lock);
     free_IOsubcontext(conn->IOsubcontext);
@@ -964,6 +967,17 @@ CMConnection conn;
 
     }
     INT_CMfree(conn);
+}
+
+static void
+CMConnection_failed(conn)
+CMConnection conn;
+{
+    CMconn_fail_conditions(conn);
+    remove_conn_from_CM(conn->cm, conn);
+    conn->trans->shutdown_conn(&CMstatic_trans_svcs, conn->transport_data);
+    conn->failed = 1;
+    if (conn->closed != 0) INT_CMConnection_close(conn);
 }
 
 void
@@ -1409,8 +1423,8 @@ CMConnection conn;
 						buf, len, 1);
 	    if (actual == -1) {
 		CMtrace_out(cm, CMLowLevelVerbose, 
-			    "CMdata read failed, actual %d", actual);
-		INT_CMConnection_close(conn);
+			    "CMdata read failed, actual %d, failing connection %lx", actual, conn);
+		CMConnection_failed(conn);
 		CManager_unlock(cm);
 		return;
 	    }
@@ -1433,8 +1447,8 @@ CMConnection conn;
 		return;
 	    }
 	    if (buffer == NULL) {
-		CMtrace_out(cm, CMLowLevelVerbose, "CMdata read_block failed");
-		INT_CMConnection_close(conn);
+		CMtrace_out(cm, CMLowLevelVerbose, "CMdata read_block failed, failing connection %lx", conn);
+		CMConnection_failed(conn);
 		CManager_unlock(cm);
 		return;
 	    }
@@ -1528,7 +1542,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	/*  otherwise give up */
 	if (CMdo_non_CM_handler(conn, *(int*)buffer, buffer, length) == 0) {
 	    printf("Unknown message on connection %lx, %x\n", (long) conn, *(int*)buffer);
-	    INT_CMConnection_close(conn);
+	    CMConnection_failed(conn);
 	}	    
 	return 0;
     }
