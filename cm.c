@@ -928,12 +928,10 @@ int i;
 }
 
 void
-INT_CMConnection_close(conn)
+INT_CMConnection_dereference(conn)
 CMConnection conn;
 {
     conn->ref_count--;
-    CMtrace_out(conn->cm, CMFreeVerbose, "CMConnection close conn=%lx ref count now %d", 
-		(long) conn, conn->ref_count);
     if (conn->ref_count > 0) {
 	CMtrace_out(conn->cm, CMConnectionVerbose, "CM - Dereference connection %lx",
 		    (void*)conn);
@@ -966,6 +964,15 @@ CMConnection conn;
 
     }
     INT_CMfree(conn);
+}
+
+void
+INT_CMConnection_close(conn)
+CMConnection conn;
+{
+    CMtrace_out(conn->cm, CMFreeVerbose, "CMConnection close conn=%lx ref count will be %d", 
+		(long) conn, conn->ref_count - 1);
+    INT_CMConnection_dereference(conn);
 }
 
 void
@@ -1700,10 +1707,12 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     conn->buffer_data_end = 0;
     conn->partial_buffer = NULL;
 
+    INT_CMConnection_add_reference(conn);
     CManager_unlock(cm);
     cm_format->handler(cm, conn, decode_buffer, cm_format->client_data,
 		       attrs);
     CManager_lock(cm);
+    INT_CMConnection_dereference(conn);
     if (cm_data_buf) {
 	cm_return_data_buf(cm_data_buf);
     }
