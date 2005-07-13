@@ -1515,6 +1515,9 @@ create_filter_action_spec(CMFormatList format_list, char *function);
 extern char *
 create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function);
 
+void
+EVdump_stone(CManager cm,  EVstone stone_num);
+
 #ifdef	__cplusplus
 }
 #endif

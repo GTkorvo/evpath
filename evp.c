@@ -465,9 +465,11 @@ dump_action(stone_type stone, int a, const char *indent)
     }
     switch(act->action_type) {
     case Action_Output:
-	printf("  Target: connection %lx, remote_stone_id %d, new %d, write_pending %d\n",
+	printf("  Target: %s: connection %lx, remote_stone_id %d, new %d, write_pending %d\n",
+	       act->o.out.remote_path,
 	       (long)(void*)act->o.out.conn, act->o.out.remote_stone_id, 
 	       act->o.out.new, act->o.out.write_pending);
+	dump_attr_list(act->o.out.conn->attrs);
 	break;
     case Action_Terminal:
 	printf("  Terminal proto action number %d\n",
@@ -520,6 +522,14 @@ dump_stone(stone_type stone)
     for (i=0; i< stone->action_count; i++) {
 	dump_action(stone, i, "    ");
     }
+}
+
+void
+EVdump_stone(CManager cm,  EVstone stone_num)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_num];
+    dump_stone(stone);
 }
 
 int
