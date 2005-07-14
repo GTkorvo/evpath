@@ -466,7 +466,7 @@ dump_action(stone_type stone, int a, const char *indent)
     switch(act->action_type) {
     case Action_Output:
 	printf("  Target: %s: connection %lx, remote_stone_id %d, new %d, write_pending %d\n",
-	       act->o.out.remote_path,
+	       (act->o.out.remote_path ? act->o.out.remote_path : "NULL" ),
 	       (long)(void*)act->o.out.conn, act->o.out.remote_stone_id, 
 	       act->o.out.new, act->o.out.write_pending);
 	dump_attr_list(act->o.out.conn->attrs);
