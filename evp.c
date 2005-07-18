@@ -135,8 +135,6 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone_num,
 	    EVregister_format_set(cm, format_list, NULL);
     }	
     action_num = stone->action_count;
-    CMtrace_out(cm, EVerbose, "Adding Terminal action %d to stone %d",
-		action_num, stone_num);
     stone->actions = realloc(stone->actions, (action_num + 1) * 
 				   sizeof(stone->actions[0]));
     memset(&stone->actions[action_num], 0, sizeof(stone->actions[0]));
@@ -148,6 +146,11 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone_num,
     stone->actions[action_num].o.terminal_proto_action_number = proto_action_num;
     stone->proto_action_count++;
     stone->action_count++;
+    if (CMtrace_on(cm, EVerbose)) {
+	printf("Adding Terminal action %d to stone %d",	action_num, stone_num);
+	printf("Stone dump->\n");
+	dump_stone(stone);
+    }
     return action_num;
 }
     
@@ -459,6 +462,7 @@ dump_action(stone_type stone, int a, const char *indent)
     printf("  reference format :");
     if (act->reference_format) {
 	int id_len;
+	printf("\"%s\" ", name_of_IOformat(act->reference_format));
 	print_server_ID(get_server_ID_IOformat(act->reference_format, &id_len));
     } else {
 	printf(" NULL\n");
