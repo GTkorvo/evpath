@@ -421,6 +421,7 @@ decode_action(CManager cm, event_item *event, action *act)
 	    }
 	    event->decoded_event = decode_buffer;
 	    event->event_encoded = 0;
+	    event->reference_format = act->o.decode.target_reference_format;
 	    return event;
 	} else {
 	    int decoded_length = this_IOrecord_length(act->o.decode.context, 
