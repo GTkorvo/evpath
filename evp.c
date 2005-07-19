@@ -614,7 +614,7 @@ event_item *event;
 	act->attrs = CMcreate_attr_list(cm);
     }
     totallength = act->event_length_sum;/*1024*/ 
-    set_attr(act->attrs, EV_EVENT_LSUM, Attr_Int4, (attr_value)totallength);
+    set_attr(act->attrs, EV_EVENT_LSUM, Attr_Int4, (attr_value)(long)totallength);
 }
 
 static
