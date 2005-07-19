@@ -80,6 +80,13 @@ extern void
 INT_CMrun_network(cm)
 CManager cm;
 {
+    if ((cm->control_list->server_thread != 0) &&
+	(cm->control_list->server_thread != thr_thread_self())) {
+	/* What?  We're polling, but we're not the server thread? */
+	fprintf(stderr, "Warning:  CMrun_network() called when another thread may already be handling the network\n");
+	fprintf(stderr, "          This situation may result in unexpected I/O blocking.\n");
+	fprintf(stderr, "          Server thread set to %lx.\n", (long) thr_thread_self());
+    }
     cm->control_list->server_thread = thr_thread_self();
     cm->control_list->has_thread = 1;
     CManager_unlock(cm);
