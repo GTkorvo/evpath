@@ -49,8 +49,132 @@ functions 1 through 4 might use that knowledge to introduce combined
 filter functions, for example using filter FC to eliminate data that
 would be rejected by both filters F3 anf F4 before it is sent.
 
+ \section examples Examples
+ \subsection triv  Single Process Example
 
- \section comm Communication
+The simplest EVpath program, which involves submitting and receiving an
+event inside a single program (address space), is shown below.
 
- \section control Control Flow
-*/
+\dontinclude triv.c
+Include evpath.h and define the data structure we're using:
+\until NULL}
+\until };
+
+Here, IOField and CMFormatRec declarations describe to EVPath the data
+structure (simple_rec) that is to be transmitted.  EVPath deals with
+structured data and that it provides the the safe marshalling of complex
+structures, even between architectures with different machine
+representations of data.  These will be described in more detail in Section
+\ref pbio.  For the moment it is merely necessary to be aware that all data
+in EVPath is typed and types play a role in determining actions. 
+
+Next, define a function which will be called to consume data from a
+stone as a passive event receiver.  Note that the event is delivered as a
+void* and cast into the appropriate data type.
+\until }
+
+In the main program, we declare some values we'll need later and create a
+CManager to handle the network (even though we're not doing network data
+transmission in this simple example, EVPath is network-focussed and won't
+work without Connection Manager).
+\until CManager_create
+
+For the sink (event receiver) side of the application, we create a stone and
+associate a terminal action with it, specifying the simple_handler()
+function from above and the simple_format_list which describes the data type
+that simple_handler expects to receive.
+\until terminal_action
+
+For the source (event sender) side of the application, we create a source
+handle (EVsource) with simple_format_list describing the type of data that
+we will submit with this source handle, and the stone to which it will be
+submitted.  (Here we are using the same data specification for both the
+source and sink.  In less tightly-coupled applications, these data types can
+vary, causing special rules to be invoked.  More in Section \ref pbio.  It
+is also possible to create many sources, each of which submit different
+types of data to the same stone.)
+\until submit_handle
+Finally, we initialize a record and submit it as an event.
+\until }
+When run, the program above should print "I got 217".
+
+
+ \subsection net  Simple Multi-Process Example
+
+The trival program in the previous example isn't very useful.  The next step
+is to split the sender and receiver and introduce network data transmission
+using output stones. 
+\subsubsection net_recv The Receiving Side
+\dontinclude net_recv.c
+This example will use the same data definitions and handler that were
+defined in the example above.  However, the main program is somewhat
+different.  In addition to the CManager_create(), we call CMlisten() so that
+Connection Manager will listen for incoming connections.  (Strictly
+speaking, this is not necessary for process that only <em>make</em> and
+don't receive connections, but we'll do it for all the examples from here on.)
+\skip this file is
+\until CMlisten
+After setting up CM, we allocate a stone and associate a terminal action as
+before, however we also have to extract contact information from CM so that
+it can be provided to the sender.  Here, we use CMget_contact_list() to
+extract that information from CM as an attr_list, then turn the attr_list
+into a string with attr_list_to_string().  Then the stone ID and the
+stringified contact information is printed so that it can be supplied to the
+sender. 
+\until printf
+Finally, we call CMrun_network().  This causes Connection Manager to use the
+main program's thread of control to service incoming messages.
+\until }
+When this program is run it will print out something like:
+\verbatim Contact list "0:AQIAAENJUEGCzwVFQ0lQUAAA0mY="
+\endverbatim
+and then sit quietly waiting for events.  When an event is received it will
+print the value of the "integer_field" in the event data.
+
+\subsubsection net_send The Sending Side
+\dontinclude net_send.c
+The sending side of our multi-process example uses the same data definitions
+from the trivial example above (but without the simple_handler() routine,
+which is not necessary).  The main program begins similarly, but we use the
+first command line arguments to specify the contact information for the
+receiver, extracted to the variables \c remote_stone and \c contact_list.
+\skip this file is
+\until CMlisten
+The next step is to create a stone and associate an output action with it.
+The output action requires a CM-style contact list in attribute list form,
+so we must unstringify the \c strong_list we extracted from the argument.
+\until EVassoc_output_action
+Finally, we create an event submission handle, initialize a record to send
+and submit it.
+\until }
+To run this program pair, first run \b net_recv in one window.  After it
+prints out the contact information, run \b net_send in another window,
+specifying that contact information as the only argument to \b net_send.
+When \b net_send runs, \b net_recv should print out "I got 318".
+The logical architecture of these two programs is shown below:
+\image latex net.pdf
+\dot
+digraph G {
+rankdir=LR;
+ node [style=filled,color=white];
+subgraph cluster_net_send {
+	 node [style=filled,color=white];
+	 color=lightblue;
+	 style=filled;
+	 source -> output[style=bold];
+	 output[label = "output stone"];
+	 output[shape=box]
+	 source[shape=circle]
+	 label = "NET_SEND";
+	}
+subgraph cluster_net_recv {
+	 node [style=filled,color=white];
+	 color=lightblue;
+	 style=filled;
+	 terminal[label = "terminal stone",shape=box];
+	 label = "NET_RECV";
+	}
+	output->terminal[style=bold,label="network data transmission"];
+}
+\enddot
+ */

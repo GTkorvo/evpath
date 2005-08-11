@@ -42,6 +42,13 @@ struct _CMformat_list {
 };
 /* The above exist for compatibility reasons -sandip */
 
+/*!
+ * A structure to hold Format Name / Field List associations.
+ *
+ *
+ *  This is used to associate names with field lists.  Together these define 
+ *  a structure that can be composed into larger structures.
+ */
 typedef struct _IOformat_list CMFormatRec;
 
 /*!
@@ -110,6 +117,22 @@ typedef void (*CMHandlerFunc) ARGS((CManager cm,
 				    void *message, void *client_data,
 				    attr_list attrs));
 
+/*!
+ * The prototype for an EVPath terminal handler function.
+ *
+ * EVPath allows application-routines matching this prototype to be 
+ * registered as sinks on stones.
+ * \param cm The CManager with which this handler was registered.
+ * \param message A pointer to the incoming data, cast to void*.  The real
+ * data is formatted to match the fields of with which the format was
+ * registered. 
+ * \param client_data This value is the same client_data value that was
+ * supplied in the EVassoc_terminal_action() call.  It is not interpreted by CM,
+ * but instead can be used to maintain some application context.
+ * \param attrs The attributes (set of name/value pairs) that this message
+ * was delivered with.  These are determined by the transport and may
+ * include those specified in CMwrite_attr() when the data was written.
+ */
 typedef int (*EVSimpleHandlerFunc) ARGS((CManager cm, 
 					  void *message, void *client_data,
 					  attr_list attrs));
@@ -310,16 +333,18 @@ extern CMConnection
 CMinitiate_conn ARGS((CManager cm, attr_list contact_list));
 
 /*!
- * shut down a connection.
+ * kill and potentially deallocate a connection.
  *
- * \param conn the CMConnection to shut down.
+ * \param conn the CMConnection to kill
  *
  * CMConnection_close decrements the reference count of a connection.  If
  * the resulting reference count is zero, then the connection is shut down.
  * All resources associated with the connection are free'd, the close
  * handler is called and the CMConnection structure itself is free'd.
  * \warning CMConnection values should not be used after
- * CMConnection_close()
+ * CMConnection_close().  CMConnection_close() should only be used on 
+ * CMConnection values created with CMget_conn() or CMinitiate_conn(), not 
+ * with connections that are passively created (accepted through CMlisten()).
 */
 extern void
 CMConnection_close ARGS((CMConnection conn));
@@ -1411,7 +1436,11 @@ CMget_self_ip_addr();
 
 /*! "CM_PATHRATE" */
 #define CM_PATHRATE ATL_CHAR_CONS('P','T','R', 'T')
+/* @}*/
 
+/** @defgroup evpath EVPath functions and types
+ * @{
+ */
 struct _EVStone;
 struct _EVSource;
 /*!
@@ -1517,6 +1546,7 @@ create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_l
 
 void
 EVdump_stone(CManager cm,  EVstone stone_num);
+/* @}*/
 
 #ifdef	__cplusplus
 }
