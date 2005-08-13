@@ -26,9 +26,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 int main(int argc, char **argv)
 {
     CManager cm;
-    simple_rec data;
     EVstone stone;
-    EVsource source;
     char *string_list;
 
     cm = CManager_create();
