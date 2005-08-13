@@ -118,37 +118,6 @@ typedef void (*CMHandlerFunc) ARGS((CManager cm,
 				    attr_list attrs));
 
 /*!
- * The prototype for an EVPath terminal handler function.
- *
- * EVPath allows application-routines matching this prototype to be 
- * registered as sinks on stones.
- * \param cm The CManager with which this handler was registered.
- * \param message A pointer to the incoming data, cast to void*.  The real
- * data is formatted to match the fields of with which the format was
- * registered. 
- * \param client_data This value is the same client_data value that was
- * supplied in the EVassoc_terminal_action() call.  It is not interpreted by CM,
- * but instead can be used to maintain some application context.
- * \param attrs The attributes (set of name/value pairs) that this message
- * was delivered with.  These are determined by the transport and may
- * include those specified in CMwrite_attr() when the data was written.
- */
-typedef int (*EVSimpleHandlerFunc) ARGS((CManager cm, 
-					  void *message, void *client_data,
-					  attr_list attrs));
-struct _event_item;
-
-typedef int (*EVImmediateHandlerFunc) ARGS((CManager cm, 
-					    struct _event_item *event, 
-					    void *client_data,
-					    attr_list attrs, 
-					    int *out_stones));
-typedef int (*EVTransformHandlerFunc) ARGS((CManager cm, 
-					    void *message, void *output,
-					    void *client_data,
-					    attr_list attrs));
-
-/*!
  * The prototype for a CM polling handler (and others).
  *
  * Functions matching of this prototype can be registered with CMadd_poll(),
@@ -1446,11 +1415,60 @@ struct _EVSource;
 /*!
  * EVStone a stone is an elementary building block of paths
  *
- * EVStone is an opaque handle.  
+ * EVStone is an integer-typed opaque handle.  It's only external use is 
+ * to act as an external stone identifier for remote operations (such as 
+ * specifying the remote target stone in an output action)
  */
 typedef int EVstone;
+/*!
+ * EVaction actions, associated with stones, are the mechanisms through 
+ * which data flow operations are defined.
+ *
+ * EVaction is an opaque integer-typed handle.  An EVaction handle is 
+ * interpreted in the context of the stone it is associated with and is 
+ * not unique across stones.
+ */
 typedef int EVaction;
+/*!
+ * EVsource an EVsource is a source handle used to submit events to EVpath.
+ * An EVsource specifies both the (local) target stone and the format 
+ * (fully-specified structured data type) of the data that will be submitted 
+ * using this handle.  
+ *
+ * EVsource is an opaque handle.
+ */
 typedef struct _EVSource *EVsource;
+
+/*!
+ * The prototype for an EVPath terminal handler function.
+ *
+ * EVPath allows application-routines matching this prototype to be 
+ * registered as sinks on stones.
+ * \param cm The CManager with which this handler was registered.
+ * \param message A pointer to the incoming data, cast to void*.  The real
+ * data is formatted to match the fields of with which the format was
+ * registered. 
+ * \param client_data This value is the same client_data value that was
+ * supplied in the EVassoc_terminal_action() call.  It is not interpreted by CM,
+ * but instead can be used to maintain some application context.
+ * \param attrs The attributes (set of name/value pairs) that this message
+ * was delivered with.  These are determined by the transport and may
+ * include those specified in CMwrite_attr() when the data was written.
+ */
+typedef int (*EVSimpleHandlerFunc) ARGS((CManager cm, 
+					  void *message, void *client_data,
+					  attr_list attrs));
+struct _event_item;
+
+typedef int (*EVImmediateHandlerFunc) ARGS((CManager cm, 
+					    struct _event_item *event, 
+					    void *client_data,
+					    attr_list attrs, 
+					    int *out_stones));
+typedef int (*EVTransformHandlerFunc) ARGS((CManager cm, 
+					    void *message, void *output,
+					    void *client_data,
+					    attr_list attrs));
 
 extern EVstone
 EValloc_stone(CManager cm);
