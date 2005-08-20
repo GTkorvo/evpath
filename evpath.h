@@ -384,7 +384,7 @@ CMget_indexed_conn ARGS((CManager cm, int i));
  * field types are simple pre-defined PBIO types, #subformat_list can be
  * NULL.  Otherwise it should contain the transitive closure of all data
  * types necessary to specify the message representation.  The list is
- * terminated with a <tt>{NULL, NULL}<\tt> value.  
+ * terminated with a <tt>{NULL, NULL}</tt> value.  
  *
  * Registering a format is a precursor to sending a message or registering a
  * handler for incoming messages.
@@ -406,7 +406,7 @@ CMregister_format ARGS((CManager cm, char *format_name,
  * field types are simple pre-defined PBIO types, #subformat_list can be
  * NULL.  Otherwise it should contain the transitive closure of all data
  * types necessary to specify the message representation.  The list is
- * terminated with a <tt>{NULL, NULL}<\tt> value.  
+ * terminated with a <tt>{NULL, NULL}</tt> value.  
  * \param opt_info This specify the compatability info and/or XML info
  *
  * Registering a format is a precursor to sending a message or registering a
@@ -521,7 +521,7 @@ void CMfree_user_type_context ARGS((CManager cm, IOContext context));
  * field types are simple pre-defined PBIO types, #subformat_list can be
  * NULL.  Otherwise it should contain the transitive closure of all data
  * types necessary to specify the message representation.  The list is
- * terminated with a <tt>{NULL, NULL}<\tt> value.  
+ * terminated with a <tt>{NULL, NULL}</tt> value.  
  */
 extern IOFormat
 CMregister_user_format ARGS((CManager cm, IOContext context, char *format_name,
@@ -675,7 +675,6 @@ CMwrite_attr ARGS((CMConnection conn, CMFormat format, void *data,
  * register a function to be called when message matching a particular 
  * format arrives. 
  *
- * \param conn The CMConnection upon which to send the message.
  * \param format The CMFormat value returned by CMregister_format()
  * \param handler The function to be called to handle the message.
  * \param client_data An uninterpreted value that is passed to the function
@@ -725,7 +724,7 @@ CMConnection_write_would_block ARGS((CMConnection conn));
  * buffers are recycled and CM only guarantees that the data delivered to a
  * CMHandlerFunc will be valid for the duration of the call.  In that
  * circumstance, a handler that wanted to preserve the data for longer than
- * it's own duration (to pass it to a thread or enter it into some other data
+ * its own duration (to pass it to a thread or enter it into some other data
  * structure for example) would have to copy the data.  To avoid that
  * inefficiency, CMtake_buffer() allows the handler to take control of the
  * buffer holding its incoming data.  The buffer will then not be recycled
@@ -1415,7 +1414,7 @@ struct _EVSource;
 /*!
  * EVStone a stone is an elementary building block of paths
  *
- * EVStone is an integer-typed opaque handle.  It's only external use is 
+ * EVStone is an integer-typed opaque handle.  Its only external use is 
  * to act as an external stone identifier for remote operations (such as 
  * specifying the remote target stone in an output action)
  */
@@ -1460,22 +1459,49 @@ typedef int (*EVSimpleHandlerFunc) ARGS((CManager cm,
 					  attr_list attrs));
 struct _event_item;
 
-typedef int (*EVImmediateHandlerFunc) ARGS((CManager cm, 
-					    struct _event_item *event, 
-					    void *client_data,
-					    attr_list attrs, 
-					    int *out_stones));
-typedef int (*EVTransformHandlerFunc) ARGS((CManager cm, 
-					    void *message, void *output,
-					    void *client_data,
-					    attr_list attrs));
-
+/*!
+ * Allocate a stone.
+ *
+ * Stones are the basic abstraction of EVPath, the entity to which events
+ * are submitted and with which actions are associated.  The value returned
+ * from EValloc_stone() is actually a simple integer which may be transmitted
+ * to remote locations (for example for use in remote output actions).
+ * \param cm The CManager which will manage the control for this stone.
+ * \return The stone identifier, an integer EVstone value, which can be used
+ * in subsequent calls to associate actions with the stone.
+ */
 extern EVstone
 EValloc_stone(CManager cm);
 
+/*!
+ * Free a stone.
+ *
+ * This call also free's all actions and data associated with a stone, 
+ * including enqueued events if any.
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The stone to free.
+ */
 extern void
 EVfree_stone(CManager cm, EVstone stone);
 
+/*!
+ * Associate a terminal action (sink) with a stone.
+ *
+ * The specified handler will be called when data matching the 
+ * format_list arrives at the stone.  The event data supplied may not 
+ * remain valid after the handler call returns.  EVtake_event_buffer() may 
+ * be used to ensure longer-term validity of the event data.  The 
+ * parameters to the handler are those of EVSimpleHandlerFunc.
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The stone to which to register the action.
+ * \param format_list The list of formats which describe the event data 
+ * structure that the function accepts.
+ * \param handler The handler function that will be called with data arrives.
+ * \param client_data An uninterpreted value that is passed to the hanlder
+ * function when it is called.
+ * \return An action identifier, an integer EVaction value, which can be used
+ * in subsequent calls to modify or remove the action.
+ */
 extern EVaction
 EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
@@ -1484,86 +1510,395 @@ EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list,
 EVassoc_queued_action(CManager cm, EVstone stone, char *queue_spec, 
 void *client_data);*/
 
-extern EVaction
-EVassoc_immediate_action(CManager cm, EVstone stone, char *queue_spec, 
-		      void *client_data);
-
-/*
- * used only by response interface 
+/*!
+ * Associate an immediate non-terminal action with a stone.
+ *
+ * EVassoc_immediate_action() can be used to install handlers which
+ * take only a single event as input and can therefore run and "consume"
+ * their data immediately.  In particular, they are distinct from actions
+ * which may leave their input data enqueued for some time (typically
+ * handlers which might require more than one event to act).  The current
+ * EVPath implementation supports only immediate actions with one input and
+ * one output, but multiple output actions will be implemented soon.
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The stone to which to register the action.
+ * \param action_spec An action specification of the sort created by
+ * create_filter_action_spec() or create_transform_action_spec().
+ * \param client_data An uninterpreted value that is passed to the handler
+ * function when it is called.
+ * \return An action identifier, an integer EVaction value, which can be used
+ * in subsequent calls to modify or remove the action.
  */
 extern EVaction
-EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
-			   EVImmediateHandlerFunc func, void *client_data,
-			   IOFormat reference_format);
+EVassoc_immediate_action(CManager cm, EVstone stone, char *action_spec, 
+		      void *client_data);
 
+/*!
+ * Direct the output of a stone action to another local target stone
+ *
+ * Immediate and queued actions have one or more outputs from which data
+ * will emerge.  EVaction_set_output() is used to assigne each of these
+ * outputs to a local stone.  (It is NOT used with output stones.)
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The stone to which the action is registered.
+ * \param action The action whose output is to be assigned.
+ * \param output_index The zero-based index of the output to assign.
+ * \param target_stone The stone to which the specified output should be
+ * directed. 
+ * \return An action identifier, an integer EVaction value, which can be used
+ * in subsequent calls to modify or remove the action.
+ */
 extern int
 EVaction_set_output(CManager cm, EVstone stone, EVaction action, 
-		    int output_index, EVstone output_stone);
+		    int output_index, EVstone target_stone);
 
+/*!
+ * Associate an immediate non-ECL filter action with a stone.
+ *
+ * EVassoc_filter_action() is similar to EVassoc_immediate_action() called
+ * with an action spec generated by create_filter_action_spec(), except that
+ * a function pointer is provided directly instead of having the function
+ * generated by ECL.
+ * 
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The stone to which to register the action.
+ * \param incoming_format_list The list of formats which describe the event data 
+ * structure that the function accepts.
+ * \param handler The handler function that will be called with data arrives.
+ * \param out_stone The local stone to which output should be directed.
+ * \param client_data An uninterpreted value that is passed to the hanlder
+ * function when it is called.
+ * \return An action identifier, an integer EVaction value, which can be used
+ * in subsequent calls to modify or remove the action.
+ *
+ * \deprecated  This function needs to go away and instead the functionality
+ * should be integrated into a new create_*_action_spec() call that would
+ * then be passed to EVassoc_immediate_action().
+ */
 extern EVaction
 EVassoc_filter_action(CManager cm, EVstone stone, 
 		      CMFormatList incoming_format_list, 
 		      EVSimpleHandlerFunc handler, EVstone out_stone,
 		      void* client_data);
 
+/*!
+ * Associate an output action with a stone.
+ *
+ * Output actions perform network data transmission between address spaces.
+ * EVassoc_output_action will acquire a CM-level connection to the remote
+ * process specified by the \b contact_list parameter.  Data delivered to
+ * the local stone specified by \b stone will be encoded, sent over the 
+ * network link and delivered to \b remote_stone in the target address space.
+ *
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The local stone to which to register the action.
+ * \param contact_list A CM-level contact list (such as from
+ * CMget_contact_list()) specifying the remote address space to connect to. 
+ * \param remote_stone The stone ID in the remote address space to which
+ * data is to be delivered.
+ * \return An action identifier, an integer EVaction value, which can be used
+ * in subsequent calls to modify or remove the action.
+ *
+ * Output actions are associated with the default action of a stone and are
+ * non-specific as far as input data, encoding and transmitting any event
+ * presented to the action.  Output actions may not be modified after
+ * association. 
+ */
 extern EVaction
 EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list, 
 		      EVstone remote_stone);
 
+/*!
+ * Associate a split action with a stone.
+ *
+ * Split actions replicate an incoming event to multiple output target
+ * stones.  All output paths receive every incoming event. (Reference counts
+ * are updated, the event is not actually copied.)  Split actions may be
+ * modified after association by using EVaction_add/remote_split_target() to
+ * modify the target list.
+ *
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The local stone to which to register the action.
+ * \param target_list A zero-terminated list of stones to which incoming
+ * data is to be replicated.  This initial list can be NULL (or merely have
+ * an initial 0) to specify no targets at action initialization time.
+ * \return An action identifier, an integer EVaction value, which can be used
+ * in subsequent calls to modify or remove the action.
+ */
 extern EVaction
 EVassoc_split_action(CManager cm, EVstone stone, EVstone *target_list);
 
-extern void
-EVassoc_conversion_action(CManager cm, int stone_id, IOFormat target_format,
-			  IOFormat incoming_format);
-
+/*!
+ * Add a target to a split action.
+ *
+ * This call adds a new target stone to the list of stones to which a split
+ * action will replicate data.
+ *
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The split stone.
+ * \param action The split action ID (as returned by EVassoc_split_action()).
+ * \param target_stone The target stone to add to the list.
+ * \return Returns 1 on success, 0 on failure (fails if there is not a split
+ * action on the specified stone).
+ */
 extern int
 EVaction_add_split_target(CManager cm, EVstone stone, EVaction action,
 			  EVstone target_stone);
 
+/*!
+ * Remove a target from a split action.
+ *
+ * This call removes a target stone from the list of stones to which a split
+ * action will replicate data.
+ *
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The split stone.
+ * \param action The split action ID (as returned by EVassoc_split_action()).
+ * \param target_stone The target stone to remove from the list.
+ */
 extern void
 EVaction_remove_split_target(CManager cm, EVstone stone, EVaction action,
 			  EVstone target_stone);
 
+/*!
+ * Create a submission handle (EVsource).
+ *
+ * EVpath is optimized for repetitive event streams.  Rather than specifying
+ * the characteristics of data and the stone to which it is to be submitted
+ * on every event submission, we use associate those characteristics with
+ * EVsource handles.  These handles serve as a cache for internal information.
+ *
+ * \param cm The CManager associated with the stone.
+ * \param stone The stone to which data is to be submitted.
+ * \param data_format The CMFormatList describing the representation of the
+ * data. 
+ * \return An EVsource handle for use in later EVsubmit() calls.
+ */
 extern EVsource
 EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format);
 
+/*!
+ * The prototype for a function which will free the memory associated with
+ * an event.
+ *
+ * Normally, the EVpath event submission functions do not return until
+ * it is safe for the application to destroy the submitted data (I.E. until
+ * EVpath is finished with it).  However, if a "free" function is associated
+ * with the event through the EVsource, EVpath will return sooner if there
+ * is another thread of control available to prosecute the actions on the
+ * event.  EVpath will then call the application-supplied free function to
+ * free the event when the event data is no longer required.
+ * Application-supplied event free functions must satisfy this profile. 
+ * \param event_data  The address of the event data, expressed as a void*.
+ * \param client_data The parameter is used to supply the free function with
+ * the same client_data value that was specified in the
+ * EVcreate_submit_handle_free() call.
+ */
 typedef void (*EVFreeFunction) ARGS((void *event_data, void *client_data));
 
+/*!
+ * Create a submission handle (EVsource), specifying a free function for the
+ * event. 
+ *
+ * EVpath is optimized for repetitive event streams.  Rather than specifying
+ * the characteristics of data and the stone to which it is to be submitted
+ * on every event submission, we use associate those characteristics with
+ * EVsource handles.  These handles serve as a cache for internal information.
+ * This version of the call allows an EVFreeFunction to be associated with
+ * the handle.  EVpath will take ownership of the submitted data, calling
+ * the free function when processing is finished.
+ *
+ * \param cm The CManager associated with the stone.
+ * \param stone The stone to which data is to be submitted.
+ * \param data_format The CMFormatList describing the representation of the
+ * data. 
+ * \param free_func  The EVFreeFunction to call when EVPath has finished
+ * processing the submitted data.
+ * \param client_data The parameter is supplied to the free function and can
+ * be used to supply it with additional information.
+ * \return An EVsource handle for use in later EVsubmit() calls.
+ */
 extern EVsource
 EVcreate_submit_handle_free(CManager cm, EVstone stone, CMFormatList data_format,
 			    EVFreeFunction free_func, void *client_data);
 
+/*!
+ * Submit an event for processing by EVPath.
+ *
+ * EVsubmit submits an event for processing by EVPath.  The format of the
+ * submitted data must match the description given by the \b data_format
+ * parameter when the EVsource handle was created.  The \b attrs parameter
+ * specifies the attributes (name/value pairs) that the event is submitted
+ * with.  These attributes will be delivered to the final terminal, as well
+ * as being available at intermediate processing points.  Some attributes
+ * may affect the processing or transmission of data, depending upon the
+ * specific transport or processing agents.
+ * \param source The EVsource handle through which data is to be submitted.
+ * \param data The data to be submitted, represented as a void*.
+ * \param attrs The attribute list to be submitted with the data.
+ */
 extern void
 EVsubmit(EVsource source, void *data, attr_list attrs);
 
+/*!
+ * Submit an event for processing by EVPath.
+ *
+ * EVsubmit submits an event for processing by EVPath.  The format of the
+ * submitted data must match the description given by the \b data_format
+ * parameter when the EVsource handle was created.  The \b attrs parameter
+ * specifies the attributes (name/value pairs) that the event is submitted
+ * with.  These attributes will be delivered to the final terminal, as well
+ * as being available at intermediate processing points.  Some attributes
+ * may affect the processing or transmission of data, depending upon the
+ * specific transport or processing agents.
+ * \param source The EVsource handle through which data is to be submitted.
+ * \param data The data to be submitted, represented as a void*.
+ * \param free_func  The EVFreeFunction to call when EVPath has finished
+ * processing the submitted data.
+ * \param attrs The attribute list to be submitted with the data.
+ *
+ * \deprecated  This function is used to underly ECho, which allows the free
+ * function to be specified with the submit.  New applications should
+ * specify the free function in the submit handle.
+ */
 extern void
 EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
 		 attr_list attrs);
 
+/*!
+ * Assume control over a incoming buffer of data.
+ *
+ * This call is designed to be used inside a EVSimpleHandlerFunc.  Normally
+ * data buffers are recycled and EVPath only guarantees that the data
+ * data delivered to an EVSimpleHandlerFunc will be valid for the duration
+ * data of the call.  In that circumstance, a handler that wanted to
+ * data preserve the data for longer than its own duration (to pass it to a
+ * data thread or enter it into some other data structure for example) would
+ * data have to copy the data.  To avoid that inefficiency, 
+ * EVtake_event_buffer() allows the handler to take control of the 
+ * buffer holding its incoming data.  The buffer will then not be recycled
+ * until it is returned to CM with EVreturn_event_buffer().
+ * \param cm The CManager in which the handler was called.
+ * \param event The base address of the data (I.E. the message parameter to
+ * the EVSimpleHandlerFunc).
+ * \return 0 on error, 1 on success;
+*/
+extern int
+EVtake_event_buffer ARGS((CManager cm, void *event));
+
+/*!
+ * Return a buffer of incoming data.
+ *
+ * This call recycles a data buffer that the application has taken control
+ * of through EVtake_event_buffer().
+ * \param cm The CManager in which the handler was called.
+ * \param event The base address of the data (I.E. same value that was passed
+ * to EVtake_event_buffer().
+*/
+extern void
+EVreturn_event_buffer ARGS((CManager cm, void *event));
+
+/*!
+ * return the IOFormat associated with an EVsource handle.
+ *
+ * Some middleware may find it useful to access the IOFormat that is
+ * produced when the CMFormatList associated with a source is registered
+ * with PBIO.  This call merely gives access to that information to save a
+ * reregistration step.
+ * \param source The EVsource value for which to retrieve the associated
+ * IOFormat.
+ */
 extern IOFormat
 EVget_src_ref_format(EVsource source);
 
+/*!
+ * Enable periodic auto-submits of NULL events on a stone.
+ *
+ * \param cm The CManager in which the stone is registered.
+ * \param stone_num The stone which should receive auto-submits.
+ * \param period_sec The period at which submits should occur, seconds portion.
+ * \param period_usec The period at which submits should occur, microseconds
+ * portion.
+ */
 extern void
 EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
 		    int period_usec);
 
-extern int
-EVtake_event_buffer ARGS((CManager cm, void *event));
-
-extern void
-EVreturn_event_buffer ARGS((CManager cm, void *event));
-
+/*!
+ * create an action specification for a filter function.
+ *
+ * 
+ * \param format_list A description of the incoming event data that the
+ * filter expects. 
+ * \param function The filter function itself.  A zero return value means
+ * that the data should be discarded. 
+ */
 /*NOLOCK*/
 extern char *
 create_filter_action_spec(CMFormatList format_list, char *function);
 
+/*!
+ * create an action specification that transforms event data.
+ *
+ * \param format_list A description of the incoming event data that the
+ * transformation expects. 
+ * \param out_format_list A description of the outgoing event data that the
+ * transformation will produce. 
+ * \param function The processing that will perform the transformation.  A
+ * zero return value means that the output data should be ignored/discarded.
+ */
 /*NOLOCK*/
 extern char *
 create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function);
 
+/*!
+ * Print a description of stone status to standard output.
+ *
+ * A simple dump function that can be used for debugging.
+ * \param cm The CManager to which the stone is registered.
+ * \param stone_num  The stone to dump.
+ */
 void
 EVdump_stone(CManager cm,  EVstone stone_num);
+
+/*!
+ * The prototype of a specific immediate handler funcion.
+ *
+ * This function prototype is used by the EVPath internal "response"
+ * interface.  At some point, the response interface will likely become
+ * external so that EVPath's response to unknown data can be customized.
+ * However, at the moment this is an internal interface.
+ */
+typedef int (*EVImmediateHandlerFunc) ARGS((CManager cm, 
+					    struct _event_item *event, 
+					    void *client_data,
+					    attr_list attrs, 
+					    int *out_stones));
+/*!
+ * Associate a specific (mutated) immediate handler funcion.
+ *
+ * This function is used by the EVPath internal "response" interface.  At
+ * some point, the response interface will likely become external so that
+ * EVPath's response to unknown data can be customized.  However, at the
+ * moment this is an internal interface.
+ */
+extern EVaction
+EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
+			   EVImmediateHandlerFunc func, void *client_data,
+			   IOFormat reference_format);
+
+/*!
+ * Associate a conversion action.
+ *
+ * This function is used by the EVPath internal "response" interface.  At
+ * some point, the response interface will likely become external so that
+ * EVPath's response to unknown data can be customized.  However, at the
+ * moment this is an internal interface.
+ */
+extern void
+EVassoc_conversion_action(CManager cm, int stone_id, IOFormat target_format,
+			  IOFormat incoming_format);
+
 /* @}*/
 
 #ifdef	__cplusplus

@@ -142,7 +142,7 @@ receiver, extracted to the variables \c remote_stone and \c contact_list.
 \until CMlisten
 The next step is to create a stone and associate an output action with it.
 The output action requires a CM-style contact list in attribute list form,
-so we must unstringify the \c strong_list we extracted from the argument.
+so we must unstringify the \c string_list we extracted from the argument.
 \until EVassoc_output_action
 Finally, we create an event submission handle, initialize a record to send
 and submit it.
@@ -152,7 +152,6 @@ prints out the contact information, run \b net_send in another window,
 specifying that contact information as the only argument to \b net_send.
 When \b net_send runs, \b net_recv should print out "I got 318".
 The logical architecture of these two programs is shown below:
-\image latex net.pdf
 \dot
 digraph G {
 rankdir=LR;
@@ -177,4 +176,308 @@ subgraph cluster_net_recv {
 	output->terminal[style=bold,label="network data transmission"];
 }
 \enddot
- */
+\subsection multi_send Sending to multiple receivers
+\dontinclude multi_send.c
+Net_send and net_recv above constitute a basic mechanism for sending data
+across the net, but what if we want to expand it to something more like a
+more capable publish-subscribe communication system?  The first obvious
+limitation is net_send only supports sending to one receiver.  Our next
+example is a modification of the sending side to support replication of
+events to multiple receivers.  Again, we use the same data definitions as
+before, but we modify the program body to introduce a split action:
+\skip this file is
+\until split_action
+EVassoc_split_action() call above adds a split action to the specified stone
+with a NULL target list.  Split actions essentially replicate the data
+stream that arrives on a stone and submit it to multiple "target stones".
+The number and identity of the target stones can be changed on the fly.
+The third argument to EVassoc_split_action() specifies a zero-terminated
+initial target list.  In this case, we'll add targets to the split stone as
+we parse the input arguments, so the initial target list is NULL.  For this
+program, we'll specify the multiple remote receivers by listing them
+separately on the program's command line, so we next parse the command line,
+create output stones for each receiver and add each output stone as a target
+for the split stone.
+\until EVaction_add_split_target
+\until }
+The call to EVaction_add_split_target() adds the newly-created output stone
+to the list of stones to which the split stone will replicate data.  Note
+that the EVaction_add_split_target() call requires specifying both the stone
+to which the split action was registered as well as the EVaction value that
+was returned.  The last bit of the program is largely unchanged, we create a
+submit handle, initialize a record and submit it to EVpath.  
+\until }
+If you run \b N
+versions of \b net_recv, then run \b multi_send with all \b N contact
+strings on the command line, each of the \b net_recv programs should print
+out "I got 318". The logical architecture of these programs is shown below
+(with 3 copies of \b net_recv):
+\dot
+digraph G {
+rankdir=LR;
+ node [style=filled,color=white];
+subgraph cluster_net_send {
+	 node [style=filled,color=white];
+	 color=lightblue;
+	 style=filled;
+	 source -> split[style=bold];
+	 split -> output1[style=bold];
+	 split -> output2[style=bold];
+	 split -> output3[style=bold];
+	 output1[label = "output stone"];
+	 output2[label = "output stone"];
+	 output3[label = "output stone"];
+	 output1[shape=box]
+	 output2[shape=box]
+	 output3[shape=box]
+	 source[shape=circle]
+	 label = "MULTI_SEND";
+	}
+subgraph cluster_net_recv1 {
+	 node [style=filled,color=white];
+	 color=lightblue;
+	 style=filled;
+	 terminal1[label = "terminal stone",shape=box];
+	 label = "NET_RECV";
+	}
+subgraph cluster_net_recv2 {
+	 node [style=filled,color=white];
+	 color=lightblue;
+	 style=filled;
+	 terminal2[label = "terminal stone",shape=box];
+	 label = "NET_RECV";
+	}
+subgraph cluster_net_recv3 {
+	 node [style=filled,color=white];
+	 color=lightblue;
+	 style=filled;
+	 terminal3[label = "terminal stone",shape=box];
+	 label = "NET_RECV";
+	}
+	output1->terminal1[style=bold,label="network data transmission"];
+	output2->terminal2[style=bold,label="network data transmission"];
+	output3->terminal3[style=bold,label="network data transmission"];
+}
+\enddot
+
+Some further notes.  The text above uses the term "split stone" as a
+shorthand for "a stone with a split action associated with it".  "output
+stone" is used similarly.  Actions which are not associated with a specific
+data format are installed as the default action on stones and are performed
+when there is no other action that more specifically matches the data format
+of the triggering event.  There is only one default action per stone, so
+registering a split action on top of an output action will overwrite the
+former (and likely leak some memory).  Also, it's technically possible to
+register, for example, a terminal action and an output action on the same
+stone.  In this case, the terminal action would be applied to incoming data
+of compatible formats, but the output action would be applied to other data
+(more about data compatability in Section \ref pbio).  At this point, I'm
+not sure if there are circumstances where this sort of flexibility is more
+useful than confusing.  But the implementation makes it easy, so for the
+moment the EVPath API will remain capable of these things.  Don't shoot
+yourself in the foot.
+
+\subsection derived Specializing the event stream
+\subsubsection derived_recv The receiving side
+\dontinclude derived_recv.c
+With output stones and split stones we can build the sorts of overlay
+networks described at the beginning of this description.  So we'll focus
+next on how clients can specialize the event stream that they receive.  In
+order to keep the example realistic, we'll assume that only the receiver
+starts out with the knowledge of how he wants to specialize his data
+stream.  To this end, we'll modify the receiver in a simple way to encode
+it's desired specialization in the contact information that it prints out.
+This is done by using create_filter_action_spec() to create a \b char* value
+that encodes both the data type that the filter function expects and the
+body of the function, in this case a simple statement that returns the
+modulus of the field \b integer_field in the input.  If the function returns
+false (0), the event is to be discarded.  For non-zero returns the event
+will be passed unchanged through the filter.  The resulting filter
+specification string is added to the printed contact list after being base64
+encoded.  (The filter spec string contains shell newlines and special
+characters such as quotes, so it is not easily specified on the command
+line.  By using a base64 encoding (as attributes are encoded), we map the
+string to characters that are shell-safe.  The function used here for
+encoding is exported from the ATtribute List package and is defined in atl.h.)
+\skip this file is
+\until CMsleep
+\until }
+Just to make life somewhat easier, we've also changed the CMrun_network() at
+the last line of the receiver to CMsleep().  This causes the receiver to
+service the network for 600 seconds and then exit, rather than hanging
+around forever.
+
+\subsubsection derived_send The sending side
+So, the actual architecture of the receiver is unchanged, we just have it
+export information about its filtering needs.  The actual specialization is
+to occur on the sending side.  We'll start with \b multi_send and change it so
+that it supports both the original \b net_recv clients as well as our new \b
+derived_recv clients.  The program preamble is the same as
+multi_send, so we'll skip forward to the body of the for loop.  In this
+modified code, we parse out the base64-encoded filter specification by
+looking for the ':' separator if present (base64 encoding uses the upper-
+and lower-case alphabet, the decimal digits, '+' and '/', so ':' will never
+be represented.). 
+\dontinclude derived_send.c
+\skip this file is 
+\skip this file is 
+\until }
+\until }
+At the end of this section, the variable \b filter_spec is set to the the
+decoded filter specification, or NULL if no filter specification was
+included (I.E. if the argument was from a \b net_recv client.)
+
+Both cases require the creation of an appropriately-targetted output stone:
+\until EVassoc_output_action
+If we're dealing with an original non-filtered client, all we have to do is
+to add its output stone as a target of the split stone:
+\until else
+For the filtered case it's a little more complicated.  In order to
+accomplish filtering, we create a new stone and use
+EVassoc_intermediate_action() to attach the filtering action to it.
+EVaction_set_output() is used to set the output of the filter stone to be
+the output stone.  Then the new filter stone is added as a target of the
+split stone:
+\until }
+
+The EVassoc_intermediate_action() can be used to install handlers which take
+only a single event as input and can therefore run and "consume" their data
+immediately.  In particular, they are distinct from actions which may leave
+their input data enqueued for some time (typically handlers which might
+require more than one event to act).  The current EVPath implementation
+supports only immediate actions with one input and one output, but multiple
+output actions will be implemented soon.
+
+\until EVsubmit
+\until }
+\until }
+
+Finally, we modify the submit action of the program to submit multiple
+events (so that some will be passed by the filters and others discarded).  
+If you run a mix of \b net_recv and \b derived_recv, then run \b multi_send
+with all the contact strings on the command line, each of the \b net_recv
+programs should receive all 10 events submitted by \b derived_send, but the
+\b derived_recv programs will receive only the odd events.  The logical
+architecture of these programs is shown below :
+\dot
+digraph G {
+rankdir=LR;
+ node [style=filled,color=white];
+subgraph cluster_net_send {
+	 node [style=filled,color=white];
+	 color=lightblue;
+	 style=filled;
+	 source -> split[style=bold];
+	 split -> filter1[style=bold];
+	 filter1 -> output1[style=bold];
+	 split -> output2[style=bold];
+	 split -> filter3[style=bold];
+	 filter3 -> output3[style=bold];
+	 output1[label = "output stone"];
+	 output2[label = "output stone"];
+	 output3[label = "output stone"];
+	 filter1[label = "filter stone"];
+	 filter3[label = "filter stone"];
+	 output1[shape=box]
+	 output2[shape=box]
+	 output3[shape=box]
+	 source[shape=circle]
+	 {rank = same ; output1 ; output2 ; output3}
+	 label = "DERIVED_SEND";
+	}
+subgraph cluster_net_recv1 {
+	 node [style=filled,color=white];
+	 color=lightblue;
+	 style=filled;
+	 terminal1[label = "terminal stone",shape=box];
+	 label = "DERIVED_RECV";
+	}
+subgraph cluster_net_recv2 {
+	 node [style=filled,color=white];
+	 color=lightblue;
+	 style=filled;
+	 terminal2[label = "terminal stone",shape=box];
+	 label = "NET_RECV";
+	}
+subgraph cluster_net_recv3 {
+	 node [style=filled,color=white];
+	 color=lightblue;
+	 style=filled;
+	 terminal3[label = "terminal stone",shape=box];
+	 label = "DERIVED_RECV";
+	}
+	output1->terminal1[style=bold,label="network data transmission"];
+	output2->terminal2[style=bold,label="network data transmission"];
+	output3->terminal3[style=bold,label="network data transmission"];
+}
+\enddot
+
+\subsubsection filter_spec Further details
+EVPath action specifications of the sort created by
+create_filter_action_spec() are designed to encompass exactly the details of
+the system's data processing that are \b not captured by diagrams like the
+one above, to wit, the details about data types and the nature of the
+processing that occurs.  The idea being that the more structural aspects of
+the system are best managed separately.  This also allows us to extend the
+functionality of EVpath without disrupting the structural aspects of the API.
+
+So far, we have only introduced the create_filter_action_spec() call as a
+mechanism for creating action specifications.  The semantics associated with
+the filter action are relatively simple.  The data format list specified in
+the create_filter_action_spec specifies the data type for a parameter named
+"input" through which the incoming event is made available to the filter
+function.  There is a fair amount of "magic" surrounding the EVpath type
+handling in any circumstance and to some extent, this magic is customized
+for the class of processing that is occurring.  In the handling of actions
+created by create_filter_action_spec(), EVpath performs very flexible type
+matching and applies the filter function to any incoming event which
+contains a superset of the data fields that are required by the filter.  In
+particular, EVpath is careful that all matching events that satisfy the
+predicate are passed through unchanged.  This is a fairly obvious and
+natural semantic for a pure filter and is possible because of the type
+flexibility of the dynamic code generation package that underlies EVpath.
+
+\subsection transform_recv Transforming streaming data
+EVpath actions are also capable of processing that modifies or transforms
+the data, potentially modifying its data type in the process.  This is
+slightly more complex than the simple filter because we 
+have to specify an output data type, so in comparison to
+create_filter_action_spec(), create_transform_action_spec() has an
+CMFormatList parameter called out_format_list.  Semantically, the
+out_format_list specifies the data type of an "output" parameter to the
+specified function.  The output record is allocated, but set to zero
+when provided to the function.  It should be initialized properly before the
+function exits.  The following example shows the stream transformation to
+add an "average" data value to the event.  We start with \b derived_recv
+and add a declaration of the transform's output data, adding the new
+"average" field, but also keeping the basic data field for good measure :
+\dontinclude transform_recv.c
+\skip this file is 
+\until NULL, NULL}
+\until }
+
+We also define a new handler function that prints out the new field as well:
+\until }
+Finally, main() is modified a bit to associate output_handler() as the new
+terminal with output_format_list defining its input type, and to use
+create_transform_action_spec() instead of create_filter_action_spec().
+\until CMsleep
+\until }
+The data transformation function, stored here in \b trans_func before being
+passed to create_transform_action_spec(), is more complex than the previous
+simple filter function.  It necessarily fills in all the fields in the
+output data record, in this case using ECL's \b static data feature to
+track event count and data sum between invocations.  It also passes only
+every fifth event.
+
+Because both filter and transform actions are immediate, and because the
+architecture in both examples is identical, we can use \b derived_send to
+install the transform action.  When we run \b transform_recv with \b
+derived_send, the output should be:
+\verbatim
+I got 322, average is now 320
+I got 327, average is now 322.5
+\endverbatim
+
+\section pbio Types and PBIO
+*/
