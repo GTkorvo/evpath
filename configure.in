@@ -176,5 +176,5 @@ USE_PTHREADS="yes"
 fi
 
 dnl Output the makefile
-AC_CONFIG_FILES([Makefile tests/Makefile])
+AC_CONFIG_FILES([Makefile tests/Makefile examples/Makefile])
 AC_OUTPUT
