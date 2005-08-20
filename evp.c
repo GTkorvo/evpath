@@ -367,8 +367,8 @@ static int
 determine_action(CManager cm, stone_type stone, event_item *event, int *sub_id)
 {
     int i;
-    CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %lx",
-	   event->reference_format);
+    CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %lx (%s)",
+	   event->reference_format, name_of_IOformat(event->reference_format));
     for (i=0; i < stone->action_count; i++) {
 	if ((stone->actions[i].action_type == Action_Immediate) && 
 	    (!event->event_encoded)) {
@@ -576,7 +576,7 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 	action_id = determine_action(cm, stone, event, &subact);
     }
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Enqueueing event %lx on stone %d, action %lx",
+	printf("Enqueueing event %lx on stone %d, action %lx\n",
 	       (long)event, local_path_id, (long)act);
 	dump_action(stone, action_id, "    ");
     }
