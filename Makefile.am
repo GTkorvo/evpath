@@ -2,7 +2,7 @@
 
 AUTOMAKE_OPTIONS = no-dependencies foreign
 
-SUBDIRS = libltdl . tests
+SUBDIRS = libltdl . tests examples
 
 INCLUDES = $(INCLTDL)
 

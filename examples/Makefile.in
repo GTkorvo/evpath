@@ -13,7 +13,6 @@
 # PARTICULAR PURPOSE.
 
 @SET_MAKE@
-
 SOURCES = derived_recv.c derived_send.c multi_send.c net_recv.c net_send.c transform_recv.c triv.c
 
 srcdir = @srcdir@
@@ -38,7 +37,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-noinst_PROGRAMS = triv$(EXEEXT) net_send$(EXEEXT) net_recv$(EXEEXT) \
+EXTRA_PROGRAMS = triv$(EXEEXT) net_send$(EXEEXT) net_recv$(EXEEXT) \
 	multi_send$(EXEEXT) derived_send$(EXEEXT) \
 	derived_recv$(EXEEXT) transform_recv$(EXEEXT)
 subdir = examples
@@ -52,7 +51,6 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-PROGRAMS = $(noinst_PROGRAMS)
 derived_recv_SOURCES = derived_recv.c
 derived_recv_OBJECTS = derived_recv.$(OBJEXT)
 derived_recv_LDADD = $(LDADD)
@@ -224,6 +222,7 @@ subdirs = @subdirs@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 AUTOMAKE_OPTIONS = no-dependencies foreign
+MOSTLYCLEANFILES = $(EXTRA_PROGRAMS)
 LDADD = ../libevpath.la
 all: all-am
 
@@ -258,13 +257,6 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
-
-clean-noinstPROGRAMS:
-	@list='$(noinst_PROGRAMS)'; for p in $$list; do \
-	  f=`echo $$p|sed 's/$(EXEEXT)$$//'`; \
-	  echo " rm -f $$p $$f"; \
-	  rm -f $$p $$f ; \
-	done
 derived_recv$(EXEEXT): $(derived_recv_OBJECTS) $(derived_recv_DEPENDENCIES) 
 	@rm -f derived_recv$(EXEEXT)
 	$(LINK) $(derived_recv_LDFLAGS) $(derived_recv_OBJECTS) $(derived_recv_LDADD) $(LIBS)
@@ -389,7 +381,7 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(PROGRAMS)
+all-am: Makefile
 installdirs:
 install: install-am
 install-exec: install-exec-am
@@ -406,6 +398,7 @@ install-strip:
 	  `test -z '$(STRIP)' || \
 	    echo "INSTALL_PROGRAM_ENV=STRIPPROG='$(STRIP)'"` install
 mostlyclean-generic:
+	-test -z "$(MOSTLYCLEANFILES)" || rm -f $(MOSTLYCLEANFILES)
 
 clean-generic:
 
@@ -417,8 +410,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic clean-libtool clean-noinstPROGRAMS \
-	mostlyclean-am
+clean-am: clean-generic clean-libtool mostlyclean-am
 
 distclean: distclean-am
 	-rm -f Makefile
@@ -465,16 +457,15 @@ ps-am:
 uninstall-am: uninstall-info-am
 
 .PHONY: CTAGS GTAGS all all-am check check-am clean clean-generic \
-	clean-libtool clean-noinstPROGRAMS ctags distclean \
-	distclean-compile distclean-generic distclean-libtool \
-	distclean-tags distdir dvi dvi-am html html-am info info-am \
-	install install-am install-data install-data-am install-exec \
-	install-exec-am install-info install-info-am install-man \
-	install-strip installcheck installcheck-am installdirs \
-	maintainer-clean maintainer-clean-generic mostlyclean \
-	mostlyclean-compile mostlyclean-generic mostlyclean-libtool \
-	pdf pdf-am ps ps-am tags uninstall uninstall-am \
-	uninstall-info-am
+	clean-libtool ctags distclean distclean-compile \
+	distclean-generic distclean-libtool distclean-tags distdir dvi \
+	dvi-am html html-am info info-am install install-am \
+	install-data install-data-am install-exec install-exec-am \
+	install-info install-info-am install-man install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-compile \
+	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
+	tags uninstall uninstall-am uninstall-info-am
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
