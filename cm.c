@@ -173,6 +173,7 @@ void *client_data;
 	}
 	CMtrace_out(cm, CMLowLevelVerbose,
 		    "CM - Forked comm thread %lx", server_thread);
+	cm->control_list->server_thread = server_thread;
 	cm->control_list->reference_count++;
 	cm->control_list->free_reference_count++;
 	cl->has_thread = 1;
