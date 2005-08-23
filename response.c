@@ -247,8 +247,9 @@ create_terminal_action_spec(CMFormatList format_list)
 {
     int format_count = 0;
     int i;
+    char *str;
     while(format_list[format_count].format_name != NULL) format_count++;
-    char *str = malloc(50);
+    str = malloc(50);
     sprintf(str, "Terminal Action   Format Count %d\n", format_count);
 
     for (i = 0 ; i < format_count; i++) {
@@ -263,8 +264,9 @@ INT_create_filter_action_spec(CMFormatList format_list, char *function)
 {
     int format_count = 0;
     int i;
+    char *str;
     while(format_list[format_count].format_name != NULL) format_count++;
-    char *str = malloc(50);
+    str = malloc(50);
     sprintf(str, "Filter Action   Format Count %d\n", format_count);
 
     for (i = 0 ; i < format_count; i++) {
@@ -281,8 +283,9 @@ INT_create_transform_action_spec(CMFormatList format_list, CMFormatList out_form
 {
     int format_count = 0;
     int i;
+    char *str;
     while(format_list[format_count].format_name != NULL) format_count++;
-    char *str = malloc(50);
+    str = malloc(50);
     sprintf(str, "Transform Action   Input Format Count %d\n", format_count);
 
     for (i = 0 ; i < format_count; i++) {
