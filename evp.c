@@ -313,6 +313,7 @@ int stone_id;
 IOFormat target_format;
 IOFormat incoming_format;
 {
+    action *act;
     stone_type stone = &(cm->evp->stone_map[stone_id]);
     int a = stone->action_count;
     int id_len;
@@ -325,7 +326,7 @@ IOFormat incoming_format;
 		a, stone_id);
     stone->actions = realloc(stone->actions, 
 			     sizeof(stone->actions[0]) * (a + 1));
-    action *act = & stone->actions[a];
+    act = & stone->actions[a];
     memset(act, 0, sizeof(*act));
     act->requires_decoded = 0;
     act->action_type = Action_Decode;
