@@ -782,7 +782,7 @@ static void
 stone_close_handler(CManager cm, CMConnection conn, void *client_data)
 {
     event_path_data evp = cm->evp;
-    int s = (int)client_data;  /* stone ID */
+    int s = (long)client_data;  /* stone ID */
     int a = 0;
     CMtrace_out(cm, EVerbose, "Got a close for connection %lx on stone %d, shutting down",
 		conn, s);
@@ -815,7 +815,7 @@ process_output_actions(CManager cm)
 	    action *act = &evp->stone_map[s].actions[a];
 	    if ((act->action_type == Action_Output) && 
 		(act->queue->queue_head != NULL)) {
-		int action_id, subact_id, ret;
+		int action_id, subact_id, ret = 1;
 		event_item *event = dequeue_event(cm, act->queue, &action_id, 
 						  &subact_id);
 		if (act->o.out.conn == NULL) {
