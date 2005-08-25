@@ -790,7 +790,6 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
 	action *act = &evp->stone_map[s].actions[a];
 	if ((act->action_type == Action_Output) && 
 	    (act->o.out.conn == conn)) {
-	    CMConnection_close(act->o.out.conn);
 	    act->o.out.conn_failed = 1;
 	    act->o.out.conn = NULL;
 	    INT_CMConnection_close(conn);   /* dereference the connection */
