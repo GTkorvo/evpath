@@ -471,11 +471,11 @@ dump_action(stone_type stone, int a, const char *indent)
     }
     switch(act->action_type) {
     case Action_Output:
-	printf("  Target: %s: connection %lx, remote_stone_id %d, new %d, write_pending %d\n",
+	printf("  Target: %s: connection %lx, remote_stone_id %d\n",
 	       (act->o.out.remote_path ? act->o.out.remote_path : "NULL" ),
-	       (long)(void*)act->o.out.conn, act->o.out.remote_stone_id, 
-	       act->o.out.new, act->o.out.write_pending);
-	dump_attr_list(act->o.out.conn->attrs);
+	       (long)(void*)act->o.out.conn, act->o.out.remote_stone_id);
+	if (act->o.out.conn != NULL) dump_attr_list(act->o.out.conn->attrs);
+	if (act->o.out.conn_failed) printf("Connection has FAILED!\n");
 	break;
     case Action_Terminal:
 	printf("  Terminal proto action number %d\n",
@@ -778,6 +778,32 @@ CManager cm;
     return more_pending;
 }
 
+static void
+stone_close_handler(CManager cm, CMConnection conn, void *client_data)
+{
+    event_path_data evp = cm->evp;
+    int s = (int)client_data;  /* stone ID */
+    int a = 0;
+    CMtrace_out(cm, EVerbose, "Got a close for connection %lx on stone %d, shutting down",
+		conn, s);
+    for (a=0 ; a < evp->stone_map[s].action_count; a++) {
+	action *act = &evp->stone_map[s].actions[a];
+	if ((act->action_type == Action_Output) && 
+	    (act->o.out.conn == conn)) {
+	    CMConnection_close(act->o.out.conn);
+	    act->o.out.conn_failed = 1;
+	    act->o.out.conn = NULL;
+	    INT_CMConnection_close(conn);   /* dereference the connection */
+	    while (act->queue->queue_head != NULL) {
+		int action_id, subact_id;
+		event_item *event = dequeue_event(cm, act->queue, &action_id, 
+						  &subact_id);
+		return_event(evp, event);
+	    }
+	}
+    }
+}
+
 static
 int
 process_output_actions(CManager cm)
@@ -790,26 +816,36 @@ process_output_actions(CManager cm)
 	    action *act = &evp->stone_map[s].actions[a];
 	    if ((act->action_type == Action_Output) && 
 		(act->queue->queue_head != NULL)) {
-		int action_id, subact_id;
+		int action_id, subact_id, ret;
 		event_item *event = dequeue_event(cm, act->queue, &action_id, 
 						  &subact_id);
-		CMtrace_out(cm, EVerbose, "Writing event to remote stone %d",
-			    act->o.out.remote_stone_id);
-		if (event->format) {
-		    internal_write_event(act->o.out.conn, event->format,
-					 &act->o.out.remote_stone_id, 4, 
-					 event, event->attrs);
+		if (act->o.out.conn == NULL) {
+		    CMtrace_out(cm, EVerbose, "Output stone %d has closed connection", s);
 		} else {
-		    struct _CMFormat tmp_format;
-		    tmp_format.format = event->reference_format;
-		    tmp_format.format_name = name_of_IOformat(event->reference_format);
-		    tmp_format.IOsubcontext = (IOContext) iofile_of_IOformat(event->reference_format);
-		    tmp_format.registration_pending = 0;
-		    internal_write_event(act->o.out.conn, &tmp_format,
-					 &act->o.out.remote_stone_id, 4, 
-					 event, event->attrs);
+		    CMtrace_out(cm, EVerbose, "Writing event to remote stone %d",
+				act->o.out.remote_stone_id);
+		    if (event->format) {
+			ret = internal_write_event(act->o.out.conn, event->format,
+						   &act->o.out.remote_stone_id, 4, 
+						   event, event->attrs);
+		    } else {
+			struct _CMFormat tmp_format;
+			tmp_format.format = event->reference_format;
+			tmp_format.format_name = name_of_IOformat(event->reference_format);
+			tmp_format.IOsubcontext = (IOContext) iofile_of_IOformat(event->reference_format);
+			tmp_format.registration_pending = 0;
+			ret = internal_write_event(act->o.out.conn, &tmp_format,
+						   &act->o.out.remote_stone_id, 4, 
+						   event, event->attrs);
+		    }
 		}
 		return_event(evp, event);
+		if (ret == 0) {
+		    if (act->o.out.conn != NULL) 
+			INT_CMConnection_close(act->o.out.conn);
+		    act->o.out.conn_failed = 1;
+		    act->o.out.conn = NULL;
+		}
 	    }
 	}
     }	    
@@ -855,6 +891,8 @@ INT_EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list
 	}
 	return -1;
     }
+    INT_CMconn_register_close_handler(conn, stone_close_handler, 
+				      (void*)(long)stone_num);
     CMtrace_out(cm, EVerbose, "Adding output action %d to stone %d",
 		action_num, stone_num);
     stone->actions = realloc(stone->actions, 

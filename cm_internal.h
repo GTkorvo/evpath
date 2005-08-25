@@ -175,6 +175,12 @@ struct queued_data_rec {
     IOEncodeVector vector_data;
 };
 
+typedef struct _CMCloseHandlerList {
+    CMCloseHandlerFunc close_handler;
+    void *close_client_data;
+    struct _CMCloseHandlerList *next;
+} *CMCloseHandlerList;
+
 struct _CMConnection {
     CManager cm;
     /* remote contact info */
@@ -190,8 +196,7 @@ struct _CMConnection {
 
     CMFormat *downloaded_formats;
 
-    CMCloseHandlerFunc close_handler;
-    void *close_client_data;
+    CMCloseHandlerList close_list;
 
     IOContext IOsubcontext;
     AttrBuffer attr_encode_buffer;

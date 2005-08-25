@@ -783,7 +783,7 @@ attr_list conn_attrs;
     conn->IOsubcontext = create_IOsubcontext(trans->cm->IOcontext);
     conn->foreign_data_handler = NULL;
     conn->io_out_buffer = create_IOBuffer();
-    conn->close_handler = NULL;
+    conn->close_list = NULL;
     conn->attrs = conn_attrs;
     conn->attr_encode_buffer = create_AttrBuffer();
 
@@ -962,18 +962,6 @@ CMConnection conn;
     conn->foreign_data_handler = NULL;
     free_IOBuffer(conn->io_out_buffer);
     free_AttrBuffer(conn->attr_encode_buffer);
-    if (conn->close_handler) {
-	CMTaskHandle prior_task = NULL;
-	CMtrace_out(conn->cm, CMConnectionVerbose, 
-		    "CM - Calling close handler %lx for connection %lx\n",
-		    (void*) conn->close_handler, (void*)conn);
-	query_attr(conn->characteristics, CM_BW_MEASURE_TASK,
-		   /* type pointer */ NULL, 
-		   (attr_value*)(long)&prior_task);
-	if (prior_task) INT_CMremove_task(prior_task);
-	conn->close_handler(conn->cm, conn, conn->close_client_data);
-
-    }
     INT_CMfree(conn);
 }
 
@@ -981,10 +969,31 @@ static void
 CMConnection_failed(conn)
 CMConnection conn;
 {
+    CMTaskHandle prior_task = NULL;
+    if (conn->failed) return;
+    conn->failed = 1;
+    CMtrace_out(conn->cm, CMFreeVerbose, "CMConnection failed conn=%lx", 
+		(long) conn);
     CMconn_fail_conditions(conn);
     remove_conn_from_CM(conn->cm, conn);
     conn->trans->shutdown_conn(&CMstatic_trans_svcs, conn->transport_data);
-    conn->failed = 1;
+    query_attr(conn->characteristics, CM_BW_MEASURE_TASK,
+	       /* type pointer */ NULL, 
+	       (attr_value*)(long)&prior_task);
+    if (prior_task) INT_CMremove_task(prior_task);
+    if (conn->close_list) {
+	CMCloseHandlerList list = conn->close_list;
+	conn->close_list = NULL;
+	while (list != NULL) {
+	    CMCloseHandlerList next = list->next;
+	    CMtrace_out(conn->cm, CMConnectionVerbose, 
+			"CM - Calling close handler %lx for connection %lx\n",
+			(void*) list->close_handler, (void*)conn);
+	    list->close_handler(conn->cm, conn, list->close_client_data);
+	    INT_CMfree(list);
+	    list = next;
+	}
+    }
     if (conn->closed != 0) INT_CMConnection_close(conn);
 }
 
@@ -1003,10 +1012,13 @@ CMConnection conn;
 CMCloseHandlerFunc func;
 void *client_data;
 {
-    conn->close_handler = func;
-    conn->close_client_data = client_data;
-    (conn->cm->control_list->wake_select)((void*)&CMstatic_trans_svcs,
-					  &conn->cm->control_list->select_data);
+    CMCloseHandlerList *lastp = &conn->close_list;
+    CMCloseHandlerList entry = INT_CMmalloc(sizeof(*entry));
+    while (*lastp != NULL) lastp = &((*lastp)->next);
+    entry->close_handler = func;
+    entry->close_client_data = client_data;
+    entry->next = NULL;
+    *lastp = entry;
 }
 
 static void
@@ -1954,7 +1966,7 @@ CMConnection conn;
     CManager_lock(conn->cm);
 }
 	
-    
+
 extern int
 INT_CMwrite_attr(conn, format, data, attrs)
 CMConnection conn;
@@ -1973,6 +1985,10 @@ attr_list attrs;
     /* ensure conn is open */
     if (conn->closed != 0) {
 	CMtrace_out(conn->cm, CMDataVerbose, "Not writing data to closed connection");
+	return 0;
+    }
+    if (conn->failed != 0) {
+	CMtrace_out(conn->cm, CMDataVerbose, "Not writing data to failed connection");
 	return 0;
     }
     if (conn->write_pending) {
@@ -2127,6 +2143,10 @@ attr_list attrs;
     /* ensure conn is open */
     if (conn->closed != 0) {
 	CMtrace_out(conn->cm, CMDataVerbose, "Not writing data to closed connection");
+	return 0;
+    }
+    if (conn->failed != 0) {
+	CMtrace_out(conn->cm, CMDataVerbose, "Not writing data to failed connection");
 	return 0;
     }
     if (conn->write_pending) {

@@ -41,8 +41,7 @@ typedef struct output_action_struct {
     int remote_stone_id;
     int remote_path_len;
     char *remote_path;
-    int new;
-    int write_pending;
+    int conn_failed;
 } output_action_vals;
 
 typedef struct decode_action_struct {
