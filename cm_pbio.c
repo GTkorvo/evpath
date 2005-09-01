@@ -285,10 +285,9 @@ void *client_data;
 	    CMtrace_out(cm, CMFormatVerbose, 
 			"CMpbio connection not available, trying to reestablish, conn %lx, host %s, port %d", 
 			conn, host_string, host_port);
-	    add_attr(contact_attrs, CM_IP_HOSTNAME, Attr_String,
-		     (attr_value) strdup(host_string));
-	    add_attr(contact_attrs, CM_IP_PORT, Attr_Int4,
-		     (attr_value) (long)host_port);
+	    set_string_attr(contact_attrs, CM_IP_HOSTNAME, 
+			    strdup(host_string));
+	    set_int_attr(contact_attrs, CM_IP_PORT, host_port);
 	    
 	    conn = CMinternal_get_conn(cm, contact_attrs);
 	
@@ -337,8 +336,7 @@ void *client_data;
 	CMinternal_listen(cm, NULL);
     }
     contact_attrs = INT_CMget_contact_list(cm);
-    if (!query_attr(contact_attrs, CM_IP_PORT, /* type pointer */ NULL,
-		    /* value pointer */ (attr_value *) (long) &int_port_num)) {
+    if (!get_int_attr(contact_attrs, CM_IP_PORT, &int_port_num)) {
 	CMtrace_out(cm, CMFormatVerbose, "CMpbio port callback found no IP_PORT attribute");
 	return 0;
     }

@@ -156,8 +156,7 @@ main(argc, argv)
 	if ((transport = getenv("CMTransport")) != NULL) {
 
 	    listen_list = create_attr_list();
-	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
-		     (attr_value) strdup(transport));
+	    add_string_attr(listen_list, CM_TRANSPORT, strdup(transport));
 	}
 	CMlisten_specific(cm, listen_list);
 	contact_list = CMget_contact_list(cm);
@@ -210,26 +209,24 @@ main(argc, argv)
 	    
 	/*Each measurement done by CMregressive_probe_bandwidth uses N streams of different size, each stream is sent out for repeat_time times. */
 	/*For scheduled measurment, Each measurement is done every 2 seconds*/
-	add_attr(bw_list, CM_REBWM_RLEN,  Attr_Int4,  (attr_value)(long)N);
-	add_attr(bw_list, CM_REBWM_REPT,  Attr_Int4,  (attr_value)(long)repeat_time);
-	add_attr(bw_list, CM_BW_MEASURE_INTERVAL, Attr_Int4, (attr_value)2);
-	add_attr(bw_list, CM_BW_MEASURE_SIZE, Attr_Int4, (attr_value)(long)size); 
-	add_attr(bw_list, CM_BW_MEASURE_SIZEINC, Attr_Int4, (attr_value)(long)size_inc);
+	add_int_attr(bw_list, CM_REBWM_RLEN,  N);
+	add_int_attr(bw_list, CM_REBWM_REPT,  repeat_time);
+	add_int_attr(bw_list, CM_BW_MEASURE_INTERVAL, 2);
+	add_int_attr(bw_list, CM_BW_MEASURE_SIZE, size); 
+	add_int_attr(bw_list, CM_BW_MEASURE_SIZEINC, size_inc);
 		
 	CMConnection_set_character(conn, bw_list);
 	for(j=0; j<2000; j++)
 	{
 	    sleep(1);
 	    result_list=CMConnection_get_attrs(conn);
-	    if (query_attr(result_list, CM_BW_MEASURED_VALUE, NULL,
-			   (attr_value *) (long) &bw_long)) {
+	    if (get_int_attr(result_list, CM_BW_MEASURED_VALUE, &bw_long)) {
 		printf("BW get from attr: %d\n", bw_long);
 	    }else{
 		printf("Failed to get bw from attr\n");
 	    }
 
-	    if (query_attr(result_list, CM_BW_MEASURED_COF, NULL,
-			   (attr_value *) (long) &bw_cof)) {
+	    if (get_int_attr(result_list, CM_BW_MEASURED_COF, &bw_cof)) {
 		printf("BW cof get from attr: %d\n", bw_cof);
 	    }else{
 		printf("Failed to get bw cof from attr\n");

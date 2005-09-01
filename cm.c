@@ -230,12 +230,10 @@ attr_list attrs;
     int i = 0;
 
     if (attrs != NULL) {
-	query_attr(attrs, CM_TRANSPORT, /* type pointer */ NULL,
-		   /* value pointer */ (attr_value *) (long) &chosen_transport);
+	get_string_attr(attrs, CM_TRANSPORT, &chosen_transport);
     }
     if (attrs != NULL) {
-	query_attr(attrs, CM_NETWORK_POSTFIX, /* type pointer */ NULL,
-		   /* value pointer */ (attr_value *) (long) &chosen_net);
+	get_string_attr(attrs, CM_NETWORK_POSTFIX, &chosen_net);
     }
     if ((chosen_transport == NULL) && (chosen_net == NULL)) {
 	CMadd_ref_attr_list(cm, cm->contact_lists[0]);
@@ -245,10 +243,8 @@ attr_list attrs;
     while (cm->contact_lists && (cm->contact_lists[i] != NULL)) {
 	char *this_transport = NULL, *this_postfix = NULL;
 
-	query_attr(cm->contact_lists[i], CM_TRANSPORT, /* type pointer */ NULL,
-		   /* value pointer */ (attr_value *)(long)&this_transport);
-	query_attr(cm->contact_lists[i], CM_NETWORK_POSTFIX, /* type pointer */ NULL,
-		   /* value pointer */ (attr_value *)(long)&this_postfix);
+	get_string_attr(cm->contact_lists[i], CM_TRANSPORT, &this_transport);
+	get_string_attr(cm->contact_lists[i], CM_NETWORK_POSTFIX, &this_postfix);
 	if (this_transport == NULL) {
 	    this_transport = "sockets";
 	}
@@ -276,10 +272,9 @@ attr_list attrs;
     while (cm->contact_lists && (cm->contact_lists[i] != NULL)) {
 	char *this_transport = NULL, *this_postfix = NULL;
 
-	query_attr(cm->contact_lists[i], CM_TRANSPORT, /* type pointer */ NULL,
-		   /* value pointer */ (attr_value *)(long)&this_transport);
-	query_attr(cm->contact_lists[i], CM_NETWORK_POSTFIX, /* type pointer */ NULL,
-		   /* value pointer */ (attr_value *)(long)&this_postfix);
+	get_string_attr(cm->contact_lists[i], CM_TRANSPORT, &this_transport);
+	get_string_attr(cm->contact_lists[i], CM_NETWORK_POSTFIX, 
+			&this_postfix);
 	if (this_transport == NULL) {
 	    this_transport = "sockets";
 	}
@@ -322,8 +317,7 @@ attr_list listen_info;
     char *choosen_transport = NULL;
 
     if (listen_info != NULL) {
-	query_attr(listen_info, CM_TRANSPORT, /* type pointer */ NULL,
-		   /* value pointer */ (attr_value *) (long) &choosen_transport);
+	get_string_attr(listen_info, CM_TRANSPORT, &choosen_transport);
     }
     if (choosen_transport != NULL) {
         CMtrace_out(cm, CMConnectionVerbose,
@@ -851,8 +845,7 @@ INT_CMConnection_set_character(CMConnection conn, attr_list attrs)
 {
     long interval_value;
     if (attrs == NULL) return 0;
-    if (query_attr(attrs, CM_BW_MEASURE_INTERVAL, /* type pointer */ NULL,
-		   (attr_value *) (long) &interval_value)) {
+    if (get_long_attr(attrs, CM_BW_MEASURE_INTERVAL, &interval_value)) {
 	bw_measure_data data;
 	int previous_interval;
 	CMTaskHandle task = NULL;
@@ -864,29 +857,26 @@ INT_CMConnection_set_character(CMConnection conn, attr_list attrs)
 
 	CMtrace_out(conn->cm, CMLowLevelVerbose,"CM_BW_MEASURE_INTERVAL set, interval is %d", interval_value);
 	if (conn->characteristics && 
-	    (query_attr(conn->characteristics, CM_BW_MEASURE_INTERVAL,
-			/* type pointer */ NULL, (attr_value*)(long)&previous_interval) != 0)) {
+	    (get_int_attr(conn->characteristics, CM_BW_MEASURE_INTERVAL,
+			  &previous_interval) != 0)) {
 	    CMTaskHandle prior_task = NULL;
 	    if (interval_value >= previous_interval) {
 		CMtrace_out(conn->cm, CMLowLevelVerbose,"CM_BW_MEASURE_INTERVAL prior interval is %d, no action.", previous_interval);
 		return 1;
 	    }
 	    CMtrace_out(conn->cm, CMLowLevelVerbose,"CM_BW_MEASURE_INTERVAL prior interval is %d, killing prior task.", previous_interval);
-	    query_attr(conn->characteristics, CM_BW_MEASURE_TASK,
-		       /* type pointer */ NULL, 
-		       (attr_value*)(long)&prior_task);
+	    get_long_attr(conn->characteristics, CM_BW_MEASURE_TASK,
+			  (long*)&prior_task);
 	    if (prior_task) INT_CMremove_task(prior_task);
 	}
 	data = malloc(sizeof(*data));
 	data->size=data->size_inc=-1;
 	
 	/*Get attr about size, size_inc from attributes. */
-	query_attr(attrs, CM_BW_MEASURE_SIZE, /* type pointer */ NULL,
-	    (attr_value *) (long) &(data->size));
+	get_int_attr(attrs, CM_BW_MEASURE_SIZE, &(data->size));
 	if(data->size<1024)
 	    data->size=1024;
-	query_attr(attrs, CM_BW_MEASURE_SIZEINC, /* type pointer */ NULL,
-	    (attr_value *) (long) &(data->size_inc));
+	get_int_attr(attrs, CM_BW_MEASURE_SIZEINC, &(data->size_inc));
 	if(data->size_inc<1024)
 	    data->size_inc=1024;
 
@@ -906,10 +896,9 @@ INT_CMConnection_set_character(CMConnection conn, attr_list attrs)
 	if (conn->characteristics == NULL) {
 	    conn->characteristics = CMcreate_attr_list(conn->cm);
 	}
-	set_attr(conn->characteristics, CM_BW_MEASURE_INTERVAL,
-	         Attr_Int4, (attr_value) interval_value);
-	set_attr(conn->characteristics, CM_BW_MEASURE_TASK,
-		 Attr_Int8, (attr_value) task);
+	set_int_attr(conn->characteristics, CM_BW_MEASURE_INTERVAL,
+		     interval_value);
+	set_long_attr(conn->characteristics, CM_BW_MEASURE_TASK, (long)task);
 	
 	return 1;
     }
@@ -977,9 +966,8 @@ CMConnection conn;
     CMconn_fail_conditions(conn);
     remove_conn_from_CM(conn->cm, conn);
     conn->trans->shutdown_conn(&CMstatic_trans_svcs, conn->transport_data);
-    query_attr(conn->characteristics, CM_BW_MEASURE_TASK,
-	       /* type pointer */ NULL, 
-	       (attr_value*)(long)&prior_task);
+    get_long_attr(conn->characteristics, CM_BW_MEASURE_TASK, 
+		  (long*)&prior_task);
     if (prior_task) INT_CMremove_task(prior_task);
     if (conn->close_list) {
 	CMCloseHandlerList list = conn->close_list;
@@ -1115,8 +1103,7 @@ attr_list attrs;
     assert(CManager_locked(cm));
 
     if (attrs != NULL) {
-	query_attr(attrs, CM_TRANSPORT, /* type pointer */ NULL,
-		   /* value pointer */ (attr_value *) (long) &choosen_transport);
+	get_string_attr(attrs, CM_TRANSPORT, &choosen_transport);
     }
     if (choosen_transport != NULL) {
 	if (load_transport(cm, choosen_transport) == 0) {
@@ -1649,8 +1636,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	if (attrs == NULL){
 	    attrs = CMcreate_attr_list(cm);
 	}
-	set_attr(attrs, CM_EVENT_SIZE, Attr_Int4, 
-		 (attr_value)(long)data_length);
+	set_int_attr(attrs, CM_EVENT_SIZE, data_length);
 
 	cm_data_buf = conn->partial_buffer;
 	conn->buffer_full_point = 0;
@@ -2859,11 +2845,9 @@ attr_list attrs;
     if (size < 16) size = 16;
 
     if (attrs != NULL) {
-	query_attr(attrs, CM_REBWM_RLEN, /* type pointer */ NULL,
-		   /* value pointer */ (attr_value *) (long) &N);
+	get_int_attr(attrs, CM_REBWM_RLEN, &N);
 	
-	query_attr(attrs, CM_REBWM_REPT, /* type pointer */ NULL,
-		   /* value pointer */ (attr_value *) (long) &repeat_count);
+	get_int_attr(attrs, CM_REBWM_REPT, &repeat_count);
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "INT_CMregressive_probe_bandwidth: get from attr, N: %d, repeat_count: %d\n", N, repeat_count);
 	if(N<6) N=6;
 	if(repeat_count<3) repeat_count=3;
@@ -2981,10 +2965,8 @@ attr_list attrs;
 	icof = cofXY * 1000;
 
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Regressive Setting measures to BW %d kbps, COF %d", ibandwidth, icof);
-	set_attr(conn->attrs, CM_BW_MEASURED_VALUE, Attr_Int4, 
-		 (attr_value) (long)ibandwidth);
-	set_attr(conn->attrs, CM_BW_MEASURED_COF, Attr_Int4, 
-		 (attr_value) (long)icof);
+	set_int_attr(conn->attrs, CM_BW_MEASURED_VALUE, ibandwidth);
+	set_int_attr(conn->attrs, CM_BW_MEASURED_COF, icof);
      
     }
     return  bandwidth;

@@ -167,8 +167,7 @@ char **argv;
 	char *transport = NULL;
 	if ((transport = getenv("CMTransport")) != NULL) {
 	    listen_list = create_attr_list();
-	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
-		     (attr_value) strdup(transport));
+	    add_string_attr(listen_list, CM_TRANSPORT, strdup(transport));
 	}
 	CMlisten_specific(cm, listen_list);
 	contact_list = CMget_contact_list(cm);
@@ -197,7 +196,7 @@ char **argv;
 	attrs = create_attr_list();
 #define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
 	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
-	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
+	add_int_attr(attrs, CMDEMO_TEST_ATOM, 45678);
 	CMwrite_attr(conn, format, &data, attrs);
 	free_attr_list(attrs);
     }

@@ -595,8 +595,7 @@ event_item *event;
     int totallength; 
 
     /*update act->event_length_sum:*/
-    if (query_attr(event->attrs, CM_EVENT_SIZE, NULL,
-		   /* value pointer */ (attr_value *) (long)& eventlength)) {
+    if (get_int_attr(event->attrs, CM_EVENT_SIZE, & eventlength)) {
 	if (eventlength >= 0 )
 	    act->event_length_sum += eventlength; 
 	else 
@@ -615,7 +614,7 @@ event_item *event;
 	act->attrs = CMcreate_attr_list(cm);
     }
     totallength = act->event_length_sum;/*1024*/ 
-    set_attr(act->attrs, EV_EVENT_LSUM, Attr_Int4, (attr_value)(long)totallength);
+    set_int_attr(act->attrs, EV_EVENT_LSUM, totallength);
 }
 
 static
