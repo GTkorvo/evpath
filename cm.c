@@ -866,7 +866,7 @@ INT_CMConnection_set_character(CMConnection conn, attr_list attrs)
 	    }
 	    CMtrace_out(conn->cm, CMLowLevelVerbose,"CM_BW_MEASURE_INTERVAL prior interval is %d, killing prior task.", previous_interval);
 	    get_long_attr(conn->characteristics, CM_BW_MEASURE_TASK,
-			  (long*)&prior_task);
+			  (long*)(long)&prior_task);
 	    if (prior_task) INT_CMremove_task(prior_task);
 	}
 	data = malloc(sizeof(*data));
@@ -967,7 +967,7 @@ CMConnection conn;
     remove_conn_from_CM(conn->cm, conn);
     conn->trans->shutdown_conn(&CMstatic_trans_svcs, conn->transport_data);
     get_long_attr(conn->characteristics, CM_BW_MEASURE_TASK, 
-		  (long*)&prior_task);
+		  (long*)(long)&prior_task);
     if (prior_task) INT_CMremove_task(prior_task);
     if (conn->close_list) {
 	CMCloseHandlerList list = conn->close_list;
