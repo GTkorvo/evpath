@@ -53,6 +53,7 @@ INT_EValloc_stone(CManager cm)
     stone->queue = malloc(sizeof(queue_struct));
     stone->queue->queue_tail = stone->queue->queue_head = NULL;
     stone->proto_actions = NULL;
+    stone->stone_attrs = CMcreate_attr_list(cm);
     evp->stone_count++;
     return stone_num;
 }
@@ -108,6 +109,10 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
     stone->proto_actions = NULL;
     stone->action_count = 0;
     stone->actions = NULL;
+    if (stone->stone_attrs != NULL) {
+	INT_CMfree_attr_list(cm, stone->stone_attrs);
+	stone->stone_attrs = NULL;
+    }
 }
 
 EVstone
@@ -557,7 +562,8 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     if (action_id ==  -1) {
 	printf("No action found for event %lx submitted to stone %d\n",
 	       (long)event, local_path_id);
-	if ((stone->actions[0].action_type == Action_Terminal) ||
+	if ((stone->actions && 
+	     (stone->actions[0].action_type == Action_Terminal)) ||
 	    CMtrace_on(cm, EVerbose)) {
 	    if (event->decoded_event != NULL) {
 		dump_unencoded_IOrecord(iofile_of_IOformat(event->reference_format),

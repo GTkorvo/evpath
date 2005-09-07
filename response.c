@@ -371,7 +371,7 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 }
 
 static response_instance
-generate_filter_code(struct response_spec *mrd, IOFormat format);
+generate_filter_code(struct response_spec *mrd, stone_type stone, IOFormat format);
 
 static IOFormat
 localize_format(CManager cm, IOFormat format)
@@ -474,7 +474,7 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 		    }
 		}
 		mrd = stone->actions[action_num].o.imm.mutable_response_data;
-		instance = generate_filter_code(mrd, conversion_target_format);
+		instance = generate_filter_code(mrd, stone, conversion_target_format);
 		if (instance == 0) return 0;
 		switch(mrd->response_type) {
 		case Response_Filter:
@@ -508,18 +508,21 @@ response_data_free(){}
 
 
 static void
-add_standard_routines(context)
+add_standard_routines(stone, context)
+stone_type stone;
 ecl_parse_context context;
 {
     static char extern_string[] = "\
 		int printf(string format, ...);\n\
 		long lrand48();\n\
-		double drand48();\n";
+		double drand48();\n\
+		attr_list stone_attrs;";
 
     static ecl_extern_entry externs[] = {
 	{"printf", (void *) 0},
 	{"lrand48", (void *) 0},
 	{"drand48", (void *) 0},
+	{"stone_attrs", (void *) 0},
 	{(void *) 0, (void *) 0}
     };
     /* 
@@ -529,6 +532,7 @@ ecl_parse_context context;
     externs[0].extern_value = (void *) (long) printf;
     externs[1].extern_value = (void *) (long) lrand48;
     externs[2].extern_value = (void *) (long) drand48;
+    externs[3].extern_value = (void *) (long) &stone->stone_attrs;
 
     ecl_assoc_externs(context, externs);
     ecl_parse_for_context(extern_string, context);
@@ -589,8 +593,9 @@ add_param_list(ecl_parse_context parse_context, char *name, int param_num,
 #endif
 
 static response_instance
-generate_filter_code(mrd, format)
+generate_filter_code(mrd, stone, format)
 struct response_spec *mrd;
+stone_type stone;
 IOFormat format;
 {
     response_instance instance = malloc(sizeof(*instance));
@@ -599,7 +604,7 @@ IOFormat format;
     ecl_parse_context parse_context = new_ecl_parse_context();
     /*    sm_ref conn_info_data_type, conn_info_param;*/
 
-    add_standard_routines(parse_context);
+    add_standard_routines(stone, parse_context);
 
     switch (mrd->response_type) {
     case Response_Filter:
