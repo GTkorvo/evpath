@@ -147,6 +147,14 @@ so we must unstringify the \c string_list we extracted from the argument.
 Finally, we create an event submission handle, initialize a record to send
 and submit it.
 \until }
+(For these trivial examples, we are using command-line arguments to
+communicate such things as contact lists and stone IDs between processes.
+In a real environment, these would probably be commicated via (perhaps
+CM-based) message passing, RPCs, carrier pigeons or some other mechanism
+allowing dynamic stone creation, action registration, etc.  All that is done
+during initialization time while parsing arguments in these example programs
+can also be done dynamically during the course of a long execution.)
+
 To run this program pair, first run \b net_recv in one window.  After it
 prints out the contact information, run \b net_send in another window,
 specifying that contact information as the only argument to \b net_send.
@@ -317,7 +325,7 @@ multi_send, so we'll skip forward to the body of the for loop.  In this
 modified code, we parse out the base64-encoded filter specification by
 looking for the ':' separator if present (base64 encoding uses the upper-
 and lower-case alphabet, the decimal digits, '+' and '/', so ':' will never
-be represented.). 
+be represented.).
 \dontinclude derived_send.c
 \skip this file is 
 \skip this file is 
@@ -478,6 +486,136 @@ derived_send, the output should be:
 I got 322, average is now 320
 I got 327, average is now 322.5
 \endverbatim
+
+\subsection transform_recv2 Multiple actions on a stone
+To this point, only a single EVpath action has been associated with any
+stone.  However, because actions are type-specialized and multiple data
+types can flow along a single path, a stone can hold multiple actions.
+In order to demonstrate this, we'll modify the \b transform_recv2 program to
+create \b transform_recv2.  \b Transform_recv2 will receive the same data as
+before, but we'll introduce a second data type that we'll use in
+a second transformation action:.  
+\dontinclude transform_recv2.c
+\skip this file is 
+\until NULL, NULL}
+\until }
+The \b output_rec type and \b output_handler() are unchanged, but we'll
+change the main program to encode the second transformation and tack it onto
+the end of our ever-growing contact list.  The second transformation
+function is similar to the first, except it takes the new datatype as an
+input parameter and maps the double to an integer to create the original
+output data type.
+\skip main
+\until CMsleep
+\until }
+(Now our contact list is growing quite large now and it may exceed the
+limitations of some shells for individual arguments.  If you get an error
+like "Word too long", try a different shell and remember that in the real
+world you won't be using the shell as a communication mechanism.)  
+
+On the sending side, we have to modify our \b derived_send program to create
+\b derived_send2 which submits two data types and can associate multiple
+actions with filter stones.  We'll use the \b second_rec data type that we
+specified above and modify the body of the main program to potentially parse
+multiple filter specs and use them to associate multiple immediate actions
+to the created filter stones.
+\dontinclude derived_send2.c
+\skip this file is 
+\skip this file is 
+\until add_split_target
+\until add_split_target
+\until }
+\until }
+
+Once the output and filter stones are established, all that remains is to
+submit events.  In order to submit two different data types to our path, we
+need two EVsource handles, one associated with each data type:
+\until submit_handle
+\until submit_handle
+Then we can use the submit handles to submit the two data types alternately:
+\until data2.data_type
+\until data2.data_type
+\until }
+\until }
+
+When transform_recv2 and derived_send2 are run, the following output should
+appear: 
+\verbatim
+I got 322, average is now 320
+I got 22, average is now 20.8
+I got 327, average is now 322.5
+I got 27, average is now 23.3
+\endverbatim
+
+In the output above, notice that the average values don't really look
+"right".  Rather than consistent values near \f$ 170 \f$ (I.E. around the
+average of our starting values, \f$ 318 \f$ and \f$ 18.8 \f$), we have two
+lines that are unchanged from the output of the previous example and two
+lines that seem to represent the average of the floating point values.  This
+is because the "static" declarations in the two filter functions are
+disjoint.  That is, the "static double sum" in trans_func does not reference
+the same data value that "static double sum" in trans_func2 references.
+This may or may not be intuitive to you.  What is probably \e not intuitive
+is that even if there were just one filter function involved, it's possible
+for there to be multiple, disjoint values for "sum" and "count".  This can
+occur because a single action can match more than one incoming data type.
+For example, the first function is designed to match incoming data that
+looks like: 
+
+\verbatim
+typedef struct _simple_rec {
+    int integer_field;
+} simple_rec, *simple_rec_ptr;
+\endverbatim
+but it will also match \e any record that has a top-level field named
+"integer field".  Such as 
+\verbatim
+typedef struct _simple_rec {
+    double new_stuff;   /* extra field */
+    int integer_field;
+} simple_rec, *simple_rec_ptr;
+\endverbatim
+Or even
+\verbatim
+typedef struct _simple_rec {
+    double integer_field;	/* different type for integer_field */
+    int  more_stuff[5];		/* more fields */
+} simple_rec, *simple_rec_ptr;
+\endverbatim
+The details of type matching will be described more fully in Section \ref
+pbio, but for our current purposes the important point is that EVpath
+generates a new instance of the filter function for each distinct incoming
+type.  This helps to minimize recurring overhead (eliminating the need to
+map each new type into some single common representation allows us to
+minimize data transformation), but at the cost of making "static" variables
+a somewhat trickier tool to use. 
+
+\subsection transform_recv3 Communicating between actions
+EVpath does afford a more reliable mechanism for communicating data between
+different incarnations of an action using attribute lists.  In particular,
+evpath defines a variable, \e stone_attrs, that is accessible from within
+each action and which represents a set of attributes (name/value pairs) that
+is associated with the stone.  All actions on a particular stone share the
+same attribute list.  This attribute list can be operated on with a set of
+standard ECL functions to set and retrieve values.  We can modify the
+transformation functions in \b transform_recv2.c to utilize this attribute
+list to get results that represent the real average of data flowing through
+the stone:
+\dontinclude transform_recv3.c
+\skip this file is 
+\until fifth
+\until fifth
+\until }";
+When these modified transformation functions are used with \b derived_send2
+the output is:
+\verbatim
+I got 320, average is now 199.12
+I got 22, average is now 170.4
+I got 325, average is now 181.64
+I got 27, average is now 172.9
+\endverbatim
+\todo There is a somewhat ugly hack here that has to do with our concept of
+atomic names for attributes.  
 
 \section pbio Types and PBIO
 */

@@ -1,3 +1,6 @@
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
 #include "evpath.h"
 
 typedef struct _simple_rec {
@@ -32,14 +35,15 @@ static CMFormatRec second_format_list[] =
     {NULL, NULL}
 };
 
-/* this file is evpath/examples/derived_send.c */
+/* this file is evpath/examples/derived_send2.c */
 int main(int argc, char **argv)
 {
     CManager cm;
     simple_rec data;
+    second_rec data2;
     EVstone split_stone;
     EVaction split_action;
-    EVsource source;
+    EVsource source, source2;
     int i;
 
     cm = CManager_create();
@@ -47,12 +51,14 @@ int main(int argc, char **argv)
 
     split_stone = EValloc_stone(cm);
     split_action = EVassoc_split_action(cm, split_stone, NULL);
+    set_attr_atom_and_string("sum", ATL_CHAR_CONS("E","x","S","u"));
+    set_attr_atom_and_string("count", ATL_CHAR_CONS("E","x","C","o"));
 
-/* this file is evpath/examples/derived_send.c */
+/* this file is evpath/examples/derived_send2.c */
     for (i = 1; i < argc; i++) {
-	char string_list[2048];
+	char string_list[20480];
 	attr_list contact_list;
-	char *filter_spec;
+	char **filter_specs = NULL, *filter_spec, *next;
 	EVstone remote_stone, output_stone;
         if (sscanf(argv[1], "%d:%s", &remote_stone, &string_list[0]) != 2) {
 	    printf("Bad argument \"%s\"\n", argv[1]);
@@ -60,9 +66,22 @@ int main(int argc, char **argv)
 	}
 	filter_spec = strchr(string_list, ':');
 	if (filter_spec != NULL) {	/* if there is a filter spec */
+	    int filter_count = 0;
 	    *filter_spec = 0;           /* terminate the contact list */
 	    filter_spec++;		/* advance pointer to string start */
-	    atl_base64_decode((unsigned char *)filter_spec, NULL);  /* decode in place */
+	    filter_specs = malloc(sizeof(filter_specs[0]) * 2);
+	    while (filter_spec != NULL) {
+		next = strchr(filter_spec, ':');
+		if (next != NULL) {
+		    *next = 0;
+		    next++;
+		}
+		atl_base64_decode((unsigned char *)filter_spec, NULL);  /* decode in place */
+		filter_specs = realloc(filter_specs, sizeof(filter_specs[0]) * (filter_count + 2));
+		filter_specs[filter_count++] = filter_spec;
+		filter_spec = next;
+	    }
+	    filter_specs[filter_count] = NULL;
 	}
 
 	/* regardless of filtering or not, we'll need an output stone */
@@ -70,20 +89,34 @@ int main(int argc, char **argv)
 	contact_list = attr_list_from_string(string_list);
 	EVassoc_output_action(cm, output_stone, contact_list, remote_stone);
 
-	if (filter_spec == NULL) {
+	if (filter_specs == NULL) {
 	    EVaction_add_split_target(cm, split_stone, split_action, output_stone);
 	} else {
+	    int i = 0;
 	    EVstone filter_stone = EValloc_stone(cm);
-	    EVaction filter_action = EVassoc_immediate_action(cm, filter_stone, filter_spec, NULL);
-	    EVaction_set_output(cm, filter_stone, filter_action, 0, output_stone);
+	    while (filter_specs[i] != NULL) {
+		EVaction filter_action = EVassoc_immediate_action(cm, filter_stone, filter_specs[i], NULL);
+		EVaction_set_output(cm, filter_stone, filter_action, 0, output_stone);
+		i++;
+	    }
 	    EVaction_add_split_target(cm, split_stone, split_action, filter_stone);
 	}
     }
 
     source = EVcreate_submit_handle(cm, split_stone, simple_format_list);
+    source2 = EVcreate_submit_handle(cm, split_stone, second_format_list);
     data.integer_field = 318;
-    for (i=0; i < 10; i++) {
-	EVsubmit(source, &data, NULL);
-	data.integer_field++;
+    data2.data_field = 18.8;
+    data2.data_type = 'A';
+    for (i=0; i < 20; i++) {
+	if ((i % 2) == 0) {
+	    EVsubmit(source, &data, NULL);
+	    data.integer_field++;
+	} else {
+	    EVsubmit(source2, &data2, NULL);
+	    data2.data_field += 1.0;
+	    data2.data_type++;
+	}
     }
+    return 1;
 }

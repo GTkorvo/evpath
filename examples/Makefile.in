@@ -13,7 +13,7 @@
 # PARTICULAR PURPOSE.
 
 @SET_MAKE@
-SOURCES = derived_recv.c derived_send.c multi_send.c net_recv.c net_send.c transform_recv.c triv.c
+SOURCES = derived_recv.c derived_send.c derived_send2.c multi_send.c net_recv.c net_send.c transform_recv.c transform_recv2.c transform_recv3.c triv.c
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -39,7 +39,9 @@ build_triplet = @build@
 host_triplet = @host@
 EXTRA_PROGRAMS = triv$(EXEEXT) net_send$(EXEEXT) net_recv$(EXEEXT) \
 	multi_send$(EXEEXT) derived_send$(EXEEXT) \
-	derived_recv$(EXEEXT) transform_recv$(EXEEXT)
+	derived_recv$(EXEEXT) transform_recv$(EXEEXT) \
+	derived_send2$(EXEEXT) transform_recv2$(EXEEXT) \
+	transform_recv3$(EXEEXT)
 subdir = examples
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -59,6 +61,10 @@ derived_send_SOURCES = derived_send.c
 derived_send_OBJECTS = derived_send.$(OBJEXT)
 derived_send_LDADD = $(LDADD)
 derived_send_DEPENDENCIES = ../libevpath.la
+derived_send2_SOURCES = derived_send2.c
+derived_send2_OBJECTS = derived_send2.$(OBJEXT)
+derived_send2_LDADD = $(LDADD)
+derived_send2_DEPENDENCIES = ../libevpath.la
 multi_send_SOURCES = multi_send.c
 multi_send_OBJECTS = multi_send.$(OBJEXT)
 multi_send_LDADD = $(LDADD)
@@ -75,6 +81,14 @@ transform_recv_SOURCES = transform_recv.c
 transform_recv_OBJECTS = transform_recv.$(OBJEXT)
 transform_recv_LDADD = $(LDADD)
 transform_recv_DEPENDENCIES = ../libevpath.la
+transform_recv2_SOURCES = transform_recv2.c
+transform_recv2_OBJECTS = transform_recv2.$(OBJEXT)
+transform_recv2_LDADD = $(LDADD)
+transform_recv2_DEPENDENCIES = ../libevpath.la
+transform_recv3_SOURCES = transform_recv3.c
+transform_recv3_OBJECTS = transform_recv3.$(OBJEXT)
+transform_recv3_LDADD = $(LDADD)
+transform_recv3_DEPENDENCIES = ../libevpath.la
 triv_SOURCES = triv.c
 triv_OBJECTS = triv.$(OBJEXT)
 triv_LDADD = $(LDADD)
@@ -90,10 +104,12 @@ LTCOMPILE = $(LIBTOOL) --mode=compile --tag=CC $(CC) $(DEFS) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link --tag=CC $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = derived_recv.c derived_send.c multi_send.c net_recv.c \
-	net_send.c transform_recv.c triv.c
-DIST_SOURCES = derived_recv.c derived_send.c multi_send.c net_recv.c \
-	net_send.c transform_recv.c triv.c
+SOURCES = derived_recv.c derived_send.c derived_send2.c multi_send.c \
+	net_recv.c net_send.c transform_recv.c transform_recv2.c \
+	transform_recv3.c triv.c
+DIST_SOURCES = derived_recv.c derived_send.c derived_send2.c \
+	multi_send.c net_recv.c net_send.c transform_recv.c \
+	transform_recv2.c transform_recv3.c triv.c
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -263,6 +279,9 @@ derived_recv$(EXEEXT): $(derived_recv_OBJECTS) $(derived_recv_DEPENDENCIES)
 derived_send$(EXEEXT): $(derived_send_OBJECTS) $(derived_send_DEPENDENCIES) 
 	@rm -f derived_send$(EXEEXT)
 	$(LINK) $(derived_send_LDFLAGS) $(derived_send_OBJECTS) $(derived_send_LDADD) $(LIBS)
+derived_send2$(EXEEXT): $(derived_send2_OBJECTS) $(derived_send2_DEPENDENCIES) 
+	@rm -f derived_send2$(EXEEXT)
+	$(LINK) $(derived_send2_LDFLAGS) $(derived_send2_OBJECTS) $(derived_send2_LDADD) $(LIBS)
 multi_send$(EXEEXT): $(multi_send_OBJECTS) $(multi_send_DEPENDENCIES) 
 	@rm -f multi_send$(EXEEXT)
 	$(LINK) $(multi_send_LDFLAGS) $(multi_send_OBJECTS) $(multi_send_LDADD) $(LIBS)
@@ -275,6 +294,12 @@ net_send$(EXEEXT): $(net_send_OBJECTS) $(net_send_DEPENDENCIES)
 transform_recv$(EXEEXT): $(transform_recv_OBJECTS) $(transform_recv_DEPENDENCIES) 
 	@rm -f transform_recv$(EXEEXT)
 	$(LINK) $(transform_recv_LDFLAGS) $(transform_recv_OBJECTS) $(transform_recv_LDADD) $(LIBS)
+transform_recv2$(EXEEXT): $(transform_recv2_OBJECTS) $(transform_recv2_DEPENDENCIES) 
+	@rm -f transform_recv2$(EXEEXT)
+	$(LINK) $(transform_recv2_LDFLAGS) $(transform_recv2_OBJECTS) $(transform_recv2_LDADD) $(LIBS)
+transform_recv3$(EXEEXT): $(transform_recv3_OBJECTS) $(transform_recv3_DEPENDENCIES) 
+	@rm -f transform_recv3$(EXEEXT)
+	$(LINK) $(transform_recv3_LDFLAGS) $(transform_recv3_OBJECTS) $(transform_recv3_LDADD) $(LIBS)
 triv$(EXEEXT): $(triv_OBJECTS) $(triv_DEPENDENCIES) 
 	@rm -f triv$(EXEEXT)
 	$(LINK) $(triv_LDFLAGS) $(triv_OBJECTS) $(triv_LDADD) $(LIBS)
