@@ -238,6 +238,18 @@ extern attr_list
 CMget_contact_list ARGS((CManager cm));
 
 /*!
+ * insert contact information into this CM.
+ *
+ * This call adds to the set of attributes that define the contact
+ * information for the network transports that have performed listen
+ * operations.  
+ * \param cm the CManager for which to add contact information.
+ * \param the information to add.
+ */
+extern void
+CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
+
+/*!
  * get a specfic subset of the contact information for this CM.
  *
  * This call returns the set of attributes that define the contact
@@ -978,6 +990,12 @@ void CMpoll_network ARGS((CManager cm));
  */
 extern 
 void CMrun_network ARGS((CManager cm));
+
+typedef void (*select_func) ARGS((void *, void*));
+
+extern void
+CM_fd_add_select ARGS((CManager cm, int fd, select_func handler_func,
+		       void *param1, void *param2));
 
 /*!
  * allocate a new CM condition value.

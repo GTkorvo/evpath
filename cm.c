@@ -212,6 +212,12 @@ attr_list attrs;
     cm->contact_lists[list_size+1] = NULL;
 }
 
+void
+INT_CM_insert_contact_info(CManager cm, attr_list attrs)
+{
+    attr_merge_lists(cm->contact_lists[0], attrs);
+}
+
 attr_list
 INT_CMget_contact_list(cm)
 CManager cm;
@@ -2977,13 +2983,14 @@ attr_list attrs;
 static void CM_init_select ARGS((CMControlList cl, CManager cm));
 
 extern void
-CM_fd_add_select(cm, fd, handler_func, param1, param2)
+INT_CM_fd_add_select(cm, fd, handler_funcv, param1, param2)
 CManager cm;
 int fd;
-select_list_func handler_func;
+void *handler_funcv;
 void *param1;
 void *param2;
 {
+    select_list_func handler_func = (select_list_func) handler_func;
     if (!cm->control_list->select_initialized) {
 	CM_init_select(cm->control_list, cm);
     }

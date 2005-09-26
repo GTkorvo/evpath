@@ -507,3 +507,6 @@ extern long
 INT_CMprobe_bandwidth ARGS((CMConnection conn, int size, attr_list attrs));
 extern int INT_CMConnection_write_would_block ARGS((CMConnection conn));
 extern void INT_CMusleep ARGS((CManager cm, int usecs));
+extern void INT_CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
+extern void INT_CM_fd_add_select ARGS((CManager cm, int fd, void *handler_func, void *param1, void *param2));
+
