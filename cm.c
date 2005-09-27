@@ -33,7 +33,7 @@ extern int getdomainname ARGS((char *name, int namelen));
 static void CMinitialize ARGS((CManager cm));
 
 struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, INT_CMfree, 
-					       CM_fd_add_select, 
+					       INT_CM_fd_add_select, 
 					       CM_fd_write_select, 
 					       CM_fd_remove_select, 
 					       CMtransport_trace,
@@ -2983,14 +2983,13 @@ attr_list attrs;
 static void CM_init_select ARGS((CMControlList cl, CManager cm));
 
 extern void
-INT_CM_fd_add_select(cm, fd, handler_funcv, param1, param2)
+INT_CM_fd_add_select(cm, fd, handler_func, param1, param2)
 CManager cm;
 int fd;
-void *handler_funcv;
+select_list_func handler_func;
 void *param1;
 void *param2;
 {
-    select_list_func handler_func = (select_list_func) handler_func;
     if (!cm->control_list->select_initialized) {
 	CM_init_select(cm->control_list, cm);
     }
