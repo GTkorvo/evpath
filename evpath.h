@@ -1489,6 +1489,7 @@ struct _event_item;
  * \return The stone identifier, an integer EVstone value, which can be used
  * in subsequent calls to associate actions with the stone.
  */
+/*REMOTE*/
 extern EVstone
 EValloc_stone(CManager cm);
 
@@ -1500,6 +1501,7 @@ EValloc_stone(CManager cm);
  * \param cm The CManager from which this stone was allocated.
  * \param stone The stone to free.
  */
+/*REMOTE*/
 extern void
 EVfree_stone(CManager cm, EVstone stone);
 
@@ -1521,6 +1523,7 @@ EVfree_stone(CManager cm, EVstone stone);
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
  */
+/*REMOTE*/
 extern EVaction
 EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
@@ -1548,6 +1551,7 @@ void *client_data);*/
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
  */
+/*REMOTE*/
 extern EVaction
 EVassoc_immediate_action(CManager cm, EVstone stone, char *action_spec, 
 		      void *client_data);
@@ -1567,6 +1571,7 @@ EVassoc_immediate_action(CManager cm, EVstone stone, char *action_spec,
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
  */
+/*REMOTE*/
 extern int
 EVaction_set_output(CManager cm, EVstone stone, EVaction action, 
 		    int output_index, EVstone target_stone);
@@ -1623,6 +1628,7 @@ EVassoc_filter_action(CManager cm, EVstone stone,
  * presented to the action.  Output actions may not be modified after
  * association. 
  */
+/*REMOTE*/
 extern EVaction
 EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list, 
 		      EVstone remote_stone);
@@ -1644,6 +1650,7 @@ EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list,
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
  */
+/*REMOTE*/
 extern EVaction
 EVassoc_split_action(CManager cm, EVstone stone, EVstone *target_list);
 
@@ -1660,6 +1667,7 @@ EVassoc_split_action(CManager cm, EVstone stone, EVstone *target_list);
  * \return Returns 1 on success, 0 on failure (fails if there is not a split
  * action on the specified stone).
  */
+/*REMOTE*/
 extern int
 EVaction_add_split_target(CManager cm, EVstone stone, EVaction action,
 			  EVstone target_stone);
@@ -1675,6 +1683,7 @@ EVaction_add_split_target(CManager cm, EVstone stone, EVaction action,
  * \param action The split action ID (as returned by EVassoc_split_action()).
  * \param target_stone The target stone to remove from the list.
  */
+/*REMOTE*/
 extern void
 EVaction_remove_split_target(CManager cm, EVstone stone, EVaction action,
 			  EVstone target_stone);
@@ -1839,6 +1848,7 @@ EVget_src_ref_format(EVsource source);
  * \param period_usec The period at which submits should occur, microseconds
  * portion.
  */
+/*REMOTE*/
 extern void
 EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
 		    int period_usec);
