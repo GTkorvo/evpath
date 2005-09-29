@@ -116,6 +116,17 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 }
 
 EVstone
+INT_EVcreate_terminal_action(CManager cm, 
+			CMFormatList format_list, EVSimpleHandlerFunc handler,
+			void *client_data)
+{
+    EVstone stone = INT_EValloc_stone(cm);
+    (void) INT_EVassoc_terminal_action(cm, stone, format_list, 
+				       handler, client_data);
+    return stone;
+}    
+
+EVaction
 INT_EVassoc_terminal_action(CManager cm, EVstone stone_num, 
 			CMFormatList format_list, EVSimpleHandlerFunc handler,
 			void *client_data)
@@ -159,6 +170,19 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone_num,
     return action_num;
 }
     
+
+EVstone
+INT_EVcreate_immediate_action(CManager cm, char *action_spec, 
+			      EVstone *target_list)
+{
+    int i = 0;
+    EVstone stone = INT_EValloc_stone(cm);
+    EVaction action = EVassoc_immediate_action(cm, stone, action_spec, NULL);
+    while (target_list && (target_list[i] != 0)) {
+	INT_EVaction_set_output(cm, stone, action, i, target_list[i]);
+    }
+    return stone;
+}
 
 EVaction
 INT_EVassoc_immediate_action(CManager cm, EVstone stone_num, 
@@ -876,6 +900,14 @@ INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
     return sub_num;
 }
 
+extern EVstone
+INT_EVcreate_output_action(CManager cm, attr_list contact_list,
+		      EVstone remote_stone)
+{
+    EVstone stone = INT_EValloc_stone(cm);
+    INT_EVassoc_output_action(cm, stone, contact_list, remote_stone);
+    return stone;
+}
 
 extern EVaction
 INT_EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
@@ -913,6 +945,14 @@ INT_EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list
     stone->default_action = action_num;
     stone->action_count++;
     return action_num;
+}
+
+extern EVstone
+INT_EVcreate_split_action(CManager cm, EVstone *target_stone_list)
+{
+    EVstone stone = INT_EValloc_stone(cm);
+    (void) INT_EVassoc_split_action(cm, stone, target_stone_list);
+    return stone;
 }
 
 extern EVaction
@@ -1090,6 +1130,17 @@ EVauto_submit_func(CManager cm, void* vstone)
     process_output_actions(cm);
 }
 
+extern EVstone
+INT_EVcreate_auto_stone(CManager cm, int period_sec, int period_usec, 
+			char *action_spec, EVstone out_stone)
+{
+    EVstone stone = INT_EValloc_stone(cm);
+    EVaction action = INT_EVassoc_immediate_action(cm, stone, action_spec, NULL);
+    INT_EVaction_set_output(cm, stone, action, 0, out_stone);
+    INT_EVenable_auto_stone(cm, stone, period_sec, period_usec);
+    return stone;
+}
+	
 extern void
 INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
 		    int period_usec)

@@ -244,7 +244,7 @@ CMget_contact_list ARGS((CManager cm));
  * information for the network transports that have performed listen
  * operations.  
  * \param cm the CManager for which to add contact information.
- * \param the information to add.
+ * \param attrs the information to add.
  */
 extern void
 CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
@@ -1528,6 +1528,30 @@ extern EVaction
 EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
 
+/*!
+ * Associate a terminal action (sink) with a new stone.
+ *
+ * The specified handler will be called when data matching the 
+ * format_list arrives at the stone.  The event data supplied may not 
+ * remain valid after the handler call returns.  EVtake_event_buffer() may 
+ * be used to ensure longer-term validity of the event data.  The 
+ * parameters to the handler are those of EVSimpleHandlerFunc.  This 
+ * function differs from the previous function only in that it creates
+ * a stone rather than using an existing stone.
+ * \param cm The CManager from which this stone was allocated.
+ * \param format_list The list of formats which describe the event data 
+ * structure that the function accepts.
+ * \param handler The handler function that will be called with data arrives.
+ * \param client_data An uninterpreted value that is passed to the hanlder
+ * function when it is called.
+ * \return The stone identifier, an integer EVstone value, which can be used
+ * in subsequent calls.
+ */
+/*REMOTE*/
+extern EVstone
+EVcreate_terminal_action(CManager cm, CMFormatList format_list, 
+			EVSimpleHandlerFunc handler, void* client_data);
+
 /*extern EVaction
 EVassoc_queued_action(CManager cm, EVstone stone, char *queue_spec, 
 void *client_data);*/
@@ -1541,7 +1565,7 @@ void *client_data);*/
  * which may leave their input data enqueued for some time (typically
  * handlers which might require more than one event to act).  The current
  * EVPath implementation supports only immediate actions with one input and
- * one output, but multiple output actions will be implemented soon.
+ * one output, but multiple output actions will be implemented soon.  
  * \param cm The CManager from which this stone was allocated.
  * \param stone The stone to which to register the action.
  * \param action_spec An action specification of the sort created by
@@ -1555,6 +1579,34 @@ void *client_data);*/
 extern EVaction
 EVassoc_immediate_action(CManager cm, EVstone stone, char *action_spec, 
 		      void *client_data);
+
+/*!
+ * Associate an immediate non-terminal action with a new stone.
+ *
+ * EVassoc_immediate_action() can be used to install handlers which
+ * take only a single event as input and can therefore run and "consume"
+ * their data immediately.  In particular, they are distinct from actions
+ * which may leave their input data enqueued for some time (typically
+ * handlers which might require more than one event to act).  The current
+ * EVPath implementation supports only immediate actions with one input and
+ * one output, but multiple output actions will be implemented soon.  This 
+ * function differs from the previous function only in that it creates
+ * a stone rather than using an existing stone.
+ * \param cm The CManager from which this stone was allocated.
+ * \param action_spec An action specification of the sort created by
+ * create_filter_action_spec() or create_transform_action_spec().
+ * \param target_list A zero-terminated list of stones to which outgoing
+ * data is to be sent.  This initial list can be NULL (or merely have
+ * an initial 0) to specify no targets at action initialization time.  
+ * Values are filled in later with EVaction_set_output().
+ * \param client_data An uninterpreted value that is passed to the handler
+ * function when it is called.
+ * \return The stone identifier, an integer EVstone value, which can be used
+ * in subsequent calls.
+ */
+/*REMOTE*/
+extern EVstone
+EVcreate_immediate_action(CManager cm, char *action_spec, EVstone *target_list);
 
 /*!
  * Direct the output of a stone action to another local target stone
@@ -1634,6 +1686,35 @@ EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list,
 		      EVstone remote_stone);
 
 /*!
+ * Associate an output action with a new stone.
+ *
+ * Output actions perform network data transmission between address spaces.
+ * EVassoc_output_action will acquire a CM-level connection to the remote
+ * process specified by the \b contact_list parameter.  Data delivered to
+ * the local stone specified by \b stone will be encoded, sent over the 
+ * network link and delivered to \b remote_stone in the target address space.
+ * This function differs from the previous function only in that it creates
+ * a stone rather than using an existing stone.
+ *
+ * \param cm The CManager from which this stone was allocated.
+ * \param contact_list A CM-level contact list (such as from
+ * CMget_contact_list()) specifying the remote address space to connect to. 
+ * \param remote_stone The stone ID in the remote address space to which
+ * data is to be delivered.
+ * \return The stone identifier, an integer EVstone value, which can be used
+ * in subsequent calls.
+ *
+ * Output actions are associated with the default action of a stone and are
+ * non-specific as far as input data, encoding and transmitting any event
+ * presented to the action.  Output actions may not be modified after
+ * association. 
+ */
+/*REMOTE*/
+extern EVstone
+EVcreate_output_action(CManager cm, attr_list contact_list, 
+		      EVstone remote_stone);
+
+/*!
  * Associate a split action with a stone.
  *
  * Split actions replicate an incoming event to multiple output target
@@ -1653,6 +1734,27 @@ EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list,
 /*REMOTE*/
 extern EVaction
 EVassoc_split_action(CManager cm, EVstone stone, EVstone *target_list);
+
+/*!
+ * Associate a split action with a new stone.
+ *
+ * Split actions replicate an incoming event to multiple output target
+ * stones.  All output paths receive every incoming event. (Reference counts
+ * are updated, the event is not actually copied.)  Split actions may be
+ * modified after association by using EVaction_add/remote_split_target() to
+ * modify the target list.  This function differs from the previous function 
+ * only in that it creates a stone rather than using an existing stone.
+ *
+ * \param cm The CManager from which this stone was allocated.
+ * \param target_list A zero-terminated list of stones to which incoming
+ * data is to be replicated.  This initial list can be NULL (or merely have
+ * an initial 0) to specify no targets at action initialization time.
+ * \return The stone identifier, an integer EVstone value, which can be used
+ * in subsequent calls.
+ */
+/*REMOTE*/
+extern EVstone
+EVcreate_split_action(CManager cm, EVstone *target_list);
 
 /*!
  * Add a target to a split action.
@@ -1734,7 +1836,7 @@ typedef void (*EVFreeFunction) ARGS((void *event_data, void *client_data));
  * EVsource handles.  These handles serve as a cache for internal information.
  * This version of the call allows an EVFreeFunction to be associated with
  * the handle.  EVpath will take ownership of the submitted data, calling
- * the free function when processing is finished.
+ * the free function when processing is finished.  
  *
  * \param cm The CManager associated with the stone.
  * \param stone The stone to which data is to be submitted.
@@ -1852,6 +1954,23 @@ EVget_src_ref_format(EVsource source);
 extern void
 EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
 		    int period_usec);
+
+/*!
+ * Enable periodic auto-submits of NULL events on a stone. This 
+ * function differs from the previous function only in that it creates
+ * a stone rather than using an existing stone.
+ *
+ * \param cm The CManager in which the stone is registered.
+ * \param period_sec The period at which submits should occur, seconds portion.
+ * \param period_usec The period at which submits should occur, microseconds
+ * portion.
+ * \return The stone identifier, an integer EVstone value, which can be used
+ * in subsequent calls.
+ */
+/*REMOTE*/
+extern EVstone
+EVcreate_auto_stone(CManager cm, int period_sec, int period_usec, 
+		    char *action_spec, EVstone out_stone);
 
 /*!
  * create an action specification for a filter function.

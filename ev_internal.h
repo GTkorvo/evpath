@@ -147,3 +147,12 @@ EVregister_format_set(CManager cm, CMFormatList list, IOContext *context_ptr);
 extern int
 internal_path_submit(CManager cm, int local_path_id, event_item *event);
 extern void INT_EVsubmit(EVsource source, void *data, attr_list attrs);
+extern EVstone INT_EVcreate_output_action(CManager cm, attr_list contact_list, EVstone remote_stone);
+extern EVstone INT_EVcreate_immediate_action(CManager cm, char *action_spec, EVstone *target_list);
+extern EVstone INT_EVcreate_split_action(CManager cm, EVstone *target_list);
+extern EVstone INT_EVcreate_terminal_action(CManager cm, CMFormatList format_list, 
+					    EVSimpleHandlerFunc handler, 
+					    void *client_data);
+extern EVstone INT_EVcreate_auto_stone(CManager cm, int period_sec, 
+				       int period_usec, char *action_spec, 
+				       EVstone out_stone);
