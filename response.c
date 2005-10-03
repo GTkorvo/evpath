@@ -229,10 +229,13 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	response->u.transform.out_format_list = out_list;
 	response->u.transform.function = function;
 	response->u.transform.client_data = local_data;
-	response->u.transform.reference_input_format = 
-	    EVregister_format_set(cm, in_list, NULL);
-	response->u.transform.reference_output_format = 
-	    EVregister_format_set(cm, out_list, NULL);
+	response->u.transform.reference_input_format = NULL;
+	if (in_list[0].format_name != NULL) 
+	    response->u.transform.reference_input_format = 
+		EVregister_format_set(cm, in_list, NULL);
+	if (out_list[0].format_name != NULL)
+	    response->u.transform.reference_output_format = 
+		EVregister_format_set(cm, out_list, NULL);
 	response->u.transform.output_base_struct_size =
 	    struct_size_field_list(out_list[0].field_list, sizeof(char*));
 	return (void*)response;
@@ -284,7 +287,8 @@ INT_create_transform_action_spec(CMFormatList format_list, CMFormatList out_form
     int format_count = 0;
     int i;
     char *str;
-    while(format_list[format_count].format_name != NULL) format_count++;
+    while(format_list && format_list[format_count].format_name != NULL) 
+	format_count++;
     str = malloc(50);
     sprintf(str, "Transform Action   Input Format Count %d\n", format_count);
 
@@ -343,9 +347,13 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	(int(*)(void *, void*, attr_list))instance->u.transform.code->func;
     if (CMtrace_on(cm, EVerbose)) {
 	printf("Input Transform Event is :\n");
-	dump_limited_unencoded_IOrecord(iofile_of_IOformat(event->reference_format),
-					event->reference_format,
-					event->decoded_event, 10240);
+	if (event->reference_format) {
+	    dump_limited_unencoded_IOrecord(iofile_of_IOformat(event->reference_format),
+					    event->reference_format,
+					    event->decoded_event, 10240);
+	} else {
+	    printf("       ****  UNFORMATTED  ****\n");
+	}
     }
     ret = func(event->decoded_event, out_event, attrs);
     if (ret) {
@@ -436,10 +444,18 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 	}
     }
     formatList[format_count] = NULL;
-    nearest_proto_action = IOformat_compat_cmp2(event->reference_format, 
-						formatList,
-						format_count,
-						&older_format);
+    if (event->reference_format == NULL) {
+	/* special case for unformatted input */
+	int i;
+	for (i=0 ; i < format_count ; i++) {
+	    if (formatList[i] == NULL) nearest_proto_action = i;
+	}
+    } else {
+	nearest_proto_action = IOformat_compat_cmp2(event->reference_format, 
+						    formatList,
+						    format_count,
+						    &older_format);
+    }
     free(formatList);
     if (nearest_proto_action != -1) {
 	if (nearest_proto_action < stone->proto_action_count) {
@@ -609,8 +625,11 @@ IOFormat format;
     switch (mrd->response_type) {
     case Response_Filter:
     case Response_Transform:
-	add_param(parse_context, "input", 0, format);
-
+	if (format) {
+	    add_param(parse_context, "input", 0, format);
+	} else {
+	    ecl_add_param("input", "int", 0, parse_context);
+	}
 	if (mrd->response_type == Response_Transform) {
 	    add_param(parse_context, "output", 1, 
 		      mrd->u.transform.reference_output_format);

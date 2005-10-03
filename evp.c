@@ -397,8 +397,12 @@ static int
 determine_action(CManager cm, stone_type stone, event_item *event, int *sub_id)
 {
     int i;
-    CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %lx (%s)",
+    if (event->reference_format == NULL) {
+	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is NULL");
+    } else {
+	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %lx (%s)",
 	   event->reference_format, name_of_IOformat(event->reference_format));
+    }
     for (i=0; i < stone->action_count; i++) {
 	if ((stone->actions[i].action_type == Action_Immediate) && 
 	    (!event->event_encoded)) {
@@ -412,7 +416,20 @@ determine_action(CManager cm, stone_type stone, event_item *event, int *sub_id)
 	    }
 	}
 	if (stone->actions[i].reference_format == event->reference_format) {
+	    /* 
+	     * if the event is encoded and the action requires decoded data,
+	     * this action won't do.  Scan further for decode action or 
+	     * generate one with response_determination().
+	     */
 	    if (event->event_encoded && stone->actions[i].requires_decoded) {
+		continue;
+	    }
+	    /*
+	     * If the incoming event has no specific format (auto event or 
+	     * other) and we didn't match something more specific above, 
+	     * fall through to response_determination. 
+	     */
+	    if (event->reference_format == NULL) {
 		continue;
 	    }
 	    return i;
@@ -607,8 +624,8 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 	action_id = determine_action(cm, stone, event, &subact);
     }
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Enqueueing event %lx on stone %d, action %lx\n",
-	       (long)event, local_path_id, (long)act);
+	printf("Enqueueing event %lx on stone %d, action %lx, subaction %d\n",
+	       (long)event, local_path_id, (long)act, subact);
 	dump_action(stone, action_id, "    ");
     }
     enqueue_event(cm, local_path_id, action_id, subact, event);
@@ -1117,6 +1134,7 @@ static void
 EVauto_submit_func(CManager cm, void* vstone)
 {
     int stone_num = (long) vstone;
+    CManager_lock(cm);
     event_item *event = get_free_event(cm->evp);
     event->event_encoded = 0;
     event->decoded_event = NULL;
@@ -1128,6 +1146,7 @@ EVauto_submit_func(CManager cm, void* vstone)
     return_event(cm->evp, event);
     while (process_local_actions(cm));
     process_output_actions(cm);
+    CManager_unlock(cm);
 }
 
 extern EVstone
