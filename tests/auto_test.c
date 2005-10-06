@@ -1,4 +1,4 @@
-#include "../config.h"
+#include "config.h"
 
 #include <stdio.h>
 #include <atl.h>
@@ -19,9 +19,6 @@
 #else
 #include <sys/wait.h>
 #endif
-
-#define MSG_COUNT 30
-static int msg_limit = MSG_COUNT;
 
 typedef struct _complex_rec {
     double r;
@@ -53,17 +50,7 @@ typedef struct _simple_rec {
     double double_field;
     char char_field;
     int scan_sum;
-    int vec_count;
-    IOEncodeVector vecs;
 } simple_rec, *simple_rec_ptr;
-
-IOField event_vec_elem_fields[] =
-{
-    {"len", "integer", sizeof(((IOEncodeVector)0)[0].iov_len), 
-     IOOffset(IOEncodeVector, iov_len)},
-    {"elem", "char[len]", sizeof(char), IOOffset(IOEncodeVector,iov_base)},
-    {(char *) 0, (char *) 0, 0, 0}
-};
 
 static IOField simple_field_list[] =
 {
@@ -81,10 +68,6 @@ static IOField simple_field_list[] =
      sizeof(char), IOOffset(simple_rec_ptr, char_field)},
     {"scan_sum", "integer",
      sizeof(int), IOOffset(simple_rec_ptr, scan_sum)},
-    {"vec_count", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, vec_count)},
-    {"vecs", "EventVecElem[vec_count]", sizeof(struct _io_encode_vec), 
-     IOOffset(simple_rec_ptr, vecs)},
     {NULL, NULL, 0, 0}
 };
 
@@ -93,49 +76,10 @@ static CMFormatRec simple_format_list[] =
     {"simple", simple_field_list},
     {"complex", complex_field_list},
     {"nested", nested_field_list},
-    {"EventVecElem", event_vec_elem_fields},
     {NULL, NULL}
 };
 
-static int size = 400;
-static int vecs = 20;
 int quiet = 1;
-
-static
-void 
-generate_record(event)
-simple_rec_ptr event;
-{
-    int i;
-    long sum = 0;
-    event->integer_field = (int) lrand48() % 100;
-    sum += event->integer_field % 100;
-    event->short_field = ((short) lrand48());
-    sum += event->short_field % 100;
-    event->long_field = ((long) lrand48());
-    sum += event->long_field % 100;
-
-    event->nested_field.item.r = drand48();
-    sum += ((int) (event->nested_field.item.r * 100.0)) % 100;
-    event->nested_field.item.i = drand48();
-    sum += ((int) (event->nested_field.item.i * 100.0)) % 100;
-
-    event->double_field = drand48();
-    sum += ((int) (event->double_field * 100.0)) % 100;
-    event->char_field = lrand48() % 128;
-    sum += event->char_field;
-    sum = sum % 100;
-    event->scan_sum = (int) sum;
-    event->vec_count = vecs;
-    event->vecs = malloc(sizeof(event->vecs[0]) * vecs);
-    if (quiet <= 0) printf("Sending %d vecs of size %d\n", vecs, size/vecs);
-    for (i=0; i < vecs; i++) {
-	event->vecs[i].iov_len = size/vecs;
-	event->vecs[i].iov_base = malloc(event->vecs[i].iov_len);
-    }
-}
-
-static int msg_count = 0;
 
 static
 int
@@ -160,9 +104,7 @@ attr_list attrs;
 	printf("Received record checksum does not match. expected %d, got %d\n",
 	       (int) sum, (int) scan_sum);
     }
-    msg_count++;
-    usleep(10000);
-    if ((quiet <= -1) || (sum != scan_sum)) {
+    if ((quiet <= 0) || (sum != scan_sum)) {
 	printf("In the handler, event data is :\n");
 	printf("	integer_field = %d\n", event->integer_field);
 	printf("	short_field = %d\n", event->short_field);
@@ -182,6 +124,31 @@ attr_list attrs;
 static int do_regression_master_test();
 static int regression = 1;
 
+char *ECL_generate = "{\n\
+    static int count = 0;\n\
+    long sum = 0;\n\
+    output.integer_field = (int) lrand48() % 100;\n\
+    sum = sum + output.integer_field % 100;\n\
+    output.short_field = ((short) lrand48());\n\
+    sum = sum + output.short_field % 100;\n\
+    output.long_field = ((long) lrand48());\n\
+    sum = sum + output.long_field % 100;\n\
+\n\
+    output.nested_field.item.r = drand48();\n\
+    sum = sum + ((int) (output.nested_field.item.r * 100.0)) % 100;\n\
+    output.nested_field.item.i = drand48();\n\
+    sum = sum + ((int) (output.nested_field.item.i * 100.0)) % 100;\n\
+\n\
+    output.double_field = drand48();\n\
+    sum = sum + ((int) (output.double_field * 100.0)) % 100;\n\
+    output.char_field = lrand48() % 128;\n\
+    sum = sum + output.char_field;\n\
+    sum = sum % 100;\n\
+    output.scan_sum = (int) sum;\n\
+    count++;\n\
+    return count == 1;\n\
+}";
+
 int
 main(argc, argv)
 int argc;
@@ -189,23 +156,9 @@ char **argv;
 {
     CManager cm;
     int regression_master = 1;
-    int forked = 0;
 
     while (argv[1] && (argv[1][0] == '-')) {
-	if (strcmp(&argv[1][1], "size") == 0) {
-	    if (sscanf(argv[2], "%d", &size) != 1) {
-		printf("Unparseable argument to -size, %s\n", argv[2]);
-	    }
-	    if (vecs == 0) { vecs = 1; printf("vecs not 1\n");}
-	    argv++;
-	    argc--;
-	} else 	if (strcmp(&argv[1][1], "vecs") == 0) {
-	    if (sscanf(argv[2], "%d", &vecs) != 1) {
-		printf("Unparseable argument to -vecs, %s\n", argv[2]);
-	    }
-	    argv++;
-	    argc--;
-	} else if (argv[1][1] == 'c') {
+	if (argv[1][1] == 'c') {
 	    regression_master = 0;
 	} else if (argv[1][1] == 's') {
 	    regression_master = 0;
@@ -228,14 +181,7 @@ char **argv;
 	return do_regression_master_test();
     }
     cm = CManager_create();
-    forked = CMfork_comm_thread(cm);
-    if (quiet <= 0) {
-	if (forked) {
-	    printf("Forked a communication thread\n");
-	} else {
-	    printf("Doing non-threaded communication handling\n");
-	}
-    }
+/*    (void) CMfork_comm_thread(cm);*/
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
@@ -257,7 +203,6 @@ char **argv;
 	contact_list = CMget_contact_list(cm);
 	if (contact_list) {
 	    string_list = attr_list_to_string(contact_list);
-	    free_attr_list(contact_list);
 	} else {
 	    /* must be multicast, hardcode a contact list */
 #define HELLO_PORT 12345
@@ -278,16 +223,14 @@ char **argv;
 	stone = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, stone, simple_format_list, simple_handler, NULL);
 	printf("Contact list \"%d:%s\"\n", stone, string_list);
-	while(msg_count != msg_limit) {
-	    CMsleep(cm, 20);
-	    printf("Received %d messages\n", msg_count);
-	}
+	CMsleep(cm, 120);
     } else {
-	simple_rec_ptr data;
 	attr_list attrs;
-	int i;
 	int remote_stone, stone = 0;
 	EVsource source_handle;
+	char *action_spec = create_transform_action_spec(NULL,simple_format_list,ECL_generate);
+	EVstone auto_stone;
+	EVaction auto_action;
 	if (argc == 2) {
 	    attr_list contact_list;
 	    char *list_str;
@@ -297,19 +240,16 @@ char **argv;
 	    stone = EValloc_stone(cm);
 	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
 	}
-	data = malloc(sizeof(simple_rec));
-	generate_record(data);
+	auto_stone = EValloc_stone (cm);
+	auto_action = EVassoc_immediate_action (cm, auto_stone, action_spec, 0);
+	EVaction_set_output(cm, auto_stone, auto_action, 0, stone);
+	EVenable_auto_stone(cm, auto_stone, 1, 0);
 	attrs = create_attr_list();
 #define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
 	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
 	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
-	source_handle = EVcreate_submit_handle(cm, stone, simple_format_list);
-	for (i=0; i < msg_limit; i++) {
-	    data->integer_field++;
-	    data->long_field--;
-	    EVsubmit(source_handle, data, attrs);
-	}
-	if (quiet <= 0) printf("Write %d messages\n", msg_limit);
+	CMsleep(cm, 3);
+	free_attr_list(attrs);
     }
     CManager_close(cm);
     return 0;
@@ -321,7 +261,7 @@ static void
 fail_and_die(signal)
 int signal;
 {
-    fprintf(stderr, "bulktest failed to complete in reasonable time\n");
+    fprintf(stderr, "EVtest failed to complete in reasonable time\n");
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
     }
@@ -335,26 +275,21 @@ char **args;
 {
 #ifdef HAVE_WINDOWS_H
     int child;
-    child = _spawnv(_P_NOWAIT, "./bulktest.exe", args);
+    child = _spawnv(_P_NOWAIT, "./evtest.exe", args);
     if (child == -1) {
-	printf("failed for bulktest\n");
+	printf("failed for evtest\n");
 	perror("spawnv");
     }
     return child;
 #else
-#if 1
-    pid_t child = fork();
+    pid_t child;
+    if (quiet <=0) {printf("Forking subprocess\n");}
+    child = fork();
     if (child == 0) {
 	/* I'm the child */
-	execv("./bulktest", args);
+	execv("./evtest", args);
     }
     return child;
-#else
-    int count = 0;
-    printf("Would have run \"");
-    while (args[count] != NULL) printf("%s ", args[count++]);
-    printf("\"\n");
-#endif
 #endif
 }
 
@@ -362,17 +297,13 @@ static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"bulktest", "-c", NULL, NULL, NULL, NULL, NULL, NULL};
+    char *args[] = {"evtest", "-c", NULL, NULL};
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
     char *string_list, *transport, *postfix;
-    char size_str[4];
-    char vec_str[4];
-    EVstone handle;
     int message_count = 0;
-    int expected_count = msg_limit;
-    int done = 0;
+    EVstone handle;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
 #else
@@ -418,13 +349,6 @@ do_regression_master_test()
 	string_list = attr_list_to_string(contact_list);
 	free_attr_list(contact_list);
     }	
-    args[2] = "-size";
-    sprintf(&size_str[0], "%d", size);
-    args[3] = size_str;
-    args[4] = "-vecs";
-    sprintf(&vec_str[0], "%d", vecs);
-    args[5] = vec_str;
-    args[6] = malloc(strlen(string_list) + 10);
 
     if (quiet <= 0) {
 	if (forked) {
@@ -437,66 +361,49 @@ do_regression_master_test()
 
     handle = EValloc_stone(cm);
     EVassoc_terminal_action(cm, handle, simple_format_list, simple_handler, &message_count);
-    sprintf(args[6], "%d:%s", handle, string_list);
+    
+    args[2] = string_list;
+    args[2] = malloc(10 + strlen(string_list));
+    sprintf(args[2], "%d:%s", handle, string_list);
     subproc_proc = run_subprocess(args);
 
+    /* give him time to start */
+    CMsleep(cm, 10);
+/* stuff */
     if (quiet <= 0) {
 	printf("Waiting for remote....\n");
     }
-    while (!done) {
 #ifdef HAVE_WINDOWS_H
-	if (_cwait(&exit_state, subproc_proc, 0) == -1) {
-	    perror("cwait");
-	}
-	if (exit_state == 0) {
-	    if (quiet <= 0) 
-		printf("Subproc exitted\n");
+    if (_cwait(&exit_state, subproc_proc, 0) == -1) {
+	perror("cwait");
+    }
+    if (exit_state == 0) {
+	if (quiet <= 0) 
+	    printf("Passed single remote subproc test\n");
+    } else {
+	printf("Single remote subproc exit with status %d\n",
+	       exit_state);
+    }
+#else
+    if (waitpid(subproc_proc, &exit_state, 0) == -1) {
+	perror("waitpid");
+    }
+    if (WIFEXITED(exit_state)) {
+	if (WEXITSTATUS(exit_state) == 0) {
+	    if (quiet <- 1) 
+		printf("Passed single remote subproc test\n");
 	} else {
 	    printf("Single remote subproc exit with status %d\n",
-		   exit_state);
+		   WEXITSTATUS(exit_state));
 	}
-#else
-	int result;
-	if (quiet <= 0) {
-	    printf(",");
-	    fflush(stdout);
-	}
-	CMsleep(cm, 50);	done++;
-
-	result = waitpid(subproc_proc, &exit_state, WNOHANG);
-	if (result == -1) {
-	    perror("waitpid");
-	    done++;
-	}
-	if (result == subproc_proc) {
-	    if (WIFEXITED(exit_state)) {
-		if (WEXITSTATUS(exit_state) == 0) {
-		    if (quiet <= 0) 
-			printf("Subproc exited\n");
-		} else {
-		    printf("Single remote subproc exit with status %d\n",
-			   WEXITSTATUS(exit_state));
-		}
-	    } else if (WIFSIGNALED(exit_state)) {
-		printf("Single remote subproc died with signal %d\n",
-		       WTERMSIG(exit_state));
-	    }
-	    done++;
-	}
+    } else if (WIFSIGNALED(exit_state)) {
+	printf("Single remote subproc died with signal %d\n",
+	       WTERMSIG(exit_state));
     }
 #endif
-    if (msg_count != msg_limit) {
-	int i = 10;
-	while ((i >= 0) && (msg_count != msg_limit)) {
-	    CMsleep(cm, 1);
-	}
-    }
-    free(args[6]);
     free(string_list);
+    EVfree_stone(cm, handle);
     CManager_close(cm);
-    if (message_count != expected_count) {
-	printf ("failure, received %d messages instead of %d\n",
-		message_count, expected_count);
-    }
-    return !(message_count == expected_count);
+    if (message_count != 1) printf("Message count == %d\n", message_count);
+    return !(message_count == 1);
 }
