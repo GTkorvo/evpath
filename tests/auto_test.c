@@ -227,7 +227,6 @@ char **argv;
     } else {
 	attr_list attrs;
 	int remote_stone, stone = 0;
-	EVsource source_handle;
 	char *action_spec = create_transform_action_spec(NULL,simple_format_list,ECL_generate);
 	EVstone auto_stone;
 	EVaction auto_action;
