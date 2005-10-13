@@ -48,6 +48,7 @@ all-local:
 check-local:
 install-exec-local:
 noinst_PROGRAMS = 
+MOSTLYCLEANFILES = cm_interface.c
 endif
 
 

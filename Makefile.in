@@ -252,6 +252,7 @@ include_HEADERS = evpath.h
 AM_CPPFLAGS = 
 noinst_HEADERS = assert.h cm_internal.h  ev_internal.h
 @KERNEL_TRUE@BUILT_SOURCES = env.c kcm.c presym.c
+@KERNEL_FALSE@MOSTLYCLEANFILES = cm_interface.c
 @KERNEL_TRUE@MOSTLYCLEANFILES = cm_module.o
 all: $(BUILT_SOURCES) config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
@@ -403,8 +404,8 @@ install-includeHEADERS: $(include_HEADERS)
 	@list='$(include_HEADERS)'; for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  f=$(am__strip_dir) \
-	  echo " cmp -s $$d$$p $(DESTDIR)$(includedir)/$$f || $(includeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(includedir)/$$f'"; \
-	  cmp -s $$d$$p $(DESTDIR)$(includedir)/$$f || $(includeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(includedir)/$$f"; \
+	  echo " $(includeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(includedir)/$$f'"; \
+	  $(includeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(includedir)/$$f"; \
 	done
 
 uninstall-includeHEADERS:
