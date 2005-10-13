@@ -113,16 +113,19 @@ EOF
 	if (!defined($nolocking{$subr})) {
 	    if (defined($cmanager)) {
 		print INT "\tCManager_lock($cmanager);\n";
-	    } elsif (defined($cmconnection)) {
-		print INT "\tCManager_lock($cmconnection->cm);\n";
-	    } elsif (defined($evsource)) {
-		print INT "\tCManager_lock($evsource->cm);\n";
-	    } elsif (defined($cmtaskhandle)) {
-		print INT "\tCManager_lock($cmtaskhandle->cm);\n";
-	    } elsif (defined($cmformat)) {
-		print INT "\tCManager_lock($cmformat->cm);\n";
 	    } else {
-#		print INT "\tCManager_lock(duh);\n";
+		if (defined($cmconnection)) {
+		    print INT "\tCManager cm = $cmconnection->cm;\n";
+		} elsif (defined($evsource)) {
+		    print INT "\tCManager cm = $evsource->cm;\n";
+		} elsif (defined($cmtaskhandle)) {
+		    print INT "\tCManager cm = $cmtaskhandle->cm;\n";
+		} elsif (defined($cmformat)) {
+		    print INT "\tCManager cm = $cmformat->cm;\n";
+		} else {
+#		    print INT "\tCManager cm = duh;\n";
+		}
+		print INT "\tCManager_lock(cm);\n";
 	    }
 	}
 	if ($return_type{$subr} eq "void") {
@@ -148,16 +151,8 @@ EOF
 	if ((!defined($nolocking{$subr})) && ($subr ne "CManager_close")) {
 	    if (defined($cmanager)) {
 		print INT "\tCManager_unlock($cmanager);\n";
-	    } elsif (defined($cmconnection)) {
-		print INT "\tCManager_unlock($cmconnection->cm);\n";
-	    } elsif (defined($evsource)) {
-		print INT "\tCManager_unlock($evsource->cm);\n";
-	    } elsif (defined($cmtaskhandle)) {
-		print INT "\tCManager_unlock($cmtaskhandle->cm);\n";
-	    } elsif (defined($cmformat)) {
-		print INT "\tCManager_unlock($cmformat->cm);\n";
 	    } else {
-#		print INT "\tCManager_lock(duh);\n";
+		print INT "\tCManager_unlock(cm);\n";
 	    }
 	}
 	print INT "\treturn ret;\n" unless ($return_type{$subr} eq "void");

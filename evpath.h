@@ -163,6 +163,7 @@ typedef void (*CMWriteCallbackFunc) ARGS((CManager cm, CMConnection conn,
  *
  * CManager is the root of control flow and message handling in a CM program.
  */
+/*NOLOCK*/
 extern CManager CManager_create();
 
 /*!
@@ -805,6 +806,7 @@ typedef void (*CMNonCMHandler) ARGS((CMConnection conn,
  * actually implement something like IIOP externally, but it's the thought
  * that counts.
  */
+/*NOLOCK*/
 extern void
 CMregister_non_CM_message_handler ARGS((int header, CMNonCMHandler handler));
 
@@ -816,6 +818,7 @@ CMregister_non_CM_message_handler ARGS((int header, CMNonCMHandler handler));
  *
  * \return returns the pointer to the services structure.
  */
+/*NOLOCK*/
 extern CMtrans_services
 CMget_static_trans_services ARGS(());
 
@@ -1144,6 +1147,7 @@ extern int CMCondition_has_failed ARGS((CManager cm, int condition));
  * \param size the new size
  * \return a pointer to the new block
  */
+/*NOLOCK*/
 extern void* CMrealloc ARGS((void *ptr, int size));
 /*!
  * allocate a chunk of memory
@@ -1151,12 +1155,14 @@ extern void* CMrealloc ARGS((void *ptr, int size));
  * \param size the requested size
  * \return a pointer to the new block
  */
+/*NOLOCK*/
 extern void* CMmalloc ARGS((int size));
 /*!
  * free a chunk of memory
  *
  * \param ptr the memory to free
  */
+/*NOLOCK*/
 extern void CMfree ARGS((void *ptr));
 
 /** @defgroup perf Performance-query functions
@@ -1225,6 +1231,7 @@ CMregressive_probe_bandwidth ARGS((CMConnection conn, int size, attr_list attrs)
 /*!
  * Try to return the IP address of the current host as an integer.
  */
+/*NOLOCK*/
 extern int
 CMget_self_ip_addr();
 /** @defgroup attrs Attributes used in various portions of CM
