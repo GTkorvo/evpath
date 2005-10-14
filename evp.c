@@ -382,6 +382,8 @@ INT_EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num,
     stone = &(cm->evp->stone_map[stone_num]);
     if (act_num > stone->action_count) return 0;
     assert(stone->actions[act_num].action_type == Action_Immediate);
+    CMtrace_out(cm, EVerbose, "Setting output %d on stone %d to local stone %d",
+		output_index, stone_num, output_stone);
     while (stone->actions[act_num].o.imm.output_stone_ids[output_count] != -1) 
 	output_count++;
     stone->actions[act_num].o.imm.output_stone_ids = 
@@ -980,8 +982,6 @@ INT_EVassoc_split_action(CManager cm, EVstone stone_num,
     stone_type stone = &evp->stone_map[stone_num];
     int action_num = stone->action_count;
     int target_count = 0, i;
-    CMtrace_out(cm, EVerbose, "Adding Split action %d to stone %d",
-		action_num, stone_num);
     stone->actions = realloc(stone->actions, 
 				   (action_num + 1) * 
 				   sizeof(stone->actions[0]));
@@ -991,6 +991,14 @@ INT_EVassoc_split_action(CManager cm, EVstone stone_num,
     stone->actions[action_num].queue = stone->queue;
     while (target_stone_list && (target_stone_list[target_count] != -1)) {
 	target_count++;
+    }
+    if (CMtrace_on(cm, EVerbose)) {
+	printf("Adding Split action %d to stone %d, %d target stones -> ",
+		action_num, stone_num, target_count);
+	for (i=0; i < target_count; i++) {
+	    printf("%d, ", target_stone_list[i]);
+	}
+	printf("\n");
     }
     stone->actions[action_num].o.split_stone_targets = 
 	malloc((target_count + 1) * sizeof(EVstone));
@@ -1169,6 +1177,7 @@ INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec,
 					      (void*)(long)stone_num);
     stone_type stone = &cm->evp->stone_map[stone_num];
     stone->periodic_handle = handle;
+    CMtrace_out(cm, EVerbose, "Enabling auto events on stone %d", stone_num);
 }
 
 
@@ -1224,7 +1233,11 @@ return_event(event_path_data evp, event_item *event)
 	/* return event memory */
 	switch (event->contents) {
 	case Event_CM_Owned:
-	    INT_CMreturn_buffer(event->cm, event->decoded_event);
+	    if (event->decoded_event) {
+		INT_CMreturn_buffer(event->cm, event->decoded_event);
+	    } else {
+		INT_CMreturn_buffer(event->cm, event->encoded_event);
+	    }
 	    break;
 	case Event_Freeable:
 	    (event->free_func)(event->decoded_event, event->free_arg);
