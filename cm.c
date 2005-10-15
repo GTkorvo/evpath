@@ -1784,7 +1784,7 @@ void *data;
 	 * their own buffers.  How to support?  Maybe do a copy and 
 	 * return the copy...?
 	 */
-	fprintf(stderr, "Error: INT_CMreturn_buffer called with record %lx not associated with cm\n", data);
+	fprintf(stderr, "Error: INT_CMreturn_buffer called with record %lx not associated with cm\n", (long)data);
     }
 }
 
