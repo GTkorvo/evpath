@@ -2175,9 +2175,15 @@ attr_list attrs;
 	    printf("CM - write attrs NULL\n");
 	}
 	printf("CM - record contents are:\n  ");
-	r = dump_limited_unencoded_IOrecord((IOFile)format->IOsubcontext, 
-					    format->format,
-					    event->decoded_event, dump_char_limit);
+	if (event->decoded_event) {
+	    r = dump_limited_unencoded_IOrecord((IOFile)format->IOsubcontext, 
+						format->format,
+						event->decoded_event, dump_char_limit);
+	} else {
+	    r = dump_limited_encoded_IOrecord((IOFile)format->IOsubcontext, 
+					      format->format,
+					      event->encoded_event, dump_char_limit);
+	}	    
 	if (r && !warned) {
 	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
 	    printf("  To change size limits, set CMDumpSize environment variable.\n\n\n");
