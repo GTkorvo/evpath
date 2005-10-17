@@ -612,8 +612,10 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 		dump_unencoded_IOrecord(iofile_of_IOformat(event->reference_format),
 					event->reference_format,
 					event->decoded_event);
-	    } else {
+	    } else if (event->encoded_event != NULL) {
 		dump_encoded_as_XML(evp->root_context, event->encoded_event);
+	    } else {
+		printf("NULL event\n");
 	    }
 	}
 	dump_stone(stone);
