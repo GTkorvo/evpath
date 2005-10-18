@@ -1352,7 +1352,7 @@ EVPinit(CManager cm)
 {
     cm->evp = INT_CMmalloc(sizeof( struct _event_path_data));
     memset(cm->evp, 0, sizeof( struct _event_path_data));
-    cm->evp->root_context = create_IOcontext();
+    cm->evp->root_context = create_IOsubcontext(cm->IOcontext);
     cm->evp->queue_items_free_list = NULL;
     cm->evp->lock = thr_mutex_alloc();
     internal_add_shutdown_task(cm, free_evp, NULL);
