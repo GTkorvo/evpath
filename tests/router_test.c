@@ -494,15 +494,15 @@ do_regression_master_test()
     CManager_close(cm);
     if (message_counts[0] != 5) {
 	printf("Message count[0] == %d\n", message_counts[0]);
-	return 0;
+	return 1;
     }
     if (message_counts[1] != 3) {
 	printf("Message count[1] == %d\n", message_counts[1]);
-	return 0;
+	return 1;
     }
     if (message_counts[2] != 2) {
 	printf("Message count[2] == %d\n", message_counts[2]);
-	return 0;
+	return 1;
     }
-    return 1;
+    return 0;
 }
