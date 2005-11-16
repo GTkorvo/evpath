@@ -386,13 +386,14 @@ INT_EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num,
     CMtrace_out(cm, EVerbose, "Setting output %d on stone %d to local stone %d",
 		output_index, stone_num, output_stone);
     output_count = stone->actions[act_num].o.imm.output_count;
-    if (output_index > output_count) {
+    if (output_index >= output_count) {
 	stone->actions[act_num].o.imm.output_stone_ids = 
 	    realloc(stone->actions[act_num].o.imm.output_stone_ids,
 		    sizeof(int) * (output_index + 2));
 	for ( ; output_count < output_index; output_count++) {
 	    stone->actions[act_num].o.imm.output_stone_ids[output_count] = -1;
 	}
+	stone->actions[act_num].o.imm.output_count = output_index + 1;
     }
     stone->actions[act_num].o.imm.output_stone_ids[output_index] = output_stone;
     return 1;
