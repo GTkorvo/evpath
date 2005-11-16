@@ -61,6 +61,7 @@ typedef struct immediate_action_struct {
     void *mutable_response_data;
     int subaction_count;
     struct immediate_subaction_struct *subacts;
+    int output_count;
     int *output_stone_ids;
 } immediate_action_vals;
 

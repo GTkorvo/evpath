@@ -31,8 +31,11 @@ extern "C" {
  * A structure to hold Format Name / Field List associations.
  *
  *
- *  This is used to associate names with field lists.  Together these define 
- *  a structure that can be composed into larger structures.
+ *  This is used to associate type names with type descriptions (field lists).
+ *  Together these define structure types that can be composed into larger 
+ *  structures.  A CMFormatList should be the transitive closure of the
+ *  structure types that are included in the first structure type
+ *  (CMFormatList[0]);  The list is terminated with a {NULL, NULL}.
  */
 struct _CMformat_list {
     /*! the name to be associated with this structure */
@@ -48,6 +51,11 @@ struct _CMformat_list {
  *
  *  This is used to associate names with field lists.  Together these define 
  *  a structure that can be composed into larger structures.
+ *  This is used to associate type names with type descriptions (field lists).
+ *  Together these define structure types that can be composed into larger 
+ *  structures.  A CMFormatList should be the transitive closure of the
+ *  structure types that are included in the first structure type
+ *  (CMFormatList[0]);  The list is terminated with a {NULL, NULL}.
  */
 typedef struct _IOformat_list CMFormatRec;
 
@@ -1993,6 +2001,22 @@ extern char *
 create_filter_action_spec(CMFormatList format_list, char *function);
 
 /*!
+ * create an action specification for a router function.
+ *
+ * 
+ * \param format_list A description of the incoming event data that the
+ * router function expects. 
+ * \param function The router function itself.  A negative return value means
+ * that the data should be discarded.  A positive value less than the number
+ * of output values that have been set with EVaction_set_output() indicates
+ * which of the output paths the input data should be submitted to.  Return
+ * values larger than the number of output paths have undefined behaviour.
+ */
+/*NOLOCK*/
+extern char *
+create_router_action_spec(CMFormatList format_list, char *function);
+
+/*!
  * create an action specification that transforms event data.
  *
  * \param format_list A description of the incoming event data that the
@@ -2005,6 +2029,20 @@ create_filter_action_spec(CMFormatList format_list, char *function);
 /*NOLOCK*/
 extern char *
 create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function);
+
+/*!
+ * create an action specification that operates on multiple queues of events
+ *
+ * \param input_format_list A null-terminated list of descriptions of 
+ *  the incoming event data types that the transformation expects. 
+ * \param out_format_list A description of the outgoing event data that the
+ * transformation will produce. 
+ * \param function The processing that will perform the transformation.  A
+ * zero return value means that the output data should be ignored/discarded.
+ */
+/*NOLOCK*/
+extern char *
+create_multiqueued_action_spec(CMFormatList *input_format_lists, char *function);
 
 /*!
  * Print a description of stone status to standard output.
@@ -2028,6 +2066,7 @@ typedef int (*EVImmediateHandlerFunc) ARGS((CManager cm,
 					    struct _event_item *event, 
 					    void *client_data,
 					    attr_list attrs, 
+					    int out_count,
 					    int *out_stones));
 /*!
  * Associate a specific (mutated) immediate handler funcion.

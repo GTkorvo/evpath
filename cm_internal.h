@@ -437,6 +437,8 @@ INT_EVPsubmit(CManager cm, int local_path_id, void *data, IOFormat format);
 extern int INT_CMlisten ARGS((CManager cm));
 extern char *
 INT_create_filter_action_spec(CMFormatList format_list, char *function);
+extern char *
+INT_create_router_action_spec(CMFormatList format_list, char *function);
 extern void
 INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
 		    int period_usec);
@@ -458,6 +460,9 @@ INT_EVPsubmit_encoded(CManager cm, int local_path_id, void *data, int len);
 extern CMFormat INT_CMlookup_format ARGS((CManager cm, IOFieldList field_list));
 extern char *
 INT_create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function);
+extern char *
+INT_create_multiqueued_action_spec(CMFormatList *input_format_lists, char *function);
+
 extern int INT_CMCondition_has_signaled ARGS((CManager cm, int condition));
 extern EVaction
 INT_EVassoc_queued_action(CManager cm, EVstone stone, char *queue_spec, 

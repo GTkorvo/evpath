@@ -20,7 +20,7 @@ static void dump_action(stone_type stone, int a, const char *indent);
 extern void print_server_ID(char *server_id);
 static void dump_stone(stone_type stone);
 
-static const char *action_str[] = { "Action_Output", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Decode", "Action_Split"};
+static const char *action_str[] = { "Action_Output", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Decode", "Action_Split", "Action_Select"};
 
 void
 EVPSubmit_encoded(CManager cm, int local_path_id, void *data, int len)
@@ -203,6 +203,7 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
     stone->actions[action_num].action_type = Action_Immediate;
     stone->actions[action_num].o.imm.subaction_count = 0;
     stone->actions[action_num].o.imm.subacts = NULL;
+    stone->actions[action_num].o.imm.output_count = 0;
     stone->actions[action_num].o.imm.output_stone_ids = malloc(sizeof(int));
     stone->actions[action_num].o.imm.output_stone_ids[0] = -1;
     stone->actions[action_num].o.imm.mutable_response_data = 
@@ -384,13 +385,16 @@ INT_EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num,
     assert(stone->actions[act_num].action_type == Action_Immediate);
     CMtrace_out(cm, EVerbose, "Setting output %d on stone %d to local stone %d",
 		output_index, stone_num, output_stone);
-    while (stone->actions[act_num].o.imm.output_stone_ids[output_count] != -1) 
-	output_count++;
-    stone->actions[act_num].o.imm.output_stone_ids = 
-	realloc(stone->actions[act_num].o.imm.output_stone_ids,
-		sizeof(int) * (output_count + 2));
-    stone->actions[act_num].o.imm.output_stone_ids[output_count] = output_stone;
-    stone->actions[act_num].o.imm.output_stone_ids[output_count+1] = -1;
+    output_count = stone->actions[act_num].o.imm.output_count;
+    if (output_index > output_count) {
+	stone->actions[act_num].o.imm.output_stone_ids = 
+	    realloc(stone->actions[act_num].o.imm.output_stone_ids,
+		    sizeof(int) * (output_index + 2));
+	for ( ; output_count < output_index; output_count++) {
+	    stone->actions[act_num].o.imm.output_stone_ids[output_count] = -1;
+	}
+    }
+    stone->actions[act_num].o.imm.output_stone_ids[output_index] = output_stone;
     return 1;
 }
     
@@ -744,11 +748,13 @@ CManager cm;
 		EVImmediateHandlerFunc func;
 		void *client_data;
 		int *out_stones;
+		int out_count;
 		/* data is already in the right format */
 		func = act->o.imm.subacts[subaction_id].handler;
 		client_data = act->o.imm.subacts[subaction_id].client_data;
 		out_stones = act->o.imm.output_stone_ids;
-		func(cm, event, client_data, event->attrs, out_stones);
+		out_count = act->o.imm.output_count;
+		func(cm, event, client_data, event->attrs, out_count, out_stones);
 		return_event(evp, event);
 		more_pending++;   /* maybe??? */
 		break;

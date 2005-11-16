@@ -10,7 +10,7 @@
 #include "cm_internal.h"
 #include "ecl.h"
 
-typedef enum {Response_Filter, Response_Transform} response_types;
+typedef enum {Response_Filter, Response_Transform, Response_Router, Response_Multiqueued} response_types;
 
 struct terminal_spec {
     CMFormatList format_list;
@@ -36,12 +36,19 @@ struct transform_spec {
     int output_base_struct_size;
 };
 
+struct multiqueued_spec {
+    CMFormatList *struct_list;
+    char *function;
+    void *client_data;
+};
+
 typedef struct response_spec {
     response_types response_type;
     union {
 	struct terminal_spec term;
 	struct filter_spec filter;
 	struct transform_spec transform;
+	struct multiqueued_spec multiqueued;
     }u;
 } *handler_list;
 
@@ -195,6 +202,29 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	    EVregister_format_set(cm, list, NULL);
 	return (void*)response;
     }
+    if (strncmp("Router Action", str, strlen("Router Action")) == 0) {
+	struct response_spec *response = malloc(sizeof(struct response_spec));
+	int format_count, i;
+	char *function;
+	CMFormatList list;
+	str += strlen("Router Action") + 1;
+	sscanf(str, "  Format Count %d\n", &format_count);
+	str = strchr(str, '\n') + 1;
+	list = malloc(sizeof(list[0]) * (format_count + 1));
+	for (i=0; i < format_count; i++) {
+	    str = parse_IOformat_from_string(str, &list[i].format_name,
+					     &list[i].field_list);
+	}
+	function = malloc(strlen(str) + 1);
+	strcpy(function, str);
+	response->response_type = Response_Router;
+	response->u.filter.format_list = list;
+	response->u.filter.function = function;
+	response->u.filter.client_data = local_data;
+	response->u.filter.reference_format = 
+	    EVregister_format_set(cm, list, NULL);
+	return (void*)response;
+    }
     if (strncmp("Transform Action", str, strlen("Transform Action")) == 0) {
 	struct response_spec *response = malloc(sizeof(struct response_spec));
 	int format_count, i;
@@ -240,6 +270,43 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	    struct_size_field_list(out_list[0].field_list, sizeof(char*));
 	return (void*)response;
     }
+    if (strncmp("Multiqueued Action", str, strlen("Multiqueued Action")) == 0) {
+	struct response_spec *response = malloc(sizeof(struct response_spec));
+	int list_count, j;
+	char *function;
+	CMFormatList *struct_list;
+	str += strlen("Multiqueued Action") + 1;
+	sscanf(str, "  List Count %d\n", &list_count);
+	str = strchr(str, '\n') + 1;
+	struct_list = malloc(sizeof(struct_list[0]) * (list_count + 1));
+	for (j = 0; j < list_count; j++) {
+	    int format_count, i;
+	    CMFormatList in_list;
+	    scanf(str, "Next format   Subformat Count %d\n", &format_count);
+
+	    in_list = malloc(sizeof(in_list[0]) * (format_count + 1));
+	    for (i=0; i < format_count; i++) {
+		str = parse_IOformat_from_string(str, &in_list[i].format_name,
+						 &in_list[i].field_list);
+	    }
+	    in_list[format_count].format_name = NULL;
+	    in_list[format_count].field_list = NULL;
+	    struct_list[j] = in_list;
+	}
+	function = malloc(strlen(str) + 1);
+	strcpy(function, str);
+	response->response_type = Response_Multiqueued;
+	response->u.multiqueued.struct_list = struct_list;
+	response->u.multiqueued.function = function;
+	response->u.multiqueued.client_data = local_data;
+/*	response->u.multiqueued.reference_input_format = NULL;
+	if (in_list[0].format_name != NULL) 
+	    response->u.multiqueued.reference_input_format = 
+		EVregister_format_set(cm, in_list, NULL);
+	response->u.multiqueued.output_base_struct_size =
+	struct_size_field_list(out_list[0].field_list, sizeof(char*));*/
+	return (void*)response;
+    }
     printf("Unparsed action : %s\n", str);
     return NULL;
 }
@@ -282,6 +349,25 @@ INT_create_filter_action_spec(CMFormatList format_list, char *function)
 }
 
 char *
+INT_create_router_action_spec(CMFormatList format_list, char *function)
+{
+    int format_count = 0;
+    int i;
+    char *str;
+    while(format_list[format_count].format_name != NULL) format_count++;
+    str = malloc(50);
+    sprintf(str, "Router Action   Format Count %d\n", format_count);
+
+    for (i = 0 ; i < format_count; i++) {
+	str = add_IOfieldlist_to_string(str, format_list[i].format_name,
+					format_list[i].field_list);
+    }
+    str = realloc(str, strlen(str) + strlen(function) + 1);
+    strcpy(&str[strlen(str)], function);
+    return str;
+}
+
+char *
 INT_create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function)
 {
     int format_count = 0;
@@ -311,18 +397,70 @@ INT_create_transform_action_spec(CMFormatList format_list, CMFormatList out_form
     return str;
 }
 
+extern char *
+INT_create_multiqueued_action_spec(CMFormatList *input_format_lists, char *function)
+{
+    int list_count = 0;
+    int l;
+    char *str;
+    while(input_format_lists && input_format_lists[list_count] != NULL) 
+	list_count++;
+
+    str = malloc(50);
+    sprintf(str, "Multiqueued Action   List Count %d\n", list_count);
+
+    for (l = 0; l < list_count; l++) {
+	int format_count = 0, i;
+	CMFormatList format_list = input_format_lists[l];
+	while(format_list && format_list[format_count].format_name != NULL) 
+	    format_count++;
+	str = realloc(str, strlen(str) + 50);
+	sprintf(str + strlen(str), "Next format   Subformat Count %d\n",
+		format_count);
+	for (i = 0 ; i < format_count; i++) {
+	    str = add_IOfieldlist_to_string(str, format_list[i].format_name,
+					    format_list[i].field_list);
+	}
+    }
+
+    str = realloc(str, strlen(str) + strlen(function) + 1);
+    strcpy(&str[strlen(str)], function);
+    return str;
+}
+
 static int
 filter_wrapper(CManager cm, struct _event_item *event, void *client_data,
-	       attr_list attrs, int *out_stones)
+	       attr_list attrs, int out_count, int *out_stones)
 {
     response_instance instance = (response_instance)client_data;
     int ret;
     ret = ((int(*)(void *, attr_list))instance->u.filter.code->func)(event->decoded_event, attrs);
     if (ret) {
-	CMtrace_out(cm, EVerbose, "Filter function returned %d, submitting further\n", ret);
+	CMtrace_out(cm, EVerbose, "Filter function returned %d, submitting further to stone %d\n", ret, out_stones[0]);
 	internal_path_submit(cm, out_stones[0], event);
     } else {
 	CMtrace_out(cm, EVerbose, "Filter function returned %d, NOT submitting\n", ret);
+    }
+    return ret;
+}
+static int
+router_wrapper(CManager cm, struct _event_item *event, void *client_data,
+	       attr_list attrs, int out_count, int *out_stones)
+{
+    response_instance instance = (response_instance)client_data;
+    int ret;
+    ret = ((int(*)(void *, attr_list))instance->u.filter.code->func)(event->decoded_event, attrs);
+    if (ret >= 0) {
+	if (ret >= out_count) {
+	    CMtrace_out(cm, EVerbose, "Router function returned %d, larger than the number of associated outputs\n", ret);
+	} else if (out_stones[ret] == -1) {
+	    CMtrace_out(cm, EVerbose, "Router function returned %d, which has not been set with EVaction_set_output()\n", ret);
+	} else {
+	    CMtrace_out(cm, EVerbose, "Router function returned %d, submitting further to stone %d\n", ret);
+	    internal_path_submit(cm, out_stones[ret], event);
+	}
+    } else {
+	CMtrace_out(cm, EVerbose, "Router function returned %d, NOT submitting\n", ret);
     }
     return ret;
 }
@@ -338,7 +476,7 @@ transform_free_wrapper(void *data, void *free_data)
 
 static int
 transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
-		  attr_list attrs, int *out_stones)
+		  attr_list attrs, int out_count, int *out_stones)
 {
     response_instance instance = (response_instance)client_data;
     int ret;
@@ -406,9 +544,15 @@ dump_mrd(void *mrdv)
 	printf("Reponse Filter, code is %s\n",
 	       mrd->u.filter.function);
 	break;
+    case Response_Router:
+	printf("Reponse Router, code is %s\n",
+	       mrd->u.filter.function);
+	break;
     case Response_Transform:
 	printf("Reponse Transform, code is %s\n",
 	       mrd->u.transform.function);
+	break;
+    case Response_Multiqueued:
 	break;
     }
 }
@@ -435,10 +579,13 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 		stone->actions[i].o.imm.mutable_response_data;
 	    switch(mrd->response_type) {
 	    case Response_Filter:
+	    case Response_Router:
 		formatList[format_count++] = mrd->u.filter.reference_format;
 		break;
 	    case Response_Transform:
 		formatList[format_count++] = mrd->u.transform.reference_input_format;
+		break;
+	    case Response_Multiqueued:
 		break;
 	    }
 	}
@@ -473,6 +620,7 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 				stone->actions[i].o.imm.mutable_response_data;
 			    switch(mrd->response_type) {
 			    case Response_Filter:
+			    case Response_Router:
 				if (event->event_encoded) {
 				    conversion_target_format = 
 					localize_format(cm, event->reference_format);
@@ -482,6 +630,8 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 				break;
 			    case Response_Transform:
 				conversion_target_format = mrd->u.transform.reference_input_format;
+				break;
+			    case Response_Multiqueued:
 				break;
 			    }
 			    action_num = i;
@@ -497,10 +647,19 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 		    INT_EVassoc_mutated_imm_action(cm, stone->local_id, action_num, 
 					       filter_wrapper, instance, 
 					       conversion_target_format);
+		    break;
+		case Response_Router:
+		    INT_EVassoc_mutated_imm_action(cm, stone->local_id, action_num, 
+					       router_wrapper, instance, 
+					       conversion_target_format);
+		    break;
 		case Response_Transform:
 		    INT_EVassoc_mutated_imm_action(cm, stone->local_id, action_num, 
 					       transform_wrapper, instance, 
 					       conversion_target_format);
+		    break;
+		case Response_Multiqueued:
+		    break;
 		}
 
 		return_value = 1;
@@ -624,6 +783,7 @@ IOFormat format;
 
     switch (mrd->response_type) {
     case Response_Filter:
+    case Response_Router:
     case Response_Transform:
 	if (format) {
 	    add_param(parse_context, "input", 0, format);
@@ -634,6 +794,9 @@ IOFormat format;
 	    add_param(parse_context, "output", 1, 
 		      mrd->u.transform.reference_output_format);
 	}
+	break;
+    case Response_Multiqueued:
+	break;
     }
 	    
 /*    conn_info_data_type = ecl_build_type_node("output_conn_info_type",
@@ -647,8 +810,9 @@ IOFormat format;
 */
     switch(mrd->response_type) {
     case Response_Filter:
+    case Response_Router:
 	code = ecl_code_gen(mrd->u.filter.function, parse_context);
-	instance->response_type = Response_Filter;
+	instance->response_type = mrd->response_type;
 	instance->u.filter.code = code;
 	break;
     case Response_Transform:
@@ -659,6 +823,8 @@ IOFormat format;
 	    mrd->u.transform.output_base_struct_size;
 	instance->u.transform.out_format = 
 	    mrd->u.transform.reference_output_format;
+	break;
+    case Response_Multiqueued:
 	break;
     }
     ecl_free_parse_context(parse_context);
