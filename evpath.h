@@ -1,7 +1,7 @@
 
 
-#ifndef __CM__H__
-#define __CM__H__
+#ifndef __EVPATH__H__
+#define __EVPATH__H__
 /*! \file */
 
 #if defined(FUNCPROTO) || defined(__STDC__) || defined(__cplusplus) || defined(c_plusplus)
