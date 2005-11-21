@@ -514,4 +514,9 @@ extern int INT_CMConnection_write_would_block ARGS((CMConnection conn));
 extern void INT_CMusleep ARGS((CManager cm, int usecs));
 extern void INT_CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
 extern void INT_CM_fd_add_select ARGS((CManager cm, int fd, select_func handler_func, void *param1, void *param2));
+extern int INT_EVfreeze_stone(CManager cm, EVstone stone_id);
+extern int INT_EVdrain_stone(CManager cm, EVstone stone_id);
+extern char* INT_EVextract_stone_events(CManager cm, EVstone stone_id);
+extern attr_list INT_EVextract_attr_list(CManager cm, EVstone stone_id);
+extern int INT_EVdestroy_stone(CManager cm, EVstone stone_id);
 

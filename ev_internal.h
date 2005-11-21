@@ -112,6 +112,10 @@ typedef struct _stone {
     int local_id;
     int default_action;
     int proto_action_count;
+    int is_frozen;
+    int is_processing;
+    int is_outputting;
+    int is_draining;
     queue_ptr queue;
     struct _proto_action *proto_actions;
     int action_count;
@@ -157,3 +161,4 @@ extern EVstone INT_EVcreate_terminal_action(CManager cm, CMFormatList format_lis
 extern EVstone INT_EVcreate_auto_stone(CManager cm, int period_sec, 
 				       int period_usec, char *action_spec, 
 				       EVstone out_stone);
+extern char* extract_events_from_queue(CManager cm, queue_ptr que);

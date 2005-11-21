@@ -50,6 +50,10 @@ INT_EValloc_stone(CManager cm)
     memset(stone, 0, sizeof(*stone));
     stone->local_id = stone_num;
     stone->default_action = -1;
+    stone->is_frozen = 0;
+    stone->is_processing = 0;
+    stone->is_outputting = 0;
+    stone->is_draining = 0;
     stone->queue = malloc(sizeof(queue_struct));
     stone->queue->queue_tail = stone->queue->queue_head = NULL;
     stone->proto_actions = NULL;
@@ -680,6 +684,7 @@ CManager cm;
 {
     event_path_data evp = cm->evp;
     int s, a, more_pending = 0;
+    stone_type stone = NULL;
     CMtrace_out(cm, EVerbose, "Process local actions");
     for (s = 0; s < evp->stone_count; s++) {
 	if (evp->stone_map[s].local_id == -1) continue;
@@ -688,6 +693,10 @@ CManager cm;
 	    event_item *event = dequeue_event(cm, evp->stone_map[s].queue, 
 					      &action_id, &subaction_id);
 	    action *act = &evp->stone_map[s].actions[action_id];
+	    stone = &(evp->stone_map[s]);
+	    stone->is_processing = 1;
+	    if(stone->is_draining == 0)
+	    {
 #ifdef NOTDEF
 	    if (act->action_type == Action_Decode) {
 		CMtrace_out(cm, EVerbose, "Decoding event  %lx, stone %d, act %d",
@@ -764,6 +773,7 @@ CManager cm;
 		assert(FALSE);
 	    }
 	}
+	}
 
 	for (a=0 ; a < evp->stone_map[s].action_count; a++) {
 	    action *act = &evp->stone_map[s].actions[a];
@@ -831,6 +841,7 @@ CManager cm;
 		}
 	    }
 	}
+	stone->is_processing = 0;
     }
     return more_pending;
 }
@@ -866,9 +877,18 @@ process_output_actions(CManager cm)
 {
     event_path_data evp = cm->evp;
     int s, a;
+    int stone_is_frozen = 0;
+    stone_type stone = NULL;
     CMtrace_out(cm, EVerbose, "Process output actions");
     for (s = 0; s < evp->stone_count; s++) {
 	for (a=0 ; a < evp->stone_map[s].action_count; a++) {
+	    stone = &evp->stone_map[s];
+	    if (stone->is_frozen == 1)
+	    {
+	        stone_is_frozen = 1;
+	        break;
+  	    }		
+	    stone->is_outputting = 1;
 	    action *act = &evp->stone_map[s].actions[a];
 	    if ((act->action_type == Action_Output) && 
 		(act->queue->queue_head != NULL)) {
@@ -903,8 +923,11 @@ process_output_actions(CManager cm)
 		    act->o.out.conn = NULL;
 		}
 	    }
+	    stone->is_outputting = 0;
 	}
-    }	    
+    }
+    if(stone_is_frozen)     
+        printf("This stone is frozen temporarily. Output actions will be performed later ... \n ");	    
     return 1;
 }
 
@@ -1442,4 +1465,156 @@ extern IOFormat
 INT_EVget_src_ref_format(EVsource source)
 {
     return source->reference_format;
+}
+
+extern int
+INT_EVfreeze_stone(CManager cm, EVstone stone_id)
+{
+	event_path_data evp = cm->evp;
+	stone_type stone;
+      if (evp->stone_count < stone_id) {
+        return -1;
+      }
+      stone = &(evp->stone_map[stone_id]);
+	stone->is_frozen = 1;
+      return 1;	
+}
+
+extern int
+INT_EVdrain_stone(CManager cm, EVstone stone_id)
+{
+      event_path_data evp = cm->evp;
+      stone_type stone;
+      attr_list stone_attrs;
+      char *event_list;
+      if (evp->stone_count < stone_id) {
+        return -1;
+      }
+      stone = &(evp->stone_map[stone_id]);
+      stone->is_draining = 1;
+      while(stone->is_processing || stone->is_outputting);
+      event_list = EVextract_stone_events(cm, stone_id);
+      stone_attrs = EVextract_attr_list(cm, stone_id); 
+      stone->is_draining = 2;
+      return 1;
+}
+
+extern char*
+INT_EVextract_stone_events(CManager cm, EVstone stone_id)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone;
+    int a;
+    char *stone_event_list = NULL, *action_event_list = NULL, *final_event_list = NULL;
+    /*if (evp->stone_count < stone_id) {
+        return -1;
+    }*/
+    stone = &(evp->stone_map[stone_id]);
+    stone_event_list = extract_events_from_queue(cm, stone->queue);
+    for (a=0 ; a < evp->stone_map[stone_id].action_count; a++) {
+        action *act = &evp->stone_map[stone_id].actions[a];
+        if (act->queue != stone->queue) {
+            /* this action has it's own separate queue */
+            action_event_list = extract_events_from_queue(cm, act->queue);
+        }
+    }
+    final_event_list = NULL;
+    final_event_list = strcat(stone_event_list, action_event_list);
+    return final_event_list;
+}
+
+extern attr_list
+INT_EVextract_attr_list(CManager cm, EVstone stone_id)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone;
+    /*if (evp->stone_count < stone_id) {
+        return -1;
+    }*/
+    stone = &(evp->stone_map[stone_id]);
+    return(stone->stone_attrs);
+}
+
+char*
+extract_events_from_queue(CManager cm, queue_ptr que)
+{
+    char *event_list = NULL, *temp_arr = NULL;
+    int first_event_entered = 0;
+    int temp, current_size = 0;
+    int *ptr_to_temp = &temp;
+    int *ptr_to_size = NULL;
+    char end = '\0';
+    char *ptr_to_end = &end;
+    //IOContext ioContext;
+    event_path_data evp = cm->evp;
+    IOBuffer ioBuffer;
+    
+        
+    while(1)
+    {
+        if(que->queue_head->item->event_encoded)
+	{
+	    temp =  que->queue_head->item->event_len;
+	    if(first_event_entered == 0)
+	    {
+	        event_list = malloc(temp + sizeof(int));
+		memcpy(event_list, ptr_to_temp, sizeof(int));
+	        memcpy(event_list + sizeof(int), que->queue_head->item->encoded_event, temp);
+		current_size = current_size + temp + sizeof(int);
+		first_event_entered = 1;
+	    }
+	    else
+	    {
+	    	event_list = realloc (event_list, current_size + temp + sizeof(int));
+		memcpy(event_list + current_size, ptr_to_temp, sizeof(int));
+	        memcpy(event_list + current_size + sizeof(int), que->queue_head->item->encoded_event, temp);
+		current_size = current_size + temp + sizeof(int);
+	    }		
+	}    
+	     
+        else
+	{
+	   /* use pbio encode and return event */ 
+	   //ioContext = create_IOContext();
+	   IOContext ioContext = create_IOsubcontext(evp->root_context);
+	   ioBuffer = create_IOBuffer();
+	   temp_arr =  encode_IOcontext_bufferB (ioContext, que->queue_head->item->reference_format, ioBuffer, que->queue_head->item->decoded_event, ptr_to_size);
+	   if(first_event_entered == 0)
+	   {
+	       event_list = malloc(*ptr_to_size + sizeof(int));
+	       memcpy(event_list, ptr_to_size, sizeof(int));
+	       memcpy(event_list + sizeof(int), temp_arr, *ptr_to_size);
+	       current_size = current_size + *ptr_to_size + sizeof(int);
+	       first_event_entered = 1;
+	   }
+	   else
+	   {
+	       event_list = realloc(event_list, current_size + *ptr_to_size + sizeof(int));
+	       memcpy(event_list + current_size, ptr_to_size, sizeof(int));
+	       memcpy(event_list + current_size + sizeof(int), temp_arr, *ptr_to_size);
+	       current_size = current_size + *ptr_to_size + sizeof(int);
+	   }    
+        }
+	if(que->queue_head == que->queue_tail)
+	    break;
+	else
+	    que->queue_head = que->queue_head->next;
+    }
+    event_list = realloc(event_list, current_size + sizeof(char));
+    memcpy(event_list + current_size, ptr_to_end, sizeof(char));
+    return event_list;
+}
+
+extern int
+INT_EVdestroy_stone(CManager cm, EVstone stone_id)
+{
+	event_path_data evp = cm->evp;
+	stone_type stone;
+        if (evp->stone_count < stone_id) {
+            return -1;
+        }
+        stone = &(evp->stone_map[stone_id]);
+	while (stone->is_draining == 2);
+	      INT_EVfree_stone(cm, stone_id);  
+	return 1;      
 }
