@@ -24,6 +24,7 @@ typedef struct _event_item {
     void *decoded_event;
     IOEncodeVector encoded_eventv;
     IOFormat reference_format;
+    IOBuffer ioBuffer;
     CMFormat format;
     attr_list attrs;
 
@@ -145,6 +146,7 @@ struct _EVSource {
     void *free_data;
 };
 
+
 extern void EVPinit(CManager cm);
 extern IOFormat
 EVregister_format_set(CManager cm, CMFormatList list, IOContext *context_ptr);
@@ -161,4 +163,4 @@ extern EVstone INT_EVcreate_terminal_action(CManager cm, CMFormatList format_lis
 extern EVstone INT_EVcreate_auto_stone(CManager cm, int period_sec, 
 				       int period_usec, char *action_spec, 
 				       EVstone out_stone);
-extern char* extract_events_from_queue(CManager cm, queue_ptr que);
+extern buffer_list extract_events_from_queue(CManager cm, queue_ptr que, int *sizeof_buflist);
