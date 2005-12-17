@@ -161,6 +161,11 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
     struct hostent *host = NULL;
 
     char *network_string = cercs_getenv("CM_NETWORK");
+    char *hostname_string = cercs_getenv("CERCS_HOSTNAME");
+    if (hostname_string != NULL) {
+	strncpy(buf, hostname_string, len);
+	return;
+    }
     gethostname(buf, len);
     buf[len - 1] = '\0';
     if (memchr(buf, '.', strlen(buf)) == NULL) {
