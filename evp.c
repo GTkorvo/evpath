@@ -775,7 +775,6 @@ CManager cm;
 	}
 	
 	for (a=0 ; a < evp->stone_map[s].action_count && evp->stone_map[s].is_draining == 0; a++) {
-	for (a=0 ; a < evp->stone_map[s].action_count; a++) {
 
 	    action *act = &evp->stone_map[s].actions[a];
 	    if (act->queue->queue_head != NULL) {
@@ -841,7 +840,6 @@ CManager cm;
 		  break;
 		}
 	    }
-	}
         }
         evp->stone_map[s].is_processing = 0;
     }
@@ -1554,10 +1552,7 @@ extract_events_from_queue(CManager cm, queue_ptr que, int *sizeof_buflist)
 {
     buffer_list buf_list = NULL, current_entry = NULL;
     queue_item *first = NULL, *last = NULL;
-    void *temp_arr = NULL;
-    int *ptr_to_size = NULL;
     event_path_data evp = cm->evp;
-    int size_buf_entry = sizeof(int) + sizeof(void*);
     int num_of_elements = 0;
     
     first = que->queue_head;
@@ -1565,40 +1560,31 @@ extract_events_from_queue(CManager cm, queue_ptr que, int *sizeof_buflist)
                 
     while(first != NULL && last != NULL) {
         if(num_of_elements == 0) {
-	    buf_list = (buffer_list) malloc(size_buf_entry);
+	    buf_list = (buffer_list) malloc(sizeof(buf_list[0]));
         } else {
-	    buf_list = (buffer_list) realloc (buf_list, (num_of_elements + 1) * size_buf_entry);
+	    buf_list = (buffer_list) realloc (buf_list, (num_of_elements + 1) * sizeof(buf_list[0]));
 	}
         if(buf_list == NULL) {
 	    printf("Could not allocate memory. \n");
 	    exit(1);
 	}
-	current_entry = buf_list + (num_of_elements * size_buf_entry);
+	current_entry = &buf_list[num_of_elements];
 	if(first->item->event_encoded) {
 	    current_entry->length = first->item->event_len;
 	    current_entry->buffer = first->item->encoded_event;
 	} else {
             IOContext ioContext = create_IOsubcontext(evp->root_context);
+	    int size;
+	    void *temp_arr;
 	    first->item->ioBuffer = create_IOBuffer();
-	    temp_arr = (void*) encode_IOcontext_bufferB (ioContext, first->item->reference_format, first->item->ioBuffer, first->item->decoded_event, ptr_to_size);
-	    current_entry->length = *ptr_to_size;
+	    temp_arr = (void*) encode_IOcontext_bufferB (ioContext, first->item->reference_format, first->item->ioBuffer, first->item->decoded_event, &size);
+	    current_entry->length = size;
 	    current_entry->buffer = temp_arr;
-	    free(first->item->ioBuffer);
 	}
 	num_of_elements++;
-	if(first == last) {
-	    first = NULL;
-	    last = NULL;
-	} else {
-	    first = first->next;
-	}    
+	first = first->next;
     }
-    *sizeof_buflist = num_of_elements * size_buf_entry;
-    free(first);
-    free(last);    
-    free(ptr_to_size);
-    free(current_entry);
-    free(temp_arr);
+    *sizeof_buflist = num_of_elements * sizeof(buf_list[0]);
     return buf_list;
 }
 
