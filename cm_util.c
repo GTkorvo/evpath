@@ -26,7 +26,7 @@
 extern int vfprintf();
 
 
-int trace_val[CMLastTraceType] = {-1, -1, -1, -1, -1, -1, -1};
+int trace_val[CMLastTraceType] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 extern void CMprint_version();
 
@@ -35,7 +35,9 @@ CMtrace_on(CManager cm, CMTraceType trace_type)
 {
     if (trace_val[0] == -1) {
 	int i, trace = 0;
+	char *str;
 	trace_val[0] = 0;
+	trace_val[EVWarning] = 1;  /* default on */
 	trace_val[CMControlVerbose] = (cercs_getenv("CMControlVerbose") != NULL);
 	trace_val[CMConnectionVerbose] = (cercs_getenv("CMConnectionVerbose") != NULL);
 	trace_val[CMDataVerbose] = (cercs_getenv("CMDataVerbose") != NULL);
@@ -44,6 +46,9 @@ CMtrace_on(CManager cm, CMTraceType trace_type)
 	trace_val[CMFreeVerbose] = (cercs_getenv("CMFreeVerbose") != NULL);
 	trace_val[CMAttrVerbose] = (cercs_getenv("CMAttrVerbose") != NULL);
 	trace_val[EVerbose] = (cercs_getenv("EVerbose") != NULL);
+	if ((str = cercs_getenv("EVWarning")) != NULL) {
+	    sscanf(str, "%d", &trace_val[EVWarning]);
+	}
 	if (cercs_getenv("CMVerbose") != NULL) {
 	    int i;
 	    for (i=0; i<CMLastTraceType; i++)
@@ -52,7 +57,7 @@ CMtrace_on(CManager cm, CMTraceType trace_type)
 	/* for low level verbose, value overrides general CMVerbose */
 	trace_val[CMLowLevelVerbose] = (cercs_getenv("CMLowLevelVerbose") != NULL);
 	for (i = 0; i < sizeof(trace_val)/sizeof(trace_val[0]); i++) {
-	    trace |= trace_val[i];
+	    if (i!=EVWarning) trace |= trace_val[i];
 	}
 	if (trace != 0) {
 	    CMprint_version();

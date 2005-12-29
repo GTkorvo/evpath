@@ -40,6 +40,7 @@ struct multiqueued_spec {
     CMFormatList *struct_list;
     char *function;
     void *client_data;
+    IOFormat *reference_input_format_list;
 };
 
 typedef struct response_spec {

@@ -50,6 +50,8 @@ INT_EValloc_stone(CManager cm)
     memset(stone, 0, sizeof(*stone));
     stone->local_id = stone_num;
     stone->default_action = -1;
+    stone->no_action_count = 0;
+    stone->no_action_list = NULL;
     stone->is_frozen = 0;
     stone->is_processing = 0;
     stone->is_outputting = 0;
@@ -106,6 +108,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
     }
     free(stone->queue);
     free(stone->actions);
+    if (stone->no_action_list) free(stone->no_action_list);
     free(stone->proto_actions);
     stone->queue = NULL;
     stone->local_id = -1;
@@ -446,6 +449,11 @@ determine_action(CManager cm, stone_type stone, event_item *event, int *sub_id)
 	    return i;
 	}
     }
+    for (i= 0; i < stone->no_action_count; i++) {
+	if (stone->no_action_list[i] == event->reference_format) {
+	    return -1;
+	}
+    }
     if (response_determination(cm, stone, event) == 1) {
 	return determine_action(cm, stone, event, sub_id);
     }
@@ -454,6 +462,24 @@ determine_action(CManager cm, stone_type stone, event_item *event, int *sub_id)
 	    dump_action(stone, stone->default_action, "   ");*/
 	return stone->default_action;
     }
+    /* 
+     * there was no action for this event, install a dummy so we 
+     * don't search again.
+     */
+    if (stone->no_action_count == 0) {
+	stone->no_action_list = malloc(sizeof(stone->no_action_list[0]));
+    } else {
+	stone->no_action_list = 
+	    realloc(stone->no_action_list,
+		    (stone->no_action_count + 1) * sizeof(stone->no_action_list[0]));
+    }
+    if (CMtrace_on(cm, EVWarning)) {
+	printf("Warning!  No action found for incoming event on stone %d\n",
+	       stone->local_id);
+	dump_stone(stone);
+    }
+    stone->no_action_list[stone->no_action_count++] = event->reference_format;
+	
     return -1;
 }
 
@@ -505,24 +531,25 @@ static void
 dump_proto_action(stone_type stone, int a, const char *indent)
 {
     proto_action *proto = &stone->proto_actions[a];
-    printf("Proto-Action %d - %s\n", a, action_str[proto->action_type]);
+    printf(" Proto-Action %d - %s\n", a, action_str[proto->action_type]);
 }
 
 static void
 dump_action(stone_type stone, int a, const char *indent)
 {
     action *act = &stone->actions[a];
-    printf("Action %d - %s  ", a, action_str[act->action_type]);
+    printf(" Action %d - %s  ", a, action_str[act->action_type]);
     if (act->requires_decoded) {
 	printf("requires decoded\n");
     } else {
 	printf("accepts encoded\n");
     }
-    printf("  reference format :");
+    printf("  expects format ");
     if (act->reference_format) {
 	int id_len;
-	printf("\"%s\" ", name_of_IOformat(act->reference_format));
-	print_server_ID(get_server_ID_IOformat(act->reference_format, &id_len));
+	char *tmp;
+	printf("\"%s\" ", tmp = global_name_of_IOformat(act->reference_format));
+	free(tmp);
     } else {
 	printf(" NULL\n");
     }
@@ -561,8 +588,9 @@ dump_action(stone_type stone, int a, const char *indent)
 	{
 	    int i = 0;
 	    for (i=0; i < act->o.imm.subaction_count; i++) {
-		printf("      Subaction %d, ref_format %lx, handler %lx\n",
-		       i, (long)act->o.imm.subacts[i].reference_format,
+		char *tmp = global_name_of_IOformat(act->o.imm.subacts[i].reference_format);
+		printf("      Subaction %d, ref_format %s1, handler %lx\n",
+		       i, tmp,
 		       (long)act->o.imm.subacts[i].handler);
 	    }
 	    printf("\n");
@@ -575,8 +603,8 @@ static void
 dump_stone(stone_type stone)
 {
     int i;
-    printf("Stone %lx, local ID %d, default action %d\n",
-	   (long)stone, stone->local_id, stone->default_action);
+    printf("Dump stone ID %d, local addr %lx, default action %d\n",
+	   stone->local_id, (long)stone, stone->default_action);
     printf("  proto_action_count %d:\n", stone->proto_action_count);
     for (i=0; i< stone->proto_action_count; i++) {
 	dump_proto_action(stone, i, "    ");
@@ -612,22 +640,20 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     stone = &(evp->stone_map[local_path_id]);
     action_id = determine_action(cm, stone, event, &subact);
     if (action_id ==  -1) {
+	char *tmp = global_name_of_IOformat(event->reference_format);
 	printf("No action found for event %lx submitted to stone %d\n",
 	       (long)event, local_path_id);
-	if ((stone->actions && 
-	     (stone->actions[0].action_type == Action_Terminal)) ||
-	    CMtrace_on(cm, EVerbose)) {
-	    if (event->decoded_event != NULL) {
-		dump_unencoded_IOrecord(iofile_of_IOformat(event->reference_format),
-					event->reference_format,
-					event->decoded_event);
-	    } else if (event->encoded_event != NULL) {
-		dump_encoded_as_XML(evp->root_context, event->encoded_event);
-	    } else {
-		printf("NULL event\n");
+	if (tmp != NULL) {
+	    static int first = 1;
+	    printf("    Unhandled incoming event format was \"%s\"\n", tmp);
+	    if (first) {
+		first = 0;
+		printf("\n\t** use \"format_info <format_name>\" to get full format information ** \n\n");
 	    }
+	} else {
+	    printf("    Unhandled incoming event format was NULL\n", tmp);
 	}
-	dump_stone(stone);
+	free(tmp);
 	return 0;
     }
     act = &stone->actions[action_id];
@@ -963,11 +989,15 @@ INT_EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list
     CMConnection conn = INT_CMget_conn(cm, contact_list);
 
     if (conn == NULL) {
-	printf("INT_EVassoc_output_action - failed to contact host at contact point \n\t");
-	if (contact_list != NULL) {
-	    dump_attr_list(contact_list);
-	} else {
-	    printf("NULL\n");
+	if (CMtrace_on(cm, EVWarning)) {
+	    printf("EVassoc_output_action - failed to contact host at contact point \n\t");
+	    if (contact_list != NULL) {
+		dump_attr_list(contact_list);
+	    } else {
+		printf("NULL\n");
+	    }
+	    printf("Output action association failed for stone %d, outputting to remote stone %d\n",
+		   stone_num, remote_stone);
 	}
 	return -1;
     }
@@ -1608,6 +1638,7 @@ INT_EVdestroy_stone(CManager cm, EVstone stone_id)
 	else
 	    stone->queue->queue_head = stone->queue->queue_head->next;
     }    
+    if (stone->no_action_list) free(stone->no_action_list);
     INT_EVfree_stone(cm, stone_id);  
     return 1;      
 } 

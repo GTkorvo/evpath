@@ -35,7 +35,7 @@ typedef struct _event_item {
     EVFreeFunction free_func;
 } event_item, *event_queue;
 
-typedef enum { Action_Output = 0, Action_Terminal, Action_Filter, Action_Immediate, Action_Decode, Action_Split} action_value;
+typedef enum { Action_Output = 0, Action_Terminal, Action_Filter, Action_Immediate, Action_Decode, Action_Split, Action_NoAction} action_value;
 
 typedef struct output_action_struct {
     CMConnection conn;
@@ -117,6 +117,8 @@ typedef struct _stone {
     int is_processing;
     int is_outputting;
     int is_draining;
+    int no_action_count;
+    IOFormat *no_action_list;
     queue_ptr queue;
     struct _proto_action *proto_actions;
     int action_count;
