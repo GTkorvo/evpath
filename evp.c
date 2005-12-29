@@ -546,7 +546,6 @@ dump_action(stone_type stone, int a, const char *indent)
     }
     printf("  expects format ");
     if (act->reference_format) {
-	int id_len;
 	char *tmp;
 	printf("\"%s\" ", tmp = global_name_of_IOformat(act->reference_format));
 	free(tmp);
@@ -651,7 +650,7 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 		printf("\n\t** use \"format_info <format_name>\" to get full format information ** \n\n");
 	    }
 	} else {
-	    printf("    Unhandled incoming event format was NULL\n", tmp);
+	    printf("    Unhandled incoming event format was NULL\n");
 	}
 	free(tmp);
 	return 0;
