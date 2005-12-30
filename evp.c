@@ -936,6 +936,10 @@ process_output_actions(CManager cm)
 		}
 		return_event(evp, event);
 		if (ret == 0) {
+		    if (CMtrace_on(cm, EVWarning)) {
+			printf("Warning!  Write failed for output action %d on stone %d, event likely not transmitted\n", a, s);
+			printf("   -  Output Stone %d disabled\n", s);
+		    }
 		    if (act->o.out.conn != NULL) 
 			INT_CMConnection_close(act->o.out.conn);
 		    act->o.out.conn_failed = 1;
