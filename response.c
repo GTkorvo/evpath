@@ -509,6 +509,7 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	s.reference_format = instance->u.transform.out_format;
 	s.free_func = transform_free_wrapper;
 	s.free_data = instance;
+	s.preencoded = 0;
 	INT_EVsubmit(&s, out_event, NULL);
     } else {
 	CMtrace_out(cm, EVerbose, "Filter function returned %d, NOT submitting\n", ret);

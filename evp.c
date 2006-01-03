@@ -489,12 +489,73 @@ determine_action(CManager cm, stone_type stone, event_item *event, int *sub_id)
  *   situations covered, try to keep both encoded and decoded versions of
  *   events where possible.  Try to augment testing because many cases are
  *   not covered in homogeneous regression testing (our normal mode).
+
+ *   Possible event situations:
+ *  Event_CM_Owned:   This is an event that came in from the network, so CM 
+ *     owns the buffer that it lives in.   The event maybe encoded or decoded, 
+ *     but whatever the situation, we need to do INT_CMreturn_buffer() to 
+ *     free it.   ioBuffer should be NULL;  The 'cm' value tells us where to 
+ *     do cmreturn_buffer() .
+ *  Event_Freeable:   This is an event that came from a higher-level and 
+ *     is provided with a free() routine that we should call when we are 
+ *     finished with it.  We are free to return control the the application 
+ *     while still retaining the event as long as we later call the free 
+ *     routine. 
+ *  Event_App_Owned:  This is an event that came from a higher-level and 
+ *     is *NOT* provided with a free() routine.  We should not return 
+ *     until we are done processing it..
  */
+
+static event_item *
+get_free_event(event_path_data evp)
+{
+    event_item *event = malloc(sizeof(*event));
+    memset(event, 0, sizeof(event_item));
+    event->ref_count = 1;
+    event->event_len = -1;
+    event->ioBuffer = NULL;
+    return event;
+}
+
+static void
+return_event(event_path_data evp, event_item *event)
+{
+    event->ref_count--;
+    if (event->ref_count == 0) {
+	/* return event memory */
+	switch (event->contents) {
+	case Event_CM_Owned:
+	    if (event->decoded_event) {
+		INT_CMreturn_buffer(event->cm, event->decoded_event);
+	    } else {
+		INT_CMreturn_buffer(event->cm, event->encoded_event);
+	    }
+	    break;
+	case Event_Freeable:
+	    (event->free_func)(event->decoded_event, event->free_arg);
+	    break;
+	case Event_App_Owned:
+	    if (event->free_func) {
+		(event->free_func)(event->free_arg, NULL);
+	    }
+	    break;
+	}
+	if (event->attrs != NULL) INT_CMfree_attr_list(event->cm, event->attrs);
+	if (event->ioBuffer != NULL)
+	free(event);
+    }
+}
 
 static event_item *
 decode_action(CManager cm, event_item *event, action *act)
 {
-    if (event->event_encoded) {
+    event_path_data evp = cm->evp;
+    if (!event->event_encoded) {
+	assert(0);
+    }
+	
+    switch(event->contents) {
+    case Event_CM_Owned:
 	if (decode_in_place_possible(act->o.decode.decode_format)) {
 	    void *decode_buffer;
 	    if (!decode_in_place_IOcontext(act->o.decode.context,
@@ -522,9 +583,52 @@ decode_action(CManager cm, event_item *event, action *act)
 	    event->reference_format = act->o.decode.target_reference_format;
 	    return event;
 	}
-    } else {
+	break;
+    case Event_Freeable:
+    case Event_App_Owned:
+    {
+	/* can't do anything with the old event, make a new one */
+	int decoded_length = this_IOrecord_length(act->o.decode.context, 
+						  event->encoded_event,
+						  event->event_len);
+	event_item *new_event = get_free_event(evp);
+	CMbuffer cm_decode_buf = cm_get_data_buf(cm, decoded_length);
+	void *decode_buffer = cm_decode_buf->buffer;
+	if (event->event_len == -1) printf("BAD LENGTH\n");
+	decode_to_buffer_IOcontext(act->o.decode.context, 
+				   event->encoded_event, decode_buffer);
+	INT_CMtake_buffer(cm, decode_buffer);
+	new_event->decoded_event = decode_buffer;
+	new_event->event_encoded = 0;
+	new_event->encoded_event = NULL;
+	new_event->event_len = 0;
+	new_event->encoded_eventv = NULL;
+	new_event->cm = cm;
+	new_event->reference_format = act->o.decode.target_reference_format;
+	new_event->contents = Event_CM_Owned;
+	new_event->attrs = attr_copy_list(event->attrs);
+	return_event(evp, event);
+	return new_event;
+	break;
+    }
+    }
+    return NULL;   /* shouldn't ever happen */
+}
+
+static void
+encode_event(CManager cm, event_item *event)
+{
+    event_path_data evp = cm->evp;
+    if (event->event_encoded) {
 	assert(0);
     }
+	
+    if (event->ioBuffer != NULL) return;  /* already encoded */
+    event->ioBuffer = create_IOBuffer();
+    event->encoded_event = 
+	encode_IOcontext_bufferB(evp->root_context, event->reference_format,
+				 event->ioBuffer, event->decoded_event,
+				 &event->event_len);
 }
 
 static void
@@ -639,7 +743,9 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     stone = &(evp->stone_map[local_path_id]);
     action_id = determine_action(cm, stone, event, &subact);
     if (action_id ==  -1) {
-	char *tmp = global_name_of_IOformat(event->reference_format);
+	char *tmp = NULL;
+	if (event->reference_format)
+	    tmp = global_name_of_IOformat(event->reference_format);
 	printf("No action found for event %lx submitted to stone %d\n",
 	       (long)event, local_path_id);
 	if (tmp != NULL) {
@@ -925,13 +1031,17 @@ process_output_actions(CManager cm)
 						   event, event->attrs);
 		    } else {
 			struct _CMFormat tmp_format;
-			tmp_format.format = event->reference_format;
-			tmp_format.format_name = name_of_IOformat(event->reference_format);
-			tmp_format.IOsubcontext = (IOContext) iofile_of_IOformat(event->reference_format);
-			tmp_format.registration_pending = 0;
-			ret = internal_write_event(act->o.out.conn, &tmp_format,
-						   &act->o.out.remote_stone_id, 4, 
-						   event, event->attrs);
+			if (event->reference_format == NULL) {
+			    CMtrace_out(cm, EVWarning, "Tried to output event with NULL reference format.  Event discarded.\n");
+			} else {
+			    tmp_format.format = event->reference_format;
+			    tmp_format.format_name = name_of_IOformat(event->reference_format);
+			    tmp_format.IOsubcontext = (IOContext) iofile_of_IOformat(event->reference_format);
+			    tmp_format.registration_pending = 0;
+			    ret = internal_write_event(act->o.out.conn, &tmp_format,
+						       &act->o.out.remote_stone_id, 4, 
+						       event, event->attrs);
+			}
 		    }
 		}
 		return_event(evp, event);
@@ -1209,9 +1319,9 @@ EVauto_submit_func(CManager cm, void* vstone)
     event->free_func = NULL;
     event->attrs = NULL;
     internal_path_submit(cm, stone_num, event);
-    return_event(cm->evp, event);
     while (process_local_actions(cm));
     process_output_actions(cm);
+    return_event(cm->evp, event);
     CManager_unlock(cm);
 }
 
@@ -1225,7 +1335,7 @@ INT_EVcreate_auto_stone(CManager cm, int period_sec, int period_usec,
     INT_EVenable_auto_stone(cm, stone, period_sec, period_usec);
     return stone;
 }
-	
+
 extern void
 INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
 		    int period_usec)
@@ -1247,6 +1357,7 @@ INT_EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format)
     memset(source, 0, sizeof(*source));
     source->local_stone_id = stone;
     source->cm = cm;
+    source->preencoded = 0;
     if (data_format != NULL) {
 	source->format = INT_CMregister_format(cm, data_format[0].format_name,
 					   data_format[0].field_list,
@@ -1270,45 +1381,8 @@ INT_EVcreate_submit_handle_free(CManager cm, EVstone stone,
     source->reference_format = EVregister_format_set(cm, data_format, NULL);
     source->free_func = free_func;
     source->free_data = free_data;
+    source->preencoded = 0;
     return source;
-}
-
-static event_item *
-get_free_event(event_path_data evp)
-{
-    event_item *event = malloc(sizeof(*event));
-    memset(event, 0, sizeof(event_item));
-    event->ref_count = 1;
-    event->event_len = -1;
-    return event;
-}
-
-static void
-return_event(event_path_data evp, event_item *event)
-{
-    event->ref_count--;
-    if (event->ref_count == 0) {
-	/* return event memory */
-	switch (event->contents) {
-	case Event_CM_Owned:
-	    if (event->decoded_event) {
-		INT_CMreturn_buffer(event->cm, event->decoded_event);
-	    } else {
-		INT_CMreturn_buffer(event->cm, event->encoded_event);
-	    }
-	    break;
-	case Event_Freeable:
-	    (event->free_func)(event->decoded_event, event->free_arg);
-	    break;
-	case Event_App_Owned:
-	    if (event->free_func) {
-		(event->free_func)(event->free_arg, NULL);
-	    }
-	    break;
-	}
-	if (event->attrs != NULL) INT_CMfree_attr_list(event->cm, event->attrs);
-	free(event);
-    }
 }
 
 static void
@@ -1355,31 +1429,67 @@ INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
     event->free_func = free_func;
     event->free_arg = data;
     internal_path_submit(source->cm, source->local_stone_id, event);
-    return_event(source->cm->evp, event);
     while (process_local_actions(source->cm));
     process_output_actions(source->cm);
+    if (event->ref_count != 1) {
+	encode_event(source->cm, event);  /* reassign memory */
+    }
+    return_event(source->cm->evp, event);
 }
     
 void
 INT_EVsubmit(EVsource source, void *data, attr_list attrs)
 {
-    event_item *event = get_free_event(source->cm->evp);
+    event_path_data evp = source->cm->evp;
+    event_item *event = get_free_event(evp);
     if (source->free_func != NULL) {
 	event->contents = Event_Freeable;
     } else {
 	event->contents = Event_App_Owned;
     }
-    event->event_encoded = 0;
-    event->decoded_event = data;
-    event->reference_format = source->reference_format;
-    event->format = source->format;
+    if (source->preencoded) {
+	event->event_encoded = 1;
+	event->encoded_event = data;
+	event->reference_format = get_format_app_IOcontext(evp->root_context, 
+							   data, NULL);
+    } else {
+	event->event_encoded = 0;
+	event->decoded_event = data;
+	event->reference_format = source->reference_format;
+	event->format = source->format;
+    }
     event->free_func = source->free_func;
     event->free_arg = source->free_data;
     event->attrs = CMadd_ref_attr_list(source->cm, attrs);
     internal_path_submit(source->cm, source->local_stone_id, event);
-    return_event(source->cm->evp, event);
     while (process_local_actions(source->cm));
     process_output_actions(source->cm);
+    if (event->ref_count != 1) {
+	encode_event(source->cm, event);  /* reassign memory */
+    }
+    return_event(source->cm->evp, event);
+}
+
+void
+INT_EVsubmit_encoded(CManager cm, EVstone stone, void *data, int data_len, attr_list attrs)
+{
+    event_path_data evp = cm->evp;
+    event_item *event = get_free_event(evp);
+    event->contents = Event_App_Owned;
+    event->event_encoded = 1;
+    event->encoded_event = data;
+    event->event_len = data_len;
+    event->reference_format = get_format_app_IOcontext(evp->root_context, 
+						       data, NULL);
+
+    event->attrs = CMadd_ref_attr_list(cm, attrs);
+    internal_path_submit(cm, stone, event);
+    while (process_local_actions(cm));
+    process_output_actions(cm);
+    if (event->ref_count != 1) {
+	printf("Bad!\n");
+    }
+    return_event(cm->evp, event);
 }
 
 static void
@@ -1511,64 +1621,38 @@ INT_EVdrain_stone(CManager cm, EVstone stone_id)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
-    attr_list stone_attrs;
-    buffer_list buf_list = NULL;
+/*    attr_list stone_attrs;
+    EVevent_list buf_list = NULL;*/
     if (evp->stone_count < stone_id) {
         return -1;
     }
     stone = &(evp->stone_map[stone_id]);
     stone->is_draining = 1;
     while(stone->is_processing || stone->is_outputting);
-    buf_list = EVextract_stone_events(cm, stone_id);
-    stone_attrs = EVextract_attr_list(cm, stone_id); 
+/*    buf_list = EVextract_stone_events(cm, stone_id);
+    stone_attrs = EVextract_attr_list(cm, stone_id); */
     stone->is_draining = 2;
     return 1;
 }
 
-extern buffer_list
+extern EVevent_list
 INT_EVextract_stone_events(CManager cm, EVstone stone_id)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
-    buffer_list buf_list1 = NULL, buf_list2 = NULL, final_buf_list = NULL;
-    int a, *sizeof_buflist = NULL;
-    int cur_size = 0;
+    EVevent_list list = malloc(sizeof(list[0]));
+    int a;
+
+    list[0].length = -1;
     stone = &(evp->stone_map[stone_id]);
-    buf_list1 = extract_events_from_queue(cm, stone->queue, sizeof_buflist);
-    if(*sizeof_buflist == 0) {
-        printf(" The returned list contains no events \n");   
-    } else {
-        final_buf_list = (buffer_list) malloc(*sizeof_buflist);
-	if(final_buf_list == NULL) {
-	    printf("Could not allocate memory. \n");
-	    exit(1);
-	}    
-	memcpy(final_buf_list, buf_list1, *sizeof_buflist);
-	cur_size = cur_size + *sizeof_buflist;
-	*sizeof_buflist = 0;
-    }		
+    list = extract_events_from_queue(cm, stone->queue, list);
     for (a=0 ; a < evp->stone_map[stone_id].action_count; a++) {
         action *act = &evp->stone_map[stone_id].actions[a];
         if (act->queue != stone->queue) {
-            buf_list2 = extract_events_from_queue(cm, act->queue, sizeof_buflist);
-	    if(*sizeof_buflist == 0) {
-                printf(" The returned list contains no events \n");   
-            } else {
-                final_buf_list = (buffer_list) realloc(final_buf_list, cur_size + *sizeof_buflist);
-	        if(final_buf_list == NULL) {
-	            printf("Could not allocate memory. \n");
-	            exit(1);
-	        }
-		memcpy(final_buf_list + cur_size, buf_list2, *sizeof_buflist);
-		cur_size = cur_size + *sizeof_buflist;
-	        *sizeof_buflist = 0;
-            }	
+            list = extract_events_from_queue(cm, act->queue, list);
         }
     }
-    free(sizeof_buflist);
-    free(buf_list1);
-    free(buf_list2);
-    return final_buf_list;
+    return list;
 }
 
 extern attr_list
@@ -1580,45 +1664,33 @@ INT_EVextract_attr_list(CManager cm, EVstone stone_id)
     return(stone->stone_attrs);
 }
 
-buffer_list
-extract_events_from_queue(CManager cm, queue_ptr que, int *sizeof_buflist)
+EVevent_list
+extract_events_from_queue(CManager cm, queue_ptr que, EVevent_list list)
 {
-    buffer_list buf_list = NULL, current_entry = NULL;
+    EVevent_list current_entry = NULL;
     queue_item *first = NULL, *last = NULL;
-    event_path_data evp = cm->evp;
     int num_of_elements = 0;
     
     first = que->queue_head;
     last = que->queue_tail;
                 
+    while (list[num_of_elements].length != -1) num_of_elements++;
     while(first != NULL && last != NULL) {
-        if(num_of_elements == 0) {
-	    buf_list = (buffer_list) malloc(sizeof(buf_list[0]));
-        } else {
-	    buf_list = (buffer_list) realloc (buf_list, (num_of_elements + 1) * sizeof(buf_list[0]));
-	}
-        if(buf_list == NULL) {
-	    printf("Could not allocate memory. \n");
-	    exit(1);
-	}
-	current_entry = &buf_list[num_of_elements];
-	if(first->item->event_encoded) {
+	list = (EVevent_list) realloc (list, (num_of_elements + 2) * sizeof(list[0]));
+	current_entry = &list[num_of_elements];
+	if((first->item->event_encoded) || (first->item->ioBuffer != NULL)) {
 	    current_entry->length = first->item->event_len;
 	    current_entry->buffer = first->item->encoded_event;
 	} else {
-            IOContext ioContext = create_IOsubcontext(evp->root_context);
-	    int size;
-	    void *temp_arr;
-	    first->item->ioBuffer = create_IOBuffer();
-	    temp_arr = (void*) encode_IOcontext_bufferB (ioContext, first->item->reference_format, first->item->ioBuffer, first->item->decoded_event, &size);
-	    current_entry->length = size;
-	    current_entry->buffer = temp_arr;
+	    encode_event(cm, first->item);
+	    current_entry->length = first->item->event_len;
+	    current_entry->buffer = first->item->encoded_event;
 	}
 	num_of_elements++;
 	first = first->next;
     }
-    *sizeof_buflist = num_of_elements * sizeof(buf_list[0]);
-    return buf_list;
+    list[num_of_elements].length = -1;
+    return list;
 }
 
 

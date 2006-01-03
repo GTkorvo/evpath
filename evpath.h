@@ -106,12 +106,12 @@ typedef struct _CMTaskHandle *CMTaskHandle;
 
 /*!
  * buf_entry is a structure used to return the lengths of encoded events
- * and a pointer to their locations. It is used while draining stones.
+ * and a pointer to their locations.
  */
 typedef struct buf_entry {
     int length;
     void *buffer;
-} *buffer_list;
+} *EVevent_list;
 
 /*!
  * The prototype for a CM data handling function.
@@ -1921,6 +1921,26 @@ EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
 		 attr_list attrs);
 
 /*!
+ * Submit a pre-encoded event for processing by EVPath.
+ *
+ * EVsubmit submits a pre-encoded event for processing by EVPath.  The event 
+ * must be a contiguous PBIO-encoded block of data.  The \b attrs parameter
+ * specifies the attributes (name/value pairs) that the event is submitted
+ * with.  These attributes will be delivered to the final terminal, as well
+ * as being available at intermediate processing points.  Some attributes
+ * may affect the processing or transmission of data, depending upon the
+ * specific transport or processing agents.
+ * \param source The EVsource handle through which data is to be submitted.
+ * \param data The pre-encoded data to be submitted, represented as a void*.
+ * \param data_len The length of the pre-encoded data block.
+ * \param attrs The attribute list to be submitted with the data.
+ *
+ */
+extern void
+EVsubmit_encoded(CManager cm, EVstone stone, void *data, int data_len,
+		 attr_list attrs);
+
+/*!
  * Assume control over a incoming buffer of data.
  *
  * This call is designed to be used inside a EVSimpleHandlerFunc.  Normally
@@ -2142,7 +2162,7 @@ EVdrain_stone(CManager cm, EVstone stone_id);
  * \return buffer_list Returns an array of structures containing the
  * lengths of events and pointers to the encoded versions of events
  */
-extern buffer_list
+extern EVevent_list
 EVextract_stone_events(CManager cm, EVstone stone_id);
 
 /*!

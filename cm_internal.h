@@ -450,6 +450,8 @@ INT_CMregister_write_callback ARGS((CMConnection conn,
 extern void
 INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
 		 attr_list attrs);
+extern void
+INT_EVsubmit_encoded(CManager cm, EVstone stone, void *data, int data_len, attr_list attrs);
 extern EVsource
 INT_EVcreate_submit_handle_free(CManager cm, EVstone stone, CMFormatList data_format,
 			    EVFreeFunction free_func, void *client_data);
@@ -516,7 +518,7 @@ extern void INT_CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
 extern void INT_CM_fd_add_select ARGS((CManager cm, int fd, select_func handler_func, void *param1, void *param2));
 extern int INT_EVfreeze_stone(CManager cm, EVstone stone_id);
 extern int INT_EVdrain_stone(CManager cm, EVstone stone_id);
-extern buffer_list INT_EVextract_stone_events(CManager cm, EVstone stone_id);
+extern EVevent_list INT_EVextract_stone_events(CManager cm, EVstone stone_id);
 extern attr_list INT_EVextract_attr_list(CManager cm, EVstone stone_id);
 extern int INT_EVdestroy_stone(CManager cm, EVstone stone_id);
 

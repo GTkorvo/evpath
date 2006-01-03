@@ -221,10 +221,8 @@ char **argv;
 	char *transport = NULL;
 	char *postfix = NULL;
 	char *string_list;
-	char *filter;
 	struct _client_rec rec0, rec1, rec2;
-	EVstone term0, term1, term2, fstone;
-	EVaction faction;
+	EVstone term0, term1, term2;
 	if ((transport = getenv("CMTransport")) != NULL) {
 	    if (listen_list == NULL) listen_list = create_attr_list();
 	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
@@ -271,31 +269,44 @@ char **argv;
 	rec2.message_count = NULL;
 	EVassoc_terminal_action(cm, term2, simple_format_list, 
 				simple_handler, (void*)&rec2);
-	filter = create_router_action_spec(filter_format_list, router_func);
 	
-	fstone = EValloc_stone(cm);
-	faction = EVassoc_immediate_action(cm, fstone, filter, NULL);
-	EVaction_set_output(cm, fstone, faction, 0, term0);
-	EVaction_set_output(cm, fstone, faction, 0, term1);
-	EVaction_set_output(cm, fstone, faction, 0, term2);
-	
-	printf("Contact list \"%d:%s\"\n", fstone, string_list);
+	printf("Contact list \"%d:%d:%d:%s\"\n", term0, term1, term2, string_list);
 	CMsleep(cm, 120);
     } else {
 	simple_rec data;
 	attr_list attrs;
-	int remote_stone, stone = 0;
-	int count;
+	int remote_stone0, remote_stone1, remote_stone2, stone = 0;
+	EVstone term0, term1, term2;
+	int count = 0;
 	EVsource source_handle;
+	char *filter;
+	EVaction faction;
+	EVevent_list events;
 	if (argc == 2) {
 	    attr_list contact_list;
 	    char *list_str;
-	    sscanf(argv[1], "%d:", &remote_stone);
+	    sscanf(argv[1], "%d:%d:%d", &remote_stone0, &remote_stone1, &remote_stone2);
 	    list_str = strchr(argv[1], ':') + 1;
+	    list_str = strchr(list_str, ':') + 1;
+	    list_str = strchr(list_str, ':') + 1;
 	    contact_list = attr_list_from_string(list_str);
-	    stone = EValloc_stone(cm);
-	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
+	    term0 = EValloc_stone(cm);
+	    EVassoc_output_action(cm, term0, contact_list, remote_stone0);
+	    term1 = EValloc_stone(cm);
+	    contact_list = attr_list_from_string(list_str);
+	    EVassoc_output_action(cm, term1, contact_list, remote_stone1);
+	    term2 = EValloc_stone(cm);
+	    contact_list = attr_list_from_string(list_str);
+	    EVassoc_output_action(cm, term2, contact_list, remote_stone2);
 	}
+	filter = create_router_action_spec(filter_format_list, router_func);
+    
+	stone = EValloc_stone(cm);
+	faction = EVassoc_immediate_action(cm, stone, filter, NULL);
+	EVaction_set_output(cm, stone, faction, 0, term0);
+	EVaction_set_output(cm, stone, faction, 1, term1);
+	EVaction_set_output(cm, stone, faction, 2, term2);
+
 	attrs = create_attr_list();
 #define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
 	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
@@ -303,6 +314,7 @@ char **argv;
 	source_handle = EVcreate_submit_handle(cm, stone, simple_format_list);
 	if (quiet <= 0) printf("submitting %d\n", data.integer_field);
 	count = repeat_count;
+	EVfreeze_stone(cm, term1);
 	while (count != 0) {
 	    generate_record(&data);
 	    if (quiet <=0) {printf("submitting %ld\n", data.long_field);}
@@ -312,6 +324,14 @@ char **argv;
 	    }
 	}
 	CMsleep(cm, 10);
+	EVdrain_stone(cm, term1);
+	events = EVextract_stone_events(cm, term1);
+	count = 0;
+	while (events && (events[count].length != -1)) {
+	    EVsubmit_encoded(cm, term0, events[count].buffer, events[count].length, attrs);
+	    count++;
+	}
+	CMsleep(cm, 5);
 	free_attr_list(attrs);
     }
     CManager_close(cm);
@@ -338,9 +358,9 @@ char **args;
 {
 #ifdef HAVE_WINDOWS_H
     int child;
-    child = _spawnv(_P_NOWAIT, "./filter_test.exe", args);
+    child = _spawnv(_P_NOWAIT, "./extract_test.exe", args);
     if (child == -1) {
-	printf("failed for filter_test\n");
+	printf("failed for extract_test\n");
 	perror("spawnv");
     }
     return child;
@@ -351,7 +371,7 @@ char **args;
     child = fork();
     if (child == 0) {
 	/* I'm the child */
-	execv("./filter_test", args);
+	execv("./extract_test", args);
     }
     return child;
 #else
@@ -365,15 +385,14 @@ static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"filter_test", "-c", NULL, NULL};
-    char *filter;
+    char *args[] = {"extract_test", "-c", NULL, NULL, NULL};
     int exit_state;
+    int ret;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
     char *string_list, *transport, *postfix;
-    int message_counts[3];
-    EVstone term0, term1, term2, fstone;
-    EVaction faction;
+    int message_counts[3], i;
+    EVstone term0, term1, term2;
     struct _client_rec rec0, rec1, rec2;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
@@ -443,17 +462,10 @@ do_regression_master_test()
     rec2.output_index = 2;
     rec2.message_count = &message_counts[0];
     EVassoc_terminal_action(cm, term2, simple_format_list, simple_handler, &rec2);
-    filter = create_router_action_spec(filter_format_list, router_func);
-    
-    fstone = EValloc_stone(cm);
-    faction = EVassoc_immediate_action(cm, fstone, filter, NULL);
-    EVaction_set_output(cm, fstone, faction, 0, term0);
-    EVaction_set_output(cm, fstone, faction, 1, term1);
-    EVaction_set_output(cm, fstone, faction, 2, term2);
-
-    args[2] = string_list;
-    args[2] = malloc(10 + strlen(string_list) + strlen(filter));
-    sprintf(args[2], "%d:%s", fstone, string_list);
+    i = 2;
+    if (!quiet) args[i++] = "-v";
+    args[i] = malloc(20 + strlen(string_list));
+    sprintf(args[i++], "%d:%d:%d:%s", term0, term1, term2, string_list);
     subproc_proc = run_subprocess(args);
 
     /* give him time to start */
@@ -492,17 +504,18 @@ do_regression_master_test()
 #endif
     free(string_list);
     CManager_close(cm);
-    if (message_counts[0] != 5) {
+    ret = 0;
+    if (message_counts[0] != 8) {
 	printf("Message count[0] == %d\n", message_counts[0]);
-	return 1;
+	ret = 1;
     }
-    if (message_counts[1] != 3) {
+    if (message_counts[1] != 0) {
 	printf("Message count[1] == %d\n", message_counts[1]);
-	return 1;
+	ret = 1;
     }
     if (message_counts[2] != 2) {
 	printf("Message count[2] == %d\n", message_counts[2]);
-	return 1;
+	ret = 1;
     }
-    return 0;
+    return ret;
 }

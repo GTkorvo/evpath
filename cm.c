@@ -2127,6 +2127,7 @@ event_item *event;
 attr_list attrs;
 {
     IOEncodeVector vec;
+    struct _io_encode_vec preencoded_vec[2];
     int data_length = 0, vec_count = 0, actual, attr_len = 0;
     int do_write = 1;
     void *encoded_attrs = NULL;
@@ -2191,13 +2192,23 @@ attr_list attrs;
 	}
     }
 
-    /* encode data with CM context */
-    vec = encode_IOcontext_vectorB(format->IOsubcontext, conn->io_out_buffer,
-				   format->format, event->decoded_event);
+    if (!event->encoded_event) {
+	/* encode data with CM context */
+	vec = encode_IOcontext_vectorB(format->IOsubcontext, conn->io_out_buffer,
+				       format->format, event->decoded_event);
 
-    while(vec[vec_count].iov_base != NULL) {
-	data_length += vec[vec_count].iov_len;
-	vec_count++;
+	while(vec[vec_count].iov_base != NULL) {
+	    data_length += vec[vec_count].iov_len;
+	    vec_count++;
+	}
+    } else {
+	vec = &preencoded_vec[0];
+	preencoded_vec[0].iov_base = event->encoded_event;
+	preencoded_vec[0].iov_len = event->event_len;
+	preencoded_vec[1].iov_base = NULL;
+	preencoded_vec[1].iov_len = 0;
+	vec_count = 1;
+	data_length = event->event_len;
     }
     if (attrs != NULL) {
 	attrs_present++;

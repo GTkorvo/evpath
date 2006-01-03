@@ -29,7 +29,6 @@ typedef struct _event_item {
     attr_list attrs;
 
     /* used for malloc/free */
-    CMbuffer buffer;
     CManager cm;
     void *free_arg;
     EVFreeFunction free_func;
@@ -144,6 +143,7 @@ struct _EVSource {
     CMFormat format;
     IOFormat reference_format;
     int local_stone_id;
+    int preencoded;
     EVFreeFunction free_func;
     void *free_data;
 };
@@ -165,4 +165,4 @@ extern EVstone INT_EVcreate_terminal_action(CManager cm, CMFormatList format_lis
 extern EVstone INT_EVcreate_auto_stone(CManager cm, int period_sec, 
 				       int period_usec, char *action_spec, 
 				       EVstone out_stone);
-extern buffer_list extract_events_from_queue(CManager cm, queue_ptr que, int *sizeof_buflist);
+extern EVevent_list extract_events_from_queue(CManager cm, queue_ptr que, EVevent_list list);
