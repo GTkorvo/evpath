@@ -276,7 +276,7 @@ char **argv;
 	simple_rec data;
 	attr_list attrs;
 	int remote_stone0, remote_stone1, remote_stone2, stone = 0;
-	EVstone term0, term1, term2;
+	EVstone term0 = -1, term1 = -1, term2 = -1;
 	int count;
 	EVsource source_handle;
 	char *filter;
