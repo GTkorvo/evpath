@@ -759,8 +759,9 @@ transport_entry trans;
 void *transport_data;
 attr_list conn_attrs;
 {
-    int first = 1;
-    int non_block_default = -1;
+    static int first = 1;
+    static int non_block_default = 0;
+    int blocking_on_conn;
     CMConnection conn = INT_CMmalloc(sizeof(struct _CMConnection));
     if (first) {
 	char *value = cercs_getenv("CMNonBlockWrite");
@@ -794,6 +795,10 @@ attr_list conn_attrs;
     conn->characteristics = NULL;
     conn->write_pending = 0;
     conn->do_non_blocking_write = non_block_default;
+    
+    if (get_int_attr(conn_attrs, CM_CONN_BLOCKING, &blocking_on_conn)) {
+	conn->do_non_blocking_write = !blocking_on_conn;
+    }
     add_conn_to_CM(trans->cm, conn);
     CMtrace_out(trans->cm, CMFreeVerbose, "CMConnection_create %lx ",
 		(long) conn);
@@ -2089,7 +2094,6 @@ attr_list attrs;
 		CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			    "Partial write, queued %d bytes",
 			    byte_count - actual_bytes);
-		/* hold the lock until the write completes */
 		return 1;
 	    }
 	    actual = vec_count;  /* set actual for success */
@@ -2226,7 +2230,7 @@ attr_list attrs;
 	int byte_count = data_length;/* sum lengths */
 	int header[4] = {0x434d4C00, 0, 0, 0};  /* CML\0 in first entry */
 	if (vec_count >= sizeof(static_vec)/ sizeof(static_vec[0])) {
-	    tmp_vec = INT_CMmalloc((vec_count+1) * sizeof(*tmp_vec));
+	    tmp_vec = INT_CMmalloc((vec_count+3) * sizeof(*tmp_vec));
 	}
 	header[1] = data_length;
 	if (path_len != 4) {
