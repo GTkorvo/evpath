@@ -228,7 +228,7 @@ int condition;
 	       (long)cl->server_thread);
     }
     if (!cl->has_thread) {
-	if (cl->server_thread == NULL) {
+	if ((cl->server_thread == NULL) || (cl->server_thread == thr_thread_self())) {
 	    while (!(cond->signaled || cond->failed)) {
 		if (cm_control_debug_flag) {
 		    printf("CMLowLevel  Polling for CMcondition %d\n", condition);
