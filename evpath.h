@@ -1284,6 +1284,9 @@ CMget_self_ip_addr();
 
 /*! "IP_PORT" */
 #define CM_IP_PORT ATL_CHAR_CONS('C','I','P','P')
+
+/*! "CONN_BLOCKING" */
+#define CM_CONN_BLOCKING ATL_CHAR_CONS('C','n','B','l')
 /*! @}*/
 
 /*! "UDP_PORT" */
