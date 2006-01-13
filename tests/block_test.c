@@ -101,6 +101,44 @@ static int size = 400;
 static int vecs = 200;
 int quiet = 1;
 
+static void generate_record(simple_rec_ptr event);
+
+typedef struct thread_rec {
+    CManager cm;
+    int count;
+    EVstone target;
+    int thread;
+} thread_rec;
+
+static
+int
+submit_thread(void *vrec)
+{
+    struct thread_rec *rec = vrec;
+    simple_rec data;
+    attr_list attrs;
+    int i;
+    EVsource source_handle = EVcreate_submit_handle(rec->cm, rec->target, 
+						    simple_format_list);
+    for (i=0; i < rec->count; i++) {
+	int tmp;
+	generate_record(&data);
+	tmp = data.short_field;
+	attrs = create_attr_list();
+#define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
+	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
+	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
+
+	data.short_field = rec->thread;
+	data.integer_field += (tmp - data.short_field);
+	data.integer_field++;
+	data.long_field--;
+	EVsubmit(source_handle, &data, attrs);
+	CMusleep(rec->cm, lrand48() % 500);
+    }
+    if (quiet <= 0) printf("Write %d messages\n", msg_limit);
+}
+
 static
 void 
 generate_record(event)
@@ -147,6 +185,7 @@ attr_list attrs;
 {
     simple_rec_ptr event = vevent;
     long sum = 0, scan_sum = 0;
+/*    printf("Received event from thread %d\n", event->short_field);*/
     sum += event->integer_field % 100;
     sum += event->short_field % 100;
     sum += event->long_field % 100;
@@ -156,6 +195,7 @@ attr_list attrs;
     sum += event->char_field;
     sum = sum % 100;
     scan_sum = event->scan_sum;
+    if (sum < 0) sum += 100;
     if (sum != scan_sum) {
 	printf("Received record checksum does not match. expected %d, got %d\n",
 	       (int) sum, (int) scan_sum);
@@ -285,11 +325,13 @@ char **argv;
 	    printf("Received %d messages\n", msg_count);
 	}
     } else {
-	simple_rec_ptr data;
-	attr_list attrs;
-	int i;
 	int remote_stone, stone = 0;
 	EVsource source_handle;
+	int i;
+	struct thread_rec thr_rec[3];
+	thr_thread_t thr0, thr1, thr2;
+	void *status;
+
 	if (argc == 2) {
 	    attr_list contact_list;
 	    char *list_str;
@@ -299,19 +341,23 @@ char **argv;
 	    stone = EValloc_stone(cm);
 	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
 	}
-	data = malloc(sizeof(simple_rec));
-	generate_record(data);
-	attrs = create_attr_list();
-#define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
-	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
-	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
-	source_handle = EVcreate_submit_handle(cm, stone, simple_format_list);
-	for (i=0; i < msg_limit; i++) {
-	    data->integer_field++;
-	    data->long_field--;
-	    EVsubmit(source_handle, data, attrs);
+	
+	for (i=0; i < 3; i++) {
+	    thr_rec[i].target = stone;
+	    thr_rec[i].cm = cm;
+	    thr_rec[i].thread = i;
+	    thr_rec[i].count = msg_limit / 3;
 	}
-	if (quiet <= 0) printf("Write %d messages\n", msg_limit);
+	thr_rec[2].count = msg_limit - thr_rec[0].count - thr_rec[1].count;
+
+	CMfork_comm_thread(cm);
+	thr0 = thr_fork(submit_thread, &thr_rec[0]);
+	thr1 = thr_fork(submit_thread, &thr_rec[1]);
+	thr2 = thr_fork(submit_thread, &thr_rec[2]);
+	thr_thread_join(thr0, &status);
+	thr_thread_join(thr1, &status);
+	thr_thread_join(thr2, &status);
+
 	CMsleep(cm, 10);
     }
     CManager_close(cm);
