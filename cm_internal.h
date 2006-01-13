@@ -181,6 +181,11 @@ typedef struct _CMCloseHandlerList {
     struct _CMCloseHandlerList *next;
 } *CMCloseHandlerList;
 
+typedef struct _CMConnHandlerList {
+    CMCloseHandlerFunc func;
+    void *client_data;
+} *CMConnHandlerList;
+
 struct _CMConnection {
     CManager cm;
     /* remote contact info */
@@ -198,6 +203,8 @@ struct _CMConnection {
 
     CMCloseHandlerList close_list;
 
+    int write_callback_len;
+    CMConnHandlerList write_callbacks;
     IOContext IOsubcontext;
     AttrBuffer attr_encode_buffer;
     void *foreign_data_handler;

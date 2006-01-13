@@ -785,6 +785,8 @@ attr_list conn_attrs;
     conn->foreign_data_handler = NULL;
     conn->io_out_buffer = create_IOBuffer();
     conn->close_list = NULL;
+    conn->write_callback_len = 0;
+    conn->write_callbacks = NULL;
     conn->attrs = conn_attrs;
     conn->attr_encode_buffer = create_AttrBuffer();
 
@@ -955,6 +957,7 @@ CMConnection conn;
     if (conn->failed == 0) {
 	CMConnection_failed(conn);
     }
+    if (conn->write_callbacks) INT_CMfree(conn->write_callbacks);
     thr_mutex_free(conn->write_lock);
     thr_mutex_free(conn->read_lock);
     free_IOsubcontext(conn->IOsubcontext);
@@ -1829,6 +1832,7 @@ CMConnection conn;
     attr_list attrs = NULL;  /* GSE fix */
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CMWriteQueuedData, conn %lx", 
 		(long)conn);
+    CManager_lock(conn->cm);
     if (conn->queued_data.rem_header_len != 0) {
 	struct _io_encode_vec tmp_vec[1];
 	int actual;
@@ -1843,6 +1847,7 @@ CMConnection conn;
 	    memmove(&conn->queued_data.rem_header[0],
 		    &conn->queued_data.rem_header[actual],
 		    conn->queued_data.rem_header_len);
+	    CManager_unlock(conn->cm);
 	    return;
 	}
     }
@@ -1858,6 +1863,7 @@ CMConnection conn;
 	if (actual < conn->queued_data.rem_attr_len) {
 	    conn->queued_data.rem_attr_len -= actual;
 	    conn->queued_data.rem_attr_base += actual;
+	    CManager_unlock(conn->cm);
 	    return;
 	}
     }
@@ -1885,14 +1891,33 @@ CMConnection conn;
 	    vec[i].iov_len -= actual;
 	    vec[i].iov_base = (char*)vec[i].iov_base + actual;
 	    conn->queued_data.vector_data = &vec[i];
+	    CManager_unlock(conn->cm);
 	    return;
 	}
     }
     conn->write_pending = 0;
     conn->trans->set_write_notify(conn->trans, &CMstatic_trans_svcs, 
 				  conn->transport_data, 0);
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write");
+
+    if(!CManager_locked(conn->cm)) {
+	printf("Not LOCKED in write queued data!\n");
+    }
+    if (conn->write_callbacks) {
+	int i;
+	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, doing notification");
+	while (conn->write_callbacks[i].func != NULL) {
+	    printf("Doing callback %d\n", i);
+	    conn->write_callbacks[i].func(conn->cm, conn,
+					     conn->write_callbacks[i].client_data);
+	    conn->write_callbacks[i].func = NULL;
+	    i++;
+	}
+    } else {
+	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, No notifications");
+    }
+    CManager_unlock(conn->cm);
 }
+
 
 static void
 queue_remaining_write(conn, tmp_vec, pbio_vec, vec_count, attrs, 
@@ -1950,17 +1975,59 @@ int attrs_present;
 
 
 static void
+add_pending_write_callback(CMConnection conn, CMCloseHandlerFunc handler, 
+			   void* client_data)
+{
+    int count = 0;
+    while (conn->write_callbacks && 
+	   (conn->write_callbacks[count].func != NULL)) count++;
+    if (count + 2 > conn->write_callback_len) {
+	if (conn->write_callbacks == NULL) {
+	    conn->write_callbacks = malloc(sizeof(conn->write_callbacks[0])*2);
+	} else {
+	    conn->write_callbacks = 
+		realloc(conn->write_callbacks,
+			sizeof(conn->write_callbacks[0])*(count+2));
+	    conn->write_callback_len = count+1;
+	}
+    }
+    conn->write_callbacks[count].func = handler;
+    conn->write_callbacks[count].client_data = client_data;
+    conn->write_callbacks[count+1].func = NULL;
+    printf("Added write callback %d\n", count);
+}
+    
+
+static void
+wake_pending_write(CManager cm, CMConnection conn, void *param)
+{
+    int cond = (long)param;
+    printf("Wake pending write, cond %d\n", cond);
+    INT_CMCondition_signal(cm, cond);
+}
+
+static void
 wait_for_pending_write(conn)
 CMConnection conn;
 {
     CMControlList cl = conn->cm->control_list;
-    CManager_unlock(conn->cm);
     if (!cl->has_thread) {
+	/* single thread working, just poll network */
+	CManager_unlock(conn->cm);
 	while(conn->write_pending) {
 	    CMcontrol_list_wait(cl);
 	}
-    }
-    CManager_lock(conn->cm);
+	CManager_lock(conn->cm);
+    } else {
+	/* other thread is handling the network wait for it to wake us up */
+	while (conn->write_pending) {
+	    int cond = INT_CMCondition_get(conn->cm, conn);
+	    add_pending_write_callback(conn, wake_pending_write, 
+				       (void*) cond);
+	    INT_CMCondition_wait(conn->cm, cond);
+	    printf("Woke up, will continue if write is not pending\n");
+	}
+    }	    
 }
 	
 
