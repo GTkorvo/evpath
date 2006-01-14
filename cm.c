@@ -1903,7 +1903,7 @@ CMConnection conn;
 	printf("Not LOCKED in write queued data!\n");
     }
     if (conn->write_callbacks) {
-	int i;
+	int i = 0;
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, doing notification");
 	while (conn->write_callbacks[i].func != NULL) {
 	    conn->write_callbacks[i].func(conn->cm, conn,
@@ -2020,7 +2020,7 @@ CMConnection conn;
 	while (conn->write_pending) {
 	    int cond = INT_CMCondition_get(conn->cm, conn);
 	    add_pending_write_callback(conn, wake_pending_write, 
-				       (void*) cond);
+				       (void*) (long)cond);
 	    INT_CMCondition_wait(conn->cm, cond);
 	}
     }	    

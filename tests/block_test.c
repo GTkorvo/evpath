@@ -137,6 +137,7 @@ submit_thread(void *vrec)
 	CMusleep(rec->cm, lrand48() % 500);
     }
     if (quiet <= 0) printf("Write %d messages\n", msg_limit);
+    return 0;
 }
 
 static
@@ -326,7 +327,6 @@ char **argv;
 	}
     } else {
 	int remote_stone, stone = 0;
-	EVsource source_handle;
 	int i;
 	struct thread_rec thr_rec[3];
 	thr_thread_t thr0, thr1, thr2;
