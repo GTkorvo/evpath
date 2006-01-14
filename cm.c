@@ -1906,7 +1906,6 @@ CMConnection conn;
 	int i;
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, doing notification");
 	while (conn->write_callbacks[i].func != NULL) {
-	    printf("Doing callback %d\n", i);
 	    conn->write_callbacks[i].func(conn->cm, conn,
 					     conn->write_callbacks[i].client_data);
 	    conn->write_callbacks[i].func = NULL;
@@ -1994,7 +1993,6 @@ add_pending_write_callback(CMConnection conn, CMCloseHandlerFunc handler,
     conn->write_callbacks[count].func = handler;
     conn->write_callbacks[count].client_data = client_data;
     conn->write_callbacks[count+1].func = NULL;
-    printf("Added write callback %d\n", count);
 }
     
 
@@ -2002,7 +2000,6 @@ static void
 wake_pending_write(CManager cm, CMConnection conn, void *param)
 {
     int cond = (long)param;
-    printf("Wake pending write, cond %d\n", cond);
     INT_CMCondition_signal(cm, cond);
 }
 
@@ -2025,7 +2022,6 @@ CMConnection conn;
 	    add_pending_write_callback(conn, wake_pending_write, 
 				       (void*) cond);
 	    INT_CMCondition_wait(conn->cm, cond);
-	    printf("Woke up, will continue if write is not pending\n");
 	}
     }	    
 }
