@@ -494,6 +494,7 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	    printf("       ****  UNFORMATTED  ****\n");
 	}
     }
+    memset(out_event, 0, instance->u.transform.out_size);
     ret = func(event->decoded_event, out_event, attrs);
     if (ret) {
 	struct _EVSource s;
