@@ -1310,8 +1310,9 @@ static void
 EVauto_submit_func(CManager cm, void* vstone)
 {
     int stone_num = (long) vstone;
+    event_item *event;
     CManager_lock(cm);
-    event_item *event = get_free_event(cm->evp);
+    event = get_free_event(cm->evp);
     event->event_encoded = 0;
     event->decoded_event = NULL;
     event->reference_format = NULL;
