@@ -1646,7 +1646,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     }
     if (event_msg) {
 	CMtrace_out(cm, CMDataVerbose, "CM - Receiving event message data len %d, attr len %d, stone_id %x\n",
-	       data_length, attr_length, stone_id);
+		    data_length, attr_length, stone_id);
 	if (attrs == NULL){
 	    attrs = CMcreate_attr_list(cm);
 	}
@@ -2234,7 +2234,7 @@ attr_list attrs;
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	printf("CM - Writing record %lx of type %s\n", event,
+	printf("CM - Writing record %lx of type %s\n", (long)event,
 	       name_of_IOformat(format->format));
 	if (attrs != NULL) {
 	    printf("CM - write attributes are:");
@@ -2242,12 +2242,14 @@ attr_list attrs;
 	} else {
 	    printf("CM - write attrs NULL\n");
 	}
-	printf("CM - record contents are:\n  ");
+	printf("CM - record contents ");
 	if (event->decoded_event) {
+	    printf("DECODED are:\n  ");
 	    r = dump_limited_unencoded_IOrecord((IOFile)format->IOsubcontext, 
 						format->format,
 						event->decoded_event, dump_char_limit);
 	} else {
+	    printf("ENCODED are:\n  ");
 	    r = dump_limited_encoded_IOrecord((IOFile)format->IOsubcontext, 
 					      format->format,
 					      event->encoded_event, dump_char_limit);
