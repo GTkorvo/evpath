@@ -2234,7 +2234,7 @@ attr_list attrs;
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	printf("CM - Writing record of type %s\n",
+	printf("CM - Writing record %lx of type %s\n", event,
 	       name_of_IOformat(format->format));
 	if (attrs != NULL) {
 	    printf("CM - write attributes are:");

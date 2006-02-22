@@ -1408,6 +1408,28 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     event->format = NULL;
     CMtrace_out(cm, EVerbose, "Event coming in from network to stone %d", 
 		stone_id);
+    if (CMtrace_on(conn->cm, EVerbose)) {
+	static int dump_char_limit = 256;
+	static int warned = 0;
+	static int size_set = 0;
+	int r;
+	if (size_set == 0) {
+	    char *size_str = cercs_getenv("CMDumpSize");
+	    size_set++;
+	    if (size_str != NULL) {
+		dump_char_limit = atoi(size_str);
+	    }
+	}
+	printf("CM - record contents are:\n  ");
+	r = dump_limited_encoded_IOrecord((IOFile)evp->root_context, 
+					  event->reference_format,
+					  event->encoded_event, dump_char_limit);
+	if (r && !warned) {
+	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
+	    printf("  To change size limits, set CMDumpSize environment variable.\n\n\n");
+	    warned++;
+	}
+    }
     INT_CMtake_buffer(cm, buffer);
     event->cm = cm;
     internal_path_submit(cm, stone_id, event);
