@@ -1839,8 +1839,7 @@ EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format);
  * Free a source.
  *
  * This call also free's the resources associated with an EVsource handle..
- * \param cm The CManager from which this stone was allocated.
- * \param stone The stone to free.
+ * \param source  The source to free.
  */
 /*REMOTE*/
 extern void
