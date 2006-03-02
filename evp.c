@@ -1387,6 +1387,12 @@ INT_EVcreate_submit_handle_free(CManager cm, EVstone stone,
     return source;
 }
 
+extern void
+INT_EVfree_source(EVsource source)
+{
+    free(source);
+}
+
 static void
 reference_event(event_item *event)
 {
