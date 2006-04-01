@@ -9,6 +9,7 @@
 #include "evpath.h"
 #include "cm_internal.h"
 #include "ecl.h"
+#include "libltdl/ltdl.h"
 
 typedef enum {Response_Filter, Response_Transform, Response_Router, Response_Multiqueued} response_types;
 
@@ -770,6 +771,84 @@ add_param_list(ecl_parse_context parse_context, char *name, int param_num,
 }
 #endif
 
+int
+check_filter_string(filter)
+char *filter;
+{
+
+    if (filter[0] == 'd' && filter[1] == 'l' && filter[2] == 'l' && filter[3] == ':') {
+    return 1;
+    }
+    return 0;
+}
+
+char *
+extract_dll_path(filter)
+char *filter;
+{
+    char *copy = strdup(filter);
+    char *temp;
+    char *path;
+
+
+    temp = strtok(copy, ":");
+    if (strcmp(temp, "dll")) {
+    return NULL;
+    }
+    temp = strtok(NULL, ":");
+
+    if (temp == NULL)
+    return NULL;
+
+    path = strdup(temp);
+
+    return path;
+}
+
+char *
+extract_symbol_name(filter)
+char *filter;
+{
+
+    char *copy = strdup(filter);
+    char *temp;
+    char *symbol;
+
+    temp = strtok(copy, ":");
+    if (strcmp(temp, "dll")) {
+    return NULL;
+    }
+    temp = strtok(NULL, ":");
+    temp = strtok(NULL, ":");
+
+    if (temp == NULL)
+    return NULL;
+
+    symbol = strdup(temp);
+
+    return symbol;
+}
+
+void*
+load_dll_symbol(path, symbol_name)
+char *path;
+char *symbol_name;
+{
+    lt_dlhandle handle;
+
+	if(lt_dlinit() != 0) {
+		fprintf(stderr, "Error in init: %s\n", lt_dlerror());
+		return NULL;
+	}
+    handle = lt_dlopen(path);
+    if (!handle) {
+    	fprintf(stderr, "failed on dll open %s\n", lt_dlerror());
+	    return NULL;
+    }
+    return lt_dlsym(handle, symbol_name);
+}
+
+
 static response_instance
 generate_filter_code(mrd, stone, format)
 struct response_spec *mrd;
@@ -814,8 +893,20 @@ IOFormat format;
     switch(mrd->response_type) {
     case Response_Filter:
     case Response_Router:
-	code = ecl_code_gen(mrd->u.filter.function, parse_context);
-	instance->response_type = mrd->response_type;
+
+    if (check_filter_string(mrd->u.filter.function)) {
+	    /* it is a dll */
+    	char *path = NULL;
+	    char *symbol_name = NULL;
+
+    	path = extract_dll_path(mrd->u.filter.function);
+	    symbol_name = extract_symbol_name(mrd->u.filter.function);
+		code = (ecl_code)malloc(sizeof(ecl_code));
+		code->func = load_dll_symbol(path, symbol_name);
+    } else {
+		code = ecl_code_gen(mrd->u.filter.function, parse_context);
+		instance->response_type = mrd->response_type;
+	}
 	instance->u.filter.code = code;
 	break;
     case Response_Transform:
