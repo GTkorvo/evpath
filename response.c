@@ -894,18 +894,18 @@ IOFormat format;
     case Response_Filter:
     case Response_Router:
 
-    if (check_filter_string(mrd->u.filter.function)) {
+	if (check_filter_string(mrd->u.filter.function)) {
 	    /* it is a dll */
-    	char *path = NULL;
+	    char *path = NULL;
 	    char *symbol_name = NULL;
-
-    	path = extract_dll_path(mrd->u.filter.function);
+	    
+	    path = extract_dll_path(mrd->u.filter.function);
 	    symbol_name = extract_symbol_name(mrd->u.filter.function);
-		code = (ecl_code)malloc(sizeof(ecl_code));
-		code->func = load_dll_symbol(path, symbol_name);
-    } else {
-		code = ecl_code_gen(mrd->u.filter.function, parse_context);
-		instance->response_type = mrd->response_type;
+	    code = (ecl_code)malloc(sizeof(ecl_code));
+	    code->func = (void (*)()) load_dll_symbol(path, symbol_name);
+	} else {
+	    code = ecl_code_gen(mrd->u.filter.function, parse_context);
+	    instance->response_type = mrd->response_type;
 	}
 	instance->u.filter.code = code;
 	break;
