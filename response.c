@@ -771,7 +771,7 @@ add_param_list(ecl_parse_context parse_context, char *name, int param_num,
 }
 #endif
 
-int
+static int
 check_filter_string(filter)
 char *filter;
 {
@@ -782,7 +782,7 @@ char *filter;
     return 0;
 }
 
-char *
+static char *
 extract_dll_path(filter)
 char *filter;
 {
@@ -805,7 +805,7 @@ char *filter;
     return path;
 }
 
-char *
+static char *
 extract_symbol_name(filter)
 char *filter;
 {
@@ -829,7 +829,7 @@ char *filter;
     return symbol;
 }
 
-void*
+static void*
 load_dll_symbol(path, symbol_name)
 char *path;
 char *symbol_name;
