@@ -122,6 +122,14 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
     }
 }
 
+static void
+clear_no_action_list(stone_type stone)
+{
+    stone->no_action_count = 0;
+    if (stone->no_action_list) free(stone->no_action_list);
+    stone->no_action_list = NULL;
+}
+
 EVstone
 INT_EVcreate_terminal_action(CManager cm, 
 			CMFormatList format_list, EVSimpleHandlerFunc handler,
@@ -169,6 +177,7 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone_num,
     stone->actions[action_num].o.terminal_proto_action_number = proto_action_num;
     stone->proto_action_count++;
     stone->action_count++;
+    clear_no_action_list(stone);
     if (CMtrace_on(cm, EVerbose)) {
 	printf("Adding Terminal action %d to stone %d",	action_num, stone_num);
 	printf("Stone dump->\n");
@@ -216,6 +225,7 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
     stone->actions[action_num].o.imm.mutable_response_data = 
 	install_response_handler(cm, stone_num, action_spec, client_data);
     stone->action_count++;
+    clear_no_action_list(stone);
     return action_num;
 }
 
@@ -256,6 +266,7 @@ INT_EVassoc_filter_action(CManager cm, EVstone stone_num,
     stone->actions[action_num].o.terminal_proto_action_number = proto_action_num;
     stone->proto_action_count++;
     stone->action_count++;
+    clear_no_action_list(stone);
     return action_num;
 }
     
@@ -378,6 +389,7 @@ IOFormat incoming_format;
     set_conversions(act->o.decode.context, format,
 		    act->o.decode.target_reference_format);
     stone->action_count++;
+    clear_no_action_list(stone);
 }
 
 int
@@ -652,7 +664,7 @@ dump_action(stone_type stone, int a, const char *indent)
     printf("  expects format ");
     if (act->reference_format) {
 	char *tmp;
-	printf("\"%s\" ", tmp = global_name_of_IOformat(act->reference_format));
+	printf("\"%s\" \n", tmp = global_name_of_IOformat(act->reference_format));
 	free(tmp);
     } else {
 	printf(" NULL\n");
@@ -1081,6 +1093,7 @@ INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
     act->o.imm.subacts[sub_num].client_data = client_data;
     act->o.imm.subacts[sub_num].reference_format = reference_format;
     act->o.imm.subaction_count++;
+    clear_no_action_list(stone);
     return sub_num;
 }
 
@@ -1132,6 +1145,7 @@ INT_EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list
     stone->actions[action_num].o.out.remote_stone_id = remote_stone;
     stone->default_action = action_num;
     stone->action_count++;
+    clear_no_action_list(stone);
     return action_num;
 }
 
@@ -1178,6 +1192,7 @@ INT_EVassoc_split_action(CManager cm, EVstone stone_num,
     stone->actions[action_num].o.split_stone_targets[i] = -1;
     stone->default_action = action_num;
     stone->action_count++;
+    clear_no_action_list(stone);
     return action_num;
 }
 
