@@ -55,12 +55,15 @@ typedef struct response_spec {
 } *handler_list;
 
 struct filter_instance {
+    int (*func_ptr)(void *, attr_list);
     ecl_code code;
+    ecl_exec_context ec;
     void *client_data;
 };
 
 struct transform_instance {
     ecl_code code;
+    ecl_exec_context ec;
     int out_size;
     void *client_data;
     IOFormat out_format;
@@ -430,13 +433,29 @@ INT_create_multiqueued_action_spec(CMFormatList *input_format_lists, char *funct
     return str;
 }
 
+struct ev_state_data {
+    CManager cm;
+    struct _event_item *cur_event;
+    int out_count;
+    int *out_stones;
+};
+
 static int
 filter_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	       attr_list attrs, int out_count, int *out_stones)
 {
     response_instance instance = (response_instance)client_data;
     int ret;
-    ret = ((int(*)(void *, attr_list))instance->u.filter.code->func)(event->decoded_event, attrs);
+    ecl_exec_context ec = instance->u.filter.ec;
+    struct ev_state_data ev_state;
+
+    ev_state.cm = cm;
+    ev_state.cur_event = event;
+    ev_state.out_count = out_count;
+    ev_state.out_stones = out_stones;
+    ecl_assoc_client_data(ec, 0x34567890, (long)&ev_state);
+
+    ret = ((int(*)(ecl_exec_context, void *, attr_list))instance->u.filter.code->func)(ec, event->decoded_event, attrs);
     if (ret) {
 	CMtrace_out(cm, EVerbose, "Filter function returned %d, submitting further to stone %d\n", ret, out_stones[0]);
 	internal_path_submit(cm, out_stones[0], event);
@@ -451,7 +470,21 @@ router_wrapper(CManager cm, struct _event_item *event, void *client_data,
 {
     response_instance instance = (response_instance)client_data;
     int ret;
-    ret = ((int(*)(void *, attr_list))instance->u.filter.code->func)(event->decoded_event, attrs);
+    if (instance->u.filter.func_ptr) {
+	ret = ((int(*)(void *, attr_list))instance->u.filter.func_ptr)(event->decoded_event, attrs);
+    } else {
+	int (*func)(ecl_exec_context, void *, attr_list) = 
+	    (int(*)(ecl_exec_context, void *, attr_list))instance->u.filter.code->func;
+	ecl_exec_context ec = instance->u.filter.ec;
+	struct ev_state_data ev_state;
+
+	ev_state.cm = cm;
+	ev_state.cur_event = event;
+	ev_state.out_count = out_count;
+	ev_state.out_stones = out_stones;
+	ecl_assoc_client_data(ec, 0x34567890, (long)&ev_state);
+	ret = (func)(ec, event->decoded_event, attrs);
+    }
     if (ret >= 0) {
 	if (ret >= out_count) {
 	    CMtrace_out(cm, EVerbose, "Router function returned %d, larger than the number of associated outputs\n", ret);
@@ -483,8 +516,17 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
     response_instance instance = (response_instance)client_data;
     int ret;
     void *out_event = malloc(instance->u.transform.out_size);
-    int(*func)(void *, void*, attr_list) = 
-	(int(*)(void *, void*, attr_list))instance->u.transform.code->func;
+    int(*func)(ecl_exec_context, void *, void*, attr_list) = 
+	(int(*)(ecl_exec_context, void *, void*, attr_list))instance->u.transform.code->func;
+    ecl_exec_context ec = instance->u.transform.ec;
+    struct ev_state_data ev_state;
+
+    ev_state.cm = cm;
+    ev_state.cur_event = event;
+    ev_state.out_count = out_count;
+    ev_state.out_stones = out_stones;
+    ecl_assoc_client_data(ec, 0x34567890, (long)&ev_state);
+
     if (CMtrace_on(cm, EVerbose)) {
 	printf("Input Transform Event is :\n");
 	if (event->reference_format) {
@@ -496,7 +538,7 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	}
     }
     memset(out_event, 0, instance->u.transform.out_size);
-    ret = func(event->decoded_event, out_event, attrs);
+    ret = func(ec, event->decoded_event, out_event, attrs);
     if (ret) {
 	struct _EVSource s;
 	if (CMtrace_on(cm, EVerbose)) {
@@ -685,6 +727,20 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 void
 response_data_free(){}
 
+static void
+internal_ecl_submit(ecl_exec_context ec, int port, void *data, void *type_info)
+{
+    printf("In submit, ec is %lx, port is %d, data is %lx, tpye_info is %lx\n",
+	   ec, port, data, type_info);
+    struct ev_state_data *ev_state = (void*)ecl_get_client_data(ec, 0x34567890);
+
+    printf("Evstate is %lx\n", ev_state);
+    printf("Evstate.cm is %lx, curevent is %lx, out_count is %lx, out_stones %lx\n", 
+	   ev_state->cm, ev_state->cur_event, ev_state->out_count, 
+	   ev_state->out_stones);
+    internal_path_submit(ev_state->cm, ev_state->out_stones[port], ev_state->cur_event);
+}
+
 
 static void
 add_standard_routines(stone, context)
@@ -695,6 +751,7 @@ ecl_parse_context context;
 		int printf(string format, ...);\n\
 		long lrand48();\n\
 		double drand48();\n\
+		void EVsubmit(ecl_exec_context ec, int port, void* d, ecl_type_spec dt);\n\
 		attr_list stone_attrs;";
 
     static ecl_extern_entry externs[] = {
@@ -702,6 +759,7 @@ ecl_parse_context context;
 	{"lrand48", (void *) 0},
 	{"drand48", (void *) 0},
 	{"stone_attrs", (void *) 0},
+	{"EVsubmit", (void *) 0},
 	{(void *) 0, (void *) 0}
     };
     /* 
@@ -712,6 +770,7 @@ ecl_parse_context context;
     externs[1].extern_value = (void *) (long) lrand48;
     externs[2].extern_value = (void *) (long) drand48;
     externs[3].extern_value = (void *) (long) &stone->stone_attrs;
+    externs[4].extern_value = (void *) (long) &internal_ecl_submit;
 
     ecl_assoc_externs(context, externs);
     ecl_parse_for_context(extern_string, context);
@@ -861,19 +920,21 @@ IOFormat format;
     ecl_parse_context parse_context = new_ecl_parse_context();
     /*    sm_ref conn_info_data_type, conn_info_param;*/
 
+    memset(instance, 0, sizeof(*instance));
     add_standard_routines(stone, parse_context);
 
     switch (mrd->response_type) {
     case Response_Filter:
     case Response_Router:
     case Response_Transform:
+	ecl_add_param("ec", "ecl_exec_context", 0, parse_context);
 	if (format) {
-	    add_param(parse_context, "input", 0, format);
+	    add_param(parse_context, "input", 1, format);
 	} else {
-	    ecl_add_param("input", "int", 0, parse_context);
+	    ecl_add_param("input", "int", 1, parse_context);
 	}
 	if (mrd->response_type == Response_Transform) {
-	    add_param(parse_context, "output", 1, 
+	    add_param(parse_context, "output", 2, 
 		      mrd->u.transform.reference_output_format);
 	}
 	break;
@@ -901,18 +962,22 @@ IOFormat format;
 	    
 	    path = extract_dll_path(mrd->u.filter.function);
 	    symbol_name = extract_symbol_name(mrd->u.filter.function);
-	    code = (ecl_code)malloc(sizeof(ecl_code));
-	    code->func = (void (*)()) load_dll_symbol(path, symbol_name);
+	    instance->u.filter.func_ptr = (int(*)(void*,attr_list)) load_dll_symbol(path, symbol_name);
+	    instance->u.filter.code = NULL;
 	} else {
 	    code = ecl_code_gen(mrd->u.filter.function, parse_context);
 	    instance->response_type = mrd->response_type;
+	    instance->u.filter.code = code;
+	    instance->u.filter.ec = ecl_create_exec_context(code);
+	    
+	    instance->u.filter.func_ptr = NULL;
 	}
-	instance->u.filter.code = code;
 	break;
     case Response_Transform:
 	code = ecl_code_gen(mrd->u.transform.function, parse_context);
 	instance->response_type = Response_Transform;
 	instance->u.transform.code = code;
+	instance->u.transform.ec = ecl_create_exec_context(code);
 	instance->u.transform.out_size = 
 	    mrd->u.transform.output_base_struct_size;
 	instance->u.transform.out_format = 

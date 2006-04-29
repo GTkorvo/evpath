@@ -60,8 +60,8 @@ int main(int argc, char **argv)
 	attr_list contact_list;
 	char **filter_specs = NULL, *filter_spec, *next;
 	EVstone remote_stone, output_stone;
-        if (sscanf(argv[1], "%d:%s", &remote_stone, &string_list[0]) != 2) {
-	    printf("Bad argument \"%s\"\n", argv[1]);
+        if (sscanf(argv[i], "%d:%s", &remote_stone, &string_list[0]) != 2) {
+	    printf("Bad argument \"%s\"\n", argv[i]);
 	    exit(0);
 	}
 	filter_spec = strchr(string_list, ':');

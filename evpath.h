@@ -1,5 +1,4 @@
 
-
 #ifndef __EVPATH__H__
 #define __EVPATH__H__
 /*! \file */
@@ -1623,12 +1622,10 @@ EVassoc_immediate_action(CManager cm, EVstone stone, char *action_spec,
  * \param cm The CManager from which this stone was allocated.
  * \param action_spec An action specification of the sort created by
  * create_filter_action_spec() or create_transform_action_spec().
- * \param target_list A zero-terminated list of stones to which outgoing
+ * \param target_list A -1 terminated list of stones to which outgoing
  * data is to be sent.  This initial list can be NULL (or merely have
  * an initial 0) to specify no targets at action initialization time.  
  * Values are filled in later with EVaction_set_output().
- * \param client_data An uninterpreted value that is passed to the handler
- * function when it is called.
  * \return The stone identifier, an integer EVstone value, which can be used
  * in subsequent calls.
  */
@@ -1753,9 +1750,9 @@ EVcreate_output_action(CManager cm, attr_list contact_list,
  *
  * \param cm The CManager from which this stone was allocated.
  * \param stone The local stone to which to register the action.
- * \param target_list A zero-terminated list of stones to which incoming
+ * \param target_list A '-1' terminated list of stones to which incoming
  * data is to be replicated.  This initial list can be NULL (or merely have
- * an initial 0) to specify no targets at action initialization time.
+ * an initial '-1') to specify no targets at action initialization time.
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
  */
@@ -1774,9 +1771,9 @@ EVassoc_split_action(CManager cm, EVstone stone, EVstone *target_list);
  * only in that it creates a stone rather than using an existing stone.
  *
  * \param cm The CManager from which this stone was allocated.
- * \param target_list A zero-terminated list of stones to which incoming
+ * \param target_list A '-1' terminated list of stones to which incoming
  * data is to be replicated.  This initial list can be NULL (or merely have
- * an initial 0) to specify no targets at action initialization time.
+ * an initial -1) to specify no targets at action initialization time.
  * \return The stone identifier, an integer EVstone value, which can be used
  * in subsequent calls.
  */
@@ -1942,7 +1939,8 @@ EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
  * as being available at intermediate processing points.  Some attributes
  * may affect the processing or transmission of data, depending upon the
  * specific transport or processing agents.
- * \param source The EVsource handle through which data is to be submitted.
+ * \param cm The CManager associated with the stone.
+ * \param stone The stone to which data is to be submitted.
  * \param data The pre-encoded data to be submitted, represented as a void*.
  * \param data_len The length of the pre-encoded data block.
  * \param attrs The attribute list to be submitted with the data.
@@ -2021,6 +2019,9 @@ EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec,
  * \param period_sec The period at which submits should occur, seconds portion.
  * \param period_usec The period at which submits should occur, microseconds
  * portion.
+ * \param action_spec An action specification of the sort created by
+ * create_filter_action_spec() or create_transform_action_spec().
+ * \param out_stone The local stone to which output should be directed.
  * \return The stone identifier, an integer EVstone value, which can be used
  * in subsequent calls.
  */
@@ -2075,10 +2076,9 @@ create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_l
 /*!
  * create an action specification that operates on multiple queues of events
  *
- * \param input_format_list A null-terminated list of descriptions of 
- *  the incoming event data types that the transformation expects. 
- * \param out_format_list A description of the outgoing event data that the
- * transformation will produce. 
+ * \param input_format_lists A null-terminated list of null-terminated lists
+ *  of descriptions of  the incoming event data types that the transformation
+ *  expects. 
  * \param function The processing that will perform the transformation.  A
  * zero return value means that the output data should be ignored/discarded.
  */
@@ -2143,7 +2143,7 @@ EVassoc_conversion_action(CManager cm, int stone_id, IOFormat target_format,
  * is currently executing and then prevent the output stone from sending any 
  * more data to its target stones.
  * \param cm The CManager in which the stone is registered
- * \param stone The output stone which is to be frozen
+ * \param stone_id The output stone which is to be frozen
  * \return Returns 1 on success, 0 on failure
  */ 
 extern int
@@ -2156,7 +2156,7 @@ EVfreeze_stone(CManager cm, EVstone stone_id);
  * two other functions to obtain the events and the attributes of the stone which 
  * is to be drained.
  * \param cm The CManager in which the stone is registered
- * \param stone The stone which is to be drained
+ * \param stone_id The stone which is to be drained
  * \return Returns 1 on success, 0 on failure
  */
 extern int
@@ -2170,8 +2170,8 @@ EVdrain_stone(CManager cm, EVstone stone_id);
  * event and a pointer to the encoded event. The array will contain an entry 
  * for each event, associated with the stone or its actions.   
  * \param cm The CManager in which the stone is registered
- * \param stone The stone whose associated events are to be extracted
- * \return buffer_list Returns an array of structures containing the
+ * \param stone_id The stone whose associated events are to be extracted
+ * \return  Returns an array of structures (EVevent_list) containing the
  * lengths of events and pointers to the encoded versions of events
  */
 extern EVevent_list
@@ -2183,7 +2183,7 @@ EVextract_stone_events(CManager cm, EVstone stone_id);
  * This function will be called by EVdrain_stone. It will return the atrributes of 
  * the stone.
  * \param cm The CManager in which the stone is registered
- * \param stone The stone whose attributes are to be extracted
+ * \param stone_id The stone whose attributes are to be extracted
  * \return attr_list Returns the attribute list associated with the stone
  */
 extern attr_list
@@ -2195,7 +2195,7 @@ EVextract_attr_list(CManager cm, EVstone stone_id);
  * This function will wait till a stone is drained. Then it will free all the
  * data and events associated with the stone.
  * \param cm The CManager in which the stone is registered
- * \param stone The stone which is to be destroyed
+ * \param stone_id The stone which is to be destroyed
  * \return Returns 1 on success, 0 on failure
  */ 
 extern int

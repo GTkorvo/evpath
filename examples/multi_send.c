@@ -35,8 +35,8 @@ int main(int argc, char **argv)
 	char string_list[2048];
 	attr_list contact_list;
 	EVstone remote_stone, output_stone;
-        if (sscanf(argv[1], "%d:%s", &remote_stone, &string_list[0]) != 2) {
-	    printf("Bad argument \"%s\"\n", argv[1]);
+        if (sscanf(argv[i], "%d:%s", &remote_stone, &string_list[0]) != 2) {
+	    printf("Bad argument \"%s\"\n", argv[i]);
 	    exit(0);
 	}
 	output_stone = EValloc_stone(cm);

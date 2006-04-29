@@ -2,11 +2,13 @@
 
 typedef struct _simple_rec {
     int integer_field;
+    char *str;
 } simple_rec, *simple_rec_ptr;
 
 static IOField simple_field_list[] =
 {
     {"integer_field", "integer", sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
+    {"str", "string", sizeof(char*), IOOffset(simple_rec_ptr, str)},
     {NULL, NULL, 0, 0}
 };
 static CMFormatRec simple_format_list[] =
@@ -54,8 +56,8 @@ int main(int argc, char **argv)
 	attr_list contact_list;
 	char *filter_spec;
 	EVstone remote_stone, output_stone;
-        if (sscanf(argv[1], "%d:%s", &remote_stone, &string_list[0]) != 2) {
-	    printf("Bad argument \"%s\"\n", argv[1]);
+        if (sscanf(argv[i], "%d:%s", &remote_stone, &string_list[0]) != 2) {
+	    printf("Bad argument \"%s\"\n", argv[i]);
 	    exit(0);
 	}
 	filter_spec = strchr(string_list, ':');
@@ -63,11 +65,14 @@ int main(int argc, char **argv)
 	    *filter_spec = 0;           /* terminate the contact list */
 	    filter_spec++;		/* advance pointer to string start */
 	    atl_base64_decode((unsigned char *)filter_spec, NULL);  /* decode in place */
+	    printf("String list is %s\n", string_list);
 	}
 
 	/* regardless of filtering or not, we'll need an output stone */
 	output_stone = EValloc_stone(cm);
 	contact_list = attr_list_from_string(string_list);
+	printf("This is the contact list   --------");
+	dump_attr_list(contact_list);
 	EVassoc_output_action(cm, output_stone, contact_list, remote_stone);
 
 	if (filter_spec == NULL) {
@@ -82,6 +87,7 @@ int main(int argc, char **argv)
 
     source = EVcreate_submit_handle(cm, split_stone, simple_format_list);
     data.integer_field = 318;
+    data.str = "kraut";
     for (i=0; i < 10; i++) {
 	EVsubmit(source, &data, NULL);
 	data.integer_field++;
