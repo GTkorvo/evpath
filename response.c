@@ -731,13 +731,13 @@ static void
 internal_ecl_submit(ecl_exec_context ec, int port, void *data, void *type_info)
 {
     printf("In submit, ec is %lx, port is %d, data is %lx, tpye_info is %lx\n",
-	   ec, port, data, type_info);
+	   (long)ec, (long)port, (long)data, (long)type_info);
     struct ev_state_data *ev_state = (void*)ecl_get_client_data(ec, 0x34567890);
 
-    printf("Evstate is %lx\n", ev_state);
+    printf("Evstate is %lx\n", (long)ev_state);
     printf("Evstate.cm is %lx, curevent is %lx, out_count is %lx, out_stones %lx\n", 
-	   ev_state->cm, ev_state->cur_event, ev_state->out_count, 
-	   ev_state->out_stones);
+	   (long)ev_state->cm, (long)ev_state->cur_event, (long)ev_state->out_count, 
+	   (long)ev_state->out_stones);
     internal_path_submit(ev_state->cm, ev_state->out_stones[port], ev_state->cur_event);
 }
 
