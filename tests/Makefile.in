@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-SOURCES = auto_test.c block_test.c bulktest.c evtest.c extract_test.c filter2_test.c filter_test.c http_test.c router_test.c router_test2.c transform_test.c
+SOURCES = auto_test.c block_test.c bulktest.c evtest.c extract_test.c filter2_test.c filter_test.c http_test.c router_test.c router_test2.c submit_test.c transform_test.c
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -42,7 +42,7 @@ noinst_PROGRAMS = evtest$(EXEEXT) bulktest$(EXEEXT) http_test$(EXEEXT) \
 	filter_test$(EXEEXT) router_test$(EXEEXT) \
 	router_test2$(EXEEXT) filter2_test$(EXEEXT) \
 	transform_test$(EXEEXT) auto_test$(EXEEXT) \
-	extract_test$(EXEEXT) block_test$(EXEEXT)
+	extract_test$(EXEEXT) block_test$(EXEEXT) submit_test$(EXEEXT)
 subdir = tests
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -95,6 +95,10 @@ router_test2_SOURCES = router_test2.c
 router_test2_OBJECTS = router_test2.$(OBJEXT)
 router_test2_LDADD = $(LDADD)
 router_test2_DEPENDENCIES = ../libevpath.la
+submit_test_SOURCES = submit_test.c
+submit_test_OBJECTS = submit_test.$(OBJEXT)
+submit_test_LDADD = $(LDADD)
+submit_test_DEPENDENCIES = ../libevpath.la
 transform_test_SOURCES = transform_test.c
 transform_test_OBJECTS = transform_test.$(OBJEXT)
 transform_test_LDADD = $(LDADD)
@@ -112,10 +116,10 @@ LINK = $(LIBTOOL) --mode=link --tag=CC $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = auto_test.c block_test.c bulktest.c evtest.c extract_test.c \
 	filter2_test.c filter_test.c http_test.c router_test.c \
-	router_test2.c transform_test.c
+	router_test2.c submit_test.c transform_test.c
 DIST_SOURCES = auto_test.c block_test.c bulktest.c evtest.c \
 	extract_test.c filter2_test.c filter_test.c http_test.c \
-	router_test.c router_test2.c transform_test.c
+	router_test.c router_test2.c submit_test.c transform_test.c
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -245,7 +249,7 @@ sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 AUTOMAKE_OPTIONS = no-dependencies foreign
 OLD_TESTS = cmtest cmping take_test
-TESTS = evtest bulktest http_test filter_test router_test router_test2 filter2_test transform_test auto_test extract_test
+TESTS = evtest bulktest http_test filter_test router_test router_test2 filter2_test transform_test auto_test extract_test submit_test
 LDADD = ../libevpath.la
 all: all-am
 
@@ -317,6 +321,9 @@ router_test$(EXEEXT): $(router_test_OBJECTS) $(router_test_DEPENDENCIES)
 router_test2$(EXEEXT): $(router_test2_OBJECTS) $(router_test2_DEPENDENCIES) 
 	@rm -f router_test2$(EXEEXT)
 	$(LINK) $(router_test2_LDFLAGS) $(router_test2_OBJECTS) $(router_test2_LDADD) $(LIBS)
+submit_test$(EXEEXT): $(submit_test_OBJECTS) $(submit_test_DEPENDENCIES) 
+	@rm -f submit_test$(EXEEXT)
+	$(LINK) $(submit_test_LDFLAGS) $(submit_test_OBJECTS) $(submit_test_LDADD) $(LIBS)
 transform_test$(EXEEXT): $(transform_test_OBJECTS) $(transform_test_DEPENDENCIES) 
 	@rm -f transform_test$(EXEEXT)
 	$(LINK) $(transform_test_LDFLAGS) $(transform_test_OBJECTS) $(transform_test_LDADD) $(LIBS)
