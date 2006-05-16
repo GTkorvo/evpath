@@ -249,6 +249,7 @@ INT_EVassoc_filter_action(CManager cm, EVstone stone_num,
     stone->proto_actions[proto_action_num].o.term.target_stone_id = out_stone_num;
     stone->proto_actions[proto_action_num].requires_decoded = 1;
     stone->proto_actions[proto_action_num].reference_format = NULL;
+    stone->proto_actions[proto_action_num].queue = stone->queue;
     if (format_list != NULL) {
 	stone->proto_actions[proto_action_num].reference_format = 
 	    EVregister_format_set(cm, format_list, NULL);
@@ -337,7 +338,10 @@ set_conversions(IOContext ctx, IOFormat src_format, IOFormat target_format)
 	    }
 	    j++;
 	}
-	if (!found) printf("No match for %s\n", global_name_of_IOformat(*subformat_list));
+	if (!found && (subformat_list[1] != NULL)) {
+	    printf("No match for %s\n", 
+		   global_name_of_IOformat(*subformat_list));
+	}
 	subformat_list++;
     }
     if (!has_conversion_IOformat(src_format)) {

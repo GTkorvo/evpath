@@ -746,7 +746,6 @@ internal_ecl_submit(ecl_exec_context ec, int port, void *data, void *type_info)
     CManager cm = ev_state->cm;
     event_path_data evp = ev_state->cm->evp;
     event_item *event;
-    printf("In internal ECL submit\n");
     assert(CManager_locked(cm));
     if (data == ev_state->cur_event->decoded_event) {
 	CMtrace_out(cm, EVerbose, 
