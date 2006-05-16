@@ -168,7 +168,7 @@ parse_IOformat_from_string(char *str, char **format_name, IOFieldList *list_p)
 
 void *
 install_response_handler(CManager cm, int stone_id, char *response_spec, 
-			 void *local_data)
+			 void *local_data, IOFormat *ref_ptr)
 {
     char *str = response_spec;
     if (strncmp("Terminal Action", str, strlen("Terminal Action")) == 0) {
@@ -205,6 +205,8 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	response->u.filter.client_data = local_data;
 	response->u.filter.reference_format = 
 	    EVregister_format_set(cm, list, NULL);
+	if (ref_ptr)
+	    *ref_ptr = response->u.filter.reference_format;
 	return (void*)response;
     }
     if (strncmp("Router Action", str, strlen("Router Action")) == 0) {
@@ -228,6 +230,8 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	response->u.filter.client_data = local_data;
 	response->u.filter.reference_format = 
 	    EVregister_format_set(cm, list, NULL);
+	if (ref_ptr)
+	    *ref_ptr = response->u.filter.reference_format;
 	return (void*)response;
     }
     if (strncmp("Transform Action", str, strlen("Transform Action")) == 0) {
@@ -268,6 +272,8 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	if (in_list[0].format_name != NULL) 
 	    response->u.transform.reference_input_format = 
 		EVregister_format_set(cm, in_list, NULL);
+	if (ref_ptr)
+	    *ref_ptr = response->u.transform.reference_input_format;
 	if (out_list[0].format_name != NULL)
 	    response->u.transform.reference_output_format = 
 		EVregister_format_set(cm, out_list, NULL);
@@ -579,8 +585,8 @@ localize_format(CManager cm, IOFormat format)
     }
     free(formats);
     return EVregister_format_set(cm, list, NULL);
-}    
-    
+}
+
 void
 dump_mrd(void *mrdv)
 {
@@ -609,33 +615,16 @@ response_determination(CManager cm, stone_type stone, event_item *event)
     int nearest_proto_action = -1;
     int return_value = 0;
     IOFormat conversion_target_format = NULL;
-    int i, format_count, action_num = -1;
+    int i, format_count;
     IOFormat * formatList;
     IOcompat_formats older_format = NULL;
 
     formatList =
-	(IOFormat *) malloc((stone->proto_action_count + stone->action_count + 1) * sizeof(IOFormat));
+	(IOFormat *) malloc((stone->proto_action_count + 1) * sizeof(IOFormat));
     for (i = 0; i < stone->proto_action_count; i++) {
 	formatList[i] = stone->proto_actions[i].reference_format;
     }
     format_count = stone->proto_action_count;
-    for (i = 0; i < stone->action_count; i++) {
-	if (stone->actions[i].action_type == Action_Immediate) {
-	    struct response_spec *mrd = 
-		stone->actions[i].o.imm.mutable_response_data;
-	    switch(mrd->response_type) {
-	    case Response_Filter:
-	    case Response_Router:
-		formatList[format_count++] = mrd->u.filter.reference_format;
-		break;
-	    case Response_Transform:
-		formatList[format_count++] = mrd->u.transform.reference_input_format;
-		break;
-	    case Response_Multiqueued:
-		break;
-	    }
-	}
-    }
     formatList[format_count] = NULL;
     if (event->reference_format == NULL) {
 	/* special case for unformatted input */
@@ -651,74 +640,88 @@ response_determination(CManager cm, stone_type stone, event_item *event)
     }
     free(formatList);
     if (nearest_proto_action != -1) {
-	if (nearest_proto_action < stone->proto_action_count) {
+	int action_generated = 0;
+	if (stone->proto_actions[nearest_proto_action].action_type != Action_Immediate) {
+	    response_cache_element *resp;
 	    conversion_target_format = stone->proto_actions[nearest_proto_action].reference_format;
+	    /* we'll install the conversion later, first map the response */
+	    if (stone->response_cache_count == 0) {
+		stone->response_cache = malloc(sizeof(stone->response_cache[0]));
+	    } else {
+		stone->response_cache = 
+		    realloc(stone->response_cache,
+			    (stone->response_cache_count + 1) * sizeof(stone->response_cache[0]));
+	    }
+	    resp = &stone->response_cache[stone->response_cache_count++];
+	    proto_action *proto = &stone->proto_actions[nearest_proto_action];
+	    resp->reference_format = conversion_target_format;
+	    resp->proto_action_id = nearest_proto_action;
+	    resp->action_type = proto->action_type;
+	    resp->requires_decoded = proto->requires_decoded;
 	} else {
-	    if (nearest_proto_action != -1) {
-		/* must be immediate action */
-		int format_count = stone->proto_action_count;
-		response_instance instance;
-		struct response_spec *mrd;
-		for (i = 0; i < stone->action_count; i++) {
-		    if (stone->actions[i].action_type == Action_Immediate) {
-			if (format_count == nearest_proto_action) {
-			    mrd = 
-				stone->actions[i].o.imm.mutable_response_data;
-			    switch(mrd->response_type) {
-			    case Response_Filter:
-			    case Response_Router:
-				if (event->event_encoded) {
-				    conversion_target_format = 
-					localize_format(cm, event->reference_format);
-				} else {
-				    conversion_target_format = event->reference_format;
-				}
-				break;
-			    case Response_Transform:
-				conversion_target_format = mrd->u.transform.reference_input_format;
-				break;
-			    case Response_Multiqueued:
-				break;
-			    }
-			    action_num = i;
-			}
-			format_count++;
-		    }
+	    /* must be immediate action */
+	    response_instance instance;
+	    struct response_spec *mrd;
+	    mrd = 
+		stone->proto_actions[nearest_proto_action].o.imm.mutable_response_data;
+	    switch(mrd->response_type) {
+	    case Response_Filter:
+	    case Response_Router:
+		if (event->event_encoded) {
+		    conversion_target_format = 
+			localize_format(cm, event->reference_format);
+		} else {
+		    conversion_target_format = event->reference_format;
 		}
-		mrd = stone->actions[action_num].o.imm.mutable_response_data;
-		instance = generate_filter_code(mrd, stone, conversion_target_format);
-		if (instance == 0) return 0;
-		switch(mrd->response_type) {
-		case Response_Filter:
-		    INT_EVassoc_mutated_imm_action(cm, stone->local_id, action_num, 
+		break;
+	    case Response_Transform:
+		conversion_target_format = mrd->u.transform.reference_input_format;
+		break;
+	    case Response_Multiqueued:
+		break;
+	    }
+
+	    instance = generate_filter_code(mrd, stone, conversion_target_format);
+	    if (instance == 0) return 0;
+	    action_generated++;
+	    switch(mrd->response_type) {
+	    case Response_Filter:
+		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action, 
 					       filter_wrapper, instance, 
 					       conversion_target_format);
-		    break;
-		case Response_Router:
-		    INT_EVassoc_mutated_imm_action(cm, stone->local_id, action_num, 
+		break;
+	    case Response_Router:
+		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action, 
 					       router_wrapper, instance, 
 					       conversion_target_format);
-		    break;
-		case Response_Transform:
-		    INT_EVassoc_mutated_imm_action(cm, stone->local_id, action_num, 
+		break;
+	    case Response_Transform:
+		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action, 
 					       transform_wrapper, instance, 
 					       conversion_target_format);
-		    break;
-		case Response_Multiqueued:
-		    break;
-		}
-
-		return_value = 1;
+		break;
+	    case Response_Multiqueued:
+		break;
 	    }
+	    
+	    return_value = 1;
 	}
-	if (event->event_encoded && (conversion_target_format != NULL)) {
-	    /* create a decode action */
-	    INT_EVassoc_conversion_action(cm, stone->local_id, 
-				      conversion_target_format, 
-				      event->reference_format);
+	if (conversion_target_format != NULL) {
+	    if (event->event_encoded) {
+		/* create a decode action */
+		INT_EVassoc_conversion_action(cm, stone->local_id, 
+					      conversion_target_format, 
+					      event->reference_format);
 /*	    printf(" Returning ");
 	    dump_action(stone, a, "   ");*/
-	    return_value = 1;
+		return_value = 1;
+	    } else {
+		if (event->reference_format != conversion_target_format) {
+		    printf("Bad things.  Conversion necessary, but event is not encoded\n");
+		} else {
+		    return_value = 1;
+		}
+	    }
 	}
     }
     return return_value;
@@ -728,17 +731,56 @@ void
 response_data_free(){}
 
 static void
+ecl_free_wrapper(void *data, void *free_data)
+{
+    event_item *event = (event_item *)free_data;
+    IOfree_var_rec_elements(iofile_of_IOformat(event->reference_format),
+			    event->reference_format,
+			    data);
+}
+
+static void
 internal_ecl_submit(ecl_exec_context ec, int port, void *data, void *type_info)
 {
-    printf("In submit, ec is %lx, port is %d, data is %lx, tpye_info is %lx\n",
-	   (long)ec, (long)port, (long)data, (long)type_info);
     struct ev_state_data *ev_state = (void*)ecl_get_client_data(ec, 0x34567890);
-
-    printf("Evstate is %lx\n", (long)ev_state);
-    printf("Evstate.cm is %lx, curevent is %lx, out_count is %lx, out_stones %lx\n", 
-	   (long)ev_state->cm, (long)ev_state->cur_event, (long)ev_state->out_count, 
-	   (long)ev_state->out_stones);
-    internal_path_submit(ev_state->cm, ev_state->out_stones[port], ev_state->cur_event);
+    CManager cm = ev_state->cm;
+    event_path_data evp = ev_state->cm->evp;
+    event_item *event;
+    printf("In internal ECL submit\n");
+    assert(CManager_locked(cm));
+    if (data == ev_state->cur_event->decoded_event) {
+	CMtrace_out(cm, EVerbose, 
+		    "Internal ECL submit, resubmission of current input event to stone %d\n",
+		    ev_state->out_stones[port]);
+	internal_path_submit(ev_state->cm, ev_state->out_stones[port], ev_state->cur_event);
+    } else {
+	IOFormat event_format = NULL;
+	CMtrace_out(cm, EVerbose, 
+		    "Internal ECL submit, submission of new data to stone %d\n",
+		    ev_state->out_stones[port]);
+	if (event_format == NULL) {
+	    event_format = EVregister_format_set(cm, (CMFormatList) type_info,
+						 NULL);
+	    if (event_format == NULL) {
+		printf("Bad format information on submit\n");
+		return;
+	    }
+	}
+	event = get_free_event(evp);
+	event->event_encoded = 0;
+	event->decoded_event = data;
+	event->reference_format = event_format;
+	event->format = NULL;
+/*	event->free_func = ecl_free_wrapper;*/
+	event->free_func = NULL;
+	event->free_arg = event;
+	event->attrs = NULL;
+	ecl_encode_event(cm, event);  /* map to memory we trust */
+	event->event_encoded = 1;
+	event->decoded_event = NULL;  /* lose old data */
+	internal_path_submit(cm, ev_state->out_stones[port], event);
+	return_event(cm->evp, event);
+    }
 }
 
 
@@ -968,7 +1010,8 @@ IOFormat format;
 	    code = ecl_code_gen(mrd->u.filter.function, parse_context);
 	    instance->response_type = mrd->response_type;
 	    instance->u.filter.code = code;
-	    instance->u.filter.ec = ecl_create_exec_context(code);
+	    if (code)
+		instance->u.filter.ec = ecl_create_exec_context(code);
 	    
 	    instance->u.filter.func_ptr = NULL;
 	}
@@ -977,7 +1020,8 @@ IOFormat format;
 	code = ecl_code_gen(mrd->u.transform.function, parse_context);
 	instance->response_type = Response_Transform;
 	instance->u.transform.code = code;
-	instance->u.transform.ec = ecl_create_exec_context(code);
+	if (code)
+	    instance->u.transform.ec = ecl_create_exec_context(code);
 	instance->u.transform.out_size = 
 	    mrd->u.transform.output_base_struct_size;
 	instance->u.transform.out_format = 

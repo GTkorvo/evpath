@@ -34,7 +34,7 @@ typedef struct _event_item {
     EVFreeFunction free_func;
 } event_item, *event_queue;
 
-typedef enum { Action_Output = 0, Action_Terminal, Action_Filter, Action_Immediate, Action_Decode, Action_Split} action_value;
+typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filter, Action_Immediate, Action_Decode, Action_Split} action_value;
 
 typedef struct output_action_struct {
     CMConnection conn;
@@ -50,17 +50,14 @@ typedef struct decode_action_struct {
     IOContext context;
 } decode_action_vals;
 
-typedef struct immediate_subaction_struct {
-    IOFormat reference_format;
+typedef struct immediate_cache_vals {
     IOContext context;
     EVImmediateHandlerFunc handler;
     void *client_data;
-} immediate_sub;
+} immediate_cache_vals;
 
 typedef struct immediate_action_struct {
     void *mutable_response_data;
-    int subaction_count;
-    struct immediate_subaction_struct *subacts;
     int output_count;
     int *output_stone_ids;
 } immediate_action_vals;
@@ -68,7 +65,6 @@ typedef struct immediate_action_struct {
 typedef struct queue_item {
     event_item *item;
     int action_id;
-    int subaction_id;
     struct queue_item *next;
 } queue_item;
 
@@ -76,22 +72,6 @@ typedef struct _queue {
     queue_item *queue_head;
     queue_item *queue_tail;
 } queue_struct, *queue_ptr;
-
-typedef struct _action {
-    action_value action_type;
-    IOFormat reference_format;
-    int requires_decoded;
-    queue_ptr queue;
-    attr_list attrs;
-    double event_length_sum;  /*in KBytes*/
-    union {
-	output_action_vals out;
-	decode_action_vals decode;
-	immediate_action_vals imm;
-	int terminal_proto_action_number;
-	int *split_stone_targets;
-    }o;
-} action;
 
 struct terminal_proto_vals {
     EVSimpleHandlerFunc handler;
@@ -105,23 +85,40 @@ typedef struct _proto_action {
     IOFormat reference_format;
     union {
 	struct terminal_proto_vals term;
-    }t;
+	output_action_vals out;
+	decode_action_vals decode;
+	immediate_action_vals imm;
+	int *split_stone_targets;
+    }o;
+    int requires_decoded;
+    queue_ptr queue;
+    attr_list attrs;
+    double event_length_sum;  /*in KBytes*/
 } proto_action;
+
+typedef struct response_cache_element {
+    IOFormat reference_format;
+    action_value action_type;		/* if -1, no action */
+    int proto_action_id;
+    int requires_decoded;
+    union {
+	decode_action_vals decode;
+	immediate_cache_vals imm;
+    }o;
+} response_cache_element;
 
 typedef struct _stone {
     int local_id;
     int default_action;
-    int proto_action_count;
     int is_frozen;
     int is_processing;
     int is_outputting;
     int is_draining;
-    int no_action_count;
-    IOFormat *no_action_list;
+    int response_cache_count;
+    response_cache_element *response_cache;
     queue_ptr queue;
+    int proto_action_count;
     struct _proto_action *proto_actions;
-    int action_count;
-    struct _action *actions;
     CMTaskHandle periodic_handle;
     attr_list stone_attrs;
 } *stone_type;
@@ -130,8 +127,6 @@ typedef struct _event_path_data {
     int stone_count;
     stone_type stone_map;
     IOContext root_context;
-    int output_action_count;
-    action **output_actions;
     queue_item *queue_items_free_list;
     event_item *current_event_item;
     queue_item *taken_events_list;
@@ -166,3 +161,6 @@ extern EVstone INT_EVcreate_auto_stone(CManager cm, int period_sec,
 				       int period_usec, char *action_spec, 
 				       EVstone out_stone);
 extern EVevent_list extract_events_from_queue(CManager cm, queue_ptr que, EVevent_list list);
+extern event_item * get_free_event(event_path_data evp);
+extern void return_event(event_path_data evp, event_item *event);
+extern void ecl_encode_event(CManager cm, event_item *event);
