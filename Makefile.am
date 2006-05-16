@@ -1,6 +1,6 @@
 ## Process this file with automake to produce Makefile.in
 
-AUTOMAKE_OPTIONS = no-dependencies foreign
+AUTOMAKE_OPTIONS = foreign
 
 SUBDIRS = libltdl . tests examples
 
