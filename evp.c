@@ -628,7 +628,6 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
 	} else {
 	    new_event->attrs = NULL;
 	}
-	return_event(evp, event);
 	return new_event;
 	break;
     }
@@ -753,6 +752,7 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     stone_type stone;
     int resp_id;
     response_cache_element *resp;
+    event_item *event_to_submit = event;
 
     assert(evpath_locked());
     assert(CManager_locked(cm));
@@ -783,17 +783,25 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     resp = &stone->response_cache[resp_id];
     if (resp->action_type == Action_Decode) {
 	CMtrace_out(cm, EVerbose, "Decoding event, action id %d", resp_id);
-	event = decode_action(cm, event, resp);
-	resp_id = determine_action(cm, stone, event);
+	event_to_submit = decode_action(cm, event, resp);
+	resp_id = determine_action(cm, stone, event_to_submit);
 	resp = &stone->response_cache[resp_id];
     }
     if (CMtrace_on(cm, EVerbose)) {
 	printf("Enqueueing event %lx on stone %d, action %lx\n",
-	       (long)event, local_path_id, (long)resp);
+	       (long)event_to_submit, local_path_id, (long)resp);
 	
 	dump_action(stone, resp->proto_action_id, "    ");
     }
-    enqueue_event(cm, local_path_id, resp_id, event);
+    enqueue_event(cm, local_path_id, resp_id, event_to_submit);
+    if (event != event_to_submit) {
+	/* 
+	 * if an event was created by the decode, decrement it's
+	 * ref count now.  The parameter 'event' will be dereferenced
+	 * by our caller.
+	 */
+	return_event(evp, event_to_submit);
+    }
     return 1;
 }
 
