@@ -92,7 +92,10 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	case Action_Filter:
 	    break;
 	case Action_Decode:
-	    free_IOcontext(act->o.decode.context);
+	    if (act->o.decode.context) {
+		free_IOcontext(act->o.decode.context);
+		act->o.decode.context = NULL;
+	    }
 	    break;
 	case Action_Split:
 	    free(act->o.split_stone_targets);
@@ -106,7 +109,19 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	}
     }
     for(i = 0; i < stone->response_cache_count; i++) {
-
+	response_cache_element *resp = &stone->response_cache[i];
+	switch(resp->action_type) {
+	case Action_Decode:
+	    if (resp->o.decode.context) {
+		free_IOcontext(resp->o.decode.context);
+		resp->o.decode.context = NULL;
+	    }
+	    break;
+	case Action_Immediate:
+	    break;
+	default:
+	    break;
+	}
     }
     free(stone->queue);
     if (stone->response_cache) free(stone->response_cache);
@@ -370,15 +385,16 @@ IOFormat incoming_format;
     int id_len;
     IOFormat format;
 
-    char *target_tmp = global_name_of_IOformat(target_format);
-    char *incoming_tmp = global_name_of_IOformat(incoming_format);
     char *server_id = get_server_ID_IOformat(incoming_format,
 						     &id_len);
-/*	    printf("Creating new DECODE action\n");*/
     CMtrace_out(cm, EVerbose, "Adding Conversion action %d to stone %d",
 		a, stone_id);
-    CMtrace_out(cm, EVerbose, "   Incoming format is %s, target %s\n",
-		incoming_tmp, target_tmp);
+    if (CMtrace_on(cm, EVerbose)) {
+	char *target_tmp = global_name_of_IOformat(target_format);
+	char *incoming_tmp = global_name_of_IOformat(incoming_format);
+	printf("   Incoming format is %s, target %s\n", incoming_tmp, 
+	       target_tmp);
+    }
     stone->response_cache = realloc(stone->response_cache,
 			     sizeof(stone->response_cache[0]) * (a + 1));
     act = & stone->response_cache[a];
@@ -1551,6 +1567,7 @@ free_evp(CManager cm, void *not_used)
 {
     event_path_data evp = cm->evp;
     int s;
+    CMtrace_out(cm, CMFreeVerbose, "Freeing evpath information, evp %lx", (long) evp);
     for (s = 0 ; s < evp->stone_count; s++) {
 	INT_EVfree_stone(cm, s);
     }

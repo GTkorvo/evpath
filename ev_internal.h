@@ -51,7 +51,6 @@ typedef struct decode_action_struct {
 } decode_action_vals;
 
 typedef struct immediate_cache_vals {
-    IOContext context;
     EVImmediateHandlerFunc handler;
     void *client_data;
 } immediate_cache_vals;
