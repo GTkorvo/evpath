@@ -18,7 +18,7 @@ static void dump_action(stone_type stone, int a, const char *indent);
 extern void print_server_ID(char *server_id);
 static void dump_stone(stone_type stone);
 
-static const char *action_str[] = { "Action_Output", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Decode", "Action_Split", "Action_Select"};
+static const char *action_str[] = { "Action_NoAction","Action_Output", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Decode", "Action_Split"};
 
 void
 EVPSubmit_encoded(CManager cm, int local_path_id, void *data, int len)
