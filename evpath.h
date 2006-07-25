@@ -2030,6 +2030,77 @@ extern EVstone
 EVcreate_auto_stone(CManager cm, int period_sec, int period_usec, 
 		    char *action_spec, EVstone out_stone);
 
+
+/*!
+ * Prevent an output stone from sending data to target.
+ *
+ * This function will allow an output stone to finish the output action it 
+ * is currently executing and then prevent the output stone from sending any 
+ * more data to its target stones.
+ * \param cm The CManager in which the stone is registered
+ * \param stone_id The output stone which is to be frozen
+ * \return Returns 1 on success, 0 on failure
+ */ 
+/*REMOTE*/
+extern int
+EVfreeze_stone(CManager cm, EVstone stone_id);
+
+/*!
+ * Prevent a stone from processing and obtain its queued events and attributes.
+ *
+ * This function prevents a stone from processing any further. It will then call 
+ * two other functions to obtain the events and the attributes of the stone which 
+ * is to be drained.
+ * \param cm The CManager in which the stone is registered
+ * \param stone_id The stone which is to be drained
+ * \return Returns 1 on success, 0 on failure
+ */
+/*REMOTE*/
+extern int
+EVdrain_stone(CManager cm, EVstone stone_id);
+
+/*!
+ * Return the queued events associated with a stone and its actions.
+ * 
+ * This function will be called by EVdrain_stone. It will form an array of
+ * structures where each structure will contain the size of the encoded 
+ * event and a pointer to the encoded event. The array will contain an entry 
+ * for each event, associated with the stone or its actions.   
+ * \param cm The CManager in which the stone is registered
+ * \param stone_id The stone whose associated events are to be extracted
+ * \return  Returns an array of structures (EVevent_list) containing the
+ * lengths of events and pointers to the encoded versions of events
+ */
+/*REMOTE*/
+extern EVevent_list
+EVextract_stone_events(CManager cm, EVstone stone_id);
+
+/*!
+ * Return the attribute list associated with a stone.
+ *
+ * This function will be called by EVdrain_stone. It will return the atrributes of 
+ * the stone.
+ * \param cm The CManager in which the stone is registered
+ * \param stone_id The stone whose attributes are to be extracted
+ * \return attr_list Returns the attribute list associated with the stone
+ */
+/*REMOTE*/
+extern attr_list
+EVextract_attr_list(CManager cm, EVstone stone_id);
+
+/*!
+ * Free a stone after it has been drained.
+ *
+ * This function will wait till a stone is drained. Then it will free all the
+ * data and events associated with the stone.
+ * \param cm The CManager in which the stone is registered
+ * \param stone_id The stone which is to be destroyed
+ * \return Returns 1 on success, 0 on failure
+ */ 
+/*REMOTE*/
+extern int
+EVdestroy_stone(CManager cm, EVstone stone_id);
+
 /*!
  * create an action specification for a filter function.
  *
@@ -2135,72 +2206,6 @@ extern void
 EVassoc_conversion_action(CManager cm, int stone_id, IOFormat target_format,
 			  IOFormat incoming_format);
 		  
-
-/*!
- * Prevent an output stone from sending data to target.
- *
- * This function will allow an output stone to finish the output action it 
- * is currently executing and then prevent the output stone from sending any 
- * more data to its target stones.
- * \param cm The CManager in which the stone is registered
- * \param stone_id The output stone which is to be frozen
- * \return Returns 1 on success, 0 on failure
- */ 
-extern int
-EVfreeze_stone(CManager cm, EVstone stone_id);
-
-/*!
- * Prevent a stone from processing and obtain its queued events and attributes.
- *
- * This function prevents a stone from processing any further. It will then call 
- * two other functions to obtain the events and the attributes of the stone which 
- * is to be drained.
- * \param cm The CManager in which the stone is registered
- * \param stone_id The stone which is to be drained
- * \return Returns 1 on success, 0 on failure
- */
-extern int
-EVdrain_stone(CManager cm, EVstone stone_id);
-
-/*!
- * Return the queued events associated with a stone and its actions.
- * 
- * This function will be called by EVdrain_stone. It will form an array of
- * structures where each structure will contain the size of the encoded 
- * event and a pointer to the encoded event. The array will contain an entry 
- * for each event, associated with the stone or its actions.   
- * \param cm The CManager in which the stone is registered
- * \param stone_id The stone whose associated events are to be extracted
- * \return  Returns an array of structures (EVevent_list) containing the
- * lengths of events and pointers to the encoded versions of events
- */
-extern EVevent_list
-EVextract_stone_events(CManager cm, EVstone stone_id);
-
-/*!
- * Return the attribute list associated with a stone.
- *
- * This function will be called by EVdrain_stone. It will return the atrributes of 
- * the stone.
- * \param cm The CManager in which the stone is registered
- * \param stone_id The stone whose attributes are to be extracted
- * \return attr_list Returns the attribute list associated with the stone
- */
-extern attr_list
-EVextract_attr_list(CManager cm, EVstone stone_id);
-
-/*!
- * Free a stone after it has been drained.
- *
- * This function will wait till a stone is drained. Then it will free all the
- * data and events associated with the stone.
- * \param cm The CManager in which the stone is registered
- * \param stone_id The stone which is to be destroyed
- * \return Returns 1 on success, 0 on failure
- */ 
-extern int
-EVdestroy_stone(CManager cm, EVstone stone_id);
-
 /* @}*/
 
 #ifdef	__cplusplus
