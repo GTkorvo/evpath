@@ -1687,6 +1687,19 @@ INT_EVfreeze_stone(CManager cm, EVstone stone_id)
 }
 
 extern int
+INT_EVunfreeze_stone(CManager cm, EVstone stone_id)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone;
+    if (evp->stone_count < stone_id) {
+        return -1;
+    }
+    stone = &(evp->stone_map[stone_id]);
+    stone->is_frozen = 0;
+    return 1;	
+}
+
+extern int
 INT_EVdrain_stone(CManager cm, EVstone stone_id)
 {
     event_path_data evp = cm->evp;

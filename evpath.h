@@ -2032,13 +2032,15 @@ EVcreate_auto_stone(CManager cm, int period_sec, int period_usec,
 
 
 /*!
- * Prevent an output stone from sending data to target.
+ * Cause a stone to suspend operation
  *
- * This function will allow an output stone to finish the output action it 
- * is currently executing and then prevent the output stone from sending any 
- * more data to its target stones.
+ * This function causes a stone to enter a "suspended" state in which
+ * incoming data will simply be queued, rather than submitted to any actions
+ * which might be registered.  In the case of an output stone, will allow
+ * the stone to finish the output action it is currently executing and then
+ * prevent the output stone from sending any more data to the target stone.
  * \param cm The CManager in which the stone is registered
- * \param stone_id The output stone which is to be frozen
+ * \param stone_id The stone which is to be frozen
  * \return Returns 1 on success, 0 on failure
  */ 
 /*REMOTE*/
@@ -2046,11 +2048,29 @@ extern int
 EVfreeze_stone(CManager cm, EVstone stone_id);
 
 /*!
- * Prevent a stone from processing and obtain its queued events and attributes.
+ * Cause a stone to resume operation
  *
- * This function prevents a stone from processing any further. It will then call 
- * two other functions to obtain the events and the attributes of the stone which 
- * is to be drained.
+ * This function causes a frozen stone (via EVfreeze_stone()) to resume
+ * operation.  Pending data will be submitted to actions during the next
+ * action processing phase. 
+ * \param cm The CManager in which the stone is registered
+ * \param stone_id The stone to unfreeze
+ * \return Returns 1 on success, 0 on failure
+ */ 
+/*REMOTE*/
+extern int
+EVunfreeze_stone(CManager cm, EVstone stone_id);
+
+/*!
+ * Drain a stone
+ *
+ * This function is a blocking call that suspends the caller until all
+ * events queued on a stone are processed (if processing is possible, it
+ * might not be for events that require the presence of other events).
+ * The function is typically used after upstream stones have been frozen
+ * with EVfreeze_stone() during a reconfiguration action.  EVdrain_stone()
+ * then makes sure a stone is as empty as possible prior to event extraction
+ * and destruction.
  * \param cm The CManager in which the stone is registered
  * \param stone_id The stone which is to be drained
  * \return Returns 1 on success, 0 on failure
