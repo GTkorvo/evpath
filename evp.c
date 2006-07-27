@@ -1712,8 +1712,6 @@ INT_EVdrain_stone(CManager cm, EVstone stone_id)
     stone = &(evp->stone_map[stone_id]);
     stone->is_draining = 1;
     while(stone->is_processing || stone->is_outputting);
-/*    buf_list = EVextract_stone_events(cm, stone_id);
-    stone_attrs = EVextract_attr_list(cm, stone_id); */
     stone->is_draining = 2;
     return 1;
 }
@@ -1745,6 +1743,15 @@ INT_EVextract_attr_list(CManager cm, EVstone stone_id)
     stone_type stone;
     stone = &(evp->stone_map[stone_id]);
     return(stone->stone_attrs);
+}
+
+extern void
+INT_EVset_attr_list(CManager cm, EVstone stone_id, attr_list stone_attrs)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone;
+    stone = &(evp->stone_map[stone_id]);
+    stone->stone_attrs = stone_attrs;
 }
 
 EVevent_list

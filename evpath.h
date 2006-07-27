@@ -2098,8 +2098,9 @@ EVextract_stone_events(CManager cm, EVstone stone_id);
 /*!
  * Return the attribute list associated with a stone.
  *
- * This function will be called by EVdrain_stone. It will return the atrributes of 
- * the stone.
+ * This function is used to extract the set of attributes associated with a
+ * stone.  It is normally used during a reconfiguration operation to
+ * recreate a stone elsewhere. 
  * \param cm The CManager in which the stone is registered
  * \param stone_id The stone whose attributes are to be extracted
  * \return attr_list Returns the attribute list associated with the stone
@@ -2107,6 +2108,20 @@ EVextract_stone_events(CManager cm, EVstone stone_id);
 /*REMOTE*/
 extern attr_list
 EVextract_attr_list(CManager cm, EVstone stone_id);
+
+/*!
+ * Set the attribute list associated with a stone.
+ *
+ * This function is used to set the attributes associated with a
+ * stone.  It is normally used during a reconfiguration operation to
+ * recreate a stone elsewhere. 
+ * \param cm The CManager in which the stone is registered
+ * \param stone_id The stone whose attributes are to be extracted
+ * \param attr_list The attribute list to be associated with the stone
+ */
+/*REMOTE*/
+extern void
+EVset_attr_list(CManager cm, EVstone stone_id, attr_list list);
 
 /*!
  * Free a stone after it has been drained.
