@@ -441,7 +441,7 @@ INT_EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num,
     
 
 static int
-determine_action(CManager cm, stone_type stone, event_item *event)
+determine_action(CManager cm, stone_type stone, event_item *event, int recursed_already)
 {
     int i;
     int return_response;
@@ -465,19 +465,11 @@ determine_action(CManager cm, stone_type stone, event_item *event)
 		(stone->response_cache[i].action_type == Action_Decode)) {
 		continue;
 	    }
-	    /*
-	     * If the incoming event has no specific format (auto event or 
-	     * other) and we didn't match something more specific above, 
-	     * fall through to response_determination. 
-	     */
-	    if (event->reference_format == NULL) {
-		continue;
-	    }
 	    return i;
 	}
     }
-    if (response_determination(cm, stone, event) == 1) {
-	return determine_action(cm, stone, event);
+    if (!recursed_already && (response_determination(cm, stone, event) == 1)) {
+	return determine_action(cm, stone, event, 1);
     }
     /* 
      * there was no action for this event, install a dummy so we 
@@ -776,7 +768,7 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 	return -1;
     }
     stone = &(evp->stone_map[local_path_id]);
-    resp_id = determine_action(cm, stone, event);
+    resp_id = determine_action(cm, stone, event, 0);
     if (stone->response_cache[resp_id].action_type == Action_NoAction) {
 	char *tmp = NULL;
 	if (event->reference_format)
@@ -800,7 +792,7 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     if (resp->action_type == Action_Decode) {
 	CMtrace_out(cm, EVerbose, "Decoding event, action id %d", resp_id);
 	event_to_submit = decode_action(cm, event, resp);
-	resp_id = determine_action(cm, stone, event_to_submit);
+	resp_id = determine_action(cm, stone, event_to_submit, 0);
 	resp = &stone->response_cache[resp_id];
     }
     if (CMtrace_on(cm, EVerbose)) {
