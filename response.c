@@ -790,6 +790,8 @@ ecl_parse_context context;
 {
     static char extern_string[] = "\
 		int printf(string format, ...);\n\
+		void *malloc(int size);\n\
+		void free(void *pointer);\n\
 		long lrand48();\n\
 		double drand48();\n\
 		void EVsubmit(ecl_exec_context ec, int port, void* d, ecl_type_spec dt);\n\
@@ -797,6 +799,8 @@ ecl_parse_context context;
 
     static ecl_extern_entry externs[] = {
 	{"printf", (void *) 0},
+	{"malloc", (void*) 0},
+	{"free", (void*) 0},
 	{"lrand48", (void *) 0},
 	{"drand48", (void *) 0},
 	{"stone_attrs", (void *) 0},
@@ -808,10 +812,12 @@ ecl_parse_context context;
      * in the structure above, so do it explicitly.
      */
     externs[0].extern_value = (void *) (long) printf;
-    externs[1].extern_value = (void *) (long) lrand48;
-    externs[2].extern_value = (void *) (long) drand48;
-    externs[3].extern_value = (void *) (long) &stone->stone_attrs;
-    externs[4].extern_value = (void *) (long) &internal_ecl_submit;
+    externs[1].extern_value = (void *) (long) malloc;
+    externs[2].extern_value = (void *) (long) free;
+    externs[3].extern_value = (void *) (long) lrand48;
+    externs[4].extern_value = (void *) (long) drand48;
+    externs[5].extern_value = (void *) (long) &stone->stone_attrs;
+    externs[6].extern_value = (void *) (long) &internal_ecl_submit;
 
     ecl_assoc_externs(context, externs);
     ecl_parse_for_context(extern_string, context);
