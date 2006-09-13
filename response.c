@@ -983,6 +983,9 @@ IOFormat format;
 	if (mrd->response_type == Response_Transform) {
 	    add_param(parse_context, "output", 2, 
 		      mrd->u.transform.reference_output_format);
+	    ecl_add_param("event_attrs", "attr_list", 3, parse_context);
+	} else {
+	    ecl_add_param("event_attrs", "attr_list", 2, parse_context);
 	}
 	break;
     case Response_Multiqueued:
