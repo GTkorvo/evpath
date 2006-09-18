@@ -858,7 +858,9 @@ CManager cm;
 	if (evp->stone_map[s].local_id == -1) continue;
 	if (evp->stone_map[s].is_draining == 1) continue;
 	evp->stone_map[s].is_processing = 1;
-	while (evp->stone_map[s].queue->queue_head != NULL && evp->stone_map[s].is_draining == 0) {
+	while (evp->stone_map[s].queue->queue_head != NULL && 
+	       evp->stone_map[s].is_draining == 0 &&
+	       (evp->stone_map[s].is_frozen != 1)) {
 	    int action_id;
 	    event_item *event = dequeue_event(cm, evp->stone_map[s].queue, 
 					      &action_id);
@@ -1048,8 +1050,8 @@ process_output_actions(CManager cm)
 	evp->stone_map[s].is_outputting = 1;
 	for (a=0 ; a < evp->stone_map[s].proto_action_count && evp->stone_map[s].is_frozen == 0 && evp->stone_map[s].is_draining == 0; a++) {
 	    proto_action *act = &evp->stone_map[s].proto_actions[a];
-	    if ((act->action_type == Action_Output) && 
-		(act->queue->queue_head != NULL)) {
+	    while ((act->action_type == Action_Output) && 
+		   (act->queue->queue_head != NULL)) {
 		int action_id, ret = 1;
 		event_item *event = dequeue_event(cm, act->queue, &action_id);
 		if (act->o.out.conn == NULL) {
