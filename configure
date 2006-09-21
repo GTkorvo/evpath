@@ -464,7 +464,7 @@ ac_includes_default="\
 #endif"
 
 ac_subdirs_all="$ac_subdirs_all libltdl"
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA CYGPATH_W PACKAGE VERSION ACLOCAL AUTOCONF AUTOMAKE AUTOHEADER MAKEINFO install_sh STRIP ac_ct_STRIP INSTALL_STRIP_PROGRAM mkdir_p AWK SET_MAKE am__leading_dot AMTAR am__tar am__untar build build_cpu build_vendor build_os host host_cpu host_vendor host_os KERNEL_TRUE KERNEL_FALSE KERNEL_OBJS KERNEL_VERSION KERNEL_TARGET_MOD CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT DEPDIR am__include am__quote AMDEP_TRUE AMDEP_FALSE AMDEPBACKSLASH CCDEPMODE am__fastdepCC_TRUE am__fastdepCC_FALSE CSH MAINTAINER_MODE_TRUE MAINTAINER_MODE_FALSE MAINT CPP EGREP INCLTDL LIBLTDL LN_S ECHO AR ac_ct_AR RANLIB ac_ct_RANLIB DLLTOOL ac_ct_DLLTOOL AS ac_ct_AS OBJDUMP ac_ct_OBJDUMP CXX CXXFLAGS ac_ct_CXX CXXDEPMODE am__fastdepCXX_TRUE am__fastdepCXX_FALSE CXXCPP F77 FFLAGS ac_ct_F77 LIBTOOL subdirs TAGS MAKEDEPEND LIBTOOL_DEPS STATIC MATH_LIB PATHPROG CMDIR LTLIBS DEMO_LIBS SOCKET_LIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA CYGPATH_W PACKAGE VERSION ACLOCAL AUTOCONF AUTOMAKE AUTOHEADER MAKEINFO install_sh STRIP ac_ct_STRIP INSTALL_STRIP_PROGRAM mkdir_p AWK SET_MAKE am__leading_dot AMTAR am__tar am__untar build build_cpu build_vendor build_os host host_cpu host_vendor host_os KERNEL_TRUE KERNEL_FALSE KERNEL_OBJS KERNEL_VERSION KERNEL_TARGET_MOD CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT DEPDIR am__include am__quote AMDEP_TRUE AMDEP_FALSE AMDEPBACKSLASH CCDEPMODE am__fastdepCC_TRUE am__fastdepCC_FALSE CSH MAINTAINER_MODE_TRUE MAINTAINER_MODE_FALSE MAINT CPP EGREP INCLTDL LIBLTDL LN_S ECHO AR ac_ct_AR RANLIB ac_ct_RANLIB DLLTOOL ac_ct_DLLTOOL AS ac_ct_AS OBJDUMP ac_ct_OBJDUMP CXX CXXFLAGS ac_ct_CXX CXXDEPMODE am__fastdepCXX_TRUE am__fastdepCXX_FALSE CXXCPP F77 FFLAGS ac_ct_F77 LIBTOOL subdirs TAGS MAKEDEPEND LIBTOOL_DEPS STATIC MATH_LIB PATHPROG CMDIR PBIODIR LTLIBS DEMO_LIBS SOCKET_LIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -23127,6 +23127,9 @@ fi
 if test -n "$cercs_cv_cm_link_dir"; then
 CMDIR="$cercs_cv_cm_link_dir"
 fi
+if test -n "$cercs_cv_pbio_link_dir"; then
+PBIODIR="$cercs_cv_pbio_link_dir"
+fi
 
 cat >>confdefs.h <<_ACEOF
 #define CM_LIBRARY_INSTALL_DIR "$CMDIR"
@@ -23358,11 +23361,11 @@ search_list="$search_list $CHAOS_HOMEDIR/include/atl.h $CHAOS_HOMEDIR/$cercs_cv_
 fi
 search_list="$search_list /usr/include/atl.h /usr/local/include/atl.h /opt/atl/include/atl.h /opt/misc/include/atl.h /opt/misc/include/$cercs_cv_archive/atl.h"
 tmp_search_results=""
-echo "configure:23361: searching for $search_list " >&5
+echo "configure:23364: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:23365: first found $tmp_search_results " >&5
+	echo "configure:23368: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -23439,11 +23442,11 @@ search_list="$search_list $CHAOS_HOMEDIR/lib/libatl.la $CHAOS_HOMEDIR/$cercs_cv_
 fi
 search_list="$search_list /usr/lib/libatl.la /usr/local/lib/libatl.la /opt/atl/lib/libatl.la /opt/misc/lib/libatl.la /opt/misc/lib/$cercs_cv_archive/libatl.la"
 tmp_search_results=""
-echo "configure:23442: searching for $search_list " >&5
+echo "configure:23445: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:23446: first found $tmp_search_results " >&5
+	echo "configure:23449: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -23573,6 +23576,7 @@ fi
 fi
 
 LTLIBS="$cercs_cv_atl_link_dir/libatl.la $LTLIBS"
+
 
 
 
@@ -24558,6 +24562,7 @@ s,@STATIC@,$STATIC,;t t
 s,@MATH_LIB@,$MATH_LIB,;t t
 s,@PATHPROG@,$PATHPROG,;t t
 s,@CMDIR@,$CMDIR,;t t
+s,@PBIODIR@,$PBIODIR,;t t
 s,@LTLIBS@,$LTLIBS,;t t
 s,@DEMO_LIBS@,$DEMO_LIBS,;t t
 s,@SOCKET_LIBS@,$SOCKET_LIBS,;t t

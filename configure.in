@@ -149,6 +149,9 @@ fi
 if test -n "$cercs_cv_cm_link_dir"; then
 CMDIR="$cercs_cv_cm_link_dir"
 fi
+if test -n "$cercs_cv_pbio_link_dir"; then
+PBIODIR="$cercs_cv_pbio_link_dir"
+fi
 AC_DEFINE_UNQUOTED(CM_LIBRARY_INSTALL_DIR,["$CMDIR"],[Place where cm transport libraries are installed])
 
 dnl maintain the BUILD_DIR definition so our sources are compatable with CM
@@ -161,6 +164,7 @@ LTLIBS="$cercs_cv_atl_link_dir/libatl.la $LTLIBS"
 
 
 AC_SUBST(CMDIR)
+AC_SUBST(PBIODIR)
 AC_SUBST(LTLIBS)
 AC_SUBST(DEMO_LIBS)
 AC_SUBST(SOCKET_LIBS)
