@@ -1575,6 +1575,7 @@ free_evp(CManager cm, void *not_used)
 	evp->queue_items_free_list = tmp;
     }
     thr_mutex_free(evp->lock);
+    free(evp);
 }
 
 void

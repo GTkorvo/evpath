@@ -128,7 +128,7 @@ EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
     conn_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (conn_sock == SOCKET_ERROR) {
 	fprintf(stderr, "Cannot open INET socket\n");
-	return NULL;
+	return 0;
     }
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_addr.s_addr = INADDR_ANY;
@@ -136,28 +136,28 @@ EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
     if (setsockopt(conn_sock, SOL_SOCKET, SO_REUSEADDR, (char *) &sock_opt_val,
 		   sizeof(sock_opt_val)) != 0) {
 	fprintf(stderr, "Failed to set 1REUSEADDR on INET socket\n");
-	return NULL;
+	return 0;
     }
     if (bind(conn_sock, (struct sockaddr *) &sock_addr,
 	     sizeof sock_addr) == SOCKET_ERROR) {
 	fprintf(stderr, "Cannot bind INET socket\n");
-	return NULL;
+	return 0;
     }
     sock_opt_val = 1;
     if (setsockopt(conn_sock, SOL_SOCKET, SO_REUSEADDR, (char *) &sock_opt_val,
 		   sizeof(sock_opt_val)) != 0) {
 	perror("Failed to set 2REUSEADDR on INET socket");
-	return NULL;
+	return 0;
     }
     length = sizeof sock_addr;
     if (getsockname(conn_sock, (struct sockaddr *) &sock_addr, &length) < 0) {
 	fprintf(stderr, "Cannot get socket name\n");
-	return NULL;
+	return 0;
     }
     /* begin listening for conns and set the backlog */
     if (listen(conn_sock, FD_SETSIZE)) {
 	fprintf(stderr, "listen failed\n");
-	return NULL;
+	return 0;
     }
     /* set the port num as one we can be contacted at */
     
@@ -171,6 +171,7 @@ EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
 	
     *hostname_p = strdup(host_name);
     *port_p = int_port_num;
+    return 1;
 }
 
 
@@ -186,6 +187,7 @@ typedef struct thin_conn {
 
 static void thin_free_func(void *event_data, void *client_data)
 {
+    free(event_data);
 }
 
 static void
@@ -193,12 +195,24 @@ thin_data_available(void *cmv, void * conn_datav)
 {
     thin_conn_data cd = conn_datav;
     CManager cm = (CManager) cmv;
+    int i;
 
     switch(next_IOrecord_type(cd->iofile)) {
     case IOend:
     case IOerror:
 	close_IOfile(cd->iofile);
 	free_IOfile(cd->iofile);
+	for (i=0; i < cd->format_count; i++) {
+	    free(cd->format_list[i].format_name);
+	    free_field_list(cd->format_list[i].field_list);
+	}
+	free(cd->format_list);
+	for (i=0; i <= cd->max_src_list; i++) {
+	    if (cd->src_list[i] != NULL) {
+		EVfree_source(cd->src_list[i]);
+	    }
+	}
+	free(cd->src_list);
 	CM_fd_remove_select(cm, cd->fd);
 	free(cd);
 	break;
@@ -219,6 +233,7 @@ thin_data_available(void *cmv, void * conn_datav)
 	set_IOconversion(cd->iofile, name_of_IOformat(next_format),
 			 cd->format_list[cd->format_count].field_list,
 			 struct_size_field_list(cd->format_list[cd->format_count].field_list, sizeof(char*)));
+	cd->format_count++;
 	break;
     }
     case IOdata: {
@@ -249,6 +264,7 @@ thin_data_available(void *cmv, void * conn_datav)
 	    cd->src_list[format_num] = 
 		EVcreate_submit_handle_free(cm, cd->target_stone, data_format,
 					    thin_free_func, cd);
+	    free(data_format);
 	}
 	EVsubmit(cd->src_list[format_num], data, NULL);
 	break;

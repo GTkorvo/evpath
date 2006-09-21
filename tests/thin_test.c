@@ -137,38 +137,7 @@ char **argv;
 	EVstone stone;
 	int thin_port = 0;
 	char *hostname;
-	if ((transport = getenv("CMTransport")) != NULL) {
-	    if (listen_list == NULL) listen_list = create_attr_list();
-	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
-		     (attr_value) strdup(transport));
-	}
-	if ((postfix = getenv("CMNetworkPostfix")) != NULL) {
-	    if (listen_list == NULL) listen_list = create_attr_list();
-	    add_attr(listen_list, CM_NETWORK_POSTFIX, Attr_String,
-		     (attr_value) strdup(postfix));
-	}
-	CMlisten_specific(cm, listen_list);
 	EVthin_socket_listen(cm,  &hostname, &thin_port);
-	contact_list = CMget_contact_list(cm);
-	if (contact_list) {
-	    string_list = attr_list_to_string(contact_list);
-	} else {
-	    /* must be multicast, hardcode a contact list */
-#define HELLO_PORT 12345
-#define HELLO_GROUP "225.0.0.37"
-	    int addr;
-	    (void) inet_aton(HELLO_GROUP, (struct in_addr *)&addr);
-	    contact_list = create_attr_list();
-	    add_attr(contact_list, CM_MCAST_ADDR, Attr_Int4,
-		     (attr_value) (long)addr);
-	    add_attr(contact_list, CM_MCAST_PORT, Attr_Int4,
-		     (attr_value) HELLO_PORT);
-	    add_attr(contact_list, CM_TRANSPORT, Attr_String,
-		     (attr_value) "multicast");
-/*	    conn = CMinitiate_conn(cm, contact_list);*/
-	    string_list = attr_list_to_string(contact_list);
-	    free_attr_list(contact_list);
-	}	
 	stone = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, stone, simple_format_list, simple_handler, NULL);
 	printf("Contact list \"%d:%s\"\n", stone, string_list);
@@ -248,17 +217,7 @@ do_regression_master_test()
 #endif
     cm = CManager_create();
 /*    forked = CMfork_comm_thread(cm);*/
-    if ((transport = getenv("CMTransport")) != NULL) {
-	listen_list = create_attr_list();
-	add_attr(listen_list, CM_TRANSPORT, Attr_String,
-		 (attr_value) strdup(transport));
-    }
-    if ((postfix = getenv("CMNetworkPostfix")) != NULL) {
-	if (listen_list == NULL) listen_list = create_attr_list();
-	add_attr(listen_list, CM_NETWORK_POSTFIX, Attr_String,
-		 (attr_value) strdup(postfix));
-    }
-    CMlisten_specific(cm, listen_list);
+
     EVthin_socket_listen(cm,  &hostname, &thin_port);
 
     if (quiet <= 0) {
@@ -279,6 +238,7 @@ do_regression_master_test()
     sprintf(args[2], "%d", thin_port);
     sprintf(args[3], "%d", handle);
     subproc_proc = run_subprocess(args);
+    free(hostname);
 
     /* give him time to start */
     CMsleep(cm, 10);
@@ -314,7 +274,6 @@ do_regression_master_test()
 	       WTERMSIG(exit_state));
     }
 #endif
-    free(string_list);
     EVfree_stone(cm, handle);
     CManager_close(cm);
     if (message_count != 1) printf("Message count == %d\n", message_count);
