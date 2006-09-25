@@ -8,7 +8,6 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <unistd.h>
-
 #include "io.h"
 
 typedef struct _simple_rec {
@@ -47,12 +46,11 @@ main(int argc, char **argv)
     char *remote_host;
     int remote_port;
     int stone;
-    struct hostent *host_addr;
     IOFile out_connection;
     IOFormat ioformat;
     simple_rec rec;
     int conn;
-    char *comment = "Stone xxxxx";
+    char *comment = strdup("Stone xxxxx");
 
     if ((argc != 4) || (sscanf(argv[2], "%d", &remote_port) != 1)
 			|| (sscanf(argv[3], "%d", &stone) != 1)) {
@@ -63,6 +61,10 @@ main(int argc, char **argv)
 
     conn = do_connection(remote_host, remote_port);
 
+    if (conn == -1) {
+	printf("Connection to %s:%d failed\n", remote_host, remote_port);
+	exit(1);
+    }
     out_connection = open_IOfd(conn, "w");
 
     sprintf(comment, "Stone %d", stone);
@@ -83,7 +85,7 @@ do_connection(char * remote_host, int port)
 
     memset((char*)&sin, 0, sizeof(sin));
 
-    int conn = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    int conn = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 
     if (conn == -1) return -1;
 
@@ -94,7 +96,7 @@ do_connection(char * remote_host, int port)
     } else {
 	memcpy((char*)&sin.sin_addr, host_addr->h_addr, host_addr->h_length);
     }
-    sin.sin_port = port;
+    sin.sin_port = htons(port);
     sin.sin_family = AF_INET;
     if (connect(conn, (struct sockaddr *) &sin,
 		sizeof sin) == -1) {

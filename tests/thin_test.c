@@ -130,17 +130,12 @@ char **argv;
 /*    (void) CMfork_comm_thread(cm);*/
 
     if (argc == 1) {
-	attr_list contact_list, listen_list = NULL;
-	char *transport = NULL;
-	char *postfix = NULL;
-	char *string_list;
 	EVstone stone;
 	int thin_port = 0;
 	char *hostname;
 	EVthin_socket_listen(cm,  &hostname, &thin_port);
 	stone = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, stone, simple_format_list, simple_handler, NULL);
-	printf("Contact list \"%d:%s\"\n", stone, string_list);
 	printf("Thin client contact: %s %d %d\n", hostname, thin_port, stone);
 	CMsleep(cm, 120);
     } else {
@@ -196,8 +191,6 @@ do_regression_master_test()
     char *args[] = {"thin_client", NULL, NULL, NULL, NULL};
     int exit_state;
     int forked = 0;
-    attr_list contact_list, listen_list = NULL;
-    char *string_list, *transport, *postfix;
     int message_count = 0;
     EVstone handle;
     char *hostname;
