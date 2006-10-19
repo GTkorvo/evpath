@@ -28,7 +28,7 @@ extern int vfprintf();
 
 int trace_val[CMLastTraceType] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
-extern void CMprint_version();
+extern void EVprint_version();
 
 extern int
 CMtrace_on(CManager cm, CMTraceType trace_type)
@@ -60,7 +60,7 @@ CMtrace_on(CManager cm, CMTraceType trace_type)
 	    if (i!=EVWarning) trace |= trace_val[i];
 	}
 	if (trace != 0) {
-	    CMprint_version();
+	    EVprint_version();
 	}
     }
 
