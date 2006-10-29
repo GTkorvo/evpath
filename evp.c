@@ -1650,7 +1650,7 @@ void *event;
 	    } else {
 		last->next = tmp->next;
 	    }
-	    return_event(cm->evp, event);
+	    return_event(cm->evp, tmp->item);
 	    tmp->next = evp->queue_items_free_list;
 	    evp->queue_items_free_list = tmp;
 	    return;
