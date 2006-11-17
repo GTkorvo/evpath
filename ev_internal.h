@@ -34,7 +34,22 @@ typedef struct _event_item {
     EVFreeFunction free_func;
 } event_item, *event_queue;
 
-typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filter, Action_Immediate, Action_Decode, Action_Split} action_value;
+typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filter, Action_Immediate, Action_Queued, Action_Decode, Action_Split} action_value;
+
+/*!
+ * The prototype of a specific queued handler funcion.
+ *
+ * This function prototype is used by the EVPath internal "response"
+ * interface.  At some point, the response interface will likely become
+ * external so that EVPath's response to unknown data can be customized.
+ * However, at the moment this is an internal interface.
+ */
+struct queue_item;  /* forward decl */
+typedef int (*EVQueuedHandlerFunc) ARGS((CManager cm, 
+					 struct queue_item *event, 
+					 void *client_data,
+					 int out_count,
+					 int *out_stones));
 
 typedef struct output_action_struct {
     CMConnection conn;
@@ -54,6 +69,11 @@ typedef struct immediate_cache_vals {
     EVImmediateHandlerFunc handler;
     void *client_data;
 } immediate_cache_vals;
+
+typedef struct queued_cache_vals {
+    EVQueuedHandlerFunc handler;
+    void *client_data;
+} queued_cache_vals;
 
 typedef struct immediate_action_struct {
     void *mutable_response_data;
@@ -81,7 +101,7 @@ struct terminal_proto_vals {
 typedef struct _proto_action {
     action_value action_type;
     CMFormatList input_format_requirements;
-    IOFormat reference_format;
+    IOFormat *matching_reference_formats;
     union {
 	struct terminal_proto_vals term;
 	output_action_vals out;
@@ -90,7 +110,6 @@ typedef struct _proto_action {
 	int *split_stone_targets;
     }o;
     int requires_decoded;
-    queue_ptr queue;
     attr_list attrs;
     double event_length_sum;  /*in KBytes*/
 } proto_action;
@@ -103,6 +122,7 @@ typedef struct response_cache_element {
     union {
 	decode_action_vals decode;
 	immediate_cache_vals imm;
+	queued_cache_vals queued;
     }o;
 } response_cache_element;
 
@@ -116,6 +136,7 @@ typedef struct _stone {
     int response_cache_count;
     response_cache_element *response_cache;
     queue_ptr queue;
+    int new_enqueue_flag;
     int proto_action_count;
     struct _proto_action *proto_actions;
     CMTaskHandle periodic_handle;
@@ -125,6 +146,7 @@ typedef struct _stone {
 typedef struct _event_path_data {
     int stone_count;
     stone_type stone_map;
+    void *as;
     IOContext root_context;
     queue_item *queue_items_free_list;
     event_item *current_event_item;
@@ -159,6 +181,10 @@ extern EVstone INT_EVcreate_terminal_action(CManager cm, CMFormatList format_lis
 extern EVstone INT_EVcreate_auto_stone(CManager cm, int period_sec, 
 				       int period_usec, char *action_spec, 
 				       EVstone out_stone);
+extern EVaction
+INT_EVassoc_mutated_queued_action(CManager cm, EVstone stone_id, EVaction act_num,
+				  EVQueuedHandlerFunc func, void *client_data, 
+				  IOFormat *reference_formats);
 extern EVevent_list extract_events_from_queue(CManager cm, queue_ptr que, EVevent_list list);
 extern event_item * get_free_event(event_path_data evp);
 extern void return_event(event_path_data evp, event_item *event);

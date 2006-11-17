@@ -470,7 +470,7 @@ extern CMFormat INT_CMlookup_format ARGS((CManager cm, IOFieldList field_list));
 extern char *
 INT_create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function);
 extern char *
-INT_create_multiqueued_action_spec(CMFormatList *input_format_lists, char *function);
+INT_create_multiqueued_action_spec(CMFormatList *input_format_lists, CMFormatList output_format_list, char *function);
 
 extern int INT_CMCondition_has_signaled ARGS((CManager cm, int condition));
 extern EVaction

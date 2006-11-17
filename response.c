@@ -39,6 +39,7 @@ struct transform_spec {
 
 struct multiqueued_spec {
     CMFormatList *struct_list;
+    CMFormatList out_format_list;
     char *function;
     void *client_data;
     IOFormat *reference_input_format_list;
@@ -69,11 +70,20 @@ struct transform_instance {
     IOFormat out_format;
 };
 
+struct queued_instance {
+    ecl_code code;
+    ecl_exec_context ec;
+    void *client_data;
+};
+
 typedef struct response_instance {
     response_types response_type;
+    int stone;
+    int proto_action_id;
     union {
 	struct filter_instance filter;
 	struct transform_instance transform;
+	struct queued_instance queued;
     }u;
 } *response_instance;
 
@@ -168,7 +178,7 @@ parse_IOformat_from_string(char *str, char **format_name, IOFieldList *list_p)
 
 void *
 install_response_handler(CManager cm, int stone_id, char *response_spec, 
-			 void *local_data, IOFormat *ref_ptr)
+			 void *local_data, IOFormat **ref_ptr)
 {
     char *str = response_spec;
     if (strncmp("Terminal Action", str, strlen("Terminal Action")) == 0) {
@@ -205,8 +215,13 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	response->u.filter.client_data = local_data;
 	response->u.filter.reference_format = 
 	    EVregister_format_set(cm, list, NULL);
-	if (ref_ptr)
-	    *ref_ptr = response->u.filter.reference_format;
+	if (ref_ptr) {
+	    IOFormat *formats = malloc(2*sizeof(IOFormat));
+	    formats[1] = NULL;
+	    formats[0] = response->u.filter.reference_format;
+
+	    *ref_ptr = formats;
+	}
 	return (void*)response;
     }
     if (strncmp("Router Action", str, strlen("Router Action")) == 0) {
@@ -230,8 +245,13 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	response->u.filter.client_data = local_data;
 	response->u.filter.reference_format = 
 	    EVregister_format_set(cm, list, NULL);
-	if (ref_ptr)
-	    *ref_ptr = response->u.filter.reference_format;
+	if (ref_ptr) {
+	    IOFormat *formats = malloc(2*sizeof(IOFormat));
+	    formats[1] = NULL;
+	    formats[0] = response->u.filter.reference_format;
+
+	    *ref_ptr = formats;
+	}
 	return (void*)response;
     }
     if (strncmp("Transform Action", str, strlen("Transform Action")) == 0) {
@@ -272,8 +292,12 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	if (in_list[0].format_name != NULL) 
 	    response->u.transform.reference_input_format = 
 		EVregister_format_set(cm, in_list, NULL);
-	if (ref_ptr)
-	    *ref_ptr = response->u.transform.reference_input_format;
+	if (ref_ptr) {
+	    IOFormat *formats = malloc(2*sizeof(IOFormat));
+	    formats[1] = NULL;
+	    formats[0] = response->u.transform.reference_input_format;
+	    *ref_ptr = formats;
+	}
 	if (out_list[0].format_name != NULL)
 	    response->u.transform.reference_output_format = 
 		EVregister_format_set(cm, out_list, NULL);
@@ -283,9 +307,9 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
     }
     if (strncmp("Multiqueued Action", str, strlen("Multiqueued Action")) == 0) {
 	struct response_spec *response = malloc(sizeof(struct response_spec));
-	int list_count, j;
+	int list_count, j, format_count, i;
 	char *function;
-	CMFormatList *struct_list;
+	CMFormatList *struct_list, out_list = NULL;
 	str += strlen("Multiqueued Action") + 1;
 	sscanf(str, "  List Count %d\n", &list_count);
 	str = strchr(str, '\n') + 1;
@@ -293,7 +317,8 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	for (j = 0; j < list_count; j++) {
 	    int format_count, i;
 	    CMFormatList in_list;
-	    scanf(str, "Next format   Subformat Count %d\n", &format_count);
+	    sscanf(str, "Next format   Subformat Count %d\n", &format_count);
+	    str = strchr(str, '\n') + 1;
 
 	    in_list = malloc(sizeof(in_list[0]) * (format_count + 1));
 	    for (i=0; i < format_count; i++) {
@@ -304,18 +329,41 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	    in_list[format_count].field_list = NULL;
 	    struct_list[j] = in_list;
 	}
+	if (sscanf(str, "  Output Format Count %d\n", &format_count) != 1) {
+	    printf("output format parse failed\n");
+	    return 0;
+	}
+	str = strchr(str, '\n') + 1;
+	out_list = malloc(sizeof(out_list[0]) * (format_count + 1));
+	for (i=0; i < format_count; i++) {
+	    str = parse_IOformat_from_string(str, &out_list[i].format_name,
+					     &out_list[i].field_list);
+	}
+	out_list[format_count].format_name = NULL;
+	out_list[format_count].field_list = NULL;
 	function = malloc(strlen(str) + 1);
 	strcpy(function, str);
 	response->response_type = Response_Multiqueued;
 	response->u.multiqueued.struct_list = struct_list;
+	response->u.multiqueued.out_format_list = out_list;
 	response->u.multiqueued.function = function;
 	response->u.multiqueued.client_data = local_data;
-/*	response->u.multiqueued.reference_input_format = NULL;
-	if (in_list[0].format_name != NULL) 
-	    response->u.multiqueued.reference_input_format = 
-		EVregister_format_set(cm, in_list, NULL);
-	response->u.multiqueued.output_base_struct_size =
-	struct_size_field_list(out_list[0].field_list, sizeof(char*));*/
+	response->u.multiqueued.reference_input_format_list = 
+	    malloc((list_count +1) * sizeof(IOFormat));
+	for (j = 0; j < list_count; j++) {
+	    if ((struct_list[j])[0].format_name != NULL) 
+		response->u.multiqueued.reference_input_format_list[j] = 
+		    EVregister_format_set(cm, struct_list[j], NULL);
+	}
+	if (ref_ptr) {
+	    IOFormat *formats = malloc((list_count + 1)*sizeof(IOFormat));
+	    int i = 0;
+	    for (i=0; i < list_count; i++) {
+		formats[i] = response->u.multiqueued.reference_input_format_list[i];
+	    }
+	    formats[list_count] = NULL;
+	    *ref_ptr = formats;
+	}
 	return (void*)response;
     }
     printf("Unparsed action : %s\n", str);
@@ -409,10 +457,11 @@ INT_create_transform_action_spec(CMFormatList format_list, CMFormatList out_form
 }
 
 extern char *
-INT_create_multiqueued_action_spec(CMFormatList *input_format_lists, char *function)
+INT_create_multiqueued_action_spec(CMFormatList *input_format_lists, CMFormatList output_format_list, char *function)
 {
     int list_count = 0;
-    int l;
+    int out_format_count = 0;
+    int l, i;
     char *str;
     while(input_format_lists && input_format_lists[list_count] != NULL) 
 	list_count++;
@@ -434,6 +483,15 @@ INT_create_multiqueued_action_spec(CMFormatList *input_format_lists, char *funct
 	}
     }
 
+    while(output_format_list && output_format_list[out_format_count].format_name != NULL) 
+	out_format_count++;
+    str = realloc(str, strlen(str) + 50);
+    sprintf(str + strlen(str), "  Output Format Count %d\n",
+	    out_format_count);
+    for (i = 0 ; i < out_format_count; i++) {
+	str = add_IOfieldlist_to_string(str, output_format_list[i].format_name,
+					output_format_list[i].field_list);
+    }
     str = realloc(str, strlen(str) + strlen(function) + 1);
     strcpy(&str[strlen(str)], function);
     return str;
@@ -442,6 +500,8 @@ INT_create_multiqueued_action_spec(CMFormatList *input_format_lists, char *funct
 struct ev_state_data {
     CManager cm;
     struct _event_item *cur_event;
+    int stone;
+    int proto_action_id;
     int out_count;
     int *out_stones;
 };
@@ -529,6 +589,8 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 
     ev_state.cm = cm;
     ev_state.cur_event = event;
+    ev_state.stone = instance->stone;
+    ev_state.proto_action_id = instance->proto_action_id;
     ev_state.out_count = out_count;
     ev_state.out_stones = out_stones;
     ecl_assoc_client_data(ec, 0x34567890, (long)&ev_state);
@@ -568,8 +630,67 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
     return ret;
 }
 
+static int
+queued_wrapper(CManager cm, queue_item *queue, void *client_data,
+	       int out_count, int *out_stones)
+{
+    response_instance instance = (response_instance)client_data;
+    int ret;
+    void *out_event = malloc(instance->u.transform.out_size);
+    int(*func)(ecl_exec_context, void *, void*, attr_list) = 
+	(int(*)(ecl_exec_context, void *, void*, attr_list))instance->u.transform.code->func;
+    ecl_exec_context ec = instance->u.transform.ec;
+    struct ev_state_data ev_state;
+
+    ev_state.cm = cm;
+    ev_state.cur_event = NULL;
+    ev_state.stone = instance->stone;
+    ev_state.proto_action_id = instance->proto_action_id;
+    ev_state.out_count = out_count;
+    ev_state.out_stones = out_stones;
+    ecl_assoc_client_data(ec, 0x34567890, (long)&ev_state);
+
+/*     if (CMtrace_on(cm, EVerbose)) { */
+/* 	printf("Input Transform Event is :\n"); */
+/* 	if (event->reference_format) { */
+/* 	    dump_limited_unencoded_IOrecord(iofile_of_IOformat(event->reference_format), */
+/* 					    event->reference_format, */
+/* 					    event->decoded_event, 10240); */
+/* 	} else { */
+/* 	    printf("       ****  UNFORMATTED  ****\n"); */
+/* 	} */
+/*     } */
+/*     memset(out_event, 0, instance->u.transform.out_size); */
+/*     ret = func(ec, event->decoded_event, out_event, attrs); */
+/*     if (ret) { */
+/* 	struct _EVSource s; */
+/* 	if (CMtrace_on(cm, EVerbose)) { */
+/* 	    IOFormat f = instance->u.transform.out_format; */
+/* 	    printf(" Transform function returned %d, submitting further\n", ret); */
+/* 	    dump_limited_unencoded_IOrecord(iofile_of_IOformat(f), f,  */
+/* 					    out_event, 10240); */
+/* 	} */
+/* 	s.local_stone_id = out_stones[0]; */
+/* 	s.cm = cm; */
+/* 	s.format = NULL; */
+/* 	s.reference_format = instance->u.transform.out_format; */
+/* 	s.free_func = transform_free_wrapper; */
+/* 	s.free_data = instance; */
+/* 	s.preencoded = 0; */
+/* 	INT_EVsubmit(&s, out_event, NULL); */
+/*     } else { */
+/* 	CMtrace_out(cm, EVerbose, "Filter function returned %d, NOT submitting\n", ret); */
+/* 	transform_free_wrapper(out_event, instance); */
+/*     } */
+    return ret;
+}
+
 static response_instance
-generate_filter_code(struct response_spec *mrd, stone_type stone, IOFormat format);
+generate_filter_code(struct response_spec *mrd, stone_type stone, 
+		     IOFormat format);
+static response_instance
+generate_multiqueued_code(struct response_spec *mrd, stone_type stone, 
+			  IOFormat *formats);
 
 static IOFormat
 localize_format(CManager cm, IOFormat format)
@@ -605,6 +726,8 @@ dump_mrd(void *mrdv)
 	       mrd->u.transform.function);
 	break;
     case Response_Multiqueued:
+	printf("Queued Action, code is %s\n",
+	       mrd->u.transform.function);
 	break;
     }
 }
@@ -615,55 +738,51 @@ response_determination(CManager cm, stone_type stone, event_item *event)
     int nearest_proto_action = -1;
     int return_value = 0;
     IOFormat conversion_target_format = NULL;
-    int i, format_count;
+    int i, format_count = 0;
     IOFormat * formatList;
+    int *format_map;
     IOcompat_formats older_format = NULL;
 
     formatList =
 	(IOFormat *) malloc((stone->proto_action_count + 1) * sizeof(IOFormat));
+    format_map = (int *) malloc((stone->proto_action_count + 1) * sizeof(int));
     for (i = 0; i < stone->proto_action_count; i++) {
-	formatList[i] = stone->proto_actions[i].reference_format;
+	int j = 0;
+	while (stone->proto_actions[i].matching_reference_formats && 
+	       (stone->proto_actions[i].matching_reference_formats[j] != NULL)) {
+	    formatList = (IOFormat *) realloc(formatList, (format_count + 2) * sizeof(IOFormat));
+	    format_map = realloc(format_map, (format_count + 2) * sizeof(int));
+	    formatList[format_count] = stone->proto_actions[i].matching_reference_formats[j];
+	    format_map[format_count] = i;
+	    format_count++;
+	    j++;
+	}
     }
-    format_count = stone->proto_action_count;
     formatList[format_count] = NULL;
     if (event->reference_format == NULL) {
 	/* special case for unformatted input */
 	int i;
-	for (i=0 ; i < format_count ; i++) {
-	    if (formatList[i] == NULL) nearest_proto_action = i;
+	for (i=0 ; i < stone->proto_action_count ; i++) {
+	    if (stone->proto_actions[i].matching_reference_formats == NULL) nearest_proto_action = i;
 	}
     } else {
-	nearest_proto_action = IOformat_compat_cmp2(event->reference_format, 
+	int map_entry = IOformat_compat_cmp2(event->reference_format, 
 						    formatList,
 						    format_count,
 						    &older_format);
+	if (map_entry != -1) nearest_proto_action = format_map[map_entry];
     }
     free(formatList);
+    free(format_map);
     if (nearest_proto_action != -1) {
 	int action_generated = 0;
-	if (stone->proto_actions[nearest_proto_action].action_type != Action_Immediate) {
-	    response_cache_element *resp;
-	    conversion_target_format = stone->proto_actions[nearest_proto_action].reference_format;
-	    /* we'll install the conversion later, first map the response */
-	    if (stone->response_cache_count == 0) {
-		stone->response_cache = malloc(sizeof(stone->response_cache[0]));
-	    } else {
-		stone->response_cache = 
-		    realloc(stone->response_cache,
-			    (stone->response_cache_count + 1) * sizeof(stone->response_cache[0]));
-	    }
-	    resp = &stone->response_cache[stone->response_cache_count++];
-	    proto_action *proto = &stone->proto_actions[nearest_proto_action];
-	    resp->reference_format = conversion_target_format;
-	    resp->proto_action_id = nearest_proto_action;
-	    resp->action_type = proto->action_type;
-	    resp->requires_decoded = proto->requires_decoded;
-	} else {
+	proto_action *proto = &stone->proto_actions[nearest_proto_action];
+	if (proto->action_type == Action_Immediate) {
 	    /* must be immediate action */
 	    response_instance instance;
 	    struct response_spec *mrd;
 	    mrd = 
-		stone->proto_actions[nearest_proto_action].o.imm.mutable_response_data;
+		proto->o.imm.mutable_response_data;
 	    switch(mrd->response_type) {
 	    case Response_Filter:
 	    case Response_Router:
@@ -678,11 +797,13 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 		conversion_target_format = mrd->u.transform.reference_input_format;
 		break;
 	    case Response_Multiqueued:
-		break;
+		assert(FALSE);
 	    }
 
 	    instance = generate_filter_code(mrd, stone, conversion_target_format);
 	    if (instance == 0) return 0;
+	    instance->stone = stone->local_id;
+	    instance->proto_action_id = nearest_proto_action;
 	    action_generated++;
 	    switch(mrd->response_type) {
 	    case Response_Filter:
@@ -701,10 +822,43 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 					       conversion_target_format);
 		break;
 	    case Response_Multiqueued:
+		assert(FALSE);
 		break;
 	    }
 	    
 	    return_value = 1;
+	} else 	if (proto->action_type == Action_Queued) {
+	    
+	    response_instance instance;
+	    struct response_spec *mrd;
+	    mrd = 
+		proto->o.imm.mutable_response_data;
+	    instance = generate_multiqueued_code(mrd, stone, 
+						 proto->matching_reference_formats);
+	    if (instance == 0) return 0;
+	    instance->stone = stone->local_id;
+	    instance->proto_action_id = nearest_proto_action;
+	    action_generated++;
+	    INT_EVassoc_mutated_queued_action(cm, stone->local_id, nearest_proto_action, 
+					      queued_wrapper, instance, 
+					      proto->matching_reference_formats);
+	} else {
+	    response_cache_element *resp;
+	    conversion_target_format = proto->matching_reference_formats[0];
+	    /* we'll install the conversion later, first map the response */
+	    if (stone->response_cache_count == 0) {
+		stone->response_cache = malloc(sizeof(stone->response_cache[0]));
+	    } else {
+		stone->response_cache = 
+		    realloc(stone->response_cache,
+			    (stone->response_cache_count + 1) * sizeof(stone->response_cache[0]));
+	    }
+	    resp = &stone->response_cache[stone->response_cache_count++];
+	    proto_action *proto = &stone->proto_actions[nearest_proto_action];
+	    resp->reference_format = conversion_target_format;
+	    resp->proto_action_id = nearest_proto_action;
+	    resp->action_type = proto->action_type;
+	    resp->requires_decoded = proto->requires_decoded;
 	}
 	if (conversion_target_format != NULL) {
 	    if (event->event_encoded) {
@@ -1038,6 +1192,39 @@ IOFormat format;
     case Response_Multiqueued:
 	break;
     }
+    ecl_free_parse_context(parse_context);
+
+    return instance;
+}
+
+static response_instance
+generate_multiqueued_code(mrd, stone, formats)
+struct response_spec *mrd;
+stone_type stone;
+IOFormat *formats;
+{
+    response_instance instance = malloc(sizeof(*instance));
+
+    ecl_code code;
+    ecl_parse_context parse_context = new_ecl_parse_context();
+    /*    sm_ref conn_info_data_type, conn_info_param;*/
+
+    memset(instance, 0, sizeof(*instance));
+    add_standard_routines(stone, parse_context);
+
+    assert(mrd->response_type == Response_Multiqueued);
+    ecl_add_param("ec", "ecl_exec_context", 0, parse_context);
+/*    if (format) {
+	add_param(parse_context, "input", 1, format);
+    } else {
+	ecl_add_param("input", "int", 1, parse_context);
+	}*/
+    code = ecl_code_gen(mrd->u.multiqueued.function, parse_context);
+    instance->response_type = mrd->response_type;
+    instance->u.queued.code = code;
+    if (code)
+	instance->u.queued.ec = ecl_create_exec_context(code);
+    
     ecl_free_parse_context(parse_context);
 
     return instance;

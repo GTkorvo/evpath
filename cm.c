@@ -2351,7 +2351,6 @@ attr_list attrs;
 		CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			    "Partial write, queued %d bytes",
 			    byte_count - actual_bytes);
-		/* hold the lock until the write completes */
 		return 1;
 	    }
 	    actual = vec_count;  /* set actual for success */
@@ -2403,12 +2402,12 @@ INT_CMConnection_write_would_block(CMConnection conn)
 
 extern void
 INT_CMregister_write_callback(CMConnection conn, CMWriteCallbackFunc handler,
-			  void *client_data)
+			      void *client_data)
 {
     if (conn->do_non_blocking_write == -1) {
 	init_non_blocking_conn(conn);
     }
-    assert(FALSE);
+    add_pending_write_callback(conn, handler, client_data);
 
 }
 

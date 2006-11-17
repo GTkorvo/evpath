@@ -1579,9 +1579,13 @@ extern EVstone
 EVcreate_terminal_action(CManager cm, CMFormatList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
 
-/*extern EVaction
+extern EVaction
+EVassoc_congestion_action(CManager cm, EVstone stone, char *multiqueue_spec,
+			  void* client_data);
+
+extern EVaction
 EVassoc_queued_action(CManager cm, EVstone stone, char *queue_spec, 
-void *client_data);*/
+		      void *client_data);
 
 /*!
  * Associate an immediate non-terminal action with a stone.
@@ -2190,7 +2194,7 @@ create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_l
  */
 /*NOLOCK*/
 extern char *
-create_multiqueued_action_spec(CMFormatList *input_format_lists, char *function);
+create_multiqueued_action_spec(CMFormatList *input_format_lists, CMFormatList out_format_list, char *function);
 
 /*!
  * Print a description of stone status to standard output.
