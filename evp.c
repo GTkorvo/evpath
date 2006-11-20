@@ -839,7 +839,7 @@ dump_action(stone_type stone, int a, const char *indent)
 		if (i != act->o.imm.output_count - 1) {
 		    printf(" %d,", act->o.imm.output_stone_ids[i]);
 		} else {
-		    printf(" %d", act->o.imm.output_stone_ids[i]);
+		    printf(" %d\n", act->o.imm.output_stone_ids[i]);
 		}
 	    }
 	}
