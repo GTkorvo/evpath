@@ -192,8 +192,12 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone_num,
     memset(&stone->response_cache[action_num], 0, sizeof(stone->response_cache[0]));
     stone->response_cache[action_num].action_type = Action_Terminal;
     stone->response_cache[action_num].requires_decoded = 1;
-    stone->response_cache[action_num].reference_format = 
-	stone->proto_actions[proto_action_num].matching_reference_formats[0];
+    if (stone->proto_actions[proto_action_num].matching_reference_formats) {
+	stone->response_cache[action_num].reference_format = 
+	    stone->proto_actions[proto_action_num].matching_reference_formats[0];
+    } else {
+	stone->response_cache[action_num].reference_format = NULL;
+    }
     stone->response_cache[action_num].proto_action_id = proto_action_num;
     stone->proto_action_count++;
     if (CMtrace_on(cm, EVerbose)) {
