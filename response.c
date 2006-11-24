@@ -636,7 +636,6 @@ queued_wrapper(CManager cm, queue_item *queue, void *client_data,
 {
     response_instance instance = (response_instance)client_data;
     int ret;
-    void *out_event = malloc(instance->u.transform.out_size);
     int(*func)(ecl_exec_context, void *, void*, attr_list) = 
 	(int(*)(ecl_exec_context, void *, void*, attr_list))instance->u.transform.code->func;
     ecl_exec_context ec = instance->u.transform.ec;

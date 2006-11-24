@@ -1425,7 +1425,7 @@ static void
 write_callback_handler(CManager cm, CMConnection conn, void *client_data)
 {
     printf("In Write callback\n");
-    do_output_action(cm, (int)client_data);
+    do_output_action(cm, (int)(long)client_data);
 }
 
 static
@@ -1433,7 +1433,7 @@ int
 do_output_action(CManager cm, int s)
 {
     event_path_data evp = cm->evp;
-    proto_action *act;
+    proto_action *act = NULL;
     int a;
     CMtrace_out(cm, EVerbose, "Process output action on stone %d", s);
     if (evp->stone_map[s].is_frozen || evp->stone_map[s].is_draining) return 0;
@@ -1456,7 +1456,8 @@ do_output_action(CManager cm, int s)
 		printf("Would call congestion_handler, %d items queued\n", i);
 		if (first) {
 		    INT_CMregister_write_callback(act->o.out.conn, 
-						  write_callback_handler, s);
+						  write_callback_handler, 
+						  (void*)(long)s);
 		    first = 0;
 		}
 		return 0;
