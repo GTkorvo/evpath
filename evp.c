@@ -76,12 +76,14 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	INT_CMremove_task(stone->periodic_handle);
 	stone->periodic_handle = NULL;
     }
+    CMtrace_out(cm, EVerbose, "Freeing stone %d", stone_num);
     for(i = 0; i < stone->proto_action_count; i++) {
 	proto_action *act = &stone->proto_actions[i];
 	if (act->attrs != NULL) {
 	    INT_CMfree_attr_list(cm, act->attrs);
 	}
-	if (stone->proto_actions != NULL) free(stone->proto_actions);
+	if (act->matching_reference_formats != NULL) 
+	    free(act->matching_reference_formats);
 	switch(act->action_type) {
 	case Action_NoAction:
 	    break;
@@ -108,8 +110,12 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	    }
 	    free(act->o.imm.output_stone_ids);
 	    break;
+	case Action_Queued:
+	    /* GSE */
+	    assert(FALSE);
 	}
     }
+    if (stone->proto_actions != NULL) free(stone->proto_actions);
     for(i = 0; i < stone->response_cache_count; i++) {
 	response_cache_element *resp = &stone->response_cache[i];
 	switch(resp->action_type) {
@@ -127,7 +133,6 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
     }
     free(stone->queue);
     if (stone->response_cache) free(stone->response_cache);
-    free(stone->proto_actions);
     stone->queue = NULL;
     stone->local_id = -1;
     stone->proto_action_count = 0;
