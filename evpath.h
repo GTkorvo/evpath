@@ -1820,6 +1820,79 @@ EVaction_remove_split_target(CManager cm, EVstone stone, EVaction action,
 			  EVstone target_stone);
 
 /*!
+ * Create a new storage stone.
+ *
+ * Store stone buffer up to a limit of events temporarily, and send
+ * the event to out_stone when done.
+ *
+ * \param cm The CManager from which this stone is allocated.
+ * \param out_stone The target stone for output
+ * \param store_limit The maximum number of events to buffer
+ *          (when this limit is reached events will be passed through)
+ * \return The newly allocated stone.
+ */
+/*REMOTE*/
+extern EVstone
+EVcreate_store_action(CManager cm, EVstone out_stone, int store_limit);
+
+/*!
+ * Create a new storage action.
+ *
+ * Storage actions implement storage stones internally and will
+ * accept any type of event.
+ *
+ * \param cm The CManager from which the stone is allocated
+ * \param stone_num The stone to add the action to.
+ * \param out_stone The stone buffered data will be sent to
+ *          when done.
+ * \param store_limit The maximum number of events to store. Set to -1
+ *                      for no limit. Stone will ordinarily act like a
+ *                      a buffer with this maximum size when the limit is
+ *                      reached.
+ * \return The number of the newly created action.
+ */
+/*REMOTE*/
+extern EVaction 
+EVassoc_store_action(CManager cm, EVstone stone_num, EVstone out_stone,
+                        int store_limit);
+
+/*!
+ * Clear the contents stored in the specified storage action.
+ * 
+ * \param cm The CManager from which the stone is allocated
+ * \param stone_num The stone the action is attached to
+ * \param action_num The action created
+ */
+/*REMOTE*/ /* XXX??? */
+extern void
+EVclear_stored(CManager cm, EVstone stone_num, EVaction action_num);
+
+/*!
+ * Send the contents stored in the specified storage action.
+ * The storage will be empty when this function returns.
+ *
+ * \param cm The CManager from whcih the stone is allocated
+ * \param stone_num The stone the action is attached to
+ * \param action_num The action created
+ */
+extern void
+EVsend_stored(CManager cm, EVstone stone_num, EVaction action_num);
+
+/*!
+ * Set the maximum number of items stored in a storage stone,
+ * when using it like a buffer. Excess items will be flushed to the
+ * next stone in line.
+ *
+ * \param cm The CManager from which the stone is allocated
+ * \param stone_num Which stone the action is attached to
+ * \param action_num The storage action
+ * \param store_limit The maximum number of events to keep buffered 
+ */
+extern void
+EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num,
+    int store_limit);
+
+/*!
  * Create a submission handle (EVsource).
  *
  * EVpath is optimized for repetitive event streams.  Rather than specifying
@@ -2244,6 +2317,11 @@ EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
 extern void
 EVassoc_conversion_action(CManager cm, int stone_id, IOFormat target_format,
 			  IOFormat incoming_format);
+
+/* XXX XXX experimental */
+/* extern void
+* EVregister_congest_handler(CManager cm, EVstone stone_id, EVaction act_num,
+    void (*ch)(void), void *user_data); */
 		  
 /* @}*/
 

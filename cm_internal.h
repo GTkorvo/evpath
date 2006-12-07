@@ -532,3 +532,7 @@ extern void INT_EVset_attr_list(CManager cm, EVstone stone_id, attr_list list);
 extern int INT_EVdestroy_stone(CManager cm, EVstone stone_id);
 extern void INT_EVfree_source(EVsource source);
 
+extern void INT_EVsend_stored(CManager cm, EVstone stone, EVaction action);
+extern void INT_EVclear_stored(CManager cm, EVstone stone, EVaction action);
+extern EVaction INT_EVassoc_store_action(CManager cm, EVstone stone, EVstone out_stone, int store_limit); 
+

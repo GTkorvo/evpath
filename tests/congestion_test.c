@@ -317,7 +317,7 @@ char **argv;
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
 	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
-	    filter = create_multiqueued_action_spec(simple_format_lists, 
+	    filter = create_multiqueued_action_spec(simple_format_lists, simple_format_list,
 						    congest);
 	    EVassoc_congestion_action(cm, stone, filter, NULL);
 	}
@@ -330,15 +330,17 @@ char **argv;
 	source_handle = EVcreate_submit_handle_free(cm, stone, simple_format_list,
 						    data_free, NULL);
 	for (i=0; i < msg_limit; i++) {
+	    simple_rec_ptr new_data = malloc(sizeof(simple_rec));
 	    data->integer_field++;
 	    data->long_field--;
+	    memcpy(new_data, data, sizeof(simple_rec));
 	    printf("SUBMITTING  %d\n", i);
 	    set_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)i);
-	    EVsubmit(source_handle, data, attrs);
-	    CMusleep(cm, 100);
+	    EVsubmit(source_handle, new_data, attrs);
+	    CMusleep(cm, 100000);
 	}
 	if (quiet <= 0) printf("Write %d messages\n", msg_limit);
-	CMsleep(cm, 3);
+	CMsleep(cm, 30);
     }
     CManager_close(cm);
     return 0;
@@ -414,7 +416,6 @@ do_regression_master_test()
     alarm(300);
 #endif
     cm = CManager_create();
-    forked = CMfork_comm_thread(cm);
     if ((transport = getenv("CMTransport")) != NULL) {
 	listen_list = create_attr_list();
 	add_attr(listen_list, CM_TRANSPORT, Attr_String,
@@ -490,8 +491,15 @@ do_regression_master_test()
 	    printf(",");
 	    fflush(stdout);
 	}
-	CMusleep(cm, 50);	done++;
-	usleep(100000);
+	while(msg_count != msg_limit) {
+	    if (quiet <= 0) {
+		printf(",");
+		fflush(stdout);
+	    }
+	    CMpoll_network(cm);
+	    usleep(1000000);
+	    printf("Received %d messages\n", msg_count);
+	}
 
 	result = waitpid(subproc_proc, &exit_state, WNOHANG);
 	if (result == -1) {

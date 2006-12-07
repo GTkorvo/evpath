@@ -74,6 +74,7 @@ struct queued_instance {
     ecl_code code;
     ecl_exec_context ec;
     void *client_data;
+    IOFormat *formats;
 };
 
 typedef struct response_instance {
@@ -310,6 +311,7 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	int list_count, j, format_count, i;
 	char *function;
 	CMFormatList *struct_list, out_list = NULL;
+        
 	str += strlen("Multiqueued Action") + 1;
 	sscanf(str, "  List Count %d\n", &list_count);
 	str = strchr(str, '\n') + 1;
@@ -504,6 +506,10 @@ struct ev_state_data {
     int proto_action_id;
     int out_count;
     int *out_stones;
+    queue_item *item;
+    queue_ptr queue;
+    response_instance instance;
+    int did_output;
 };
 
 static int
@@ -630,15 +636,103 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
     return ret;
 }
 
+static queue_item *queue_find_index(queue_item *item, int i, IOFormat format) {
+    for (;;) {
+        if (!item) {
+            return NULL;
+        }
+        if (!format || item->item->reference_format == format) {
+            if (i == 0)
+                return item;
+            --i;
+        }
+        item = item->next;
+    }
+}
+
+static queue_item *ecl_find_index(struct ev_state_data *ev_state, int queue, int index)
+{
+    return queue_find_index(
+        ev_state->item, index, 
+        queue < 0 ?  NULL : ev_state->instance->u.queued.formats[queue]);
+}
+
+
+static void ecl_ev_discard(ecl_exec_context ec, int queue, int index) {
+    struct ev_state_data *ev_state = (void*)ecl_get_client_data(ec, 0x34567890);
+    CManager cm = ev_state->cm;
+    queue_item *item;
+
+    item = ecl_find_index(ev_state, queue, index);
+
+    fprintf(stderr, "about to discard item %d from queue %d [item=%p]\n",
+            index, queue, item);
+
+    assert(item);
+
+    EVdiscard_queue_item(cm, ev_state->queue, item);
+}
+
+static void ecl_ev_discard_and_submit(ecl_exec_context ec,
+        EVstone stone, int queue, int index) {
+    struct ev_state_data *ev_state = (void*)ecl_get_client_data(ec, 0x34567890);
+    CManager cm = ev_state->cm;
+    queue_item *item;
+
+    item = ecl_find_index(ev_state, queue, index);
+
+    internal_path_submit(cm, stone, item->item);
+    
+    EVdiscard_queue_item(cm, ev_state->queue, item);
+}
+
+static void *ecl_ev_get_data(ecl_exec_context ec, int queue, int index)
+{
+    struct ev_state_data *ev_state = (void*)ecl_get_client_data(ec, 0x34567890);
+    queue_item *item;
+    item = ecl_find_index(ev_state, queue, index);
+
+    /* XXX this needs typechecking */
+    return item->item->decoded_event;
+}
+
+static int ecl_ev_present(ecl_exec_context ec, int queue, int index) {
+    struct ev_state_data *ev_state = (void*)ecl_get_client_data(ec, 0x34567890);
+    queue_item *item;
+    
+    item = ecl_find_index(ev_state, queue, index);
+    
+    if (!item)
+        return 0;
+    
+    /* we have something, does the type match? */
+    return (item->item->reference_format == ev_state->instance->u.queued.formats[queue]);
+}
+
+static int ecl_ev_count(ecl_exec_context ec, int queue) {
+    struct ev_state_data *ev_state = (void*) ecl_get_client_data(ec, 0x34567890);
+    IOFormat type = queue < 0 ? NULL : 
+        ev_state->instance->u.queued.formats[queue];
+    queue_item *item = ev_state->item;
+    int count = 1;
+
+    while (item->next) {
+        if (!type || item->item->reference_format == type)
+            ++count;
+        item = item->next;
+    }
+
+    return count;
+}
+
 static int
-queued_wrapper(CManager cm, queue_item *queue, void *client_data,
-	       int out_count, int *out_stones)
+queued_wrapper(CManager cm, struct queue_struct *queue, queue_item *item,
+                void *client_data, int out_count, int *out_stones)
 {
     response_instance instance = (response_instance)client_data;
-    int ret;
-    int(*func)(ecl_exec_context, void *, void*, attr_list) = 
-	(int(*)(ecl_exec_context, void *, void*, attr_list))instance->u.transform.code->func;
-    ecl_exec_context ec = instance->u.transform.ec;
+    int(*func)(ecl_exec_context) =  /* XXX wrong type */
+	(int(*)(ecl_exec_context))instance->u.queued.code->func;
+    ecl_exec_context ec = instance->u.queued.ec;
     struct ev_state_data ev_state;
 
     ev_state.cm = cm;
@@ -647,7 +741,13 @@ queued_wrapper(CManager cm, queue_item *queue, void *client_data,
     ev_state.proto_action_id = instance->proto_action_id;
     ev_state.out_count = out_count;
     ev_state.out_stones = out_stones;
+    ev_state.queue = queue;
+    ev_state.item = item;
+    ev_state.instance = instance;
+    ev_state.did_output = 0;
     ecl_assoc_client_data(ec, 0x34567890, (long)&ev_state);
+
+    func(ec);
 
 /*     if (CMtrace_on(cm, EVerbose)) { */
 /* 	printf("Input Transform Event is :\n"); */
@@ -681,7 +781,7 @@ queued_wrapper(CManager cm, queue_item *queue, void *client_data,
 /* 	CMtrace_out(cm, EVerbose, "Filter function returned %d, NOT submitting\n", ret); */
 /* 	transform_free_wrapper(out_event, instance); */
 /*     } */
-    return ret;
+    return ev_state.did_output;
 }
 
 static response_instance
@@ -737,6 +837,7 @@ response_determination(CManager cm, stone_type stone, event_item *event)
     int nearest_proto_action = -1;
     int return_value = 0;
     IOFormat conversion_target_format = NULL;
+    IOFormat matching_format = NULL;
     int i, format_count = 0;
     IOFormat * formatList;
     int *format_map;
@@ -769,7 +870,18 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 						    formatList,
 						    format_count,
 						    &older_format);
-	if (map_entry != -1) nearest_proto_action = format_map[map_entry];
+	if (map_entry != -1) {
+            nearest_proto_action = format_map[map_entry];
+            matching_format = formatList[map_entry];
+        }
+    }
+    if (nearest_proto_action == -1) {
+        /* special case for accepting anything */
+        int i;
+        for (i=0; i < format_count ; i++) {
+            if (formatList[i] == NULL && !stone->proto_actions[i].requires_decoded) 
+                nearest_proto_action = i;
+        }
     }
     free(formatList);
     free(format_map);
@@ -827,22 +939,30 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 	    
 	    return_value = 1;
 	} else 	if (proto->action_type == Action_Queued) {
-	    
 	    response_instance instance;
 	    struct response_spec *mrd;
+
 	    mrd = 
 		proto->o.imm.mutable_response_data;
 	    instance = generate_multiqueued_code(mrd, stone, 
 						 proto->matching_reference_formats);
-	    if (instance == 0) return 0;
+	    if (instance == 0) {
+                return 0;
+            }
 	    instance->stone = stone->local_id;
 	    instance->proto_action_id = nearest_proto_action;
 	    action_generated++;
 	    INT_EVassoc_mutated_queued_action(cm, stone->local_id, nearest_proto_action, 
 					      queued_wrapper, instance, 
 					      proto->matching_reference_formats);
+
+            if (event->event_encoded) {
+                conversion_target_format = matching_format;
+            }
+            return_value = 1;
 	} else {
 	    response_cache_element *resp;
+
 	    conversion_target_format = proto->matching_reference_formats[0];
 	    /* we'll install the conversion later, first map the response */
 	    if (stone->response_cache_count == 0) {
@@ -875,7 +995,9 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 		    return_value = 1;
 		}
 	    }
-	}
+	} else {
+            return_value = 1;
+        }
     }
     return return_value;
 }
@@ -900,7 +1022,8 @@ internal_ecl_submit(ecl_exec_context ec, int port, void *data, void *type_info)
     event_path_data evp = ev_state->cm->evp;
     event_item *event;
     assert(CManager_locked(cm));
-    if (data == ev_state->cur_event->decoded_event) {
+    ev_state->did_output++;
+    if (ev_state->cur_event && data == ev_state->cur_event->decoded_event) {
 	CMtrace_out(cm, EVerbose, 
 		    "Internal ECL submit, resubmission of current input event to stone %d\n",
 		    ev_state->out_stones[port]);
@@ -977,6 +1100,35 @@ ecl_parse_context context;
 }
 
 static void
+add_queued_routines(ecl_parse_context context) {
+    static char extern_string[] = "\
+        int EVpresent(ecl_exec_context ec, int queue, int index);\n\
+        void EVdiscard(ecl_exec_context ec, int queue, int index);\n\
+        void EVdiscard_and_submit(ecl_exec_context ec, int target,\
+                    int queue, int index);\n\
+        void *EVdata(ecl_exec_context ec, int queue, int index);\n\
+        int EVcount(ecl_exec_context ec, int queue);";
+    static ecl_extern_entry externs[] = {
+        {"EVpresent", (void *)0},
+        {"EVdiscard", (void *)0},
+        {"EVdiscard_and_submit", (void *)0},
+        {"EVdata", (void *)0},
+        {"EVcount", (void *)0},
+        {(void *)0, (void *)0}
+    };
+    
+    externs[0].extern_value = ecl_ev_present;
+    externs[1].extern_value = ecl_ev_discard;
+    externs[2].extern_value = ecl_ev_discard_and_submit;
+    externs[3].extern_value = ecl_ev_get_data;
+    externs[4].extern_value = ecl_ev_count;
+
+    ecl_assoc_externs(context, externs);
+    ecl_parse_for_context(extern_string, context);
+}
+
+
+static void
 add_param(ecl_parse_context parse_context, char *name, int param_num,
 	  IOFormat format)
 {
@@ -1001,6 +1153,16 @@ add_param(ecl_parse_context parse_context, char *name, int param_num,
 
     ecl_add_decl_to_parse_context(name, param, parse_context);
     free(formats);
+}
+
+static void
+add_type(ecl_parse_context parse_context, IOFormat format)
+{
+    IOFormat *sub_formats = get_subformats_IOformat(format);
+    IOFormat *cur_format;
+    for (cur_format = sub_formats; *cur_format; ++cur_format) {
+        ecl_add_struct_type(name_of_IOformat(format), get_local_field_list(format), parse_context);
+    }
 }
 
 #if 0
@@ -1142,6 +1304,8 @@ IOFormat format;
 	}
 	break;
     case Response_Multiqueued:
+        /* this should call generate_multiqueued_code() */
+        assert(FALSE);
 	break;
     }
 	    
@@ -1203,6 +1367,7 @@ stone_type stone;
 IOFormat *formats;
 {
     response_instance instance = malloc(sizeof(*instance));
+    IOFormat *cur_format;
 
     ecl_code code;
     ecl_parse_context parse_context = new_ecl_parse_context();
@@ -1210,6 +1375,12 @@ IOFormat *formats;
 
     memset(instance, 0, sizeof(*instance));
     add_standard_routines(stone, parse_context);
+    add_queued_routines(parse_context);
+
+    for (cur_format = formats; *cur_format; ++cur_format) {
+        add_type(parse_context, *cur_format);
+    }
+
 
     assert(mrd->response_type == Response_Multiqueued);
     ecl_add_param("ec", "ecl_exec_context", 0, parse_context);
@@ -1220,11 +1391,17 @@ IOFormat *formats;
 	}*/
     code = ecl_code_gen(mrd->u.multiqueued.function, parse_context);
     instance->response_type = mrd->response_type;
+    instance->u.queued.formats = formats;
     instance->u.queued.code = code;
     if (code)
 	instance->u.queued.ec = ecl_create_exec_context(code);
     
     ecl_free_parse_context(parse_context);
+
+    if (!instance->u.queued.ec) {
+        free(instance);
+        return NULL;
+    }
 
     return instance;
 }

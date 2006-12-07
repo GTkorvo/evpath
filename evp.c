@@ -17,8 +17,9 @@ static void reference_event(event_item *event);
 static void dump_action(stone_type stone, int a, const char *indent);
 extern void print_server_ID(char *server_id);
 static void dump_stone(stone_type stone);
+static int is_output_stone(CManager cm, EVstone stone_num);
 
-static const char *action_str[] = { "Action_NoAction","Action_Output", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Decode", "Action_Split"};
+static const char *action_str[] = { "Action_NoAction","Action_Output", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Queued", "Action_Decode", "Action_Split", "Action_Store"};
 
 void
 EVPSubmit_encoded(CManager cm, int local_path_id, void *data, int len)
@@ -63,6 +64,52 @@ INT_EValloc_stone(CManager cm)
     return stone_num;
 }
 
+static void
+empty_queue(queue_ptr queue)
+{
+    while(queue->queue_head != NULL && queue->queue_tail != NULL) {
+        free(queue->queue_head->item->ioBuffer);
+        if(queue->queue_head == queue->queue_tail) {
+	    queue->queue_head = NULL;
+	    queue->queue_tail = NULL;
+	}       
+	else
+	    queue->queue_head = queue->queue_head->next;
+    }
+}
+
+/* {{{ storage_queue_* */
+static storage_queue_ptr 
+storage_queue_init(CManager cm, storage_queue_ptr queue,
+        storage_queue_ops_ptr ops, attr_list attrs) {
+    memset(queue, 0, sizeof *queue);
+    queue->ops = ops;
+    if (queue->ops->init)
+        (queue->ops->init)(cm, queue, attrs);
+}
+
+static void
+storage_queue_cleanup(CManager cm, storage_queue_ptr queue) {
+    if (queue->ops->cleanup)
+        (queue->ops->cleanup)(cm, queue);
+}
+
+static void
+storage_queue_empty(CManager cm, storage_queue_ptr queue) {
+    (queue->ops->empty)(cm, queue);
+}
+
+static void
+storage_queue_enqueue(CManager cm, storage_queue_ptr queue, event_item *item) {
+    (queue->ops->enqueue)(cm, queue, item);
+}
+
+static event_item *
+storage_queue_dequeue(CManager cm, storage_queue_ptr queue) {
+    return (queue->ops->dequeue)(cm, queue);
+}
+/* }}} */
+
 void
 INT_EVfree_stone(CManager cm, EVstone stone_num)
 {
@@ -105,14 +152,15 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	    free(act->o.split_stone_targets);
 	    break;
 	case Action_Immediate:
+        case Action_Queued:
 	    if (act->o.imm.mutable_response_data != NULL) {
 		response_data_free(cm, act->o.imm.mutable_response_data);
 	    }
 	    free(act->o.imm.output_stone_ids);
 	    break;
-	case Action_Queued:
-	    /* GSE */
-	    assert(FALSE);
+        case Action_Store:
+            storage_queue_cleanup(cm, &act->o.store.queue);
+            break; 
 	}
     }
     if (stone->proto_actions != NULL) free(stone->proto_actions);
@@ -141,6 +189,20 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	INT_CMfree_attr_list(cm, stone->stone_attrs);
 	stone->stone_attrs = NULL;
     }
+}
+
+EVaction
+add_proto_action(CManager cm, stone_type stone, proto_action **act)
+{
+    int proto_action_num = stone->proto_action_count;
+    stone->proto_actions = realloc(stone->proto_actions, 
+				   (proto_action_num + 1) * 
+				   sizeof(stone->proto_actions[0]));
+    memset(&stone->proto_actions[proto_action_num], 0, 
+	   sizeof(stone->proto_actions[0]));
+    ++stone->proto_action_count;
+    *act = &stone->proto_actions[proto_action_num];
+    return proto_action_num;
 }
 
 static void
@@ -189,9 +251,8 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone_num,
 	stone->proto_actions[proto_action_num].matching_reference_formats[0] = 
 	    EVregister_format_set(cm, format_list, NULL);
 	stone->proto_actions[proto_action_num].matching_reference_formats[1] = NULL;
-    }	
+    }
     action_num = stone->response_cache_count;
-    clear_response_cache(stone);
     stone->response_cache = realloc(stone->response_cache, (action_num + 1) * 
 				   sizeof(stone->response_cache[0]));
     memset(&stone->response_cache[action_num], 0, sizeof(stone->response_cache[0]));
@@ -211,7 +272,7 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone_num,
 	printf("Stone dump->\n");
 	dump_stone(stone);
     }
-    return proto_action_num;
+    return action_num;
 }
     
 
@@ -233,10 +294,11 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
 			 char *action_spec, void *client_data)
 {
     event_path_data evp = cm->evp;
-    int action_num;
+    EVaction action_num;
+    proto_action *act;
     stone_type stone = &evp->stone_map[stone_num];
 
-    action_num = stone->proto_action_count;
+    action_num = add_proto_action(cm, stone, &act);
     CMtrace_out(cm, EVerbose, "Adding Immediate action %d to stone %d",
 		action_num, stone_num);
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
@@ -264,7 +326,7 @@ INT_EVassoc_queued_action(CManager cm, EVstone stone_num,
     stone_type stone = &evp->stone_map[stone_num];
 
     action_num = stone->proto_action_count;
-    CMtrace_out(cm, EVerbose, "Adding Immediate action %d to stone %d",
+    CMtrace_out(cm, EVerbose, "Adding Queued action %d to stone %d",
 		action_num, stone_num);
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
@@ -291,7 +353,7 @@ INT_EVassoc_congestion_action(CManager cm, EVstone stone_num,
     stone_type stone = &evp->stone_map[stone_num];
 
     action_num = stone->proto_action_count;
-    CMtrace_out(cm, EVerbose, "Adding Immediate action %d to stone %d",
+    CMtrace_out(cm, EVerbose, "Adding Congestion action %d to stone %d",
 		action_num, stone_num);
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
@@ -337,11 +399,54 @@ INT_EVassoc_filter_action(CManager cm, EVstone stone_num,
 	    EVregister_format_set(cm, format_list, NULL);
 	stone->proto_actions[proto_action_num].matching_reference_formats[1] = NULL;
     }	
-    stone->proto_action_count++;
     clear_response_cache(stone);
     return proto_action_num;
 }
-    
+
+static storage_queue_ops storage_queue_default_ops;
+
+EVaction 
+INT_EVassoc_store_action(CManager cm, EVstone stone_num, EVstone out_stone,
+                            int store_limit)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_num];
+    proto_action *act;
+    int action_num;
+
+    action_num = add_proto_action(cm, stone, &act);
+
+    act->requires_decoded = 0;
+    act->action_type = Action_Store;
+    act->matching_reference_formats = NULL;
+    storage_queue_init(cm, &act->o.store.queue, &storage_queue_default_ops, NULL);
+    act->o.store.max_stored = store_limit;
+    act->o.store.num_stored = 0;
+    clear_response_cache(stone);
+
+    return action_num;
+}
+
+EVstone
+INT_EVcreate_store_action(CManager cm, EVstone out_stone, int store_limit)
+{
+    EVstone stone = INT_EValloc_stone(cm);
+    (void) INT_EVassoc_store_action(cm, stone, out_stone, store_limit);
+    return stone;
+}
+
+void
+INT_EVclear_stored(CManager cm, EVstone stone_num, EVaction action_num)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_num];
+    storage_queue_ptr queue;
+
+    queue = &stone->proto_actions[action_num].o.store.queue;
+
+    storage_queue_empty(cm, queue);
+}
+
 
 static int evpath_locked(){return 1;}
 
@@ -351,16 +456,10 @@ typedef struct action_tracking_state {
 } *action_state;
 
 static void
-enqueue_event(CManager cm, int stone_id, int action_id, event_item *event)
+raw_enqueue_event(CManager cm, queue_ptr queue, int action_id, event_item *event)
 {
-    event_path_data evp = cm->evp;
     queue_item *item;
-    stone_type stone = &evp->stone_map[stone_id];
-    action_state as = evp->as;
-    if (as == NULL) {
-	as = evp->as = malloc(sizeof(*as));
-	memset(as, 0, sizeof(*as));
-    }
+    event_path_data evp = cm->evp;
     if (evp->queue_items_free_list == NULL) {
 	item = malloc(sizeof(*item));
     } else {
@@ -370,18 +469,52 @@ enqueue_event(CManager cm, int stone_id, int action_id, event_item *event)
     item->item = event;
     item->action_id = action_id;
     reference_event(event);
-    if (stone->queue->queue_head == NULL) {
-	stone->queue->queue_head = item;
-	stone->queue->queue_tail = item;
+    if (queue->queue_head == NULL) {
+	queue->queue_head = item;
+	queue->queue_tail = item;
 	item->next = NULL;
     } else {
-	stone->queue->queue_tail->next = item;
-	stone->queue->queue_tail = item;
+	queue->queue_tail->next = item;
+	queue->queue_tail = item;
 	item->next = NULL;
     }
+}
+
+static void
+enqueue_event(CManager cm, int stone_id, int action_id, event_item *event)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_id];
+    action_state as = evp->as;
+    if (as == NULL) {
+	as = evp->as = malloc(sizeof(*as));
+	memset(as, 0, sizeof(*as));
+    }
+    raw_enqueue_event(cm, stone->queue, action_id, event);
     stone->new_enqueue_flag = 1;
     as->last_active_stone = stone_id;
     as->events_in_play++;
+}
+
+static event_item *
+raw_dequeue_event(CManager cm, queue_ptr q, int *act_p)
+{
+    event_path_data evp = cm->evp;
+    queue_item *item = q->queue_head;
+    event_item *event = NULL;
+    if (item == NULL) return event;
+    event = item->item;
+    if (q->queue_head == q->queue_tail) {
+	q->queue_head = NULL;
+	q->queue_tail = NULL;
+    } else {
+	q->queue_head = q->queue_head->next;
+    }   
+    if (act_p)
+        *act_p = item->action_id;
+    item->next = evp->queue_items_free_list;
+    evp->queue_items_free_list = item;
+    return event;
 }
 
 static event_item *
@@ -389,19 +522,8 @@ dequeue_event(CManager cm, queue_ptr q, int *act_p)
 {
     event_path_data evp = cm->evp;
     action_state as = evp->as;
-    queue_item *item = q->queue_head;
     event_item *event = NULL;
-    if (item == NULL) return event;
-    event = item->item;
-    *act_p = item->action_id;
-    if (q->queue_head == q->queue_tail) {
-	q->queue_head = NULL;
-	q->queue_tail = NULL;
-    } else {
-	q->queue_head = q->queue_head->next;
-    }
-    item->next = evp->queue_items_free_list;
-    evp->queue_items_free_list = item;
+    event = raw_dequeue_event(cm, q, act_p);
     as->events_in_play--;
     return event;
 }
@@ -430,6 +552,7 @@ dequeue_item(CManager cm, queue_ptr q, queue_item *to_dequeue)
 	    last = cur;
 	    cur = cur->next;
 	}
+        assert(cur == to_dequeue);
 	item = cur;
 	last->next = cur->next;
 	if (cur == q->queue_tail) {
@@ -441,6 +564,40 @@ dequeue_item(CManager cm, queue_ptr q, queue_item *to_dequeue)
     as->events_in_play--;
     return event;
 }
+
+void
+EVdiscard_queue_item(CManager cm, queue_ptr q, queue_item *item) {
+    (void) dequeue_item(cm, q, item);
+}
+
+
+
+/* {{{ storage_queue_default_* */
+static void
+storage_queue_default_empty(CManager cm, storage_queue_ptr queue) {
+    empty_queue(&queue->u.queue); 
+}
+
+
+static void
+storage_queue_default_enqueue(CManager cm, storage_queue_ptr queue, event_item *item) {
+    raw_enqueue_event(cm, &queue->u.queue, -1, item);
+}
+
+static event_item *
+storage_queue_default_dequeue(CManager cm, storage_queue_ptr queue) {
+    return raw_dequeue_event(cm, &queue->u.queue, NULL);
+}
+
+static storage_queue_ops storage_queue_default_ops = {
+    /* init    */ NULL,
+    /* cleanup */ storage_queue_default_empty,
+    /* enqueue */ storage_queue_default_enqueue,
+    /* dequeue */ storage_queue_default_dequeue,
+    /* empty   */ storage_queue_default_empty
+};
+/* }}} */
+
 
 static void
 set_conversions(IOContext ctx, IOFormat src_format, IOFormat target_format)
@@ -538,25 +695,28 @@ INT_EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num,
     if (stone_num > cm->evp->stone_count) return 0;
     stone = &(cm->evp->stone_map[stone_num]);
     if (act_num > stone->proto_action_count) return 0;
-    assert((stone->proto_actions[act_num].action_type == Action_Immediate) ||
-	   (stone->proto_actions[act_num].action_type == Action_Queued));
-
-    CMtrace_out(cm, EVerbose, "Setting output %d on stone %d to local stone %d",
-		output_index, stone_num, output_stone);
-    output_count = stone->proto_actions[act_num].o.imm.output_count;
-    if (output_index >= output_count) {
-	stone->proto_actions[act_num].o.imm.output_stone_ids = 
-	    realloc(stone->proto_actions[act_num].o.imm.output_stone_ids,
-		    sizeof(int) * (output_index + 2));
-	for ( ; output_count < output_index; output_count++) {
-	    stone->proto_actions[act_num].o.imm.output_stone_ids[output_count] = -1;
-	}
-	stone->proto_actions[act_num].o.imm.output_count = output_index + 1;
+    if (stone->proto_actions[act_num].action_type == Action_Store) {
+        assert(output_index == 0); /* more than one storage output not supported */
+        stone->proto_actions[act_num].o.store.target_stone_id = output_stone;
+    } else {
+        assert((stone->proto_actions[act_num].action_type == Action_Immediate) ||
+               (stone->proto_actions[act_num].action_type == Action_Queued));
+        CMtrace_out(cm, EVerbose, "Setting output %d on stone %d to local stone %d",
+                    output_index, stone_num, output_stone);
+        output_count = stone->proto_actions[act_num].o.imm.output_count;
+        if (output_index >= output_count) {
+            stone->proto_actions[act_num].o.imm.output_stone_ids = 
+                realloc(stone->proto_actions[act_num].o.imm.output_stone_ids,
+                        sizeof(int) * (output_index + 2));
+            for ( ; output_count < output_index; output_count++) {
+                stone->proto_actions[act_num].o.imm.output_stone_ids[output_count] = -1;
+            }
+            stone->proto_actions[act_num].o.imm.output_count = output_index + 1;
+        }
+        stone->proto_actions[act_num].o.imm.output_stone_ids[output_index] = output_stone;
     }
-    stone->proto_actions[act_num].o.imm.output_stone_ids[output_index] = output_stone;
     return 1;
 }
-    
 
 static int
 determine_action(CManager cm, stone_type stone, event_item *event, int recursed_already)
@@ -584,7 +744,10 @@ determine_action(CManager cm, stone_type stone, event_item *event, int recursed_
 		continue;
 	    }
 	    return i;
-	}
+	} else if (stone->response_cache[i].reference_format == NULL &&
+                   !stone->response_cache[i].requires_decoded) {
+            return i;
+        }
     }
     if (!recursed_already && (response_determination(cm, stone, event) == 1)) {
 	return determine_action(cm, stone, event, 1);
@@ -805,13 +968,14 @@ dump_action(stone_type stone, int a, const char *indent)
 	int i = 0;
 	while (act->matching_reference_formats[i] != NULL) {
 	    char *tmp;
-	    printf("\"%s\" \n", tmp = global_name_of_IOformat(act->matching_reference_formats[i]));
+	    printf("\"%s\" ", tmp = global_name_of_IOformat(act->matching_reference_formats[i]));
 	    i++;
 	    free(tmp);
 	}
     } else {
-	printf(" NULL\n");
+	printf(" NULL");
     }
+    printf("\n");
     switch(act->action_type) {
     case Action_Output:
 	printf("  Target: %s: connection %lx, remote_stone_id %d\n",
@@ -854,12 +1018,15 @@ dump_action(stone_type stone, int a, const char *indent)
 	}
 	dump_mrd(act->o.imm.mutable_response_data);
 	break;
+    case Action_Store:
+        printf("   Store action: %d/%d items\n", act->o.store.num_stored, 
+                    act->o.store.max_stored);
     case Action_NoAction:
 	printf("   NoAction\n");
 	break;
     case Action_Queued:
 	printf("   Queued action\n");
-	printf("       Target Stones:");
+	printf("       Target Stones: ");
 	{
 	    int i;
 	    for(i = 0; i < act->o.imm.output_count; i++) {
@@ -869,6 +1036,7 @@ dump_action(stone_type stone, int a, const char *indent)
 		    printf(" %d", act->o.imm.output_stone_ids[i]);
 		}
 	    }
+            printf("\n");
 	}
 	dump_mrd(act->o.imm.mutable_response_data);
 	break;
@@ -990,7 +1158,7 @@ event_item *event;
     set_int_attr(act->attrs, EV_EVENT_LSUM, totallength);
 }
 
-typedef enum {Immediate, Immediate_and_Queued, Output} action_class;
+typedef enum {Immediate, Immediate_and_Queued, Output, Congestion} action_class;
 
 static int
 is_immediate_action(response_cache_element *act)
@@ -1037,11 +1205,16 @@ process_events_stone(CManager cm, int s, action_class c)
     if (evp->stone_map[s].local_id == -1) return 0;
     if (evp->stone_map[s].is_draining == 1) return 0;
     if (evp->stone_map[s].is_frozen == 1) return 0;
+    if (is_output_stone(cm, s) && (c != Output)) return 0;
     evp->stone_map[s].is_processing = 1;
     
     CMtrace_out(cm, EVerbose, "Process events stone %d\n", s);
     item = evp->stone_map[s].queue->queue_head;
     stone = &(evp->stone_map[s]);
+    if (is_output_stone(cm, s) && (c == Output)) {
+	do_output_action(cm, s);
+	return 0;
+    }
     while (item != NULL && stone->is_draining == 0) {
 	queue_item *next = item->next;
 	response_cache_element *resp;
@@ -1089,9 +1262,6 @@ process_events_stone(CManager cm, int s, action_class c)
 	    item->action_id = resp_id;
 	}	    
 	response_cache_element *act = &stone->response_cache[item->action_id];
-	if (act->action_type == Action_Output) {
-	    do_output_action(cm, s);
-	}
 	if (is_immediate_action(act) &&
 	    ((c == Immediate) || (c == Immediate_and_Queued))) {
 
@@ -1166,10 +1336,15 @@ process_events_stone(CManager cm, int s, action_class c)
 	    default:
 		assert(FALSE);
 	    }
-	} else if (is_immediate_action(act) &&
+	} else if (is_queued_action(act) &&
 		   (c == Immediate_and_Queued)) {
-	    printf("Doing queued \n");
-	}
+            proto_action *p = &stone->proto_actions[act->proto_action_id];
+	    /* event_item *event = dequeue_item(cm, stone->queue, item); XXX */
+            if ((act->o.queued.handler)(cm, stone->queue, item,
+					act->o.queued.client_data, p->o.imm.output_count,
+					p->o.imm.output_stone_ids))
+                more_pending++;
+	} 
 	item = next;
     }
     return more_pending;
@@ -1249,14 +1424,14 @@ CManager cm;
 	    event_item *event = dequeue_event(cm, evp->stone_map[s].queue, 
 					      &action_id);
 	    response_cache_element *act = &evp->stone_map[s].response_cache[action_id];
+            proto_action *p;
 	    stone = &(evp->stone_map[s]);
+            p = &stone->proto_actions[act->proto_action_id];
 
 	    switch(act->action_type) {
 	    case Action_Terminal:
 	    case Action_Filter: {
 		/* the data should already be in the right format */
-		int proto = act->proto_action_id;
-		proto_action *p = &stone->proto_actions[proto];
 		int out;
 		struct terminal_proto_vals *term = &(p->o.term);
 		EVSimpleHandlerFunc handler = term->handler;
@@ -1287,7 +1462,6 @@ CManager cm;
 	    }
 	    case Action_Split: {
 		int t = 0;
-		proto_action *p = &stone->proto_actions[act->proto_action_id];
 		update_event_length_sum(cm, p, event);
 		while (p->o.split_stone_targets[t] != -1) {
 		    internal_path_submit(cm, 
@@ -1304,7 +1478,6 @@ CManager cm;
 		void *client_data;
 		int *out_stones;
 		int out_count;
-		proto_action *p = &stone->proto_actions[act->proto_action_id];
 		/* data is already in the right format */
 		func = act->o.imm.handler;
 		client_data = act->o.imm.client_data;
@@ -1318,6 +1491,23 @@ CManager cm;
 	    case Action_Output:
 		/* handled later */
 		break;
+            case Action_Store: {
+                assert(event->ref_count > 0);
+                storage_queue_enqueue(cm, &p->o.store.queue, event);
+                CMtrace_out(cm, EVerbose, "Enqueued item to store");
+                if (++p->o.store.num_stored > p->o.store.max_stored
+                        && p->o.store.max_stored != -1) {
+                    CMtrace_out(cm, EVerbose, "Dequeuing item because of limit");
+                    event_item *last_event;
+                    last_event = storage_queue_dequeue(cm, &p->o.store.queue);
+                    assert(last_event->ref_count > 0);
+                    --p->o.store.num_stored;
+                    internal_path_submit(cm, p->o.store.target_stone_id, last_event);
+                    return_event(evp, last_event);
+                    more_pending++;
+                }
+                break;
+            }
 	    default:
 		assert(FALSE);
 	    }
@@ -1385,6 +1575,7 @@ CManager cm;
 		  break;
 		case Action_Immediate:
 		case Action_Decode:
+                case Action_Store:
 		case Action_NoAction:
 		  assert(0);  
 		  break;
@@ -1424,7 +1615,14 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
 static void
 write_callback_handler(CManager cm, CMConnection conn, void *client_data)
 {
-    printf("In Write callback\n");
+    int stone = (int)(long) client_data;
+    printf("In Write callback, write_pending is %d\n", conn->write_pending);
+    if (conn->write_pending) {
+	/* nothing for EVPath level to do yet */
+	return;
+    }
+    /* try calling the congestion handler before we write again... */
+    process_events_stone(cm, stone, Congestion);
     do_output_action(cm, (int)(long)client_data);
 }
 
@@ -1445,7 +1643,7 @@ do_output_action(CManager cm, int s)
     }
     while (evp->stone_map[s].queue->queue_head != NULL) {
 	int action_id, ret = 1;
-	if (0/*INT_CMConnection_write_would_block(act->o.out.conn)*/) {
+	if (INT_CMConnection_write_would_block(act->o.out.conn)) {
 	    int i = 0;
 	    int first = 1;
 	    printf("Would call congestion_handler, new flag %d\n", evp->stone_map[s].new_enqueue_flag);
@@ -1504,6 +1702,31 @@ do_output_action(CManager cm, int s)
     return 0;
 }
 
+void
+INT_EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num, int new_limit)
+{
+    int old_limit;
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_num];
+    proto_action *p = &stone->proto_actions[action_num];
+
+    old_limit = p->o.store.max_stored;
+    p->o.store.max_stored = new_limit;
+    if (p->o.store.max_stored != -1) {
+        while (p->o.store.num_stored > p->o.store.max_stored) {
+            event_item *item;
+            item = storage_queue_dequeue(cm, &p->o.store.queue);
+            if (!item)
+                break;
+            p->o.store.num_stored--;
+            internal_path_submit(cm, p->o.store.target_stone_id, item);
+            while (process_local_actions(cm));
+            return_event(evp, item);
+        }
+    }
+}
+
+
 extern EVaction
 INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
 			   EVImmediateHandlerFunc func, void *client_data, 
@@ -1556,6 +1779,15 @@ INT_EVcreate_output_action(CManager cm, attr_list contact_list,
     EVstone stone = INT_EValloc_stone(cm);
     INT_EVassoc_output_action(cm, stone, contact_list, remote_stone);
     return stone;
+}
+
+static int
+is_output_stone(CManager cm, EVstone stone_num)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_num];
+    if (stone->default_action == -1) return 0;
+    return (stone->proto_actions[stone->default_action].action_type == Action_Output);
 }
 
 extern EVaction
@@ -1690,6 +1922,22 @@ INT_EVaction_remove_split_target(CManager cm, EVstone stone_num,
 	target_count++;
     }
     target_stone_list[target_count] = -1;
+}
+
+void
+INT_EVsend_stored(CManager cm, EVstone stone_num, EVaction action_num)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_num];
+    event_item *item;
+    proto_action *p = &stone->proto_actions[action_num];
+
+    while ((item = storage_queue_dequeue(cm, &p->o.store.queue)) != NULL) {
+        internal_path_submit(cm, p->o.store.target_stone_id, item);
+        p->o.store.num_stored--;
+        return_event(evp, item);
+        while (process_local_actions(cm));
+    }
 }
 
 static int
@@ -2195,7 +2443,6 @@ extract_events_from_queue(CManager cm, queue_ptr que, EVevent_list list)
     return list;
 }
 
-
 extern int
 INT_EVdestroy_stone(CManager cm, EVstone stone_id)
 {
@@ -2206,15 +2453,8 @@ INT_EVdestroy_stone(CManager cm, EVstone stone_id)
     }
     stone = &(evp->stone_map[stone_id]);
     while (stone->is_draining != 2);  
-    while(stone->queue->queue_head != NULL && stone->queue->queue_tail != NULL) {
-        free(stone->queue->queue_head->item->ioBuffer);
-        if(stone->queue->queue_head == stone->queue->queue_tail) {
-	    stone->queue->queue_head = NULL;
-	    stone->queue->queue_tail = NULL;
-	}       
-	else
-	    stone->queue->queue_head = stone->queue->queue_head->next;
-    }    
+    empty_queue(stone->queue);
+    free(stone->queue);
     if (stone->response_cache) free(stone->response_cache);
     INT_EVfree_stone(cm, stone_id);  
     return 1;      

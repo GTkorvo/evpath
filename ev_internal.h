@@ -34,7 +34,7 @@ typedef struct _event_item {
     EVFreeFunction free_func;
 } event_item, *event_queue;
 
-typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filter, Action_Immediate, Action_Queued, Action_Decode, Action_Split} action_value;
+typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filter, Action_Immediate, Action_Queued, Action_Decode, Action_Split, Action_Store} action_value;
 
 /*!
  * The prototype of a specific queued handler funcion.
@@ -45,8 +45,10 @@ typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filte
  * However, at the moment this is an internal interface.
  */
 struct queue_item;  /* forward decl */
+struct queue_struct;
 typedef int (*EVQueuedHandlerFunc) ARGS((CManager cm, 
-					 struct queue_item *event, 
+                                         struct queue_struct *queue,
+                                         struct queue_item *item,
 					 void *client_data,
 					 int out_count,
 					 int *out_stones));
@@ -98,6 +100,30 @@ struct terminal_proto_vals {
     int target_stone_id;
 };
 
+typedef struct _storage_queue *storage_queue_ptr;
+typedef struct _storage_queue_ops {
+    void (*init)(CManager cm, storage_queue_ptr queue, attr_list attrs);
+    void (*cleanup)(CManager cm, storage_queue_ptr queue);
+    void (*enqueue)(CManager cm, storage_queue_ptr queue, event_item *item);
+    event_item *(*dequeue)(CManager cm, storage_queue_ptr queue);
+    void (*empty)(CManager cm, storage_queue_ptr queue);
+} storage_queue_ops, *storage_queue_ops_ptr;
+
+typedef struct _storage_queue {
+    union {
+        void *data;
+        queue_struct queue;
+    } u;
+    struct _storage_queue_ops *ops;
+} storage_queue;
+
+struct storage_proto_vals {
+    int target_stone_id;
+    int max_stored;
+    int num_stored;
+    storage_queue queue;
+};
+
 typedef struct _proto_action {
     action_value action_type;
     CMFormatList input_format_requirements;
@@ -108,6 +134,7 @@ typedef struct _proto_action {
 	decode_action_vals decode;
 	immediate_action_vals imm;
 	int *split_stone_targets;
+        struct storage_proto_vals store;
     }o;
     int requires_decoded;
     attr_list attrs;
@@ -181,6 +208,7 @@ extern EVstone INT_EVcreate_terminal_action(CManager cm, CMFormatList format_lis
 extern EVstone INT_EVcreate_auto_stone(CManager cm, int period_sec, 
 				       int period_usec, char *action_spec, 
 				       EVstone out_stone);
+extern EVstone INT_EVcreate_store_action(CManager cm, EVstone out_tsone, int store_limit);
 extern EVaction
 INT_EVassoc_mutated_queued_action(CManager cm, EVstone stone_id, EVaction act_num,
 				  EVQueuedHandlerFunc func, void *client_data, 
@@ -189,3 +217,4 @@ extern EVevent_list extract_events_from_queue(CManager cm, queue_ptr que, EVeven
 extern event_item * get_free_event(event_path_data evp);
 extern void return_event(event_path_data evp, event_item *event);
 extern void ecl_encode_event(CManager cm, event_item *event);
+extern void EVdiscard_queue_item(CManager cm, queue_ptr que, queue_item *item);
