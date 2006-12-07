@@ -1830,8 +1830,9 @@ transport_entry trans;
 CMConnection conn;
 {
     attr_list attrs = NULL;  /* GSE fix */
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMWriteQueuedData, conn %lx", 
-		(long)conn);
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMWriteQueuedData, conn %lx, header %d, attr %d", 
+		(long)conn, conn->queued_data.rem_header_len, 
+		conn->queued_data.rem_attr_len);
     CManager_lock(conn->cm);
     if (conn->queued_data.rem_header_len != 0) {
 	struct _io_encode_vec tmp_vec[1];
@@ -1848,6 +1849,8 @@ CMConnection conn;
 		    &conn->queued_data.rem_header[actual],
 		    conn->queued_data.rem_header_len);
 	    CManager_unlock(conn->cm);
+	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMWriteQueuedData, conn %lx, %d remaining header %d", 
+			(long)conn, conn->queued_data.rem_header_len);
 	    return;
 	}
     }
@@ -1863,6 +1866,8 @@ CMConnection conn;
 	if (actual < conn->queued_data.rem_attr_len) {
 	    conn->queued_data.rem_attr_len -= actual;
 	    conn->queued_data.rem_attr_base += actual;
+	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMWriteQueuedData, conn %lx, %d remaining attr %d", 
+			(long)conn, conn->queued_data.rem_attr_len);
 	    CManager_unlock(conn->cm);
 	    return;
 	}
@@ -1887,11 +1892,14 @@ CMConnection conn;
 	    while (actual > vec[i].iov_len) {
 		actual -= vec[i].iov_len;
 		i++;
+		vec_count--;
 	    }
 	    vec[i].iov_len -= actual;
 	    vec[i].iov_base = (char*)vec[i].iov_base + actual;
 	    conn->queued_data.vector_data = &vec[i];
 	    CManager_unlock(conn->cm);
+	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMWriteQueuedData, conn %lx, %d remaining data vectors", 
+			(long)conn, vec_count);
 	    return;
 	}
     }
@@ -1904,13 +1912,13 @@ CMConnection conn;
     }
     if (conn->write_callbacks) {
 	int i = 0;
-	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, doing notification");
 	while (conn->write_callbacks[i].func != NULL) {
 	    conn->write_callbacks[i].func(conn->cm, conn,
 					     conn->write_callbacks[i].client_data);
 	    conn->write_callbacks[i].func = NULL;
 	    i++;
 	}
+	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, did %d notifications", i);
     } else {
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, No notifications");
     }
