@@ -312,7 +312,6 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
     stone->proto_actions[action_num].o.imm.mutable_response_data = 
  	install_response_handler(cm, stone_num, action_spec, client_data, 
 				 &stone->proto_actions[action_num].matching_reference_formats);
-   stone->proto_action_count++;
     clear_response_cache(stone);
     return action_num;
 }
