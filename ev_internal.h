@@ -45,9 +45,9 @@ typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filte
  * However, at the moment this is an internal interface.
  */
 struct queue_item;  /* forward decl */
-struct queue_struct;
+struct _queue;
 typedef int (*EVQueuedHandlerFunc) ARGS((CManager cm, 
-                                         struct queue_struct *queue,
+                                         struct _queue *queue,
                                          struct queue_item *item,
 					 void *client_data,
 					 int out_count,
@@ -213,6 +213,9 @@ extern EVaction
 INT_EVassoc_mutated_queued_action(CManager cm, EVstone stone_id, EVaction act_num,
 				  EVQueuedHandlerFunc func, void *client_data, 
 				  IOFormat *reference_formats);
+extern EVaction
+INT_EVassoc_congestion_action(CManager cm, EVstone stone_num, 
+			      char *action_spec, void *client_data)
 extern EVevent_list extract_events_from_queue(CManager cm, queue_ptr que, EVevent_list list);
 extern event_item * get_free_event(event_path_data evp);
 extern void return_event(event_path_data evp, event_item *event);

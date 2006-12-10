@@ -507,7 +507,7 @@ struct ev_state_data {
     int out_count;
     int *out_stones;
     queue_item *item;
-    queue_ptr queue;
+    struct _queue *queue;
     response_instance instance;
     int did_output;
 };
@@ -726,7 +726,7 @@ static int ecl_ev_count(ecl_exec_context ec, int queue) {
 }
 
 static int
-queued_wrapper(CManager cm, struct queue_struct *queue, queue_item *item,
+queued_wrapper(CManager cm, struct _queue *queue, queue_item *item,
                 void *client_data, int out_count, int *out_stones)
 {
     response_instance instance = (response_instance)client_data;
@@ -1117,11 +1117,11 @@ add_queued_routines(ecl_parse_context context) {
         {(void *)0, (void *)0}
     };
     
-    externs[0].extern_value = ecl_ev_present;
-    externs[1].extern_value = ecl_ev_discard;
-    externs[2].extern_value = ecl_ev_discard_and_submit;
-    externs[3].extern_value = ecl_ev_get_data;
-    externs[4].extern_value = ecl_ev_count;
+    externs[0].extern_value = (void*)ecl_ev_present;
+    externs[1].extern_value = (void*)ecl_ev_discard;
+    externs[2].extern_value = (void*)ecl_ev_discard_and_submit;
+    externs[3].extern_value = (void*)ecl_ev_get_data;
+    externs[4].extern_value = (void*)ecl_ev_count;
 
     ecl_assoc_externs(context, externs);
     ecl_parse_for_context(extern_string, context);
