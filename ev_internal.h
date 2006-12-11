@@ -215,7 +215,8 @@ INT_EVassoc_mutated_queued_action(CManager cm, EVstone stone_id, EVaction act_nu
 				  IOFormat *reference_formats);
 extern EVaction
 INT_EVassoc_congestion_action(CManager cm, EVstone stone_num, 
-			      char *action_spec, void *client_data)
+			      char *action_spec, void *client_data);
+
 extern EVevent_list extract_events_from_queue(CManager cm, queue_ptr que, EVevent_list list);
 extern event_item * get_free_event(event_path_data evp);
 extern void return_event(event_path_data evp, event_item *event);
