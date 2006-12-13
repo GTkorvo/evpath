@@ -2267,7 +2267,7 @@ create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_l
  */
 /*NOLOCK*/
 extern char *
-create_multiqueued_action_spec(CMFormatList *input_format_lists, CMFormatList out_format_list, char *function);
+create_multityped_action_spec(CMFormatList *input_format_lists, CMFormatList out_format_list, char *function);
 
 /*!
  * Print a description of stone status to standard output.

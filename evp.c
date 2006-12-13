@@ -63,7 +63,6 @@ INT_EValloc_stone(CManager cm)
     evp->stone_count++;
     return stone_num;
 }
-
 static void
 empty_queue(queue_ptr queue)
 {
@@ -86,6 +85,7 @@ storage_queue_init(CManager cm, storage_queue_ptr queue,
     queue->ops = ops;
     if (queue->ops->init)
         (queue->ops->init)(cm, queue, attrs);
+    return queue;
 }
 
 static void
@@ -1222,6 +1222,7 @@ process_events_stone(CManager cm, int s, action_class c)
 	    int resp_id;
 	    event_item *event = item->item;
 	    resp_id = determine_action(cm, stone, item->item, 0);
+            assert(resp_id < stone->response_cache_count);
 	    if (stone->response_cache[resp_id].action_type == Action_NoAction) {
 		char *tmp = NULL;
 		if (event->reference_format)
@@ -1259,7 +1260,8 @@ process_events_stone(CManager cm, int s, action_class c)
 	    }
 
 	    item->action_id = resp_id;
-	}	    
+	}
+        assert(item->action_id < stone->response_cache_count);
 	response_cache_element *act = &stone->response_cache[item->action_id];
 	if (is_immediate_action(act) &&
 	    ((c == Immediate) || (c == Immediate_and_Queued))) {
@@ -1343,6 +1345,7 @@ process_events_stone(CManager cm, int s, action_class c)
 					act->o.queued.client_data, p->o.imm.output_count,
 					p->o.imm.output_stone_ids))
                 more_pending++;
+            break;    
 	} 
 	item = next;
     }
@@ -2459,4 +2462,5 @@ INT_EVdestroy_stone(CManager cm, EVstone stone_id)
     return 1;      
 } 
     
+
 

@@ -210,7 +210,7 @@ extern EVstone INT_EVcreate_auto_stone(CManager cm, int period_sec,
 				       EVstone out_stone);
 extern EVstone INT_EVcreate_store_action(CManager cm, EVstone out_tsone, int store_limit);
 extern EVaction
-INT_EVassoc_mutated_queued_action(CManager cm, EVstone stone_id, EVaction act_num,
+INT_EVassoc_mutated_typed_action(CManager cm, EVstone stone_id, EVaction act_num,
 				  EVQueuedHandlerFunc func, void *client_data, 
 				  IOFormat *reference_formats);
 extern EVaction
