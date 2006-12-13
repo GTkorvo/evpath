@@ -1584,7 +1584,7 @@ EVassoc_congestion_action(CManager cm, EVstone stone, char *multiqueue_spec,
 			  void* client_data);
 
 extern EVaction
-EVassoc_queued_action(CManager cm, EVstone stone, char *queue_spec, 
+EVassoc_multi_action(CManager cm, EVstone stone, char *queue_spec, 
 		      void *client_data);
 
 /*!

@@ -317,7 +317,7 @@ char **argv;
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
 	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
-	    filter = create_multiqueued_action_spec(simple_format_lists, simple_format_list,
+	    filter = create_multityped_action_spec(simple_format_lists, simple_format_list,
 						    congest);
 	    EVassoc_congestion_action(cm, stone, filter, NULL);
 	}

@@ -19,7 +19,7 @@ extern void print_server_ID(char *server_id);
 static void dump_stone(stone_type stone);
 static int is_output_stone(CManager cm, EVstone stone_num);
 
-static const char *action_str[] = { "Action_NoAction","Action_Output", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Queued", "Action_Decode", "Action_Split", "Action_Store"};
+static const char *action_str[] = { "Action_NoAction","Action_Output", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Split", "Action_Store"};
 
 void
 EVPSubmit_encoded(CManager cm, int local_path_id, void *data, int len)
@@ -152,7 +152,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	    free(act->o.split_stone_targets);
 	    break;
 	case Action_Immediate:
-        case Action_Queued:
+        case Action_Multi:
 	    if (act->o.imm.mutable_response_data != NULL) {
 		response_data_free(cm, act->o.imm.mutable_response_data);
 	    }
@@ -317,7 +317,7 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
 }
 
 EVaction
-INT_EVassoc_queued_action(CManager cm, EVstone stone_num, 
+INT_EVassoc_multi_action(CManager cm, EVstone stone_num, 
 			  char *action_spec, void *client_data)
 {
     event_path_data evp = cm->evp;
@@ -325,13 +325,13 @@ INT_EVassoc_queued_action(CManager cm, EVstone stone_num,
     stone_type stone = &evp->stone_map[stone_num];
 
     action_num = stone->proto_action_count;
-    CMtrace_out(cm, EVerbose, "Adding Queued action %d to stone %d",
+    CMtrace_out(cm, EVerbose, "Adding Multi action %d to stone %d",
 		action_num, stone_num);
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
     memset(&stone->proto_actions[action_num], 0, sizeof(stone->proto_actions[0]));
     stone->proto_actions[action_num].requires_decoded = 1;
-    stone->proto_actions[action_num].action_type = Action_Queued;
+    stone->proto_actions[action_num].action_type = Action_Multi;
     stone->proto_actions[action_num].o.imm.output_count = 0;
     stone->proto_actions[action_num].o.imm.output_stone_ids = malloc(sizeof(int));
     stone->proto_actions[action_num].o.imm.output_stone_ids[0] = -1;
@@ -699,7 +699,7 @@ INT_EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num,
         stone->proto_actions[act_num].o.store.target_stone_id = output_stone;
     } else {
         assert((stone->proto_actions[act_num].action_type == Action_Immediate) ||
-               (stone->proto_actions[act_num].action_type == Action_Queued));
+               (stone->proto_actions[act_num].action_type == Action_Multi));
         CMtrace_out(cm, EVerbose, "Setting output %d on stone %d to local stone %d",
                     output_index, stone_num, output_stone);
         output_count = stone->proto_actions[act_num].o.imm.output_count;
@@ -1023,8 +1023,8 @@ dump_action(stone_type stone, int a, const char *indent)
     case Action_NoAction:
 	printf("   NoAction\n");
 	break;
-    case Action_Queued:
-	printf("   Queued action\n");
+    case Action_Multi:
+	printf("   Multi action\n");
 	printf("       Target Stones: ");
 	{
 	    int i;
@@ -1157,7 +1157,7 @@ event_item *event;
     set_int_attr(act->attrs, EV_EVENT_LSUM, totallength);
 }
 
-typedef enum {Immediate, Immediate_and_Queued, Output, Congestion} action_class;
+typedef enum {Immediate, Immediate_and_Multi, Output, Congestion} action_class;
 
 static int
 is_immediate_action(response_cache_element *act)
@@ -1174,10 +1174,10 @@ is_immediate_action(response_cache_element *act)
 }
 
 static int
-is_queued_action(response_cache_element *act)
+is_multi_action(response_cache_element *act)
 {
     switch(act->action_type) {
-    case Action_Queued:
+    case Action_Multi:
 	return 1;
     default:
 	return 0;
@@ -1264,7 +1264,7 @@ process_events_stone(CManager cm, int s, action_class c)
         assert(item->action_id < stone->response_cache_count);
 	response_cache_element *act = &stone->response_cache[item->action_id];
 	if (is_immediate_action(act) &&
-	    ((c == Immediate) || (c == Immediate_and_Queued))) {
+	    ((c == Immediate) || (c == Immediate_and_Multi))) {
 
 	    event_item *event = dequeue_item(cm, stone->queue, item);
 	    switch(act->action_type) {
@@ -1337,12 +1337,12 @@ process_events_stone(CManager cm, int s, action_class c)
 	    default:
 		assert(FALSE);
 	    }
-	} else if (is_queued_action(act) &&
-		   (c == Immediate_and_Queued)) {
+	} else if (is_multi_action(act) &&
+		   (c == Immediate_and_Multi)) {
             proto_action *p = &stone->proto_actions[act->proto_action_id];
 	    /* event_item *event = dequeue_item(cm, stone->queue, item); XXX */
-            if ((act->o.queued.handler)(cm, stone->queue, item,
-					act->o.queued.client_data, p->o.imm.output_count,
+            if ((act->o.multi.handler)(cm, stone->queue, item,
+					act->o.multi.client_data, p->o.imm.output_count,
 					p->o.imm.output_stone_ids))
                 more_pending++;
             break;    
@@ -1384,7 +1384,7 @@ CManager cm;
 	    if (evp->stone_map[s].is_draining == 1) continue;
 	    if (evp->stone_map[s].is_frozen == 1) continue;
 	    CMtrace_out(cm, EVerbose, "1 - in-play %d", as->events_in_play);
-	    more_pending += process_events_stone(cm, s, Immediate_and_Queued);
+	    more_pending += process_events_stone(cm, s, Immediate_and_Multi);
 	    if (more_pending && (as->last_active_stone != -1)) goto restart;
 	}
     }
@@ -1750,8 +1750,8 @@ INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
 }
 
 extern EVaction
-INT_EVassoc_mutated_queued_action(CManager cm, EVstone stone_id, EVaction act_num,
-				  EVQueuedHandlerFunc func, void *client_data, 
+INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
+				  EVMultiHandlerFunc func, void *client_data, 
 				  IOFormat *reference_formats)
 {
     event_path_data evp = cm->evp;
@@ -1763,11 +1763,11 @@ INT_EVassoc_mutated_queued_action(CManager cm, EVstone stone_id, EVaction act_nu
     response_cache_element *resp;
     for (i=0; i < queue_count; i++) {
 	resp = &stone->response_cache[stone->response_cache_count + i];
-	resp->action_type = Action_Queued;
+	resp->action_type = Action_Multi;
 	resp->requires_decoded = 1;
 	resp->proto_action_id = act_num;
-	resp->o.queued.handler = func;
-	resp->o.queued.client_data = client_data;
+	resp->o.multi.handler = func;
+	resp->o.multi.client_data = client_data;
 	resp->reference_format = reference_formats[i];
     }
     stone->response_cache_count += queue_count;

@@ -34,7 +34,7 @@ typedef struct _event_item {
     EVFreeFunction free_func;
 } event_item, *event_queue;
 
-typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filter, Action_Immediate, Action_Queued, Action_Decode, Action_Split, Action_Store} action_value;
+typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filter, Action_Immediate, Action_Multi, Action_Decode, Action_Split, Action_Store} action_value;
 
 /*!
  * The prototype of a specific queued handler funcion.
@@ -46,7 +46,7 @@ typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filte
  */
 struct queue_item;  /* forward decl */
 struct _queue;
-typedef int (*EVQueuedHandlerFunc) ARGS((CManager cm, 
+typedef int (*EVMultiHandlerFunc) ARGS((CManager cm, 
                                          struct _queue *queue,
                                          struct queue_item *item,
 					 void *client_data,
@@ -72,10 +72,10 @@ typedef struct immediate_cache_vals {
     void *client_data;
 } immediate_cache_vals;
 
-typedef struct queued_cache_vals {
-    EVQueuedHandlerFunc handler;
+typedef struct multi_cache_vals {
+    EVMultiHandlerFunc handler;
     void *client_data;
-} queued_cache_vals;
+} multi_cache_vals;
 
 typedef struct immediate_action_struct {
     void *mutable_response_data;
@@ -149,7 +149,7 @@ typedef struct response_cache_element {
     union {
 	decode_action_vals decode;
 	immediate_cache_vals imm;
-	queued_cache_vals queued;
+	multi_cache_vals multi;
     }o;
 } response_cache_element;
 
@@ -210,8 +210,8 @@ extern EVstone INT_EVcreate_auto_stone(CManager cm, int period_sec,
 				       EVstone out_stone);
 extern EVstone INT_EVcreate_store_action(CManager cm, EVstone out_tsone, int store_limit);
 extern EVaction
-INT_EVassoc_mutated_typed_action(CManager cm, EVstone stone_id, EVaction act_num,
-				  EVQueuedHandlerFunc func, void *client_data, 
+INT_EVassoc_mutated_multityped_action(CManager cm, EVstone stone_id, EVaction act_num,
+				  EVMultiHandlerFunc func, void *client_data, 
 				  IOFormat *reference_formats);
 extern EVaction
 INT_EVassoc_congestion_action(CManager cm, EVstone stone_num, 

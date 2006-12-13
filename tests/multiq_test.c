@@ -122,8 +122,8 @@ attr_list attrs;
 
 static int do_regression_master_test();
 static int regression = 1;
-static int repeat_count = 10;
-
+static int repeat_count = 20; /* XXX */
+/*
 static char *trans = "{\
     c_rec c;\n\
     if ((input_queue[0].size < 1) || \n\
@@ -135,6 +135,33 @@ static char *trans = "{\
     EVsubmit(0, c);\n\
     return;\n\
 }\0\0";
+*/
+
+static char *trans = "{\
+    int found = 0;\
+    a_rec *a;\
+    b_rec *b;\
+    c_rec c;\
+    if (EVpresent(a_rec_ID, 0)) {\
+        printf(\"present (0)\\n\");\
+        a = EVdata_a_rec(0); ++found;\
+    }\
+    if (EVpresent(b_rec_ID, 0)) {\
+        printf(\"present (1)\\n\");\
+        b = EVdata_b_rec(0); ++found;\
+    }\
+    if (found == 2) {\
+        c.c_field = a.a_field + b.b_field;\
+        if (!EVpresent_b_rec(0))\
+            printf(\"??? <1> not present (1)\\n\");\
+        EVdiscard_a_rec(0);\
+        if (!EVpresent_b_rec(0))\
+            printf(\"??? <2> not present (1)\\n\");\
+        EVdiscard_b_rec(0);\
+        EVsubmit(0, c);\
+    }\
+}\0\0";
+
 
 static void
 data_free(void *event_data, void *client_data)
@@ -217,11 +244,11 @@ char **argv;
 	}	
 	term = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, term, c_format_list, output_handler, NULL);
-	filter = create_multiqueued_action_spec(queue_list, 
+	filter = create_multityped_action_spec(queue_list, 
 						c_format_list, trans);
 	
 	fstone = EValloc_stone(cm);
-	faction = EVassoc_queued_action(cm, fstone, filter, NULL);
+	faction = EVassoc_multi_action(cm, fstone, filter, NULL);
 	EVaction_set_output(cm, fstone, faction, 0, term);
 	
 	printf("Contact list \"%d:%s\"\n", fstone, string_list);
@@ -303,9 +330,9 @@ char **args;
 {
 #ifdef HAVE_WINDOWS_H
     int child;
-    child = _spawnv(_P_NOWAIT, "./transform_test.exe", args);
+    child = _spawnv(_P_NOWAIT, "./multiq_test.exe", args);
     if (child == -1) {
-	printf("failed for transform_test\n");
+	printf("failed for multiq_test\n");
 	perror("spawnv");
     }
     return child;
@@ -315,7 +342,7 @@ char **args;
     child = fork();
     if (child == 0) {
 	/* I'm the child */
-	execv("./transform_test", args);
+	execv("./multiq_test", args);
     }
     return child;
 #endif
@@ -325,7 +352,7 @@ static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"transform_test", "-c", NULL, NULL};
+    char *args[] = {"multiq_test", "-c", NULL, NULL};
     char *filter;
     int exit_state;
     int forked = 0;
@@ -390,12 +417,13 @@ do_regression_master_test()
     srand48(1);
 
     term = EValloc_stone(cm);
-    EVassoc_terminal_action(cm, term, c_format_list, output_handler, NULL);
-    filter = create_multiqueued_action_spec(queue_list, 
+    EVassoc_terminal_action(cm, term, c_format_list, output_handler, &message_count);
+
+    filter = create_multityped_action_spec(queue_list, 
 					    c_format_list, trans);
     
     fstone = EValloc_stone(cm);
-    faction = EVassoc_queued_action(cm, fstone, filter, NULL);
+    faction = EVassoc_multi_action(cm, fstone, filter, NULL);
     EVaction_set_output(cm, fstone, faction, 0, term);
 
     args[2] = string_list;
@@ -439,6 +467,6 @@ do_regression_master_test()
 #endif
     free(string_list);
     CManager_close(cm);
-    if (message_count != repeat_count) printf("Message count == %d\n", message_count);
-    return !(message_count == repeat_count);
+    if (message_count != repeat_count / 2) printf("Message count == %d\n", message_count);
+    return !(message_count == repeat_count / 2);
 }
