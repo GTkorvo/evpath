@@ -692,11 +692,11 @@ static void ecl_ev_discard(ecl_exec_context ec, int absp, int queue, int index) 
 }
 
 static void ecl_ev_discard_rel(ecl_exec_context ec, int queue, int index) {
-    return ecl_ev_discard(ec, 0, queue, index);
+    ecl_ev_discard(ec, 0, queue, index);
 }
 
 static void ecl_ev_discard_abs(ecl_exec_context ec, int queue, int index) {
-    return ecl_ev_discard(ec, 1, queue, index);
+    ecl_ev_discard(ec, 1, queue, index);
 }
 
 static void ecl_ev_discard_and_submit(ecl_exec_context ec,
@@ -718,12 +718,12 @@ static void ecl_ev_discard_and_submit(ecl_exec_context ec,
 
 static void ecl_ev_discard_and_submit_rel(ecl_exec_context ec, EVstone stone, int queue,
         int index) {
-    return ecl_ev_discard_and_submit(ec, 0, stone, queue, index);
+    ecl_ev_discard_and_submit(ec, 0, stone, queue, index);
 }
 
 static void ecl_ev_discard_and_submit_abs(ecl_exec_context ec, EVstone stone, int queue,
         int index) {
-    return ecl_ev_discard_and_submit(ec, 1, stone, queue, index);
+    ecl_ev_discard_and_submit(ec, 1, stone, queue, index);
 }
 
 static void *ecl_ev_get_data(ecl_exec_context ec, int absp, int queue, int index)
@@ -1182,12 +1182,12 @@ add_typed_queued_routines(ecl_parse_context context, int index, IOFormat format)
     externs = malloc(sizeof(externs_fmt));
     assert(externs);
     memcpy(externs, externs_fmt, sizeof(externs_fmt));
-    externs[0].extern_value = ecl_ev_get_data_rel;
-    externs[1].extern_value = ecl_ev_get_data_abs;
-    externs[2].extern_value = ecl_ev_discard_rel;
-    externs[3].extern_value = ecl_ev_count;
-    externs[4].extern_value = ecl_ev_present;
-    externs[5].extern_value = ecl_ev_discard_and_submit_rel;
+    externs[0].extern_value = (void*) ecl_ev_get_data_rel;
+    externs[1].extern_value = (void*) ecl_ev_get_data_abs;
+    externs[2].extern_value = (void*) ecl_ev_discard_rel;
+    externs[3].extern_value = (void*) ecl_ev_count;
+    externs[4].extern_value = (void*) ecl_ev_present;
+    externs[5].extern_value = (void*) ecl_ev_discard_and_submit_rel;
 
     for (cur = externs; cur->extern_name; ++cur) {
         char *real_name = malloc(strlen(cur->extern_name) + strlen(fmt_name));
