@@ -399,6 +399,7 @@ INT_EVassoc_filter_action(CManager cm, EVstone stone_num,
 	    EVregister_format_set(cm, format_list, NULL);
 	stone->proto_actions[proto_action_num].matching_reference_formats[1] = NULL;
     }	
+    stone->proto_action_count++;
     clear_response_cache(stone);
     CMtrace_out(cm, EVerbose, "Adding filter action %d to stone %d",
 		proto_action_num, stone_num);
