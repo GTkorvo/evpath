@@ -426,6 +426,7 @@ INT_EVassoc_store_action(CManager cm, EVstone stone_num, EVstone out_stone,
     act->o.store.max_stored = store_limit;
     act->o.store.num_stored = 0;
     clear_response_cache(stone);
+    stone->default_action = action_num;
 
     return action_num;
 }
@@ -787,6 +788,7 @@ determine_action(CManager cm, stone_type stone, event_item *event, int recursed_
 	dump_stone(stone);
     }
     stone->response_cache[return_response].action_type = Action_NoAction;
+    stone->response_cache[return_response].requires_decoded = 0;
 
     return return_response;
 }
