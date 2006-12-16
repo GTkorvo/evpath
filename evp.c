@@ -14,7 +14,8 @@ extern
 IOFormat EVregister_format_set(CManager cm, CMFormatList list, 
 				    IOContext *context_ptr);
 static void reference_event(event_item *event);
-static void dump_action(stone_type stone, int a, const char *indent);
+static void dump_action(stone_type stone, response_cache_element *resp, 
+			int a, const char *indent);
 extern void print_server_ID(char *server_id);
 static void dump_stone(stone_type stone);
 static int is_output_stone(CManager cm, EVstone stone_num);
@@ -399,6 +400,8 @@ INT_EVassoc_filter_action(CManager cm, EVstone stone_num,
 	stone->proto_actions[proto_action_num].matching_reference_formats[1] = NULL;
     }	
     clear_response_cache(stone);
+    CMtrace_out(cm, EVerbose, "Adding filter action %d to stone %d",
+		proto_action_num, stone_id);
     return proto_action_num;
 }
 
@@ -768,7 +771,7 @@ determine_action(CManager cm, stone_type stone, event_item *event, int recursed_
 
     if (stone->default_action != -1) {
 /*	    printf(" Returning ");
-	    dump_action(stone, stone->default_action, "   ");*/
+	    dump_action(stone, NULL, stone->default_action, "   ");*/
 	response_cache_element *resp = 
 	    &stone->response_cache[return_response];
 	proto_action *proto = &stone->proto_actions[stone->default_action];
@@ -953,9 +956,14 @@ dump_proto_action(stone_type stone, int a, const char *indent)
 }
 
 static void
-dump_action(stone_type stone, int a, const char *indent)
+dump_action(stone_type stone, response_cache_element *resp, int a, const char *indent)
 {
-    proto_action *act = &stone->proto_actions[a];
+    proto_action *act;
+    if ((resp != NULL) && (resp->action_type == Action_NoAction)) {
+	printf("NO ACTION REGISTERED\n");
+	return;
+    }
+    act = &stone->proto_actions[a];
     printf(" Action %d - %s  ", a, action_str[act->action_type]);
     if (act->requires_decoded) {
 	printf("requires decoded\n");
@@ -1056,7 +1064,7 @@ dump_stone(stone_type stone)
     }
     printf("  proto_action_count %d:\n", stone->proto_action_count);
     for (i=0; i< stone->proto_action_count; i++) {
-	dump_action(stone, i, "    ");
+	dump_action(stone, NULL, i, "    ");
     }
 }
 
@@ -1111,7 +1119,7 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 	printf("Enqueueing event %lx on stone %d, action %lx\n",
 	       (long)event_to_submit, local_path_id, (long)resp);
 	
-	dump_action(stone, resp->proto_action_id, "    ");
+	dump_action(stone, resp, resp->proto_action_id, "    ");
 	}*/
     enqueue_event(cm, local_path_id, -1, event_to_submit);
 /*    if (event != event_to_submit) {
@@ -1256,7 +1264,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		printf("next action event %lx on stone %d, action %lx\n",
 		       (long)event, s, (long)resp);
 		
-		dump_action(stone, resp->proto_action_id, "    ");
+		dump_action(stone, resp, resp->proto_action_id, "    ");
 	    }
 
 	    item->action_id = resp_id;
