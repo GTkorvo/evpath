@@ -3,7 +3,7 @@ AUTOMAKE_OPTIONS = no-dependencies foreign
 
 OLD_TESTS = cmtest cmping take_test
 
-TESTS = evtest bulktest http_test filter_test router_test router_test2 filter2_test transform_test auto_test extract_test submit_test thin_test store_limit_test store_send_test congestion_test multiq_test
+TESTS = evtest bulktest http_test filter_test router_test router_test2 filter2_test transform_test auto_test extract_test submit_test thin_test store_limit_test store_send_test multiq_test
 
 check-local:
 	@if CMTransport=udp ./evtest$(EXEEXT) ; then\
@@ -13,7 +13,7 @@ check-local:
 	 echo "PASS: block_test";\
 	else echo "FAIL: block_test"; fi
 
-noinst_PROGRAMS = $(TESTS) thin_client
+noinst_PROGRAMS = $(TESTS) thin_client congestion_test 
 
 LDADD = ../libevpath.la
 
