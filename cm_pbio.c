@@ -241,10 +241,6 @@ int condition;
     }
 }
 
-#ifndef MODULE
-extern void print_server_ID ARGS((unsigned char*));
-#endif 
-
 extern void *
 CMpbio_get_format_rep_callback(format_ID, format_ID_length, host_IP,
 			       host_port, app_context, client_data)

@@ -16,7 +16,6 @@ IOFormat EVregister_format_set(CManager cm, CMFormatList list,
 static void reference_event(event_item *event);
 static void dump_action(stone_type stone, response_cache_element *resp, 
 			int a, const char *indent);
-extern void print_server_ID(char *server_id);
 static void dump_stone(stone_type stone);
 static int is_output_stone(CManager cm, EVstone stone_num);
 

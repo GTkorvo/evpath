@@ -526,7 +526,6 @@ int native_struct_size;
 }
 
 extern int CMself_hosted_formats;
-extern void print_server_ID(char *server_id);
 
 static void
 preload_pbio_format(conn, ioformat, context)
