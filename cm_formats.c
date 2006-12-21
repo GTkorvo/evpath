@@ -552,7 +552,7 @@ IOContext context;
 	if (CMtrace_on(conn->cm, CMFormatVerbose)) {
 	    int junk;
 	    printf("CMpbio Preload is format ");
-	    print_server_ID(get_server_ID_IOformat(*subformats, &junk));
+	    print_server_ID((unsigned char *)get_server_ID_IOformat(*subformats, &junk));
 	    printf("\n");
 	}
 #endif
