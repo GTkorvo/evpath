@@ -924,9 +924,12 @@ response_determination(CManager cm, stone_type stone, event_item *event)
     if (nearest_proto_action == -1) {
         /* special case for accepting anything */
         int i;
-        for (i=0; i < format_count ; i++) {
-            if (formatList[i] == NULL && !stone->proto_actions[i].requires_decoded) 
+        for (i=0; i < stone->proto_action_count; i++) {
+            if (stone->proto_actions[i].matching_reference_formats 
+                && stone->proto_actions[i].matching_reference_formats[0] == NULL
+                && !stone->proto_actions[i].requires_decoded) {
                 nearest_proto_action = i;
+            }
         }
     }
     free(formatList);

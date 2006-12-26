@@ -420,7 +420,8 @@ INT_EVassoc_store_action(CManager cm, EVstone stone_num, EVstone out_stone,
 
     act->requires_decoded = 0;
     act->action_type = Action_Store;
-    act->matching_reference_formats = NULL;
+    act->matching_reference_formats = malloc(sizeof(IOFormat));
+    act->matching_reference_formats[0] = NULL; /* signal that we accept all formats */
     storage_queue_init(cm, &act->o.store.queue, &storage_queue_default_ops, NULL);
     act->o.store.max_stored = store_limit;
     act->o.store.num_stored = 0;
@@ -1177,6 +1178,7 @@ is_immediate_action(response_cache_element *act)
     case Action_Filter:
     case Action_Split:
     case Action_Immediate:
+    case Action_Store:
 	return 1;
     default:
 	return 0;
@@ -1343,6 +1345,23 @@ process_events_stone(CManager cm, int s, action_class c)
 		    more_pending++;   /* maybe??? */
 		break;
 	    }
+            case Action_Store: {
+		proto_action *p = &stone->proto_actions[act->proto_action_id];
+                storage_queue_enqueue(cm, &p->o.store.queue, event);
+                CMtrace_out(cm, EVerbose, "Enqueued item to store");
+                if (++p->o.store.num_stored > p->o.store.max_stored
+                        && p->o.store.max_stored != -1) {
+                    CMtrace_out(cm, EVerbose, "Dequeuing item because of limit");
+                    event_item *last_event;
+                    last_event = storage_queue_dequeue(cm, &p->o.store.queue);
+                    assert(last_event->ref_count > 0);
+                    --p->o.store.num_stored;
+                    internal_path_submit(cm, p->o.store.target_stone_id, last_event);
+                    return_event(evp, last_event);
+                    more_pending++;
+                }
+                break;
+            }
 	    case Action_Output:
 	    default:
 		assert(FALSE);
