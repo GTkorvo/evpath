@@ -1306,7 +1306,7 @@ add_type(ecl_parse_context parse_context, IOFormat format)
     IOFormat *sub_formats = get_subformats_IOformat(format);
     IOFormat *cur_format;
     for (cur_format = sub_formats; *cur_format; ++cur_format) {
-        ecl_add_struct_type(name_of_IOformat(format), get_local_field_list(format), parse_context);
+        ecl_add_struct_type(name_of_IOformat(*cur_format), get_local_field_list(*cur_format), parse_context);
     }
 }
 
