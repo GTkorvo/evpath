@@ -733,6 +733,13 @@ static void *ecl_ev_get_data(ecl_exec_context ec, int absp, int queue, int index
     item = ecl_find_index(absp, ev_state, queue, index);
 
     assert(item);
+    assert(item->item);
+
+    if (!item->item->decoded_event) {
+        item->item = ecl_decode_event(ev_state->cm, ev_state->stone,    
+            ev_state->proto_action_id, item->item);
+    }
+    assert(item->item->decoded_event);
 
     return item->item->decoded_event;
 }
@@ -877,8 +884,34 @@ dump_mrd(void *mrdv)
     }
 }
 
+static int
+proto_action_in_stage(proto_action *act, action_class stage) {
+    switch (stage) {
+    case Immediate_and_Multi:
+        if (act->action_type == Action_Multi) return 1;
+        /* fallthrough */
+    case Immediate:
+        switch (act->action_type) {
+        case Action_Terminal:
+        case Action_Filter:
+        case Action_Split:
+        case Action_Immediate:
+        case Action_Store:
+            return 1;
+        default:
+            return 0;
+        }
+    case Output:
+        return act->action_type == Action_Output;
+    case Congestion:
+        return act->action_type == Action_Congestion;     
+    default:
+        assert(0);
+    }
+}
+
 int
-response_determination(CManager cm, stone_type stone, event_item *event)
+response_determination(CManager cm, stone_type stone, action_class stage, event_item *event)
 {
     int nearest_proto_action = -1;
     int return_value = 0;
@@ -894,6 +927,9 @@ response_determination(CManager cm, stone_type stone, event_item *event)
     format_map = (int *) malloc((stone->proto_action_count + 1) * sizeof(int));
     for (i = 0; i < stone->proto_action_count; i++) {
 	int j = 0;
+        if (!proto_action_in_stage(&stone->proto_actions[i], stage)) {
+            continue;
+        }
 	while (stone->proto_actions[i].matching_reference_formats && 
 	       (stone->proto_actions[i].matching_reference_formats[j] != NULL)) {
 	    formatList = (IOFormat *) realloc(formatList, (format_count + 2) * sizeof(IOFormat));
@@ -909,6 +945,7 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 	/* special case for unformatted input */
 	int i;
 	for (i=0 ; i < stone->proto_action_count ; i++) {
+            if (!proto_action_in_stage(&stone->proto_actions[i], stage)) continue;
 	    if (stone->proto_actions[i].matching_reference_formats[0] == NULL) nearest_proto_action = i;
 	}
     } else {
@@ -925,6 +962,7 @@ response_determination(CManager cm, stone_type stone, event_item *event)
         /* special case for accepting anything */
         int i;
         for (i=0; i < stone->proto_action_count; i++) {
+            if (!proto_action_in_stage(&stone->proto_actions[i], stage)) continue;
             if (stone->proto_actions[i].matching_reference_formats 
                 && stone->proto_actions[i].matching_reference_formats[0] == NULL
                 && !stone->proto_actions[i].requires_decoded) {
@@ -988,7 +1026,7 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 	    }
 	    
 	    return_value = 1;
-	} else 	if (proto->action_type == Action_Multi) {
+	} else 	if (proto->action_type == Action_Multi || proto->action_type == Action_Congestion) {
 	    response_instance instance;
 	    struct response_spec *mrd;
 
@@ -1028,11 +1066,12 @@ response_determination(CManager cm, stone_type stone, event_item *event)
 	    resp->proto_action_id = nearest_proto_action;
 	    resp->action_type = proto->action_type;
 	    resp->requires_decoded = proto->requires_decoded;
+            resp->stage = stage;
 	}
 	if (conversion_target_format != NULL) {
 	    if (event->event_encoded) {
 		/* create a decode action */
-		INT_EVassoc_conversion_action(cm, stone->local_id, 
+		INT_EVassoc_conversion_action(cm, stone->local_id, stage,
 					      conversion_target_format, 
 					      event->reference_format);
 /*	    printf(" Returning ");

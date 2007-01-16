@@ -20,7 +20,7 @@
 #include <sys/wait.h>
 #endif
 
-#define MSG_COUNT 30
+#define MSG_COUNT 50 
 static int msg_limit = MSG_COUNT;
 
 typedef struct _complex_rec {
@@ -181,6 +181,9 @@ attr_list attrs;
 	int tmp = *((int *) client_data);
 	*((int *) client_data) = tmp + 1;
     }
+
+    printf("Waiting to cause stall...\n");
+    sleep(1);
     return 0;
 }
 
@@ -189,7 +192,6 @@ static int regression = 1;
 
 static char *congest = "{\n\
 printf(\"In congestion handler\\n\");\n\
-event_queues[0].attrs;\n\
 return 0;\n\
 }";
 
@@ -317,6 +319,9 @@ char **argv;
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
 	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
+
+            source_handle = EVcreate_submit_handle_free(cm, stone, simple_format_list,
+						    data_free, NULL);
 	    filter = create_multityped_action_spec(simple_format_lists, simple_format_list,
 						    congest);
 	    EVassoc_congestion_action(cm, stone, filter, NULL);

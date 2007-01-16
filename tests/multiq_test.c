@@ -122,7 +122,7 @@ attr_list attrs;
 
 static int do_regression_master_test();
 static int regression = 1;
-static int repeat_count = 20; /* XXX */
+static int repeat_count = 100;
 /*
 static char *trans = "{\
     c_rec c;\n\
@@ -143,11 +143,9 @@ static char *trans = "{\
     b_rec *b;\
     c_rec c;\
     if (EVpresent(a_rec_ID, 0)) {\
-        printf(\"present (0)\\n\");\
         a = EVdata_a_rec(0); ++found;\
     }\
     if (EVpresent(b_rec_ID, 0)) {\
-        printf(\"present (1)\\n\");\
         b = EVdata_b_rec(0); ++found;\
     }\
     if (found == 2) {\
@@ -176,6 +174,8 @@ char **argv;
 {
     CManager cm;
     int regression_master = 1;
+
+    /* XXX for testing */ setbuf(stdout, NULL);
 
     while (argv[1] && (argv[1][0] == '-')) {
 	if (argv[1][1] == 'c') {
@@ -294,12 +294,12 @@ char **argv;
 	    if (map[i] == 1) {
 		rec_a_ptr a = malloc(sizeof(*a));
 		generate_a_record(a);
-		if (quiet <=0) {printf("submitting a -> %ld\n", a->a_field);}
+		if (quiet <=0) {printf("submitting a -> %d\n", a->a_field);}
 		EVsubmit(a_handle, a, attrs);
 	    } else {
 		rec_b_ptr b = malloc(sizeof(*b));
 		generate_b_record(b);
-		if (quiet <=0) {printf("submitting b -> %ld\n", b->b_field);}
+		if (quiet <=0) {printf("submitting b -> %d\n", b->b_field);}
 		EVsubmit(b_handle, b, attrs);
 	    }
 	}

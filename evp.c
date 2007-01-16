@@ -153,6 +153,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	    break;
 	case Action_Immediate:
         case Action_Multi:
+        case Action_Congestion:
 	    if (act->o.imm.mutable_response_data != NULL) {
 		response_data_free(cm, act->o.imm.mutable_response_data);
 	    }
@@ -358,7 +359,7 @@ INT_EVassoc_congestion_action(CManager cm, EVstone stone_num,
 				   sizeof(stone->proto_actions[0]));
     memset(&stone->proto_actions[action_num], 0, sizeof(stone->proto_actions[0]));
     stone->proto_actions[action_num].requires_decoded = 1;
-    stone->proto_actions[action_num].action_type = Action_Immediate;
+    stone->proto_actions[action_num].action_type = Action_Congestion;
     stone->proto_actions[action_num].o.imm.output_count = 0;
     stone->proto_actions[action_num].o.imm.output_stone_ids = malloc(sizeof(int));
     stone->proto_actions[action_num].o.imm.output_stone_ids[0] = -1;
@@ -650,9 +651,10 @@ set_conversions(IOContext ctx, IOFormat src_format, IOFormat target_format)
 }
 
 extern void
-INT_EVassoc_conversion_action(cm, stone_id, target_format, incoming_format)
+INT_EVassoc_conversion_action(cm, stone_id, stage, target_format, incoming_format)
 CManager cm;
 int stone_id;
+int stage;
 IOFormat target_format;
 IOFormat incoming_format;
 {
@@ -679,6 +681,7 @@ IOFormat incoming_format;
     act->requires_decoded = 0;
     act->action_type = Action_Decode;
     act->reference_format = incoming_format;
+    act->stage = (action_class) stage;
 
     act->o.decode.context = create_IOsubcontext(cm->evp->root_context);
     format = get_format_app_IOcontext(act->o.decode.context, 
@@ -723,7 +726,12 @@ INT_EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num,
 }
 
 static int
-determine_action(CManager cm, stone_type stone, event_item *event, int recursed_already)
+compatible_stages(int real_stage, int cache_stage) {
+    return real_stage == cache_stage || (real_stage == Immediate_and_Multi && cache_stage == Immediate);
+}
+
+static int
+determine_action(CManager cm, stone_type stone, action_class stage, event_item *event, int recursed_already)
 {
     int i;
     int return_response;
@@ -734,6 +742,9 @@ determine_action(CManager cm, stone_type stone, event_item *event, int recursed_
 	   event->reference_format, name_of_IOformat(event->reference_format));
     }
     for (i=0; i < stone->response_cache_count; i++) {
+        if (stone->response_cache[i].stage != stage) {
+            continue;
+        }
 	if (stone->response_cache[i].reference_format == event->reference_format) {
 	    /* 
 	     * if the event is encoded and the action requires decoded data,
@@ -753,8 +764,8 @@ determine_action(CManager cm, stone_type stone, event_item *event, int recursed_
             return i;
         }
     }
-    if (!recursed_already && (response_determination(cm, stone, event) == 1)) {
-	return determine_action(cm, stone, event, 1);
+    if (!recursed_already && (response_determination(cm, stone, stage, event) == 1)) {
+	return determine_action(cm, stone, stage, event, 1);
     }
     /* 
      * there was no action for this event, install a dummy so we 
@@ -780,14 +791,18 @@ determine_action(CManager cm, stone_type stone, event_item *event, int recursed_
 	resp->proto_action_id = stone->default_action;
 	resp->action_type = proto->action_type;
 	resp->requires_decoded = proto->requires_decoded;
+        resp->stage = stage;
 	return return_response;
     }
+    /* This should be detected elsewhere now
     if (CMtrace_on(cm, EVWarning)) {
 	printf("Warning!  No action found for incoming event on stone %d\n",
 	       stone->local_id);
 	dump_stone(stone);
     }
+    */
     stone->response_cache[return_response].action_type = Action_NoAction;
+    stone->response_cache[return_response].stage = stage;
     stone->response_cache[return_response].requires_decoded = 0;
 
     return return_response;
@@ -949,6 +964,43 @@ extern void
 ecl_encode_event(CManager cm, event_item *event)
 {
     encode_event(cm, event);
+}
+
+static action_class
+cached_stage_for_action(proto_action *act) {
+    switch (act->action_type) {
+    case Action_Congestion:
+        return Congestion;
+    case Action_Multi:
+        return Immediate_and_Multi;
+    case Action_Output:
+        return Output;
+    case Action_Terminal:
+    case Action_Filter:
+    case Action_Split:
+    case Action_Immediate:
+    case Action_Store:
+        return Immediate;
+    default:
+        assert(0);    
+    }
+}
+
+extern event_item * 
+ecl_decode_event(CManager cm, int stone_num, int act_num, event_item *event) {
+    event_path_data evp = cm->evp;
+    stone_type stone;
+    action_class stage;
+    int resp_id;
+
+    assert(!event->decoded_event);
+
+    stone = &evp->stone_map[stone_num];
+    stage = cached_stage_for_action(&stone->proto_actions[act_num]);
+
+    resp_id = determine_action(cm, stone, stage, event, 0);
+    assert(stone->response_cache[resp_id].action_type == Action_Decode);
+    return decode_action(cm, event, &stone->response_cache[resp_id]);
 }
 
 static void
@@ -1168,8 +1220,6 @@ event_item *event;
     set_int_attr(act->attrs, EV_EVENT_LSUM, totallength);
 }
 
-typedef enum {Immediate, Immediate_and_Multi, Output, Congestion} action_class;
-
 static int
 is_immediate_action(response_cache_element *act)
 {
@@ -1196,6 +1246,11 @@ is_multi_action(response_cache_element *act)
     }
 }
 
+static int
+is_congestion_action(response_cache_element *act) {
+    return act->action_type == Action_Congestion;
+}
+
 static int do_output_action(CManager cm, int s);
 
 static int
@@ -1216,7 +1271,7 @@ process_events_stone(CManager cm, int s, action_class c)
     if (evp->stone_map[s].local_id == -1) return 0;
     if (evp->stone_map[s].is_draining == 1) return 0;
     if (evp->stone_map[s].is_frozen == 1) return 0;
-    if (is_output_stone(cm, s) && (c != Output)) return 0;
+    if (is_output_stone(cm, s) && (c != Output) && (c != Congestion)) return 0;
     evp->stone_map[s].is_processing = 1;
     
     CMtrace_out(cm, EVerbose, "Process events stone %d\n", s);
@@ -1229,39 +1284,44 @@ process_events_stone(CManager cm, int s, action_class c)
     while (item != NULL && stone->is_draining == 0) {
 	queue_item *next = item->next;
 	response_cache_element *resp;
-	if (item->action_id == -1) {
+	response_cache_element *act = NULL;
+        if (c != Congestion && item->action_id != -1) {
+             act = &stone->response_cache[item->action_id];
+        } else {
 	    /* determine what kind of action to take here */
 	    int resp_id;
 	    event_item *event = item->item;
-	    resp_id = determine_action(cm, stone, item->item, 0);
+	    resp_id = determine_action(cm, stone, c, item->item, 0);
             assert(resp_id < stone->response_cache_count);
-	    if (stone->response_cache[resp_id].action_type == Action_NoAction) {
-		char *tmp = NULL;
-		if (event->reference_format)
-		    tmp = global_name_of_IOformat(event->reference_format);
-		printf("No action found for event %lx submitted to stone %d\n",
-		       (long)event, s);
-		if (tmp != NULL) {
-		    static int first = 1;
-		    printf("    Unhandled incoming event format was \"%s\"\n", tmp);
-		    if (first) {
-			first = 0;
-			printf("\n\t** use \"format_info <format_name>\" to get full format information ** \n\n");
-		    }
-		} else {
-		    printf("    Unhandled incoming event format was NULL\n");
-		}
-		free(tmp);
-		event = dequeue_item(cm, stone->queue, item);
-		return_event(evp, event);
-	    }
+	    if (stone->response_cache[resp_id].action_type == Action_NoAction
+                && c == Immediate_and_Multi) {
+                /* ignore event */
+                char *tmp = NULL;
+                if (event->reference_format)
+                    tmp = global_name_of_IOformat(event->reference_format);
+                printf("No action found for event %lx submitted to stone %d\n",
+                       (long)event, s);
+                if (tmp != NULL) {
+                    static int first = 1;
+                    printf("    Unhandled incoming event format was \"%s\"\n", tmp);
+                    if (first) {
+                        first = 0;
+                        printf("\n\t** use \"format_info <format_name>\" to get full format information ** \n\n");
+                    }
+                } else {
+                    printf("    Unhandled incoming event format was NULL\n");
+                }
+                free(tmp);
+                event = dequeue_item(cm, stone->queue, item);
+                return_event(evp, event);
+            }
 	    resp = &stone->response_cache[resp_id];
 	    if (resp->action_type == Action_Decode) {
 		event_item *event_to_submit;
 		CMtrace_out(cm, EVerbose, "Decoding event, action id %d", resp_id);
 		event_to_submit = decode_action(cm, event, resp);
 		item->item = event_to_submit;
-		resp_id = determine_action(cm, stone, event_to_submit, 0);
+		resp_id = determine_action(cm, stone, c, event_to_submit, 0);
 		resp = &stone->response_cache[resp_id];
 	    }
 	    if (CMtrace_on(cm, EVerbose)) {
@@ -1270,14 +1330,15 @@ process_events_stone(CManager cm, int s, action_class c)
 		
 		dump_action(stone, resp, resp->proto_action_id, "    ");
 	    }
-
-	    item->action_id = resp_id;
+            act = &stone->response_cache[resp_id];
+            if (c == Immediate_and_Multi && act->action_type != Action_NoAction) {
+                item->action_id = resp_id;
+            }
 	}
         assert(item->action_id < stone->response_cache_count);
-	response_cache_element *act = &stone->response_cache[item->action_id];
-	if (is_immediate_action(act) &&
-	    ((c == Immediate) || (c == Immediate_and_Multi))) {
-
+        if (!compatible_stages(c, act->stage)) {
+            /* do nothing */
+        } else if (is_immediate_action(act)) {
 	    event_item *event = dequeue_item(cm, stone->queue, item);
 	    switch(act->action_type) {
 	    case Action_Terminal:
@@ -1366,8 +1427,7 @@ process_events_stone(CManager cm, int s, action_class c)
 	    default:
 		assert(FALSE);
 	    }
-	} else if (is_multi_action(act) &&
-		   (c == Immediate_and_Multi)) {
+	} else if (is_multi_action(act) || is_congestion_action(act)) {
             proto_action *p = &stone->proto_actions[act->proto_action_id];
 	    /* event_item *event = dequeue_item(cm, stone->queue, item); XXX */
             if ((act->o.multi.handler)(cm, stone->queue, item,
@@ -1689,6 +1749,7 @@ do_output_action(CManager cm, int s)
 						  (void*)(long)s);
 		    first = 0;
 		}
+                process_events_stone(cm, s, Congestion);
 		return 0;
 /*	    }*/
 	}
@@ -1757,7 +1818,6 @@ INT_EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num, int n
     }
 }
 
-
 extern EVaction
 INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
 			   EVImmediateHandlerFunc func, void *client_data, 
@@ -1774,6 +1834,7 @@ INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
     resp->o.imm.handler = func;
     resp->o.imm.client_data = client_data;
     resp->reference_format = reference_format;
+    resp->stage = cached_stage_for_action(&stone->proto_actions[act_num]);
     stone->response_cache_count++;
     return resp_num;
 }
@@ -1792,11 +1853,12 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
     response_cache_element *resp;
     for (i=0; i < queue_count; i++) {
 	resp = &stone->response_cache[stone->response_cache_count + i];
-	resp->action_type = Action_Multi;
+	resp->action_type = stone->proto_actions[act_num].action_type;
 	resp->requires_decoded = 1;
 	resp->proto_action_id = act_num;
 	resp->o.multi.handler = func;
 	resp->o.multi.client_data = client_data;
+        resp->stage = cached_stage_for_action(&stone->proto_actions[act_num]);
 	resp->reference_format = reference_formats[i];
     }
     stone->response_cache_count += queue_count;

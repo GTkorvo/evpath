@@ -2315,14 +2315,9 @@ EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
  * moment this is an internal interface.
  */
 extern void
-EVassoc_conversion_action(CManager cm, int stone_id, IOFormat target_format,
+EVassoc_conversion_action(CManager cm, int stone_id, int stage, IOFormat target_format,
 			  IOFormat incoming_format);
 
-/* XXX XXX experimental */
-/* extern void
-* EVregister_congest_handler(CManager cm, EVstone stone_id, EVaction act_num,
-    void (*ch)(void), void *user_data); */
-		  
 /* @}*/
 
 #ifdef	__cplusplus

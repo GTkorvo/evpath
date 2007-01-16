@@ -34,7 +34,9 @@ typedef struct _event_item {
     EVFreeFunction free_func;
 } event_item, *event_queue;
 
-typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filter, Action_Immediate, Action_Multi, Action_Decode, Action_Split, Action_Store} action_value;
+typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filter, Action_Immediate, Action_Multi, Action_Decode, Action_Split, Action_Store, Action_Congestion } action_value;
+
+typedef enum {Immediate, Immediate_and_Multi, Output, Congestion} action_class;
 
 /*!
  * The prototype of a specific queued handler funcion.
@@ -143,6 +145,7 @@ typedef struct _proto_action {
 
 typedef struct response_cache_element {
     IOFormat reference_format;
+    action_class stage;
     action_value action_type;		/* if -1, no action */
     int proto_action_id;
     int requires_decoded;
@@ -221,4 +224,5 @@ extern EVevent_list extract_events_from_queue(CManager cm, queue_ptr que, EVeven
 extern event_item * get_free_event(event_path_data evp);
 extern void return_event(event_path_data evp, event_item *event);
 extern void ecl_encode_event(CManager cm, event_item *event);
+extern event_item *ecl_decode_event(CManager cm, int stone_num, int act_num, event_item *event);
 extern void EVdiscard_queue_item(CManager cm, queue_ptr que, queue_item *item);

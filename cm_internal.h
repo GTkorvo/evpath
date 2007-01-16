@@ -377,7 +377,7 @@ INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
 			       EVImmediateHandlerFunc func, void *client_data,
 			       IOFormat reference_format);
 extern void
-INT_EVassoc_conversion_action(CManager cm, int stone_id, IOFormat target_format,
+INT_EVassoc_conversion_action(CManager cm, int stone_id, int stage, IOFormat target_format,
 			      IOFormat incoming_format);
 extern void
 INT_CMregister_handler ARGS((CMFormat format, CMHandlerFunc handler, 
