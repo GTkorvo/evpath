@@ -58,6 +58,7 @@ INT_EValloc_stone(CManager cm)
     stone->queue = malloc(sizeof(queue_struct));
     stone->queue->queue_tail = stone->queue->queue_head = NULL;
     stone->new_enqueue_flag = 0;
+    stone->write_callback = -1;
     stone->proto_actions = NULL;
     stone->stone_attrs = CMcreate_attr_list(cm);
     evp->stone_count++;
@@ -730,6 +731,8 @@ compatible_stages(int real_stage, int cache_stage) {
     return real_stage == cache_stage || (real_stage == Immediate_and_Multi && cache_stage == Immediate);
 }
 
+static action_class cached_stage_for_action(proto_action*);
+
 static int
 determine_action(CManager cm, stone_type stone, action_class stage, event_item *event, int recursed_already)
 {
@@ -782,7 +785,9 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
 	event->reference_format;
     return_response = stone->response_cache_count++;
 
-    if (stone->default_action != -1) {
+    if (stone->default_action != -1 
+            && compatible_stages(stage, cached_stage_for_action(&stone->proto_actions[stone->default_action]))
+        ) {
 /*	    printf(" Returning ");
 	    dump_action(stone, NULL, stone->default_action, "   ");*/
 	response_cache_element *resp = 
@@ -1706,15 +1711,20 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
 static void
 write_callback_handler(CManager cm, CMConnection conn, void *client_data)
 {
-    int stone = (int)(long) client_data;
-    printf("In Write callback, write_pending is %d\n", conn->write_pending);
+    int s = (int)(long) client_data;
+    stone_type stone = &cm->evp->stone_map[s];
+    CMtrace_out(cm, EVerbose, "In Write callback, write_pending is %d, stone is %d\n", conn->write_pending, s);
     if (conn->write_pending) {
 	/* nothing for EVPath level to do yet */
 	return;
     }
+    assert(CManager_locked(conn->cm));
+    assert(stone->write_callback != -1);
+    INT_CMunregister_write_callback(conn, stone->write_callback);
+    stone->write_callback = -1;
     /* try calling the congestion handler before we write again... */
-    process_events_stone(cm, stone, Congestion);
-    do_output_action(cm, (int)(long)client_data);
+    process_events_stone(cm, s, Congestion);
+    do_output_action(cm, s);
 }
 
 static
@@ -1736,18 +1746,17 @@ do_output_action(CManager cm, int s)
 	int action_id, ret = 1;
 	if (INT_CMConnection_write_would_block(act->o.out.conn)) {
 	    int i = 0;
-	    int first = 1;
-	    printf("Would call congestion_handler, new flag %d\n", evp->stone_map[s].new_enqueue_flag);
+	    CMtrace_out(cm, EVerbose, "Would call congestion_handler, new flag %d\n", evp->stone_map[s].new_enqueue_flag);
 /*	    if (evp->stone_map[s].new_enqueue_flag == 1) {*/
 		queue_item *q = evp->stone_map[s].queue->queue_head;
 		evp->stone_map[s].new_enqueue_flag = 0;
 		while (q != NULL) {q = q->next; i++;}
-		printf("Would call congestion_handler, %d items queued\n", i);
-		if (first) {
-		    INT_CMregister_write_callback(act->o.out.conn, 
+		CMtrace_out(cm, EVerbose, "Would call congestion_handler, %d items queued\n", i);
+		if (evp->stone_map[s].write_callback == -1) {
+		    evp->stone_map[s].write_callback = 
+                        INT_CMregister_write_callback(act->o.out.conn, 
 						  write_callback_handler, 
 						  (void*)(long)s);
-		    first = 0;
 		}
                 process_events_stone(cm, s, Congestion);
 		return 0;

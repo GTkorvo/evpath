@@ -929,7 +929,7 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	int j = 0;
         if (!proto_action_in_stage(&stone->proto_actions[i], stage)) {
             continue;
-        }
+        } 
 	while (stone->proto_actions[i].matching_reference_formats && 
 	       (stone->proto_actions[i].matching_reference_formats[j] != NULL)) {
 	    formatList = (IOFormat *) realloc(formatList, (format_count + 2) * sizeof(IOFormat));

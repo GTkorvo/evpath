@@ -1912,12 +1912,15 @@ CMConnection conn;
     }
     if (conn->write_callbacks) {
 	int i = 0;
-	while (conn->write_callbacks[i].func != NULL) {
-	    conn->write_callbacks[i].func(conn->cm, conn,
-					     conn->write_callbacks[i].client_data);
-	    conn->write_callbacks[i].func = NULL;
-	    i++;
-	}
+        CMConnHandlerListEntry callbacks[16];
+        int callback_len = conn->write_callback_len;
+        assert(conn->write_callback_len <= 16);
+        memcpy(callbacks, conn->write_callbacks, sizeof(callbacks[0]) * conn->write_callback_len);
+        for (i = 0; i < callback_len; ++i) {
+            if (callbacks[i].func) {
+                (callbacks[i].func)(conn->cm, conn, callbacks[i].client_data);
+            }
+        }
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, did %d notifications", i);
     } else {
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, No notifications");
@@ -1980,27 +1983,43 @@ int attrs_present;
 	copy_all_to_IOBuffer(conn->io_out_buffer, &pbio_vec[j]);
 }
 
+static void
+remove_pending_write_callback_by_id(CMConnection conn, int id) {
+    assert(id < conn->write_callback_len && id >= 0);
+    conn->write_callbacks[id].func = NULL;
+}
 
 static void
-add_pending_write_callback(CMConnection conn, CMCloseHandlerFunc handler, 
+remove_pending_write_callback(CMConnection conn, CMWriteCallbackFunc handler,
+                              void *client_data)
+{
+    int i = 0;
+    while (conn->write_callbacks[i].func != handler
+             && conn->write_callbacks[i].client_data != client_data) i++;
+    conn->write_callbacks[i].func = NULL;
+}
+
+static int
+add_pending_write_callback(CMConnection conn, CMWriteCallbackFunc handler, 
 			   void* client_data)
 {
     int count = 0;
-    while (conn->write_callbacks && 
+    while (conn->write_callbacks && count < conn->write_callback_len &&
 	   (conn->write_callbacks[count].func != NULL)) count++;
-    if (count + 2 > conn->write_callback_len) {
+    if (count + 1 > conn->write_callback_len) {
 	if (conn->write_callbacks == NULL) {
-	    conn->write_callbacks = malloc(sizeof(conn->write_callbacks[0])*2);
+	    conn->write_callbacks = malloc(sizeof(conn->write_callbacks[0]));
+            conn->write_callback_len = 1;
 	} else {
 	    conn->write_callbacks = 
 		realloc(conn->write_callbacks,
-			sizeof(conn->write_callbacks[0])*(count+2));
+			sizeof(conn->write_callbacks[0])*(count+1));
 	    conn->write_callback_len = count+1;
 	}
     }
     conn->write_callbacks[count].func = handler;
     conn->write_callbacks[count].client_data = client_data;
-    conn->write_callbacks[count+1].func = NULL;
+    return count;
 }
     
 
@@ -2008,6 +2027,7 @@ static void
 wake_pending_write(CManager cm, CMConnection conn, void *param)
 {
     int cond = (long)param;
+    remove_pending_write_callback(conn, wake_pending_write, param);
     INT_CMCondition_signal(cm, cond);
 }
 
@@ -2104,7 +2124,6 @@ attr_list attrs;
     /* encode data with CM context */
     vec = encode_IOcontext_vectorB(format->IOsubcontext, conn->io_out_buffer,
 				   format->format, data);
-
     while(vec[vec_count].iov_base != NULL) {
 	length += vec[vec_count].iov_len;
 	vec_count++;
@@ -2273,7 +2292,6 @@ attr_list attrs;
 	/* encode data with CM context */
 	vec = encode_IOcontext_vectorB(format->IOsubcontext, conn->io_out_buffer,
 				       format->format, event->decoded_event);
-
 	while(vec[vec_count].iov_base != NULL) {
 	    data_length += vec[vec_count].iov_len;
 	    vec_count++;
@@ -2352,7 +2370,10 @@ attr_list attrs;
 	    if (actual_bytes < byte_count) {
 		/* copy remaining and send it later */
 		if (actual_bytes < 0 ) actual_bytes = 0;
-		queue_remaining_write(conn, tmp_vec, vec, vec_count, 
+                if (vec == &preencoded_vec[0]) {
+                    vec = copy_vector_to_IOBuffer(conn->io_out_buffer, vec);
+                }
+    		queue_remaining_write(conn, tmp_vec, vec, vec_count, 
 				      attrs, actual_bytes, attrs_present);
 		conn->trans->set_write_notify(conn->trans, &CMstatic_trans_svcs, conn->transport_data, 1);
 		conn->write_pending = 1;
@@ -2408,15 +2429,20 @@ INT_CMConnection_write_would_block(CMConnection conn)
     return conn->write_pending;
 }
 
-extern void
+extern int 
 INT_CMregister_write_callback(CMConnection conn, CMWriteCallbackFunc handler,
 			      void *client_data)
 {
     if (conn->do_non_blocking_write == -1) {
 	init_non_blocking_conn(conn);
     }
-    add_pending_write_callback(conn, handler, client_data);
+    return add_pending_write_callback(conn, handler, client_data);
+}
 
+extern void
+INT_CMunregister_write_callback(CMConnection conn, int id)
+{
+    remove_pending_write_callback_by_id(conn, id);
 }
 
 #define CMPerfProbe (unsigned int) 0xf0

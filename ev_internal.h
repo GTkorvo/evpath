@@ -167,6 +167,7 @@ typedef struct _stone {
     response_cache_element *response_cache;
     queue_ptr queue;
     int new_enqueue_flag;
+    int write_callback;
     int proto_action_count;
     struct _proto_action *proto_actions;
     CMTaskHandle periodic_handle;

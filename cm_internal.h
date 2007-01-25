@@ -184,7 +184,7 @@ typedef struct _CMCloseHandlerList {
 typedef struct _CMConnHandlerList {
     CMCloseHandlerFunc func;
     void *client_data;
-} *CMConnHandlerList;
+} *CMConnHandlerList, CMConnHandlerListEntry;
 
 struct _CMConnection {
     CManager cm;
@@ -450,10 +450,12 @@ extern void
 INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
 		    int period_usec);
 extern int INT_CMfork_comm_thread ARGS((CManager cm));
-extern void
+extern int
 INT_CMregister_write_callback ARGS((CMConnection conn, 
 				CMWriteCallbackFunc handler,
 				void *client_data));
+extern void
+INT_CMunregister_write_callback ARGS((CMConnection conn, int id));
 extern void
 INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
 		 attr_list attrs);

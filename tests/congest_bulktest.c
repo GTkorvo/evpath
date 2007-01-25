@@ -1,5 +1,6 @@
 #include "../config.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <atl.h>
 #ifdef HAVE_UNISTD_H
@@ -20,7 +21,7 @@
 #include <sys/wait.h>
 #endif
 
-#define MSG_COUNT 1200
+#define MSG_COUNT 1200 
 static int msg_limit = MSG_COUNT;
 
 typedef struct _complex_rec {
@@ -95,6 +96,12 @@ static CMFormatRec simple_format_list[] =
     {"nested", nested_field_list},
     {"EventVecElem", event_vec_elem_fields},
     {NULL, NULL}
+};
+
+static CMFormatRec *simple_format_lists[] =
+{
+    simple_format_list,
+    NULL
 };
 
 static int size = 400;
@@ -283,7 +290,7 @@ char **argv;
 	EVassoc_terminal_action(cm, stone, simple_format_list, simple_handler, NULL);
 	printf("Contact list \"%d:%s\"\n", stone, string_list);
 	while(msg_count != msg_limit) {
-	    CMsleep(cm, 20);
+	    CMsleep(cm, 1);
 	    printf("Received %d messages\n", msg_count);
 	}
     } else {
@@ -301,10 +308,12 @@ char **argv;
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
 	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
-            congest_act = create_multityped_action_spec(NULL,
+            congest_act = create_multityped_action_spec(simple_format_lists,
                 simple_format_list, (char *) congest);
-            EVassoc_congestion_action(cm, stone, congest_act, NULL);
-	}
+            EVassoc_congestion_action(cm, stone, congest_act, NULL); 
+        } else {
+            assert(FALSE);
+        }
 	data = malloc(sizeof(simple_rec));
 	generate_record(data);
 	attrs = create_attr_list();
@@ -318,6 +327,7 @@ char **argv;
 	    EVsubmit(source_handle, data, attrs);
 	}
 	if (quiet <= 0) printf("Write %d messages\n", msg_limit);
+        CMsleep(cm, 20); /* wait for them to all be sent */
     }
     CManager_close(cm);
     return 0;
@@ -497,6 +507,7 @@ do_regression_master_test()
 	int i = 10;
 	while ((i >= 0) && (msg_count != msg_limit)) {
 	    CMsleep(cm, 1);
+            --i;
 	}
     }
     free(args[6]);
