@@ -1744,7 +1744,8 @@ do_output_action(CManager cm, int s)
     }
     while (evp->stone_map[s].queue->queue_head != NULL) {
 	int action_id, ret = 1;
-	if (INT_CMConnection_write_would_block(act->o.out.conn)) {
+	if (act->o.out.conn && 
+	    INT_CMConnection_write_would_block(act->o.out.conn)) {
 	    int i = 0;
 	    CMtrace_out(cm, EVerbose, "Would call congestion_handler, new flag %d\n", evp->stone_map[s].new_enqueue_flag);
 /*	    if (evp->stone_map[s].new_enqueue_flag == 1) {*/
