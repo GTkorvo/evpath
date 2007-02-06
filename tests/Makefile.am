@@ -13,7 +13,7 @@ check-local:
 	 echo "PASS: block_test";\
 	else echo "FAIL: block_test"; fi
 
-noinst_PROGRAMS = $(TESTS) thin_client congestion_test congest_bulktest multiq_test
+noinst_PROGRAMS = $(TESTS) thin_client congestion_test congest_bulktest multiq_test store_send_test store_limit_test
 
 LDADD = ../libevpath.la
 

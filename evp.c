@@ -1746,12 +1746,12 @@ do_output_action(CManager cm, int s)
 	int action_id, ret = 1;
 	if (act->o.out.conn && 
 	    INT_CMConnection_write_would_block(act->o.out.conn)) {
+            queue_item *q = evp->stone_map[s].queue->queue_head;
 	    int i = 0;
 	    CMtrace_out(cm, EVerbose, "Would call congestion_handler, new flag %d\n", evp->stone_map[s].new_enqueue_flag);
 /*	    if (evp->stone_map[s].new_enqueue_flag == 1) {*/
-		queue_item *q = evp->stone_map[s].queue->queue_head;
 		evp->stone_map[s].new_enqueue_flag = 0;
-		while (q != NULL) {q = q->next; i++;}
+                while (q != NULL) {q = q->next; i++;}
 		CMtrace_out(cm, EVerbose, "Would call congestion_handler, %d items queued\n", i);
 		if (evp->stone_map[s].write_callback == -1) {
 		    evp->stone_map[s].write_callback = 

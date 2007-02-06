@@ -126,7 +126,7 @@ attr_list attrs;
     long sum = 0, scan_sum = 0;
     if (event->sequence_number != seq_num++) {
         printf("Sequence number %d but expected %d\n", event->sequence_number,
-            seq_num);
+            seq_num - 1);
     }
     sum += event->integer_field % 100;
     sum += event->short_field % 100;
@@ -160,13 +160,13 @@ attr_list attrs;
 
 static int do_regression_master_test();
 static int regression = 1;
-static int repeat_count = 10;
+static int repeat_count = 5000;
 
 int
 main(argc, argv)
 int argc;
 char **argv;
-{
+{ 
     CManager cm;
     int regression_master = 1;
 
@@ -263,13 +263,16 @@ char **argv;
 	attrs = create_attr_list();
 #define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
 	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
-	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
+	/* add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678); */
 	source_handle = EVcreate_submit_handle(cm, stone, simple_format_list);
 	count = repeat_count;
 	while (count != 0) {
+            attr_list event_attrs;
+            event_attrs = create_attr_list();
 	    generate_record(&data);
+            add_attr(event_attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)(int)data.sequence_number);
 	    if (quiet <=0) {printf("submitting %ld\n", data.long_field);}
-	    EVsubmit(source_handle, &data, attrs);
+	    EVsubmit(source_handle, &data, event_attrs);
             count--;
 	}
 	CMsleep(cm, 1);

@@ -14,7 +14,7 @@
 
 @SET_MAKE@
 
-SOURCES = auto_test.c bulktest.c congest_bulktest.c congestion_test.c evtest.c extract_test.c filter2_test.c filter_test.c http_test.c multiq_test.c router_test.c router_test2.c submit_test.c thin_client.c thin_test.c transform_test.c
+SOURCES = auto_test.c bulktest.c congest_bulktest.c congestion_test.c evtest.c extract_test.c filter2_test.c filter_test.c http_test.c multiq_test.c router_test.c router_test2.c store_limit_test.c store_send_test.c submit_test.c thin_client.c thin_test.c transform_test.c
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -40,7 +40,8 @@ build_triplet = @build@
 host_triplet = @host@
 noinst_PROGRAMS = $(am__EXEEXT_1) thin_client$(EXEEXT) \
 	congestion_test$(EXEEXT) congest_bulktest$(EXEEXT) \
-	multiq_test$(EXEEXT)
+	multiq_test$(EXEEXT) store_send_test$(EXEEXT) \
+	store_limit_test$(EXEEXT)
 subdir = tests
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -106,6 +107,14 @@ router_test2_SOURCES = router_test2.c
 router_test2_OBJECTS = router_test2.$(OBJEXT)
 router_test2_LDADD = $(LDADD)
 router_test2_DEPENDENCIES = ../libevpath.la
+store_limit_test_SOURCES = store_limit_test.c
+store_limit_test_OBJECTS = store_limit_test.$(OBJEXT)
+store_limit_test_LDADD = $(LDADD)
+store_limit_test_DEPENDENCIES = ../libevpath.la
+store_send_test_SOURCES = store_send_test.c
+store_send_test_OBJECTS = store_send_test.$(OBJEXT)
+store_send_test_LDADD = $(LDADD)
+store_send_test_DEPENDENCIES = ../libevpath.la
 submit_test_SOURCES = submit_test.c
 submit_test_OBJECTS = submit_test.$(OBJEXT)
 submit_test_LDADD = $(LDADD)
@@ -134,12 +143,13 @@ LINK = $(LIBTOOL) --mode=link --tag=CC $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 SOURCES = auto_test.c bulktest.c congest_bulktest.c congestion_test.c \
 	evtest.c extract_test.c filter2_test.c filter_test.c \
 	http_test.c multiq_test.c router_test.c router_test2.c \
-	submit_test.c thin_client.c thin_test.c transform_test.c
+	store_limit_test.c store_send_test.c submit_test.c \
+	thin_client.c thin_test.c transform_test.c
 DIST_SOURCES = auto_test.c bulktest.c congest_bulktest.c \
 	congestion_test.c evtest.c extract_test.c filter2_test.c \
 	filter_test.c http_test.c multiq_test.c router_test.c \
-	router_test2.c submit_test.c thin_client.c thin_test.c \
-	transform_test.c
+	router_test2.c store_limit_test.c store_send_test.c \
+	submit_test.c thin_client.c thin_test.c transform_test.c
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -350,6 +360,12 @@ router_test$(EXEEXT): $(router_test_OBJECTS) $(router_test_DEPENDENCIES)
 router_test2$(EXEEXT): $(router_test2_OBJECTS) $(router_test2_DEPENDENCIES) 
 	@rm -f router_test2$(EXEEXT)
 	$(LINK) $(router_test2_LDFLAGS) $(router_test2_OBJECTS) $(router_test2_LDADD) $(LIBS)
+store_limit_test$(EXEEXT): $(store_limit_test_OBJECTS) $(store_limit_test_DEPENDENCIES) 
+	@rm -f store_limit_test$(EXEEXT)
+	$(LINK) $(store_limit_test_LDFLAGS) $(store_limit_test_OBJECTS) $(store_limit_test_LDADD) $(LIBS)
+store_send_test$(EXEEXT): $(store_send_test_OBJECTS) $(store_send_test_DEPENDENCIES) 
+	@rm -f store_send_test$(EXEEXT)
+	$(LINK) $(store_send_test_LDFLAGS) $(store_send_test_OBJECTS) $(store_send_test_LDADD) $(LIBS)
 submit_test$(EXEEXT): $(submit_test_OBJECTS) $(submit_test_DEPENDENCIES) 
 	@rm -f submit_test$(EXEEXT)
 	$(LINK) $(submit_test_LDFLAGS) $(submit_test_OBJECTS) $(submit_test_LDADD) $(LIBS)

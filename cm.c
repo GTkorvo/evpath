@@ -1624,7 +1624,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	} else {
 	    stone_id = ((int *) base)[2];
 	}
-    }	
+    }
 
     if (length < header_len + padding + data_length + attr_length) {
 	return header_len + padding + data_length + attr_length - 
@@ -1949,7 +1949,8 @@ int attrs_present;
     tmp_vec[i].iov_base = (char*)tmp_vec[i].iov_base + actual_bytes_written;
 
     if (i == 0) {
-	/* didn't even write the 8 or 12 byte header */
+	/* didn't even write the 8 or 12 or 16 byte header */
+        assert(sizeof(conn->queued_data.rem_header) >= tmp_vec[0].iov_len);
 	memcpy(&conn->queued_data.rem_header, tmp_vec[0].iov_base, 
 	       tmp_vec[0].iov_len);
 	conn->queued_data.rem_header_len = tmp_vec[0].iov_len;
@@ -1968,6 +1969,7 @@ int attrs_present;
     j = i - 1;  /* how far into the pbio vector are we? */
     if (attrs_present) j--;
     if (j >= 0) {
+        CMtrace_out(conn->cm, CMLowLevelVerbose, "Removing from pbio_vec at offset %d\n", (int) j);
 	pbio_vec[j].iov_len -= actual_bytes_written;
 	pbio_vec[j].iov_base = (char*)pbio_vec[j].iov_base + 
 	    actual_bytes_written;
