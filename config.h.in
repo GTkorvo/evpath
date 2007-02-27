@@ -57,6 +57,9 @@
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 #undef HAVE_LIBPTHREAD
 
+/* Define this if a modern libltdl is already installed */
+#undef HAVE_LTDL
+
 /* Define to 1 if you have the <malloc.h> header file. */
 #undef HAVE_MALLOC_H
 
@@ -122,6 +125,10 @@
 
 /* define if listen is declared in sys/socket.h */
 #undef LISTEN_DEFINED
+
+/* Define to the sub-directory in which libtool stores uninstalled libraries.
+   */
+#undef LT_OBJDIR
 
 /* Name of package */
 #undef PACKAGE
