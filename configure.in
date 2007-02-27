@@ -2,7 +2,9 @@ dnl Process this file with autoconf to create configure.
 
 AC_INIT
 AC_CONFIG_SRCDIR([cm.c])
-AC_CONFIG_AUX_DIR(config)
+AC_CONFIG_AUX_DIR([config])
+AC_CONFIG_AUX_DIR([libltdl/config])
+AC_CONFIG_AUX_DIR([libltdl/m4])
 AC_CONFIG_MACRO_DIR([config])
 AM_INIT_AUTOMAKE(cmdemo,0.1)
 AM_CONFIG_HEADER(config.h)
@@ -92,10 +94,11 @@ AC_LIBTOOL_DLOPEN
 dnl Configure libtool
 AC_LIBTOOL_WIN32_DLL
 AM_PROG_LIBTOOL
+LT_CONFIG_LTDL_DIR([libltdl])
+LT_WITH_LTDL
 test -n "$LIBTOOL" && LIBTOOL="$LIBTOOL --silent"
 
 dnl Configure libltdl
-AC_CONFIG_SUBDIRS(libltdl)
 AC_CHECK_PROGS(TAGS, etags ctags, echo)
 AC_CHECK_PROGS(MAKEDEPEND, makedepend, :)
 

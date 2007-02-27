@@ -10,7 +10,6 @@
 #include <signal.h>
 #include "cm.h"
 #include "gen_thread.h"
-#include "libltdl/ltdl.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))

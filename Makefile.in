@@ -40,9 +40,9 @@ subdir = .
 DIST_COMMON = $(am__configure_deps) $(include_HEADERS) \
 	$(noinst_HEADERS) $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/config.h.in $(top_srcdir)/configure ChangeLog \
-	config/config.guess config/config.sub config/depcomp \
-	config/install-sh config/ltmain.sh config/missing \
-	mkinstalldirs
+	libltdl/m4/config.guess libltdl/m4/config.sub \
+	libltdl/m4/depcomp libltdl/m4/install-sh libltdl/m4/ltmain.sh \
+	libltdl/m4/missing mkinstalldirs
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/config/cercs.m4 \
 	$(top_srcdir)/config/definitions.m4 \
@@ -79,7 +79,7 @@ libevpath_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
 DEFAULT_INCLUDES = -I.@am__isrc@
-depcomp = $(SHELL) $(top_srcdir)/config/depcomp
+depcomp = $(SHELL) $(top_srcdir)/libltdl/m4/depcomp
 am__depfiles_maybe = depfiles
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -254,7 +254,7 @@ libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c\
 		       cm_interface.c thin_server.c version.c
 
 libevpath_la_LDFLAGS = $(MATH_LIB)
-libevpath_la_LIBADD = $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lIO -lecl @SOCKET_LIBS@ @KERNEL_OBJS@ -dlpreopen $(CMDIR)/libcmsockets.la -dlpreopen $(CMDIR)/libcmselect.la
+libevpath_la_LIBADD = $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lIO -lecl @SOCKET_LIBS@ @KERNEL_OBJS@ 
 libevpath_la_DEPENDENCIES = $(LIBLTDL) $(LTLIBS) @KERNEL_OBJS@
 include_HEADERS = evpath.h
 AM_CPPFLAGS = 

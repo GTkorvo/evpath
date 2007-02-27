@@ -700,6 +700,10 @@ fi
 
 
 
+lt_ltdl_dir='libltdl'
+
+lt_dlopen_dir="$lt_ltdl_dir"
+
 exec 7<&0 </dev/null 6>&1
 
 # Name of the host.
@@ -1496,6 +1500,7 @@ Optional Packages:
   --with-pic              try to use only PIC/non-PIC objects [default=use
                           both]
   --with-gnu-ld           assume the C compiler uses GNU ld [default=no]
+  --with-included-ltdl    use the GNU ltdl sources included here
   --with-pbio=DIR	Where to find pbio package
   --with-gen_thread=DIR	Where to find gen_thread package
   --with-cercs_env=DIR	Where to find cercs_env package
@@ -1955,6 +1960,68 @@ done
 if test -z "$ac_aux_dir"; then
   { { echo "$as_me:$LINENO: error: cannot find install-sh or install.sh in config \"$srcdir\"/config" >&5
 echo "$as_me: error: cannot find install-sh or install.sh in config \"$srcdir\"/config" >&2;}
+   { (exit 1); exit 1; }; }
+fi
+
+# These three variables are undocumented and unsupported,
+# and are intended to be withdrawn in a future Autoconf release.
+# They can cause serious problems if a builder's source tree is in a directory
+# whose full name contains unusual characters.
+ac_config_guess="$SHELL $ac_aux_dir/config.guess"  # Please don't use this var.
+ac_config_sub="$SHELL $ac_aux_dir/config.sub"  # Please don't use this var.
+ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
+
+
+ac_aux_dir=
+for ac_dir in libltdl/config "$srcdir"/libltdl/config; do
+  if test -f "$ac_dir/install-sh"; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/install-sh -c"
+    break
+  elif test -f "$ac_dir/install.sh"; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/install.sh -c"
+    break
+  elif test -f "$ac_dir/shtool"; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/shtool install -c"
+    break
+  fi
+done
+if test -z "$ac_aux_dir"; then
+  { { echo "$as_me:$LINENO: error: cannot find install-sh or install.sh in libltdl/config \"$srcdir\"/libltdl/config" >&5
+echo "$as_me: error: cannot find install-sh or install.sh in libltdl/config \"$srcdir\"/libltdl/config" >&2;}
+   { (exit 1); exit 1; }; }
+fi
+
+# These three variables are undocumented and unsupported,
+# and are intended to be withdrawn in a future Autoconf release.
+# They can cause serious problems if a builder's source tree is in a directory
+# whose full name contains unusual characters.
+ac_config_guess="$SHELL $ac_aux_dir/config.guess"  # Please don't use this var.
+ac_config_sub="$SHELL $ac_aux_dir/config.sub"  # Please don't use this var.
+ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
+
+
+ac_aux_dir=
+for ac_dir in libltdl/m4 "$srcdir"/libltdl/m4; do
+  if test -f "$ac_dir/install-sh"; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/install-sh -c"
+    break
+  elif test -f "$ac_dir/install.sh"; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/install.sh -c"
+    break
+  elif test -f "$ac_dir/shtool"; then
+    ac_aux_dir=$ac_dir
+    ac_install_sh="$ac_aux_dir/shtool install -c"
+    break
+  fi
+done
+if test -z "$ac_aux_dir"; then
+  { { echo "$as_me:$LINENO: error: cannot find install-sh or install.sh in libltdl/m4 \"$srcdir\"/libltdl/m4" >&5
+echo "$as_me: error: cannot find install-sh or install.sh in libltdl/m4 \"$srcdir\"/libltdl/m4" >&2;}
    { (exit 1); exit 1; }; }
 fi
 
@@ -3751,11 +3818,11 @@ search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/lib/libcm.la $CHAOS_H
 fi
 search_list="$search_list /usr/lib/libcm.la /usr/local/lib/libcm.la /opt/cm/lib/libcm.la /opt/misc/lib/libcm.la"
 tmp_search_results=""
-echo "configure:3754: searching for $search_list " >&5
+echo "configure:3821: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:3758: first found $tmp_search_results " >&5
+	echo "configure:3825: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -6697,13 +6764,13 @@ if test "${lt_cv_nm_interface+set}" = set; then
 else
   lt_cv_nm_interface="BSD nm"
   echo "int some_variable = 0;" > conftest.$ac_ext
-  (eval echo "\"\$as_me:6700: $ac_compile\"" >&5)
+  (eval echo "\"\$as_me:6767: $ac_compile\"" >&5)
   (eval "$ac_compile" 2>conftest.err)
   cat conftest.err >&5
-  (eval echo "\"\$as_me:6703: $NM \\\"conftest.$ac_objext\\\"\"" >&5)
+  (eval echo "\"\$as_me:6770: $NM \\\"conftest.$ac_objext\\\"\"" >&5)
   (eval "$NM \"conftest.$ac_objext\"" 2>conftest.err > conftest.out)
   cat conftest.err >&5
-  (eval echo "\"\$as_me:6706: output\"" >&5)
+  (eval echo "\"\$as_me:6773: output\"" >&5)
   cat conftest.out >&5
   if $GREP 'External.*some_variable' conftest.out > /dev/null; then
     lt_cv_nm_interface="MS dumpbin"
@@ -7799,7 +7866,7 @@ ia64-*-hpux*)
   ;;
 *-*-irix6*)
   # Find out which ABI we are using.
-  echo '#line 7802 "configure"' > conftest.$ac_ext
+  echo '#line 7869 "configure"' > conftest.$ac_ext
   if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
   (eval $ac_compile) 2>&5
   ac_status=$?
@@ -8420,11 +8487,11 @@ else
    -e 's:.*FLAGS}\{0,1\} :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:8423: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:8490: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:8427: \$? = $ac_status" >&5
+   echo "$as_me:8494: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings other than the usual output.
@@ -8742,11 +8809,11 @@ else
    -e 's:.*FLAGS}\{0,1\} :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:8745: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:8812: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>conftest.err)
    ac_status=$?
    cat conftest.err >&5
-   echo "$as_me:8749: \$? = $ac_status" >&5
+   echo "$as_me:8816: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s "$ac_outfile"; then
      # The compiler can only warn and ignore the option if not recognized
      # So say no if there are warnings other than the usual output.
@@ -8847,11 +8914,11 @@ else
    -e 's:.*FLAGS}\{0,1\} :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:8850: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:8917: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:8854: \$? = $ac_status" >&5
+   echo "$as_me:8921: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -8902,11 +8969,11 @@ else
    -e 's:.*FLAGS}\{0,1\} :&$lt_compiler_flag :; t' \
    -e 's: [^ ]*conftest\.: $lt_compiler_flag&:; t' \
    -e 's:$: $lt_compiler_flag:'`
-   (eval echo "\"\$as_me:8905: $lt_compile\"" >&5)
+   (eval echo "\"\$as_me:8972: $lt_compile\"" >&5)
    (eval "$lt_compile" 2>out/conftest.err)
    ac_status=$?
    cat out/conftest.err >&5
-   echo "$as_me:8909: \$? = $ac_status" >&5
+   echo "$as_me:8976: \$? = $ac_status" >&5
    if (exit $ac_status) && test -s out/conftest2.$ac_objext
    then
      # The compiler can only warn and ignore the option if not recognized
@@ -11651,7 +11718,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 11654 "configure"
+#line 11721 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -11751,7 +11818,7 @@ else
   lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<_LT_EOF
-#line 11754 "configure"
+#line 11821 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -11982,9 +12049,255 @@ CC="$lt_save_CC"
 # Only expand once:
 
 
-test -n "$LIBTOOL" && LIBTOOL="$LIBTOOL --silent"
 
-subdirs="$subdirs libltdl"
+
+
+
+
+
+
+
+
+
+
+
+# Check whether --with-included_ltdl was given.
+if test "${with_included_ltdl+set}" = set; then
+  withval=$with_included_ltdl;
+fi
+
+
+if test "x$with_included_ltdl" != xyes; then
+  # We are not being forced to use the included libltdl sources, so
+  # decide whether there is a useful installed version we can use.
+  { echo "$as_me:$LINENO: checking for ltdl.h" >&5
+echo $ECHO_N "checking for ltdl.h... $ECHO_C" >&6; }
+if test "${ac_cv_header_ltdl_h+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+$ac_includes_default
+
+
+#include <ltdl.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  ac_cv_header_ltdl_h=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_cv_header_ltdl_h=no
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+{ echo "$as_me:$LINENO: result: $ac_cv_header_ltdl_h" >&5
+echo "${ECHO_T}$ac_cv_header_ltdl_h" >&6; }
+if test $ac_cv_header_ltdl_h = yes; then
+  { echo "$as_me:$LINENO: checking whether lt_dlinterface_register is declared" >&5
+echo $ECHO_N "checking whether lt_dlinterface_register is declared... $ECHO_C" >&6; }
+if test "${ac_cv_have_decl_lt_dlinterface_register+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+$ac_includes_default
+	    #include <ltdl.h>
+
+int
+main ()
+{
+#ifndef lt_dlinterface_register
+  (void) lt_dlinterface_register;
+#endif
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (ac_try="$ac_compile"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_compile") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest.$ac_objext; then
+  ac_cv_have_decl_lt_dlinterface_register=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_cv_have_decl_lt_dlinterface_register=no
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+{ echo "$as_me:$LINENO: result: $ac_cv_have_decl_lt_dlinterface_register" >&5
+echo "${ECHO_T}$ac_cv_have_decl_lt_dlinterface_register" >&6; }
+if test $ac_cv_have_decl_lt_dlinterface_register = yes; then
+  { echo "$as_me:$LINENO: checking for lt_dlinterface_register in -lltdl" >&5
+echo $ECHO_N "checking for lt_dlinterface_register in -lltdl... $ECHO_C" >&6; }
+if test "${ac_cv_lib_ltdl_lt_dlinterface_register+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lltdl  $LIBS"
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char lt_dlinterface_register ();
+int
+main ()
+{
+return lt_dlinterface_register ();
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (ac_try="$ac_link"
+case "(($ac_try" in
+  *\"* | *\`* | *\\*) ac_try_echo=\$ac_try;;
+  *) ac_try_echo=$ac_try;;
+esac
+eval "echo \"\$as_me:$LINENO: $ac_try_echo\"") >&5
+  (eval "$ac_link") 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } && {
+	 test -z "$ac_c_werror_flag" ||
+	 test ! -s conftest.err
+       } && test -s conftest$ac_exeext &&
+       $as_test_x conftest$ac_exeext; then
+  ac_cv_lib_ltdl_lt_dlinterface_register=yes
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+	ac_cv_lib_ltdl_lt_dlinterface_register=no
+fi
+
+rm -f core conftest.err conftest.$ac_objext conftest_ipa8_conftest.oo \
+      conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ echo "$as_me:$LINENO: result: $ac_cv_lib_ltdl_lt_dlinterface_register" >&5
+echo "${ECHO_T}$ac_cv_lib_ltdl_lt_dlinterface_register" >&6; }
+if test $ac_cv_lib_ltdl_lt_dlinterface_register = yes; then
+  with_included_ltdl=no
+else
+  with_included_ltdl=yes
+fi
+
+else
+  with_included_ltdl=yes
+fi
+
+else
+  with_included_ltdl=yes
+fi
+
+
+fi
+
+if test "x$enable_ltdl_install" != xyes; then
+  # If the user did not specify an installable libltdl, then default
+  # to a convenience lib.
+
+case $enable_ltdl_convenience in
+  no) { { echo "$as_me:$LINENO: error: this package needs a convenience libltdl" >&5
+echo "$as_me: error: this package needs a convenience libltdl" >&2;}
+   { (exit 1); exit 1; }; } ;;
+  "") enable_ltdl_convenience=yes
+      ac_configure_args="$ac_configure_args --enable-ltdl-convenience" ;;
+  esac
+LIBLTDL='${top_builddir}'"${lt_ltdl_dir+/$lt_ltdl_dir}/libltdlc.la"
+LTDLINCL='-I${top_srcdir}'"${lt_ltdl_dir+/$lt_ltdl_dir}"
+
+
+
+
+# For backwards non-gettext consistent compatibility...
+INCLTDL="$LTDLINCL"
+
+
+fi
+
+if test "x$with_included_ltdl" = xno; then
+  # If the included ltdl is not to be used, then use the
+  # preinstalled libltdl we found.
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_LTDL 1
+_ACEOF
+
+  LIBLTDL=-lltdl
+  LTDLINCL=
+  INCLTDL=
+fi
+
+# Report our decision...
+{ echo "$as_me:$LINENO: checking whether to use included libltdl" >&5
+echo $ECHO_N "checking whether to use included libltdl... $ECHO_C" >&6; }
+{ echo "$as_me:$LINENO: result: $with_included_ltdl" >&5
+echo "${ECHO_T}$with_included_ltdl" >&6; }
+
+    subdirs="$subdirs libltdl"
+
+
+
+
+
+test -n "$LIBTOOL" && LIBTOOL="$LIBTOOL --silent"
 
 for ac_prog in etags ctags
 do
@@ -12890,11 +13203,11 @@ search_list="$search_list $CHAOS_HOMEDIR/include/io.h $CHAOS_HOMEDIR/$cercs_cv_a
 fi
 search_list="$search_list /usr/include/io.h /usr/local/include/io.h /opt/pbio/include/io.h /opt/misc/include/io.h /opt/misc/include/$cercs_cv_archive/io.h"
 tmp_search_results=""
-echo "configure:12893: searching for $search_list " >&5
+echo "configure:13206: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:12897: first found $tmp_search_results " >&5
+	echo "configure:13210: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -12971,11 +13284,11 @@ search_list="$search_list $CHAOS_HOMEDIR/lib/libIO.la $CHAOS_HOMEDIR/$cercs_cv_a
 fi
 search_list="$search_list /usr/lib/libIO.la /usr/local/lib/libIO.la /opt/pbio/lib/libIO.la /opt/misc/lib/libIO.la /opt/misc/lib/$cercs_cv_archive/libIO.la"
 tmp_search_results=""
-echo "configure:12974: searching for $search_list " >&5
+echo "configure:13287: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:12978: first found $tmp_search_results " >&5
+	echo "configure:13291: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13173,11 +13486,11 @@ search_list="$search_list $CHAOS_HOMEDIR/include/gen_thread.h $CHAOS_HOMEDIR/$ce
 fi
 search_list="$search_list /usr/include/gen_thread.h /usr/local/include/gen_thread.h /opt/gen_thread/include/gen_thread.h /opt/misc/include/gen_thread.h /opt/misc/include/$cercs_cv_archive/gen_thread.h"
 tmp_search_results=""
-echo "configure:13176: searching for $search_list " >&5
+echo "configure:13489: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13180: first found $tmp_search_results " >&5
+	echo "configure:13493: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13254,11 +13567,11 @@ search_list="$search_list $CHAOS_HOMEDIR/lib/libgen_thread.la $CHAOS_HOMEDIR/$ce
 fi
 search_list="$search_list /usr/lib/libgen_thread.la /usr/local/lib/libgen_thread.la /opt/gen_thread/lib/libgen_thread.la /opt/misc/lib/libgen_thread.la /opt/misc/lib/$cercs_cv_archive/libgen_thread.la"
 tmp_search_results=""
-echo "configure:13257: searching for $search_list " >&5
+echo "configure:13570: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13261: first found $tmp_search_results " >&5
+	echo "configure:13574: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13456,11 +13769,11 @@ search_list="$search_list $CHAOS_HOMEDIR/include/cercs_env.h $CHAOS_HOMEDIR/$cer
 fi
 search_list="$search_list /usr/include/cercs_env.h /usr/local/include/cercs_env.h /opt/cercs_env/include/cercs_env.h /opt/misc/include/cercs_env.h /opt/misc/include/$cercs_cv_archive/cercs_env.h"
 tmp_search_results=""
-echo "configure:13459: searching for $search_list " >&5
+echo "configure:13772: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13463: first found $tmp_search_results " >&5
+	echo "configure:13776: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13537,11 +13850,11 @@ search_list="$search_list $CHAOS_HOMEDIR/lib/libcercs_env.la $CHAOS_HOMEDIR/$cer
 fi
 search_list="$search_list /usr/lib/libcercs_env.la /usr/local/lib/libcercs_env.la /opt/cercs_env/lib/libcercs_env.la /opt/misc/lib/libcercs_env.la /opt/misc/lib/$cercs_cv_archive/libcercs_env.la"
 tmp_search_results=""
-echo "configure:13540: searching for $search_list " >&5
+echo "configure:13853: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13544: first found $tmp_search_results " >&5
+	echo "configure:13857: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13739,11 +14052,11 @@ search_list="$search_list $CHAOS_HOMEDIR/include/ecl.h $CHAOS_HOMEDIR/$cercs_cv_
 fi
 search_list="$search_list /usr/include/ecl.h /usr/local/include/ecl.h /opt/ecl/include/ecl.h /opt/misc/include/ecl.h /opt/misc/include/$cercs_cv_archive/ecl.h"
 tmp_search_results=""
-echo "configure:13742: searching for $search_list " >&5
+echo "configure:14055: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13746: first found $tmp_search_results " >&5
+	echo "configure:14059: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13820,11 +14133,11 @@ search_list="$search_list $CHAOS_HOMEDIR/lib/libecl.la $CHAOS_HOMEDIR/$cercs_cv_
 fi
 search_list="$search_list /usr/lib/libecl.la /usr/local/lib/libecl.la /opt/ecl/lib/libecl.la /opt/misc/lib/libecl.la /opt/misc/lib/$cercs_cv_archive/libecl.la"
 tmp_search_results=""
-echo "configure:13823: searching for $search_list " >&5
+echo "configure:14136: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13827: first found $tmp_search_results " >&5
+	echo "configure:14140: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14023,11 +14336,11 @@ search_list="$search_list $CHAOS_HOMEDIR/lib/libcm.la $CHAOS_HOMEDIR/$cercs_cv_a
 fi
 search_list="$search_list /usr/lib/libcm.la /usr/local/lib/libcm.la /opt/cm/lib/libcm.la /opt/misc/lib/libcm.la /opt/misc/lib/$cercs_cv_archive/libcm.la"
 tmp_search_results=""
-echo "configure:14026: searching for $search_list " >&5
+echo "configure:14339: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14030: first found $tmp_search_results " >&5
+	echo "configure:14343: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14366,11 +14679,11 @@ search_list="$search_list $CHAOS_HOMEDIR/include/atl.h $CHAOS_HOMEDIR/$cercs_cv_
 fi
 search_list="$search_list /usr/include/atl.h /usr/local/include/atl.h /opt/atl/include/atl.h /opt/misc/include/atl.h /opt/misc/include/$cercs_cv_archive/atl.h"
 tmp_search_results=""
-echo "configure:14369: searching for $search_list " >&5
+echo "configure:14682: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14373: first found $tmp_search_results " >&5
+	echo "configure:14686: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14447,11 +14760,11 @@ search_list="$search_list $CHAOS_HOMEDIR/lib/libatl.la $CHAOS_HOMEDIR/$cercs_cv_
 fi
 search_list="$search_list /usr/lib/libatl.la /usr/local/lib/libatl.la /opt/atl/lib/libatl.la /opt/misc/lib/libatl.la /opt/misc/lib/$cercs_cv_archive/libatl.la"
 tmp_search_results=""
-echo "configure:14450: searching for $search_list " >&5
+echo "configure:14763: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14454: first found $tmp_search_results " >&5
+	echo "configure:14767: first found $tmp_search_results " >&5
 	break
    fi
 done
