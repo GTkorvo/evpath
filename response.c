@@ -688,7 +688,7 @@ static void ecl_ev_discard(ecl_exec_context ec, int absp, int queue, int index) 
 
     assert(item);
 
-    EVdiscard_queue_item(cm, ev_state->queue, item);
+    EVdiscard_queue_item(cm, ev_state->stone, item);
 }
 
 static void ecl_ev_discard_rel(ecl_exec_context ec, int queue, int index) {
@@ -713,7 +713,7 @@ static void ecl_ev_discard_and_submit(ecl_exec_context ec,
 
     ev_state->did_output++;
     
-    EVdiscard_queue_item(cm, ev_state->queue, item);
+    EVdiscard_queue_item(cm, ev_state->stone, item);
 }
 
 static void ecl_ev_discard_and_submit_rel(ecl_exec_context ec, EVstone stone, int queue,
@@ -776,6 +776,15 @@ static int ecl_ev_count(ecl_exec_context ec, int queue) {
     }
 
     return count;
+}
+
+static attr_list ecl_ev_get_attrs(ecl_exec_context ec, int queue, int index) {
+    struct ev_state_data *ev_state = (void*) ecl_get_client_data(ec, 0x34567890);
+    attr_list *pattr = &ecl_find_index_rel(ev_state, queue, index)->item->attrs;
+    if (!*pattr) {
+        *pattr = CMcreate_attr_list(ev_state->cm);
+    }
+    return *pattr;
 }
 
 static int
@@ -1020,11 +1029,10 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 					       transform_wrapper, instance, 
 					       conversion_target_format);
 		break;
-	    case Response_Multityped:
+            default:
 		assert(FALSE);
 		break;
 	    }
-	    
 	    return_value = 1;
 	} else 	if (proto->action_type == Action_Multi || proto->action_type == Action_Congestion) {
 	    response_instance instance;
@@ -1199,7 +1207,8 @@ add_typed_queued_routines(ecl_parse_context context, int index, IOFormat format)
         "void EVdiscard_%s(ecl_exec_context ec, ecl_closure_context type, int index);\n"
         "int EVcount_%s(ecl_exec_context ec, ecl_closure_context type);\n"
         "int EVpresent_%s(ecl_exec_context ec, ecl_closure_context queue, int index);\n"
-        "void EVdiscard_and_submit_%s(ecl_exec_context ec, ecl_closure_context queue, int index);\n";
+        "void EVdiscard_and_submit_%s(ecl_exec_context ec, ecl_closure_context queue, int index);\n"
+        "attr_list EVget_attrs_%s(ecl_exec_context ec, ecl_closure_context queue, int index);\n";
     static ecl_extern_entry externs_fmt[] = {
         {"EVdata_%s", (void *) 0},
         {"EVdata_full_%s", (void *) 0},
@@ -1207,6 +1216,7 @@ add_typed_queued_routines(ecl_parse_context context, int index, IOFormat format)
         {"EVcount_%s", (void *) 0},
         {"EVpresent_%s", (void *) 0},
         {"EVdiscard_and_submit_%s", (void *) 0},
+        {"EVget_attrs_%s", (void *) 0},
         {NULL, (void *) 0}
     };
     ecl_extern_entry *cur;
@@ -1214,12 +1224,13 @@ add_typed_queued_routines(ecl_parse_context context, int index, IOFormat format)
 
     fmt_name = name_of_IOformat(format);
 
-    extern_string = malloc(strlen(fmt_name) * 8 + strlen(extern_string_fmt));
+    extern_string = malloc(strlen(fmt_name) * 9 + strlen(extern_string_fmt));
     assert(extern_string);
 
     sprintf(extern_string, extern_string_fmt,
         fmt_name, fmt_name, fmt_name, fmt_name,
-        fmt_name, fmt_name, fmt_name, fmt_name
+        fmt_name, fmt_name, fmt_name, fmt_name,
+        fmt_name
         );
     externs = malloc(sizeof(externs_fmt));
     assert(externs);
@@ -1230,6 +1241,7 @@ add_typed_queued_routines(ecl_parse_context context, int index, IOFormat format)
     externs[3].extern_value = (void*) ecl_ev_count;
     externs[4].extern_value = (void*) ecl_ev_present;
     externs[5].extern_value = (void*) ecl_ev_discard_and_submit_rel;
+    externs[6].extern_value = (void*) ecl_ev_get_attrs;
 
     for (cur = externs; cur->extern_name; ++cur) {
         char *real_name = malloc(strlen(cur->extern_name) + strlen(fmt_name));

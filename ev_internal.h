@@ -121,6 +121,8 @@ typedef struct _storage_queue {
 
 struct storage_proto_vals {
     int target_stone_id;
+    int is_paused;
+    int is_sending;
     int max_stored;
     int num_stored;
     storage_queue queue;
@@ -163,6 +165,10 @@ typedef struct _stone {
     int is_processing;
     int is_outputting;
     int is_draining;
+    int is_stalled; /* for backpressure */
+    int is_squelched; /* for backpressure */
+    int queue_size; /* for backpressure */
+    int pending_output; /* for storage; do we have pending events to push */
     int response_cache_count;
     response_cache_element *response_cache;
     queue_ptr queue;
@@ -172,6 +178,9 @@ typedef struct _stone {
     struct _proto_action *proto_actions;
     CMTaskHandle periodic_handle;
     attr_list stone_attrs;
+
+    CMConnection last_remote_source;
+    int squelch_depth;
 } *stone_type;
     
 typedef struct _event_path_data {
@@ -183,6 +192,7 @@ typedef struct _event_path_data {
     event_item *current_event_item;
     queue_item *taken_events_list;
     thr_mutex_t lock;
+    int use_backpressure;
 } *event_path_data;
 
 struct _EVSource {
@@ -226,4 +236,4 @@ extern event_item * get_free_event(event_path_data evp);
 extern void return_event(event_path_data evp, event_item *event);
 extern void ecl_encode_event(CManager cm, event_item *event);
 extern event_item *ecl_decode_event(CManager cm, int stone_num, int act_num, event_item *event);
-extern void EVdiscard_queue_item(CManager cm, queue_ptr que, queue_item *item);
+extern void EVdiscard_queue_item(CManager cm, int stone, queue_item *item);

@@ -965,6 +965,7 @@ CMConnection conn;
     conn->foreign_data_handler = NULL;
     free_IOBuffer(conn->io_out_buffer);
     free_AttrBuffer(conn->attr_encode_buffer);
+    INT_EVforget_connection(conn->cm, conn);
     INT_CMfree(conn);
 }
 
@@ -1521,7 +1522,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     int byte_swap = 0;
     int get_attrs = 0;
     int padding = 0;
-    int performance_msg = 0, event_msg = 0;
+    int performance_msg = 0, event_msg = 0, evcontrol_msg = 0;
     int performance_func = 0;
     CMbuffer cm_decode_buf = NULL, cm_data_buf;
     attr_list attrs = NULL;
@@ -1546,6 +1547,11 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     case 0x434d4100:  /* CMA\0 */
 	get_attrs = 1;
 	break;
+    case 0x00435645: /* \0CVE reversed byte order */
+        byte_swap = 1;
+    case 0x45564300: /* EVC\0 */
+        evcontrol_msg = 1;
+        break;
     case 0x00504d43: /* \0PMC reversed byte order */
 	byte_swap = 1;
     case 0x434d5000:  /* CMP\0 */
@@ -1610,7 +1616,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	}
     }
 
-    if (performance_msg) {
+    if (performance_msg || evcontrol_msg) {
 	performance_func = 0xff & (data_length >> 24);
 	data_length &= 0xffffff;
 	data_length -= 8;  /* subtract off header size */
@@ -1634,6 +1640,18 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     if (performance_msg) {
 	CMdo_performance_response(conn, data_length, performance_func, byte_swap,
 				  base);
+        return 0;
+    } else if (evcontrol_msg) {
+        int arg;
+        if (byte_swap) {
+            ((char*)&arg)[0] = base[3];
+	    ((char*)&arg)[1] = base[2];
+	    ((char*)&arg)[2] = base[1];
+	    ((char*)&arg)[3] = base[0];
+	} else {
+	    arg = ((int *) base)[0];
+	}
+        INT_EVhandle_control_message(conn->cm, conn, performance_func, arg);
         return 0;
     }
     data_buffer = base + attr_length;
@@ -2055,7 +2073,69 @@ CMConnection conn;
 	}
     }	    
 }
-	
+
+/* Returns 1 if successful, -1 if deferred, 0 on error */
+static int
+INT_CMwrite_raw(CMConnection conn, IOEncodeVector full_vec, IOEncodeVector data_vec,
+                int vec_count, int byte_count, attr_list attrs, int nowp, int data_vec_stack)
+{
+    int actual = 0;
+    assert(!conn->write_pending);
+    assert(!conn->closed && !conn->failed);
+    if (conn->do_non_blocking_write == 1 && !nowp) {
+        int actual_bytes;
+        actual_bytes = 
+            conn->trans->NBwritev_attr_func(&CMstatic_trans_svcs, 
+                                            conn->transport_data, 
+                                            full_vec, vec_count, attrs);
+        if (actual_bytes < byte_count) {
+            /* copy remaining and send it later */
+            if (actual_bytes < 0 ) actual_bytes = 0;
+            if (data_vec_stack) {
+                data_vec = copy_vector_to_IOBuffer(conn->io_out_buffer, data_vec);
+            }
+            queue_remaining_write(conn, full_vec, data_vec, vec_count, 
+                                  attrs, actual_bytes, attrs != NULL);
+            conn->trans->set_write_notify(conn->trans, &CMstatic_trans_svcs, conn->transport_data, 1);
+            printf("queued write\n");
+            conn->write_pending = 1;
+            CMtrace_out(conn->cm, CMLowLevelVerbose, 
+                        "Partial write, queued %d bytes",
+                        byte_count - actual_bytes);
+            return -1; /* XXX */
+        }
+        actual = vec_count;  /* set actual for success */
+    } else if (conn->trans->writev_attr_func != NULL) {
+        actual = conn->trans->writev_attr_func(&CMstatic_trans_svcs, 
+                                               conn->transport_data, 
+                                               full_vec,
+                                               vec_count, attrs);
+    } else {
+        actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
+                                          conn->transport_data, 
+                                          full_vec, vec_count);
+    }
+    return actual == vec_count ? 1 : 0;
+}
+
+extern int
+INT_CMwrite_evcontrol(CMConnection conn, unsigned char type, int argument) {
+    int evcontrol_header[2] = {0x45564300, 0};
+    struct _io_encode_vec static_vec[3];
+    int success;
+    IOEncodeVector vec = &static_vec[0];
+    assert(sizeof(int) == 4);
+    vec[0].iov_base = evcontrol_header;
+    vec[0].iov_len = sizeof(evcontrol_header);
+    vec[1].iov_base = &argument; /* XXX int size */
+    vec[1].iov_len = sizeof(int);
+    vec[2].iov_base = NULL;
+    vec[2].iov_len = 0;
+    evcontrol_header[1] = type << 24 | (sizeof(evcontrol_header) + sizeof(int));
+    success = INT_CMwrite_raw(conn, vec, vec + 1, 2, evcontrol_header[1] & 0xffffff, NULL, 0, 1) != 0;
+    printf("done write\n");
+    return success;
+}
 
 extern int
 INT_CMwrite_attr(conn, format, data, attrs)
@@ -2170,42 +2250,14 @@ attr_list attrs;
 			"Writing %d vectors, total %d bytes (including attrs) in writev", 
 			vec_count, byte_count);
 	}
-	if (conn->do_non_blocking_write == 1) {
-	    int actual_bytes;
-	    actual_bytes = 
-		conn->trans->NBwritev_attr_func(&CMstatic_trans_svcs, 
-						conn->transport_data, 
-						tmp_vec, vec_count, attrs);
-	    if (actual_bytes < byte_count) {
-		/* copy remaining and send it later */
-		if (actual_bytes < 0 ) actual_bytes = 0;
-		queue_remaining_write(conn, tmp_vec, vec, vec_count, 
-				      attrs, actual_bytes, attrs_present);
-		conn->trans->set_write_notify(conn->trans, &CMstatic_trans_svcs, conn->transport_data, 1);
-		conn->write_pending = 1;
-		CMtrace_out(conn->cm, CMLowLevelVerbose, 
-			    "Partial write, queued %d bytes",
-			    byte_count - actual_bytes);
-		return 1;
-	    }
-	    actual = vec_count;  /* set actual for success */
-	} else if (conn->trans->writev_attr_func != NULL) {
-	    actual = conn->trans->writev_attr_func(&CMstatic_trans_svcs, 
-						   conn->transport_data, 
-						   tmp_vec,
-						   vec_count, attrs);
-	} else {
-	    actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
-					      conn->transport_data, 
-					      tmp_vec, vec_count);
-	}
+        actual = INT_CMwrite_raw(conn, tmp_vec, vec, vec_count, byte_count, attrs, 0, 0);
 	if (tmp_vec != &static_vec[0]) {
 	    INT_CMfree(tmp_vec);
 	}
-	if (actual != vec_count) {
+	if (actual == 0) {
 	    /* fail */
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, 
-			"Writev failed, expected %d, only wrote %d", vec_count, actual);
+			"Writev failed");
 	    return 0;
 	}
     }
@@ -2363,45 +2415,15 @@ attr_list attrs;
 			"Writing %d vectors, total %d bytes (including attrs) in writev", 
 			vec_count, byte_count);
 	}
-	if (conn->do_non_blocking_write == 1) {
-	    int actual_bytes;
-	    actual_bytes = 
-		conn->trans->NBwritev_attr_func(&CMstatic_trans_svcs, 
-						conn->transport_data, 
-						tmp_vec, vec_count, attrs);
-	    if (actual_bytes < byte_count) {
-		/* copy remaining and send it later */
-		if (actual_bytes < 0 ) actual_bytes = 0;
-                if (vec == &preencoded_vec[0]) {
-                    vec = copy_vector_to_IOBuffer(conn->io_out_buffer, vec);
-                }
-    		queue_remaining_write(conn, tmp_vec, vec, vec_count, 
-				      attrs, actual_bytes, attrs_present);
-		conn->trans->set_write_notify(conn->trans, &CMstatic_trans_svcs, conn->transport_data, 1);
-		conn->write_pending = 1;
-		CMtrace_out(conn->cm, CMLowLevelVerbose, 
-			    "Partial write, queued %d bytes",
-			    byte_count - actual_bytes);
-		return 1;
-	    }
-	    actual = vec_count;  /* set actual for success */
-	} else if (conn->trans->writev_attr_func != NULL) {
-	    actual = conn->trans->writev_attr_func(&CMstatic_trans_svcs, 
-						   conn->transport_data, 
-						   tmp_vec,
-						   vec_count, attrs);
-	} else {
-	    actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
-					      conn->transport_data, 
-					      tmp_vec, vec_count);
-	}
+        actual = INT_CMwrite_raw(conn, tmp_vec, vec, vec_count, byte_count, attrs, 0,   
+                                    vec == &preencoded_vec[0]);
 	if (tmp_vec != &static_vec[0]) {
 	    INT_CMfree(tmp_vec);
 	}
-	if (actual != vec_count) {
+	if (actual == 0) {
 	    /* fail */
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, 
-			"Writev failed, expected %d, only wrote %d", vec_count, actual);
+			"Writev failed");
 	    return 0;
 	}
     }

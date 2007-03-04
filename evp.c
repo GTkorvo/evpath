@@ -61,6 +61,10 @@ INT_EValloc_stone(CManager cm)
     stone->write_callback = -1;
     stone->proto_actions = NULL;
     stone->stone_attrs = CMcreate_attr_list(cm);
+    stone->queue_size = 0;
+    stone->is_stalled = 0;
+    stone->last_remote_source = NULL;
+    stone->squelch_depth = 0;
     evp->stone_count++;
     return stone_num;
 }
@@ -183,6 +187,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
     }
     free(stone->queue);
     if (stone->response_cache) free(stone->response_cache);
+    /* XXX unsquelch senders */
     stone->queue = NULL;
     stone->local_id = -1;
     stone->proto_action_count = 0;
@@ -425,6 +430,7 @@ INT_EVassoc_store_action(CManager cm, EVstone stone_num, EVstone out_stone,
     act->matching_reference_formats = malloc(sizeof(IOFormat));
     act->matching_reference_formats[0] = NULL; /* signal that we accept all formats */
     storage_queue_init(cm, &act->o.store.queue, &storage_queue_default_ops, NULL);
+    act->o.store.target_stone_id = out_stone;
     act->o.store.max_stored = store_limit;
     act->o.store.num_stored = 0;
     clear_response_cache(stone);
@@ -452,7 +458,6 @@ INT_EVclear_stored(CManager cm, EVstone stone_num, EVaction action_num)
 
     storage_queue_empty(cm, queue);
 }
-
 
 static int evpath_locked(){return 1;}
 
@@ -486,6 +491,8 @@ raw_enqueue_event(CManager cm, queue_ptr queue, int action_id, event_item *event
     }
 }
 
+static void backpressure_check(CManager, EVstone);
+
 static void
 enqueue_event(CManager cm, int stone_id, int action_id, event_item *event)
 {
@@ -498,6 +505,8 @@ enqueue_event(CManager cm, int stone_id, int action_id, event_item *event)
     }
     raw_enqueue_event(cm, stone->queue, action_id, event);
     stone->new_enqueue_flag = 1;
+    stone->queue_size++;
+    backpressure_check(cm, stone_id);
     as->last_active_stone = stone_id;
     as->events_in_play++;
 }
@@ -524,19 +533,22 @@ raw_dequeue_event(CManager cm, queue_ptr q, int *act_p)
 }
 
 static event_item *
-dequeue_event(CManager cm, queue_ptr q, int *act_p)
+dequeue_event(CManager cm, stone_type stone, int *act_p)
 {
+    queue_ptr q = stone->queue;
     event_path_data evp = cm->evp;
     action_state as = evp->as;
     event_item *event = NULL;
     event = raw_dequeue_event(cm, q, act_p);
+    stone->queue_size--;
     as->events_in_play--;
     return event;
 }
 
 static event_item *
-dequeue_item(CManager cm, queue_ptr q, queue_item *to_dequeue)
+dequeue_item(CManager cm, stone_type stone, queue_item *to_dequeue)
 {
+    queue_ptr q = stone->queue;
     event_path_data evp = cm->evp;
     action_state as = evp->as;
     queue_item *item = q->queue_head;
@@ -567,32 +579,45 @@ dequeue_item(CManager cm, queue_ptr q, queue_item *to_dequeue)
     }
     item->next = evp->queue_items_free_list;
     evp->queue_items_free_list = item;
+    stone->queue_size--;
     as->events_in_play--;
     return event;
 }
 
 void
-EVdiscard_queue_item(CManager cm, queue_ptr q, queue_item *item) {
-    (void) dequeue_item(cm, q, item);
+EVdiscard_queue_item(CManager cm, int s, queue_item *item) {
+    stone_type stone = &cm->evp->stone_map[s];
+    (void) dequeue_item(cm, stone, item);
 }
 
-
+static void encode_event(CManager, event_item*);
 
 /* {{{ storage_queue_default_* */
+static void ensure_ev_owned(CManager cm, event_item *event) {
+    if (event->contents == Event_App_Owned && !event->free_func) {
+        encode_event(cm, event);
+        event->decoded_event = NULL;
+        event->event_encoded = 1;
+        event->contents = Event_CM_Owned;
+        assert(event->encoded_event);
+    }
+}
+
 static void
 storage_queue_default_empty(CManager cm, storage_queue_ptr queue) {
     empty_queue(&queue->u.queue); 
 }
 
-
 static void
 storage_queue_default_enqueue(CManager cm, storage_queue_ptr queue, event_item *item) {
+    ensure_ev_owned(cm, item);
     raw_enqueue_event(cm, &queue->u.queue, -1, item);
 }
 
 static event_item *
 storage_queue_default_dequeue(CManager cm, storage_queue_ptr queue) {
-    return raw_dequeue_event(cm, &queue->u.queue, NULL);
+    event_item *ev = raw_dequeue_event(cm, &queue->u.queue, NULL);
+    return ev;
 }
 
 static storage_queue_ops storage_queue_default_ops = {
@@ -745,7 +770,7 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
 	   event->reference_format, name_of_IOformat(event->reference_format));
     }
     for (i=0; i < stone->response_cache_count; i++) {
-        if (stone->response_cache[i].stage != stage) {
+        if (!compatible_stages(stage, stone->response_cache[i].stage)) {
             continue;
         }
 	if (stone->response_cache[i].reference_format == event->reference_format) {
@@ -1258,6 +1283,9 @@ is_congestion_action(response_cache_element *act) {
 
 static int do_output_action(CManager cm, int s);
 
+static void backpressure_set(CManager, EVstone, int stalledp);
+static int process_stone_pending_output(CManager, EVstone);
+
 static int
 process_events_stone(CManager cm, int s, action_class c)
 {
@@ -1276,6 +1304,9 @@ process_events_stone(CManager cm, int s, action_class c)
     if (evp->stone_map[s].local_id == -1) return 0;
     if (evp->stone_map[s].is_draining == 1) return 0;
     if (evp->stone_map[s].is_frozen == 1) return 0;
+    if (c == Immediate_and_Multi && evp->stone_map[s].pending_output) {
+        more_pending += process_stone_pending_output(cm, s);
+    }
     if (is_output_stone(cm, s) && (c != Output) && (c != Congestion)) return 0;
     evp->stone_map[s].is_processing = 1;
     
@@ -1306,6 +1337,7 @@ process_events_stone(CManager cm, int s, action_class c)
                     tmp = global_name_of_IOformat(event->reference_format);
                 printf("No action found for event %lx submitted to stone %d\n",
                        (long)event, s);
+                dump_stone(&evp->stone_map[s]);
                 if (tmp != NULL) {
                     static int first = 1;
                     printf("    Unhandled incoming event format was \"%s\"\n", tmp);
@@ -1317,7 +1349,7 @@ process_events_stone(CManager cm, int s, action_class c)
                     printf("    Unhandled incoming event format was NULL\n");
                 }
                 free(tmp);
-                event = dequeue_item(cm, stone->queue, item);
+                event = dequeue_item(cm, stone, item);
                 return_event(evp, event);
             }
 	    resp = &stone->response_cache[resp_id];
@@ -1341,10 +1373,11 @@ process_events_stone(CManager cm, int s, action_class c)
             }
 	}
         assert(item->action_id < stone->response_cache_count);
+        backpressure_check(cm, s);
         if (!compatible_stages(c, act->stage)) {
             /* do nothing */
         } else if (is_immediate_action(act)) {
-	    event_item *event = dequeue_item(cm, stone->queue, item);
+	    event_item *event = dequeue_item(cm, stone, item);
 	    switch(act->action_type) {
 	    case Action_Terminal:
 	    case Action_Filter: {
@@ -1497,6 +1530,7 @@ CManager cm;
 	    more_pending += process_events_stone(cm, s, Output);
 	}
     }
+
     return more_pending;
 }
 
@@ -1517,7 +1551,7 @@ CManager cm;
 	while (evp->stone_map[s].queue->queue_head != NULL && 
 	       evp->stone_map[s].is_draining == 0) {
 	    int action_id;
-	    event_item *event = dequeue_event(cm, evp->stone_map[s].queue, 
+	    event_item *event = dequeue_event(cm, &evp->stone_map[s], 
 					      &action_id);
 	    response_cache_element *act = &evp->stone_map[s].response_cache[action_id];
             proto_action *p;
@@ -1684,6 +1718,20 @@ CManager cm;
     return more_pending;
 }
 
+void
+INT_EVforget_connection(CManager cm, CMConnection conn)
+{
+    event_path_data evp = cm->evp;
+    int s;
+    for (s = 0; s < evp->stone_count; ++s)  {
+        if (evp->stone_map[s].last_remote_source == conn) {
+            evp->stone_map[s].last_remote_source = NULL;
+            evp->stone_map[s].squelch_depth = 0;
+        }
+    }
+}
+
+
 static void
 stone_close_handler(CManager cm, CMConnection conn, void *client_data)
 {
@@ -1763,7 +1811,7 @@ do_output_action(CManager cm, int s)
 		return 0;
 /*	    }*/
 	}
-	event_item *event = dequeue_event(cm, evp->stone_map[s].queue, &action_id);
+	event_item *event = dequeue_event(cm, &evp->stone_map[s], &action_id);
 	if (act->o.out.conn == NULL) {
 	    CMtrace_out(cm, EVerbose, "Output stone %d has closed connection", s);
 	} else {
@@ -1789,6 +1837,7 @@ do_output_action(CManager cm, int s)
 	    }
 	}
 	return_event(evp, event);
+        backpressure_check(cm, s);
 	if (ret == 0) {
 	    if (CMtrace_on(cm, EVWarning)) {
 		printf("Warning!  Write failed for output action %d on stone %d, event likely not transmitted\n", a, s);
@@ -2043,6 +2092,320 @@ INT_EVsend_stored(CManager cm, EVstone stone_num, EVaction action_num)
     }
 }
 
+/* this is called to make a store-send happen; it just
+ * runs the standard loop later.
+ */
+static void
+deferred_process_actions(CManager cm, void *client_data) {
+    CManager_lock(cm);
+    while (process_local_actions(cm)) printf("looping\n");
+    CManager_unlock(cm);
+}
+
+void
+INT_EVstore_start_send(CManager cm, EVstone stone_num, EVaction action_num)
+{
+    event_path_data evp = cm->evp;
+    action_state as = evp->as;
+    stone_type stone = &evp->stone_map[stone_num];
+    proto_action *act = &stone->proto_actions[action_num];
+
+    if (act->o.store.num_stored == 0) return;
+    if (act->o.store.is_sending == 1) return;
+
+    act->o.store.is_sending = 1;
+    act->o.store.is_paused = 0;
+    as->events_in_play++;
+    stone->pending_output++;
+    
+    /* make sure the local action loop is called soon */
+    (void) INT_CMadd_delayed_task(cm, 0, 0, deferred_process_actions, NULL);
+}
+
+static int 
+process_stone_pending_output(CManager cm, EVstone stone_num) {
+    event_path_data evp = cm->evp;
+    action_state as = evp->as;
+    stone_type stone = &evp->stone_map[stone_num];
+    EVaction action_num;
+    int found = 0;
+    int more_pending = 0;
+
+    for (action_num = 0; action_num < stone->proto_action_count
+            && found < stone->pending_output; ++action_num) {
+        proto_action *act = &stone->proto_actions[action_num];
+        if (act->action_type == Action_Store &&
+            act->o.store.is_sending && !act->o.store.is_paused) {
+            event_item *item;
+            ++found;
+            item = storage_queue_dequeue(cm, &act->o.store.queue);
+            assert(item->ref_count > 0);
+            assert(!evp->stone_map[act->o.store.target_stone_id].is_stalled
+                    && !evp->stone_map[act->o.store.target_stone_id].is_squelched);
+            internal_path_submit(cm, act->o.store.target_stone_id, item);
+            /* printf("submitted one <%d / %d>\n", as->events_in_play, as->last_active_stone); */
+            act->o.store.num_stored--;
+            /* return_event(evp, item); */
+            if (!act->o.store.num_stored) {
+                /* printf("stopping sending\n"); */
+                act->o.store.is_sending = act->o.store.is_paused = 0;
+                as->events_in_play--;
+                stone->pending_output--;
+                found--;
+            } else {
+                ++more_pending;
+            }
+        }
+    }
+    return more_pending;
+}
+
+int
+INT_EVstore_is_sending(CManager cm, EVstone stone_num, EVaction action_num)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_num];
+    proto_action *p = &stone->proto_actions[action_num];
+
+    return p->o.store.is_sending;
+}
+
+int
+INT_EVstore_count(CManager cm, EVstone stone_num, EVaction action_num)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[stone_num];
+    proto_action *p = &stone->proto_actions[action_num];
+
+    return p->o.store.num_stored;
+}
+
+struct source_info {
+    EVstone to_stone;
+    void *user_data;
+    enum { SOURCE_ACTION, SOURCE_REMOTE } type;
+    union {
+        struct {
+            EVstone stone;
+            EVaction action;
+        } action;
+        struct {
+            EVstone target_stone;
+            CMConnection conn;
+        } remote;
+    };
+};
+
+typedef void (*ForeachSourceCB)(CManager, struct source_info *);
+
+static void
+foreach_source_inner(CManager cm, EVstone to_stone, char *seen,
+        ForeachSourceCB cb, struct source_info *info) {
+    event_path_data evp = cm->evp;
+    EVstone cur_stone;
+    for (cur_stone = 0; cur_stone < evp->stone_count; ++cur_stone) {
+        EVaction cur_action;
+        stone_type stone = &evp->stone_map[cur_stone];
+        if (seen[cur_stone]) continue;
+        if (stone->local_id == -1) continue;
+        if (cur_stone == to_stone) {
+            if (stone->last_remote_source != NULL) {
+                info->type = SOURCE_REMOTE;
+                info->remote.target_stone = to_stone;
+                info->remote.conn = stone->last_remote_source;
+                cb(cm, info);
+            }
+        } else {
+            for (cur_action = 0; cur_action < stone->proto_action_count; ++cur_action) {
+                proto_action *act;
+                int matches = 0;
+                int matches_recursive = 0;
+                act = &stone->proto_actions[cur_action];
+                switch (act->action_type) {
+                case Action_Store:
+                    if (act->o.store.target_stone_id == to_stone) {
+                        ++matches;
+                    }
+                    break;
+                case Action_Split:
+                    {
+                        int i;
+                        for (i = 0; act->o.split_stone_targets[i] != -1; ++i) {
+                            if (act->o.split_stone_targets[i] == to_stone) {
+                                ++matches;
+                                ++matches_recursive;
+                            }
+                        }
+                    }
+                    break;
+                case Action_Filter:
+                    if (to_stone == act->o.term.target_stone_id) {
+                        ++matches;
+                        ++matches_recursive;
+                    }
+                    break;
+                case Action_Immediate:
+                    {
+                        int i;
+                        for (i = 0; i < act->o.imm.output_count; ++i) {
+                            if (to_stone == act->o.imm.output_stone_ids[i]) {
+                                ++matches;
+                                ++matches_recursive;
+                            }
+                        }
+                    }
+                    break;
+                case Action_Terminal:
+                    /* nothing to do */
+                    break;
+                default: ;
+                    /* printf("source searching: unhandled type %d\n", act->action_type); */
+                    /* TODO unhandled cases
+                            - Source handles?
+                     */
+                }
+                if (matches) {
+                    info->type = SOURCE_ACTION;
+                    info->action.stone = cur_stone;
+                    info->action.action = cur_action;
+                    cb(cm, info);
+                }
+                if (matches_recursive) {
+                    /* avoid infinite recursion */
+                    seen[cur_stone] = 1;
+                    foreach_source_inner(cm, cur_stone, seen, cb, info);
+                    seen[cur_stone] = 0; /* XXX */
+                }
+            }
+        }
+    }
+}
+
+static void
+foreach_source(CManager cm, EVstone to_stone, ForeachSourceCB cb, void *user_data) {
+    char* seen = calloc(1, cm->evp->stone_count); /* XXX try to keep static */
+    struct source_info info;
+    info.user_data = user_data;
+    info.to_stone = to_stone;
+    foreach_source_inner(cm, to_stone, seen, cb, &info);
+    free(seen);
+}
+
+enum { CONTROL_SQUELCH, CONTROL_UNSQUELCH };
+
+static void
+backpressure_set_one(CManager cm, struct source_info *info)
+{
+    event_path_data evp = cm->evp;
+    action_state as = evp->as;
+    assert(as->events_in_play >= 0);
+    int s = info->to_stone;
+    stone_type to_stone = &evp->stone_map[s];
+    switch (info->type) {
+    case SOURCE_ACTION: {
+            stone_type stone = &evp->stone_map[info->action.stone];
+            proto_action *act = &stone->proto_actions[info->action.action];
+            switch (act->action_type) {
+            case Action_Store:
+                {
+                    struct storage_proto_vals *store = &act->o.store;
+                    if (store->is_paused != to_stone->is_stalled) {
+                        store->is_paused = to_stone->is_stalled;
+                        if (store->is_sending) {
+                            if (store->is_paused) {
+                                --as->events_in_play;
+                                --stone->pending_output;
+                            } else {
+                                ++as->events_in_play;
+                                ++stone->pending_output;
+                                (void) INT_CMadd_delayed_task(cm, 0, 0, deferred_process_actions, NULL);
+                            }
+                        }
+                    }
+                }
+                break;
+            default:;
+                /* printf("unhandled action %d\n", act->action_type); */
+                /* TODO more cases? */
+            }
+        }
+        break;
+    case SOURCE_REMOTE: {
+            stone_type stone = &evp->stone_map[info->remote.target_stone];
+            if (to_stone->is_stalled) {
+                if (stone->squelch_depth++ == 0) {
+                    INT_CMwrite_evcontrol(info->remote.conn, CONTROL_SQUELCH, info->remote.target_stone);
+                }
+            } else if (0 == --stone->squelch_depth) {
+                INT_CMwrite_evcontrol(info->remote.conn, CONTROL_UNSQUELCH, info->remote.target_stone);
+            }
+        }
+        break;
+    default:
+        /* XXX */
+        ;
+    }
+}
+
+static void
+backpressure_set(CManager cm, EVstone to_stone, int stalledp) {
+    event_path_data evp = cm->evp;
+    stone_type stone = &evp->stone_map[to_stone];
+    assert(cm->evp->use_backpressure);
+    if (stone->is_stalled == stalledp) {
+        return;
+    }
+    /*
+    if (stalledp) {
+        printf("backpressure stalled %d\n", (int) to_stone);
+    } else {
+        printf("backpressure unstalled %d\n", (int) to_stone);
+    }
+    */
+    stone->is_stalled = stalledp;
+    foreach_source(cm, to_stone, backpressure_set_one, NULL);
+}
+
+static void
+backpressure_check(CManager cm, EVstone s) {
+    if (cm->evp->use_backpressure) {
+        stone_type stone = &cm->evp->stone_map[s];
+        int old_stalled = stone->is_stalled;
+        int low_threshold = 50, high_threshold = 200;
+        if (stone->stone_attrs) {
+            get_int_attr(stone->stone_attrs, EV_BACKPRESSURE_HIGH, &high_threshold);
+            get_int_attr(stone->stone_attrs, EV_BACKPRESSURE_LOW, &low_threshold);
+        }
+        backpressure_set(cm, s, stone->is_squelched || stone->queue_size > (old_stalled ? 50 : 200));
+    }
+}
+void
+INT_EVhandle_control_message(CManager cm, CMConnection conn, unsigned char type, int arg) {
+    event_path_data evp = cm->evp;
+    switch (type) {
+    case CONTROL_SQUELCH:
+    case CONTROL_UNSQUELCH: {
+            int s;
+            stone_type stone;
+            for (s = 0; s < evp->stone_count; ++s) {
+                stone = &evp->stone_map[s];
+                if (is_output_stone(cm, s) &&  stone->proto_actions[stone->default_action].o.out.conn == conn
+                        && stone->proto_actions[stone->default_action].o.out.remote_stone_id == arg) {
+                    stone->is_squelched = type == CONTROL_SQUELCH;
+                    if (stone->is_squelched) {
+                        backpressure_check(cm, s);
+                    } else {
+                        backpressure_check(cm, s);
+                    }
+                }
+            }
+        }
+        break;
+    default:
+        assert(FALSE);
+    }
+}
+
 static int
 register_subformats(context, field_list, sub_list)
 IOContext context;
@@ -2253,6 +2616,9 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     }
     INT_CMtake_buffer(cm, buffer);
     event->cm = cm;
+    if (evp->stone_map[stone_id].squelch_depth == 0) {
+        evp->stone_map[stone_id].last_remote_source = conn;
+    }
     internal_path_submit(cm, stone_id, event);
     return_event(evp, event);
     while (process_local_actions(cm));
@@ -2272,7 +2638,7 @@ INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
     event->free_arg = data;
     internal_path_submit(source->cm, source->local_stone_id, event);
     while (process_local_actions(source->cm));
-    if (event->ref_count != 1) {
+    if (event->ref_count != 1 && !event->event_encoded) {
 	encode_event(source->cm, event);  /* reassign memory */
     }
     return_event(source->cm->evp, event);
@@ -2302,9 +2668,13 @@ INT_EVsubmit(EVsource source, void *data, attr_list attrs)
     event->free_func = source->free_func;
     event->free_arg = source->free_data;
     event->attrs = CMadd_ref_attr_list(source->cm, attrs);
+    if (evp->stone_map[source->local_stone_id].is_stalled) {
+        /* XXX */
+        printf("submit to stalled stone\n");
+    }
     internal_path_submit(source->cm, source->local_stone_id, event);
     while (process_local_actions(source->cm));
-    if (event->ref_count != 1) {
+    if (event->ref_count != 1 && !event->event_encoded) {
 	encode_event(source->cm, event);  /* reassign memory */
     }
     return_event(source->cm->evp, event);
@@ -2362,6 +2732,15 @@ EVPinit(CManager cm)
     cm->evp->queue_items_free_list = NULL;
     cm->evp->lock = thr_mutex_alloc();
     internal_add_shutdown_task(cm, free_evp, NULL);
+    {
+        char *backpressure_env;
+        backpressure_env = cercs_getenv("EVBackpressure");
+        if (backpressure_env && atoi(backpressure_env) != 0) {
+            cm->evp->use_backpressure = 1;
+        } else {
+            cm->evp->use_backpressure = 0;
+        }
+    }
 }
 
     
@@ -2466,6 +2845,9 @@ INT_EVunfreeze_stone(CManager cm, EVstone stone_id)
     }
     stone = &(evp->stone_map[stone_id]);
     stone->is_frozen = 0;
+    /* ensure that we run the process_actions loop soon so the stone's
+       pending events (or pending output) won't be ignored */
+    (void) INT_CMadd_delayed_task(cm, 0, 0, deferred_process_actions, NULL);
     return 1;	
 }
 

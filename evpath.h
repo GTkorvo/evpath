@@ -1452,6 +1452,17 @@ CMget_self_ip_addr();
 #define CM_PATHRATE ATL_CHAR_CONS('P','T','R', 'T')
 /* @}*/
 
+/** @defgroup evattr EVPath attributes
+ * @{
+ */
+/*! "EV_BACKPRESSURE_LOW" Low watermark for backpressure */
+#define EV_BACKPRESSURE_LOW ATL_CHAR_CONS('E','B','k','L')
+
+/*! "EV_BACKPRESSURE_HIGH" High watermark for backpressure */
+#define EV_BACKPRESSURE_HIGH ATL_CHAR_CONS('E','B','k','H')
+
+/* @} */
+
 /** @defgroup evpath EVPath functions and types
  * @{
  */
@@ -1871,12 +1882,44 @@ EVclear_stored(CManager cm, EVstone stone_num, EVaction action_num);
  * Send the contents stored in the specified storage action.
  * The storage will be empty when this function returns.
  *
- * \param cm The CManager from whcih the stone is allocated
+ * \param cm The CManager from which the stone is allocated
  * \param stone_num The stone the action is attached to
  * \param action_num The action created
  */
 extern void
 EVsend_stored(CManager cm, EVstone stone_num, EVaction action_num);
+
+/*!
+ * Count the number of items stored in a storage action.
+ * 
+ * \param cm The CManager from which the stone is allocated
+ * \param stone_num The stone the action is attached to
+ * \param action_num The action created (return value of EVassoc_store_action())
+ * \return Number of events stored
+ */
+extern int 
+EVstore_count(CManager cm, EVstone stone_num, EVaction action_num); 
+
+/*!
+ * Return whether we are sending from this storage stone.
+ * 
+ * \param cm The CManager from which this stone is allocated.
+ * \param stone_num The stone the action is attached to
+ * \param action_num The action created
+ * \return True iff currently sending
+ */
+extern int
+EVstore_is_sending(CManager cm, EVstone stone_num, EVaction action_num);
+
+/*!
+ * Start sending from a storage stone. Will not stop until done sending.
+ *
+ * \param cm The CManager from which this stone is allocated.
+ * \param stone_num The stone the action is attached to
+ * \param action_num The action created
+ */
+extern void
+EVstore_start_send(CManager cm, EVstone stone_num, EVaction action_num); 
 
 /*!
  * Set the maximum number of items stored in a storage stone,

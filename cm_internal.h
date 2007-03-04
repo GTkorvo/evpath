@@ -358,6 +358,8 @@ INT_CMadd_delayed_task ARGS((CManager cm, int secs, int usecs, CMPollFunc func,
 extern int
 INT_CMwrite_attr ARGS((CMConnection conn, CMFormat format, void *data, 
 		       attr_list attrs));
+extern int
+INT_CMwrite_evcontrol ARGS((CMConnection conn, unsigned char type, int arg));
 int INT_CMCondition_get ARGS((CManager cm, CMConnection dep));
 void INT_CMCondition_signal ARGS((CManager cm, int condition));
 void INT_CMCondition_set_client_data ARGS((CManager cm, int condition,
@@ -372,6 +374,11 @@ extern CMConnection INT_CMget_conn ARGS((CManager cm, attr_list contact_list));
 extern CMFormat INT_CMregister_format ARGS((CManager cm, char *format_name,
 					    IOFieldList field_list,
 					    CMFormatList subformat_list));
+extern void
+INT_EVforget_connection(CManager, CMConnection);
+extern void
+INT_EVhandle_control_message(CManager, CMConnection, unsigned char type, int arg);
+
 extern EVaction
 INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
 			       EVImmediateHandlerFunc func, void *client_data,
@@ -533,6 +540,9 @@ extern EVevent_list INT_EVextract_stone_events(CManager cm, EVstone stone_id);
 extern attr_list INT_EVextract_attr_list(CManager cm, EVstone stone_id);
 extern void INT_EVset_attr_list(CManager cm, EVstone stone_id, attr_list list);
 extern void INT_EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num, int store_limit);
+extern void INT_EVstore_start_send(CManager cm, EVstone stone_num, EVaction action_num);
+extern int INT_EVstore_is_sending(CManager cm, EVstone stone_num, EVaction action_num);
+extern int INT_EVstore_count(CManager cm, EVstone stone_num, EVaction action_num);
 extern int INT_EVdestroy_stone(CManager cm, EVstone stone_id);
 extern void INT_EVfree_source(EVsource source);
 
