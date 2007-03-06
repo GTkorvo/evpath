@@ -2193,7 +2193,7 @@ struct source_info {
             EVstone target_stone;
             CMConnection conn;
         } remote;
-    };
+    }u;
 };
 
 typedef void (*ForeachSourceCB)(CManager, struct source_info *);
@@ -2211,8 +2211,8 @@ foreach_source_inner(CManager cm, EVstone to_stone, char *seen,
         if (cur_stone == to_stone) {
             if (stone->last_remote_source != NULL) {
                 info->type = SOURCE_REMOTE;
-                info->remote.target_stone = to_stone;
-                info->remote.conn = stone->last_remote_source;
+                info->u.remote.target_stone = to_stone;
+                info->u.remote.conn = stone->last_remote_source;
                 cb(cm, info);
             }
         } else {
@@ -2266,8 +2266,8 @@ foreach_source_inner(CManager cm, EVstone to_stone, char *seen,
                 }
                 if (matches) {
                     info->type = SOURCE_ACTION;
-                    info->action.stone = cur_stone;
-                    info->action.action = cur_action;
+                    info->u.action.stone = cur_stone;
+                    info->u.action.action = cur_action;
                     cb(cm, info);
                 }
                 if (matches_recursive) {
@@ -2303,8 +2303,8 @@ backpressure_set_one(CManager cm, struct source_info *info)
     stone_type to_stone = &evp->stone_map[s];
     switch (info->type) {
     case SOURCE_ACTION: {
-            stone_type stone = &evp->stone_map[info->action.stone];
-            proto_action *act = &stone->proto_actions[info->action.action];
+            stone_type stone = &evp->stone_map[info->u.action.stone];
+            proto_action *act = &stone->proto_actions[info->u.action.action];
             switch (act->action_type) {
             case Action_Store:
                 {
@@ -2331,13 +2331,13 @@ backpressure_set_one(CManager cm, struct source_info *info)
         }
         break;
     case SOURCE_REMOTE: {
-            stone_type stone = &evp->stone_map[info->remote.target_stone];
+            stone_type stone = &evp->stone_map[info->u.remote.target_stone];
             if (to_stone->is_stalled) {
                 if (stone->squelch_depth++ == 0) {
-                    INT_CMwrite_evcontrol(info->remote.conn, CONTROL_SQUELCH, info->remote.target_stone);
+                    INT_CMwrite_evcontrol(info->u.remote.conn, CONTROL_SQUELCH, info->u.remote.target_stone);
                 }
             } else if (0 == --stone->squelch_depth) {
-                INT_CMwrite_evcontrol(info->remote.conn, CONTROL_UNSQUELCH, info->remote.target_stone);
+                INT_CMwrite_evcontrol(info->u.remote.conn, CONTROL_UNSQUELCH, info->u.remote.target_stone);
             }
         }
         break;
