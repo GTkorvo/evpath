@@ -40,8 +40,7 @@ TESTS = evtest$(EXEEXT) bulktest$(EXEEXT) http_test$(EXEEXT) \
 noinst_PROGRAMS = $(am__EXEEXT_1) thin_client$(EXEEXT) \
 	congestion_test$(EXEEXT) congest_bulktest$(EXEEXT) \
 	multiq_test$(EXEEXT) store_send_test$(EXEEXT) \
-	store_limit_test$(EXEEXT) store_pressure_test$(EXEEXT) \
-	net_send$(EXEEXT) net_recv$(EXEEXT)
+	store_limit_test$(EXEEXT) store_pressure_test$(EXEEXT)
 subdir = tests
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -103,14 +102,6 @@ multiq_test_SOURCES = multiq_test.c
 multiq_test_OBJECTS = multiq_test.$(OBJEXT)
 multiq_test_LDADD = $(LDADD)
 multiq_test_DEPENDENCIES = ../libevpath.la
-net_recv_SOURCES = net_recv.c
-net_recv_OBJECTS = net_recv.$(OBJEXT)
-net_recv_LDADD = $(LDADD)
-net_recv_DEPENDENCIES = ../libevpath.la
-net_send_SOURCES = net_send.c
-net_send_OBJECTS = net_send.$(OBJEXT)
-net_send_LDADD = $(LDADD)
-net_send_DEPENDENCIES = ../libevpath.la
 router_test_SOURCES = router_test.c
 router_test_OBJECTS = router_test.$(OBJEXT)
 router_test_LDADD = $(LDADD)
@@ -159,16 +150,15 @@ LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	$(LDFLAGS) -o $@
 SOURCES = auto_test.c bulktest.c congest_bulktest.c congestion_test.c \
 	evtest.c extract_test.c filter2_test.c filter_test.c \
-	http_test.c multiq_test.c net_recv.c net_send.c router_test.c \
+	http_test.c multiq_test.c router_test.c router_test2.c \
+	store_limit_test.c store_pressure_test.c store_send_test.c \
+	submit_test.c thin_client.c thin_test.c transform_test.c
+DIST_SOURCES = auto_test.c bulktest.c congest_bulktest.c \
+	congestion_test.c evtest.c extract_test.c filter2_test.c \
+	filter_test.c http_test.c multiq_test.c router_test.c \
 	router_test2.c store_limit_test.c store_pressure_test.c \
 	store_send_test.c submit_test.c thin_client.c thin_test.c \
 	transform_test.c
-DIST_SOURCES = auto_test.c bulktest.c congest_bulktest.c \
-	congestion_test.c evtest.c extract_test.c filter2_test.c \
-	filter_test.c http_test.c multiq_test.c net_recv.c net_send.c \
-	router_test.c router_test2.c store_limit_test.c \
-	store_pressure_test.c store_send_test.c submit_test.c \
-	thin_client.c thin_test.c transform_test.c
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -374,12 +364,6 @@ http_test$(EXEEXT): $(http_test_OBJECTS) $(http_test_DEPENDENCIES)
 multiq_test$(EXEEXT): $(multiq_test_OBJECTS) $(multiq_test_DEPENDENCIES) 
 	@rm -f multiq_test$(EXEEXT)
 	$(LINK) $(multiq_test_OBJECTS) $(multiq_test_LDADD) $(LIBS)
-net_recv$(EXEEXT): $(net_recv_OBJECTS) $(net_recv_DEPENDENCIES) 
-	@rm -f net_recv$(EXEEXT)
-	$(LINK) $(net_recv_OBJECTS) $(net_recv_LDADD) $(LIBS)
-net_send$(EXEEXT): $(net_send_OBJECTS) $(net_send_DEPENDENCIES) 
-	@rm -f net_send$(EXEEXT)
-	$(LINK) $(net_send_OBJECTS) $(net_send_LDADD) $(LIBS)
 router_test$(EXEEXT): $(router_test_OBJECTS) $(router_test_DEPENDENCIES) 
 	@rm -f router_test$(EXEEXT)
 	$(LINK) $(router_test_OBJECTS) $(router_test_LDADD) $(LIBS)
