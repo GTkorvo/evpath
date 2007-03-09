@@ -1387,6 +1387,7 @@ CMConnection conn;
     static int first = 1;
     static int read_ahead_msg_limit = 50;
     static int read_ahead_byte_limit = 1024*1024;
+    static int use_blocking_reads = 0;
     char *buffer = NULL;
     int length;
 
@@ -1406,6 +1407,10 @@ CMConnection conn;
 		printf("Read ahead byte limit \"%s\" not parsed\n", tmp);
 	    }
 	}
+        tmp = cercs_getenv("CMBlockingReads");
+        if (tmp != NULL) {
+            use_blocking_reads = atoi(tmp);
+        }
     }
 
  start_read:
@@ -1440,9 +1445,9 @@ CMConnection conn;
 	    int len = conn->buffer_full_point - conn->buffer_data_end;
 	    char *buf = (char*)conn->partial_buffer->buffer + conn->buffer_data_end;
 	    int actual;
-	    actual = trans->read_to_buffer_func(&CMstatic_trans_svcs, 
+            actual = trans->read_to_buffer_func(&CMstatic_trans_svcs, 
 						conn->transport_data, 
-						buf, len, 1);
+						buf, len, !use_blocking_reads);
 	    if (actual == -1) {
 		CMtrace_out(cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d, failing connection %lx", actual, conn);
