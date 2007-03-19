@@ -71,7 +71,7 @@ LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 am_libevpath_la_OBJECTS = cm.lo cm_control.lo cm_formats.lo cm_util.lo \
 	cm_transport.lo cm_lock.lo cm_pbio.lo cm_evol.lo evp.lo \
-	response.lo cm_interface.lo thin_server.lo version.lo
+	response.lo cm_interface.lo thin_server.lo version.lo revp.lo
 libevpath_la_OBJECTS = $(am_libevpath_la_OBJECTS)
 libevpath_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -252,12 +252,12 @@ lib_LTLIBRARIES = libevpath.la
 EXTRA_LTLIBRARIES = 
 libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c\
 		       cm_lock.c cm_pbio.c cm_evol.c evp.c response.c \
-		       cm_interface.c thin_server.c version.c
+		       cm_interface.c thin_server.c version.c revp.c
 
 libevpath_la_LDFLAGS = $(MATH_LIB)
 libevpath_la_LIBADD = $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lIO -lecl @SOCKET_LIBS@ @KERNEL_OBJS@ 
 libevpath_la_DEPENDENCIES = $(LIBLTDL) $(LTLIBS) @KERNEL_OBJS@
-include_HEADERS = evpath.h
+include_HEADERS = evpath.h revpath.h
 AM_CPPFLAGS = 
 noinst_HEADERS = assert.h cm_internal.h  ev_internal.h
 @KERNEL_TRUE@BUILT_SOURCES = env.c kcm.c presym.c
@@ -400,6 +400,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/response.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/revp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thin_server.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/version.Plo@am__quote@
 
@@ -439,7 +440,7 @@ install-includeHEADERS: $(include_HEADERS)
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  f=$(am__strip_dir) \
 	  echo " cmp -s '$$d$$p' '$(DESTDIR)$(includedir)/$$f' || $(includeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(includedir)/$$f'"; \
-	   cmp -s '$$d$$p' '$(DESTDIR)$(includedir)/$$f' || $(includeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(includedir)/$$f"; \
+	   cmp -s "$$d$$p" "$(DESTDIR)$(includedir)/$$f" || $(includeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(includedir)/$$f"; \
 	done
 
 uninstall-includeHEADERS:
