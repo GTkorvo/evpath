@@ -2,7 +2,7 @@
 
 AUTOMAKE_OPTIONS = foreign
 
-SUBDIRS = libltdl . tests examples
+SUBDIRS = libltdl . tests rtests examples
 
 INCLUDES = $(INCLTDL)
 
@@ -30,7 +30,7 @@ AM_CPPFLAGS =
 noinst_HEADERS = assert.h cm_internal.h  ev_internal.h
 
 cm_interface.c: evpath.h gen_interface.pl
-	perl ./gen_interface.pl
+	@PERL@ ./gen_interface.pl
 
 if KERNEL
 bin_PROGRAMS = 

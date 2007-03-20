@@ -183,6 +183,7 @@ PACKAGE_VERSION = @PACKAGE_VERSION@
 PATHPROG = @PATHPROG@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PBIODIR = @PBIODIR@
+PERL = @PERL@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
@@ -245,7 +246,7 @@ target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign
-SUBDIRS = libltdl . tests examples
+SUBDIRS = libltdl . tests rtests examples
 INCLUDES = $(INCLTDL)
 EXTRA_DIST = 
 lib_LTLIBRARIES = libevpath.la
@@ -854,7 +855,7 @@ uninstall-am: uninstall-binPROGRAMS uninstall-includeHEADERS \
 
 
 cm_interface.c: evpath.h gen_interface.pl
-	perl ./gen_interface.pl
+	@PERL@ ./gen_interface.pl
 @KERNEL_TRUE@install-exec-local: cm_module.o
 @KERNEL_TRUE@		install -d /lib/modules/@KERNEL_VERSION@/misc /lib/modules/misc
 @KERNEL_TRUE@		install -c cm_module.o /lib/modules/@KERNEL_VERSION@/misc

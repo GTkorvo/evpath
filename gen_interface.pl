@@ -384,8 +384,12 @@ EOF
 	defined($remote_enabled{$subr}) || next;
 
 	print REVPH "\nextern $return_type{$subr}\n";
-	@args = split( ", ",  $arguments{$subr});
-	print REVPH "R$subr(CMConnection conn, $args[1]);\n";
+	@args = split( ", ",  $arguments{$subr}, 2);
+	if ($#args > 0) {
+	    print REVPH "R$subr(CMConnection conn, $args[1]);\n";
+	} else {
+	    print REVPH "R$subr(CMConnection conn);\n";
+	}
 	gen_type(${subr}, $arguments{$subr});
 	gen_field_list(${subr}, $arguments{$subr});
 	gen_stub(${subr}, $arguments{$subr});
