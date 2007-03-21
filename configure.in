@@ -85,20 +85,12 @@ esac
 
 dnl Enable building of the convenience library
 dnl and set LIBLTDL accordingly
+LT_CONFIG_LTDL_DIR([libltdl], [recursive])
 LTDL_CONVENIENCE
-dnl Substitute INCLTDL and LIBLTDL in the Makefiles
-AC_SUBST(INCLTDL)
-AC_SUBST(LIBLTDL)
-dnl Check for dlopen support
-AC_LIBTOOL_DLOPEN
-dnl Configure libtool
-LT_INIT([dlopen win32-dll])
-AC_SUBST(LIBTOOL_DEPS)
-LT_LIB_M
-
-LT_CONFIG_LTDL_DIR([libltdl])
+LT_INIT([dlopen])
 LT_WITH_LTDL
 test -n "$LIBTOOL" && LIBTOOL="$LIBTOOL --silent"
+AC_SUBST(LIBTOOL_DEPS)
 
 dnl Configure libltdl
 AC_CHECK_PROGS(TAGS, etags ctags, echo)
@@ -186,5 +178,5 @@ USE_PTHREADS="yes"
 fi
 
 dnl Output the makefile
-AC_CONFIG_FILES([Makefile tests/Makefile rtests/Makefile examples/Makefile])
+AC_CONFIG_FILES([Makefile libltdl/Makefile tests/Makefile rtests/Makefile examples/Makefile])
 AC_OUTPUT

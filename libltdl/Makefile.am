@@ -1,4 +1,4 @@
-## Makefile.am -- Process this file with automake to produce Makefile.in
+##  -- Process this file with automake to produce 
 ##
 ## Copyright (C) 2003, 2004, 2005 Free Software Foundation, Inc.
 ##
@@ -128,16 +128,10 @@ CLEANFILES		       += libltdl.la \
 CLEANFILES	       += $(LIBOBJS) $(LTLIBOBJS)
 
 EXTRA_DIST	       += COPYING.LIB \
-			  configure.ac \
-			  Makefile.am \
-			  aclocal.m4 \
-			  Makefile.in \
-			  configure \
-			  config-h.in \
 			  README
 
 ## --------------------------- ##
-## Gnulib Makefile.am snippets ##
+## Gnulib  snippets ##
 ## --------------------------- ##
 
 BUILT_SOURCES	+= $(ARGZ_H)

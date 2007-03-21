@@ -39,8 +39,50 @@
 /* define if struct hostent is declared in netdb.h or winsock.h */
 #undef HAS_STRUCT_HOSTENT
 
+/* Define to 1 if you have the `argz_append' function. */
+#undef HAVE_ARGZ_APPEND
+
+/* Define to 1 if you have the `argz_create_sep' function. */
+#undef HAVE_ARGZ_CREATE_SEP
+
+/* Define to 1 if you have the <argz.h> header file. */
+#undef HAVE_ARGZ_H
+
+/* Define to 1 if you have the `argz_insert' function. */
+#undef HAVE_ARGZ_INSERT
+
+/* Define to 1 if you have the `argz_next' function. */
+#undef HAVE_ARGZ_NEXT
+
+/* Define to 1 if you have the `argz_stringify' function. */
+#undef HAVE_ARGZ_STRINGIFY
+
+/* Define to 1 if you have the `closedir' function. */
+#undef HAVE_CLOSEDIR
+
+/* Define to 1 if you have the <dirent.h> header file. */
+#undef HAVE_DIRENT_H
+
+/* Define if you have the GNU dld library. */
+#undef HAVE_DLD
+
+/* Define to 1 if you have the <dld.h> header file. */
+#undef HAVE_DLD_H
+
+/* Define to 1 if you have the `dlerror' function. */
+#undef HAVE_DLERROR
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
+
+/* Define to 1 if you have the <dl.h> header file. */
+#undef HAVE_DL_H
+
+/* Define if you have the _dyld_func_lookup function. */
+#undef HAVE_DYLD
+
+/* Define to 1 if the system has the type `error_t'. */
+#undef HAVE_ERROR_T
 
 /* Define if fd_set has element fds_bits */
 #undef HAVE_FDS_BITS
@@ -54,11 +96,20 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
+/* Define if you have the libdl library or equivalent. */
+#undef HAVE_LIBDL
+
+/* Define if libdlloader will be built on this platform */
+#undef HAVE_LIBDLLOADER
+
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 #undef HAVE_LIBPTHREAD
 
 /* Define this if a modern libltdl is already installed */
 #undef HAVE_LTDL
+
+/* Define to 1 if you have the <mach-o/dyld.h> header file. */
+#undef HAVE_MACH_O_DYLD_H
 
 /* Define to 1 if you have the <malloc.h> header file. */
 #undef HAVE_MALLOC_H
@@ -72,8 +123,20 @@
 /* Define to 1 if you have the <netdb.h> header file. */
 #undef HAVE_NETDB_H
 
+/* Define to 1 if you have the `opendir' function. */
+#undef HAVE_OPENDIR
+
+/* Define if libtool can extract symbol lists from object files. */
+#undef HAVE_PRELOADED_SYMBOLS
+
 /* Define to 1 if you have the <pwd.h> header file. */
 #undef HAVE_PWD_H
+
+/* Define to 1 if you have the `readdir' function. */
+#undef HAVE_READDIR
+
+/* Define if you have the shl_load function. */
+#undef HAVE_SHL_LOAD
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
@@ -89,6 +152,15 @@
 
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
+
+/* Define to 1 if you have the `strlcat' function. */
+#undef HAVE_STRLCAT
+
+/* Define to 1 if you have the `strlcpy' function. */
+#undef HAVE_STRLCPY
+
+/* Define to 1 if you have the <sys/dl.h> header file. */
+#undef HAVE_SYS_DL_H
 
 /* Define to 1 if you have the <sys/resource.h> header file. */
 #undef HAVE_SYS_RESOURCE_H
@@ -126,9 +198,25 @@
 /* define if listen is declared in sys/socket.h */
 #undef LISTEN_DEFINED
 
+/* Define if the OS needs help to load dependent libraries for dlopen(). */
+#undef LTDL_DLOPEN_DEPLIBS
+
+/* Define to the system default library search path. */
+#undef LT_DLSEARCH_PATH
+
+/* Define to the extension used for runtime loadable modules, say, ".so". */
+#undef LT_MODULE_EXT
+
+/* Define to the name of the environment variable that determines the run-time
+   module search path. */
+#undef LT_MODULE_PATH_VAR
+
 /* Define to the sub-directory in which libtool stores uninstalled libraries.
    */
 #undef LT_OBJDIR
+
+/* Define if dlsym() requires a leading underscore in symbol names. */
+#undef NEED_USCORE
 
 /* Name of package */
 #undef PACKAGE
@@ -193,8 +281,14 @@
 /* Define this if compiling for linux kernel */
 #undef __KERNEL__
 
+/* Define so that glibc/gnulib argp.h does not typedef error_t. */
+#undef __error_t_defined
+
 /* Define to empty if `const' does not conform to ANSI C. */
 #undef const
+
+/* Define to a type to use for `error_t' if it is not otherwise available. */
+#undef error_t
 
 /* Define to `int' if <sys/types.h> does not define. */
 #undef pid_t
