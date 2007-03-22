@@ -2741,6 +2741,7 @@ EVPinit(CManager cm)
             cm->evp->use_backpressure = 0;
         }
     }
+    REVPinit(cm);
 }
 
     

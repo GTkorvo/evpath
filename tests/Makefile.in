@@ -40,7 +40,8 @@ TESTS = evtest$(EXEEXT) bulktest$(EXEEXT) http_test$(EXEEXT) \
 noinst_PROGRAMS = $(am__EXEEXT_1) thin_client$(EXEEXT) \
 	congestion_test$(EXEEXT) congest_bulktest$(EXEEXT) \
 	multiq_test$(EXEEXT) store_send_test$(EXEEXT) \
-	store_limit_test$(EXEEXT) store_pressure_test$(EXEEXT)
+	store_limit_test$(EXEEXT) store_pressure_test$(EXEEXT) \
+	block_test$(EXEEXT)
 subdir = tests
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -67,6 +68,10 @@ auto_test_SOURCES = auto_test.c
 auto_test_OBJECTS = auto_test.$(OBJEXT)
 auto_test_LDADD = $(LDADD)
 auto_test_DEPENDENCIES = ../libevpath.la
+block_test_SOURCES = block_test.c
+block_test_OBJECTS = block_test.$(OBJEXT)
+block_test_LDADD = $(LDADD)
+block_test_DEPENDENCIES = ../libevpath.la
 bulktest_SOURCES = bulktest.c
 bulktest_OBJECTS = bulktest.$(OBJEXT)
 bulktest_LDADD = $(LDADD)
@@ -149,12 +154,13 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = auto_test.c bulktest.c congest_bulktest.c congestion_test.c \
-	evtest.c extract_test.c filter2_test.c filter_test.c \
-	http_test.c multiq_test.c router_test.c router_test2.c \
-	store_limit_test.c store_pressure_test.c store_send_test.c \
-	submit_test.c thin_client.c thin_test.c transform_test.c
-DIST_SOURCES = auto_test.c bulktest.c congest_bulktest.c \
+SOURCES = auto_test.c block_test.c bulktest.c congest_bulktest.c \
+	congestion_test.c evtest.c extract_test.c filter2_test.c \
+	filter_test.c http_test.c multiq_test.c router_test.c \
+	router_test2.c store_limit_test.c store_pressure_test.c \
+	store_send_test.c submit_test.c thin_client.c thin_test.c \
+	transform_test.c
+DIST_SOURCES = auto_test.c block_test.c bulktest.c congest_bulktest.c \
 	congestion_test.c evtest.c extract_test.c filter2_test.c \
 	filter_test.c http_test.c multiq_test.c router_test.c \
 	router_test2.c store_limit_test.c store_pressure_test.c \
@@ -314,9 +320,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  --ignore-deps tests/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  tests/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign  --ignore-deps tests/Makefile
+	  $(AUTOMAKE) --foreign  tests/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -344,6 +350,9 @@ clean-noinstPROGRAMS:
 auto_test$(EXEEXT): $(auto_test_OBJECTS) $(auto_test_DEPENDENCIES) 
 	@rm -f auto_test$(EXEEXT)
 	$(LINK) $(auto_test_OBJECTS) $(auto_test_LDADD) $(LIBS)
+block_test$(EXEEXT): $(block_test_OBJECTS) $(block_test_DEPENDENCIES) 
+	@rm -f block_test$(EXEEXT)
+	$(LINK) $(block_test_OBJECTS) $(block_test_LDADD) $(LIBS)
 bulktest$(EXEEXT): $(bulktest_OBJECTS) $(bulktest_DEPENDENCIES) 
 	@rm -f bulktest$(EXEEXT)
 	$(LINK) $(bulktest_OBJECTS) $(bulktest_LDADD) $(LIBS)
@@ -670,7 +679,7 @@ uninstall-am:
 	tags uninstall uninstall-am
 
 
-check-local:
+check-local: block_test evtest
 	@if CMTransport=udp ./evtest$(EXEEXT) ; then\
 	 echo "PASS: evtest(udp)";\
 	else echo "FAIL: evtest(udp)"; fi

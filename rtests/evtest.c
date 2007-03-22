@@ -164,7 +164,6 @@ handshake_with_parent(CManager cm, attr_list parent_contact_list)
     alive.contact = attr_list_to_string(CMget_contact_list(cm));
     alive_format = CMregister_format(cm, "alive", alive_fields, NULL);
     CMwrite(conn, alive_format, &alive);
-    CMConnection_close(conn);
 }
 
 int
@@ -195,7 +194,6 @@ char **argv;
     if (be_the_child) {
 	CManager cm = CManager_create();
 	attr_list parent_contact_list = attr_list_from_string(argv[1]);
-	REVinit(cm);
 	handshake_with_parent(cm, parent_contact_list);
 /*    (void) CMfork_comm_thread(cm);*/
 	CMsleep(cm, 20);
@@ -260,7 +258,6 @@ static void
 alive_handler(CManager cm, CMConnection conn, void *alive_v, 
 	      void *client_data, attr_list attrs)
 {
-    alive_msg_t *alive = alive_v;
     EVstone stone, output_stone;
     EVaction action;
     EVstone local_stone;
@@ -311,7 +308,6 @@ do_regression_master_test()
 		 (attr_value) strdup(postfix));
     }
     CMlisten_specific(cm, listen_list);
-    REVinit(cm);
     contact_list = CMget_contact_list(cm);
     if (contact_list) {
 	string_list = attr_list_to_string(contact_list);

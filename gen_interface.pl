@@ -60,12 +60,14 @@ sub gen_field_list
 	  switch:for ($argtype) {
 	      /attr_list/ && do {$iotype = "string"; $argtype="char*"; last;};
 	      /char*/ && do {$iotype = "string"; $argtype="char*"; last;};
+	      /int/ && do {$iotype = "integer"; $argtype="int"; last;};
 	      /EVstone/ && do {$iotype = "integer"; $argtype="EVstone"; last;};
+	      /EVaction/ && do {$iotype = "integer"; $argtype="EVaction"; last;};
 	  }
 	}
 	print REVP "    {\"$argname\", \"$iotype\", sizeof($sizetype), IOOffset(${subr}_request*,$argname)},\n";
     }
-    print REVP "};\n";
+    print REVP "    {NULL, NULL, 0, 0}\n};\n";
 }
 
 sub gen_stub {
@@ -79,32 +81,6 @@ sub gen_stub {
 	print REVP "R$subr(CMConnection conn)\n";
     }
     print REVP "{\n";
-    undef $cmanager;
-    undef $cmconnection;
-    undef $evsource;
-    undef $cmtaskhandle;
-    undef $cmformat;
-    foreach $arg (split ( ",", $arg_str)) {
-	$_ = $arg;
-	if (/\W+(\w+)\W*$/) {
-	    $name = $1;
-	}
-	if (/CManager/) {
-	    $cmanager = $name;
-	}
-	if (/CMConnection/) {
-	    $cmconnection = $name;
-	}
-	if (/EVsource/) {
-	    $evsource = $name;
-	}
-	if (/CMTaskHandle/) {
-	    $cmtaskhandle = $name;
-	}
-	if ((/CMFormat/) && (!/CMFormatList/)){
-	    $cmformat = $name;
-	}
-    }
     
     $_ = $return_type{$subr};
     if (/^\s*void\s*$/) {
@@ -136,8 +112,9 @@ sub gen_stub {
 	}
 	print REVP "    request.$argname = $argright;\n";
     }
+    print REVP "    request.condition_var = cond;\n";
     print REVP "    if (f == NULL) {\n";
-    print REVP "        f = CMregister_format(conn->cm, \"${subr}_request\", ${subr}_req_flds,\n";
+    print REVP "        f = CMregister_format(conn->cm, \"EV_${subr}_request\", ${subr}_req_flds,\n";
     print REVP "			      all_subformats_list);\n";
     print REVP "    }\n";
     print REVP "    CMCondition_set_client_data(conn->cm, cond, &response);\n"  unless ($return_type{$subr} eq "void");
@@ -152,6 +129,97 @@ sub gen_stub {
       /EVevent_list/ && do {print REVP "    return response->ret;\n"; last;};
   }
     print REVP "}\n";
+}
+
+sub gen_handler {
+    my($subr, $arg_str, $has_client_data) = @_;
+    my(@args);
+    @args = split( ", ",  $arg_str,2);
+    print REVP "\nstatic void\n";
+    print REVP "R${subr}_handler(CManager cm, CMConnection conn, void *data,void *client_data,attr_list attrs)\n";
+    $handler_register_string = "$handler_register_string\
+    tmp_format = CMregister_format(cm, \"EV_${subr}_request\",\
+				   ${subr}_req_flds, NULL);\
+    CMregister_handler(tmp_format, R${subr}_handler, cm->evp);\n";
+
+    print REVP "{\n";
+    $_ = $return_type{$subr};
+    if (/^\s*void\s*$/) {
+	$return_type{$subr} = "void";
+    }
+    $retsubtype = $return_type{$subr};
+  switch:  for ($ret_type) {
+      /attr_list/ && do {$retsubtype = "string"; $ret_type="char*"; last;};
+      /char*/ && do {$retsubtype = "string"; $ret_type="char*"; last;};
+      /EVstone/ && do {$retsubtype = "int"; $ret_type="EVstone"; last;};
+      /EVaction/ && do {$retsubtype = "int"; $ret_type="EVaction"; last;};
+    }
+    print REVP "    EV_${retsubtype}_response response;\n";
+    print REVP "    ${subr}_request *request = (${subr}_request *) data;\n";
+    print REVP "    $return_type{$subr} ret;\n" unless ($return_type{$subr} eq "void");
+    print REVP "    CMFormat f = CMlookup_format(conn->cm, EV_${retsubtype}_response_flds);\n";
+    print REVP "    if (f == NULL) {\n";
+    print REVP "        f = CMregister_format(conn->cm, \"EV_${retsubtype}_response\", EV_${retsubtype}_response_flds,\n";
+    print REVP "			      all_subformats_list);\n";
+    print REVP "    }\n";
+    foreach $arg (split (", ", $args[1])) {
+	$_ = $arg;
+	if (/^\s*(.*\W+)(\w+)$\s*/) {
+	    $argtype = $1;
+	    $argname = $2;
+	    $argtype =~ s/\s+$//;
+	    $argtype =~ s/(?!\w)\s+(?=\W)//;  #remove unnecessary white space
+	    $argtype =~ s/(?!\W)\s+(?=\w)//;  #remove unnecessary white space
+	    $argright = $argname;
+	  switch:for ($argtype) {
+	      /attr_list/ && do {print REVP "    attr_list $argname = attr_list_from_string(request->$argname);\n"; last;};
+	  }
+	}
+    }
+    if ($return_type{$subr} eq "void") {
+	print REVP "    $subr(cm";
+    } else {
+	print REVP "    ret = $subr(cm";
+    }
+    foreach $arg (split (", ", $args[1])) {
+	$_ = $arg;
+	if (/^\s*(.*\W+)(\w+)$\s*/) {
+	    $argtype = $1;
+	    $argname = $2;
+	    $argtype =~ s/\s+$//;
+	    $argtype =~ s/(?!\w)\s+(?=\W)//;  #remove unnecessary white space
+	    $argtype =~ s/(?!\W)\s+(?=\w)//;  #remove unnecessary white space
+	    $argright = "request->$argname";
+	  switch:for ($argtype) {
+	      /attr_list/ && do {$argright = "$argname"; last;};
+	  }
+	}
+	print REVP ", $argright";
+    }
+    if ($has_client_data == 1) {print REVP ", NULL";}
+    print REVP ");\n";
+  switch:for ($return_type{$subr}) {
+      /attr_list/ && do {print REVP "    response.ret = attr_list_to_string(ret);\n"; last;};
+      /void/ && do {last;};
+      /EVstone/ && do {print REVP "    response.ret = (int)ret;\n"; last;};
+      /EVaction/ && do {print REVP "    response.ret = (int) ret;\n"; last;};
+      /int/ && do {print REVP "    response.ret = ret;;\n"; last;};
+      /EVevent_list/ && do {print REVP "    response.ret = ret;\n"; last;};
+  }
+    print REVP "    response.condition_var = request->condition_var;\n";
+    print REVP "    CMwrite(conn, f, &response);\n";
+    print REVP "}\n";
+}
+
+sub strip_client_data {
+    my($arg_str) = @_;
+    local(@args);
+    @args = split( ", ",  $arguments{$subr});
+    $_ = pop(@args);
+    if (!/.*client_data\W*$/) {
+	push(@args, $_);
+    }
+    $arg_str = join(", ", @args);
 }
 
 {
@@ -363,15 +431,32 @@ typedef struct _EV_void_response {
     int condition_var;
 } EV_void_response;
 
+IOField  EV_void_response_flds[] = {
+    {"condition_var", "integer", sizeof(int), IOOffset(EV_void_response*, condition_var)},
+    {NULL, NULL, 0, 0}
+};
+
 typedef struct _EV_int_response {
     int condition_var;
     int  ret;
 } EV_int_response;
 
+IOField  EV_int_response_flds[] = {
+    {"condition_var", "integer", sizeof(int), IOOffset(EV_int_response*, condition_var)},
+    {"ret", "integer", sizeof(EVstone), IOOffset(EV_int_response*,ret)},
+    {NULL, NULL, 0, 0}
+};
+
 typedef struct _EV_string_response {
     int condition_var;
     char *ret;
 } EV_string_response;
+
+IOField  EV_string_response_flds[] = {
+    {"condition_var", "integer", sizeof(int), IOOffset(EV_string_response*, condition_var)},
+    {"ret", "string", sizeof(char*), IOOffset(EV_string_response*,ret)},
+    {NULL, NULL, 0, 0}
+};
 
 typedef struct _EV_EVevent_list_response {
     int condition_var;
@@ -379,27 +464,67 @@ typedef struct _EV_EVevent_list_response {
     EVevent_list ret;
 } EV_EVevent_list_response;
 
+IOField  EV_EVevent_list_response_flds[] = {
+    {"condition_var", "integer", sizeof(int), IOOffset(EV_EVevent_list_response*, condition_var)},
+    {"ret_len", "integer", sizeof(int), IOOffset(EV_EVevent_list_response*,ret_len)},
+    {"ret", "string", sizeof(char*), IOOffset(EV_EVevent_list_response*,ret)},
+    {NULL, NULL, 0, 0}
+};
+
 EOF
     foreach $subr (keys %return_type) {
 	defined($remote_enabled{$subr}) || next;
 
 	print REVPH "\nextern $return_type{$subr}\n";
-	@args = split( ", ",  $arguments{$subr}, 2);
+	$no_client_data = strip_client_data($arguments{$subr});
+	$_ = $arguments{$subr};
+	$has_client_data = 0;
+	if (/.*client_data\W*$/) {
+	    $has_client_data = 1;
+	}
+	@args = split( ", ",  $no_client_data, 2);
 	if ($#args > 0) {
 	    print REVPH "R$subr(CMConnection conn, $args[1]);\n";
 	} else {
 	    print REVPH "R$subr(CMConnection conn);\n";
 	}
-	gen_type(${subr}, $arguments{$subr});
-	gen_field_list(${subr}, $arguments{$subr});
-	gen_stub(${subr}, $arguments{$subr});
+	gen_type(${subr}, $no_client_data);
+	gen_field_list(${subr}, $no_client_data);
+	gen_stub(${subr}, $no_client_data);
+	gen_handler(${subr}, $no_client_data, $has_client_data);
     }
-print "done\n";
 
-print INT<<EOF;
-#ifdef	__cplusplus
-\}
-#endif
+print REVP<<EOF;
+static void
+REV_response_handler(CManager cm, CMConnection conn, void *data,void *client_data,attr_list attrs)
+{
+    EV_void_response *response = (EV_void_response*) data;
+    CMtake_buffer(cm, data);
+    void **response_ptr = CMCondition_get_client_data(cm, response->condition_var);
+    *response_ptr = data;
+    CMCondition_signal(cm, response->condition_var);
+}
+
+
+extern void
+REVPinit(CManager cm)
+{
+    CMFormat tmp_format;
+$handler_register_string
+    tmp_format = CMregister_format(cm, "EV_int_response",
+				   EV_int_response_flds, NULL);
+    CMregister_handler(tmp_format, REV_response_handler, cm->evp);
+
+    tmp_format = CMregister_format(cm, "EV_void_response",
+				   EV_void_response_flds, NULL);
+    CMregister_handler(tmp_format, REV_response_handler, cm->evp);
+
+    tmp_format = CMregister_format(cm, "EV_string_response",
+				   EV_string_response_flds, NULL);
+    CMregister_handler(tmp_format, REV_response_handler, cm->evp);
+
+    tmp_format = CMregister_format(cm, "EV_EVevent_list_response",
+				   EV_EVevent_list_response_flds, NULL);
+    CMregister_handler(tmp_format, REV_response_handler, cm->evp);
+}
 EOF
-close INT;
-close FIXUP;

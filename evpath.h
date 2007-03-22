@@ -1561,7 +1561,6 @@ EVfree_stone(CManager cm, EVstone stone);
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
  */
-/*REMOTE*/
 extern EVaction
 EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
@@ -1585,7 +1584,6 @@ EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list,
  * \return The stone identifier, an integer EVstone value, which can be used
  * in subsequent calls.
  */
-/*REMOTE*/
 extern EVstone
 EVcreate_terminal_action(CManager cm, CMFormatList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
