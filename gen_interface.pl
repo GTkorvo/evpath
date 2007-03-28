@@ -117,7 +117,11 @@ sub gen_stub {
     print REVP "        f = CMregister_format(conn->cm, \"EV_${subr}_request\", ${subr}_req_flds,\n";
     print REVP "			      all_subformats_list);\n";
     print REVP "    }\n";
-    print REVP "    CMCondition_set_client_data(conn->cm, cond, &response);\n"  unless ($return_type{$subr} eq "void");
+    if ($return_type{$subr} eq "void") {
+	print REVP "    CMCondition_set_client_data(conn->cm, cond, NULL);\n";
+    } else {
+	print REVP "    CMCondition_set_client_data(conn->cm, cond, &response);\n";
+    }
     print REVP "    CMwrite(conn, f, &request);\n";
     print REVP "    CMCondition_wait(conn->cm, cond);\n";
   switch:for ($return_type{$subr}) {
@@ -501,7 +505,9 @@ REV_response_handler(CManager cm, CMConnection conn, void *data,void *client_dat
     EV_void_response *response = (EV_void_response*) data;
     CMtake_buffer(cm, data);
     void **response_ptr = CMCondition_get_client_data(cm, response->condition_var);
-    *response_ptr = data;
+    if (NULL != response_ptr) {
+	*response_ptr = data;
+    }
     CMCondition_signal(cm, response->condition_var);
 }
 
