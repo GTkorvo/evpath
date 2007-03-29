@@ -3,7 +3,7 @@ AUTOMAKE_OPTIONS = no-dependencies foreign
 
 TESTS = evtest
 
-check-local:
+not-really-check-local:
 	@if CMTransport=udp ./evtest$(EXEEXT) ; then\
 	 echo "PASS: evtest(udp)";\
 	else echo "FAIL: evtest(udp)"; fi
