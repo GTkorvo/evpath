@@ -1514,6 +1514,9 @@ typedef struct _EVSource *EVsource;
 typedef int (*EVSimpleHandlerFunc) ARGS((CManager cm, 
 					  void *message, void *client_data,
 					  attr_list attrs));
+typedef int (*EVRawHandlerFunc) ARGS((CManager cm, void *message, 
+				      int msg_len, void *client_data,
+				      attr_list attrs));
 struct _event_item;
 
 /*!
@@ -1564,6 +1567,27 @@ EVfree_stone(CManager cm, EVstone stone);
 extern EVaction
 EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
+
+/*!
+ * Associate a raw terminal action (sink) with a stone.
+ *
+ * The specified handler will be called when any data.  Data is delivered in
+ * PBIO-encoded form using the EVRawHandlerFunc interface. The event data
+ * supplied may not remain valid after the handler call returns.
+ * EVtake_event_buffer() may be used to ensure longer-term validity of the
+ * event data.  The parameters to the handler are those of
+ * EVRawHandlerFunc.
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The stone to which to register the action.
+ * \param handler The handler function that will be called with data arrives.
+ * \param client_data An uninterpreted value that is passed to the hanlder
+ * function when it is called.
+ * \return An action identifier, an integer EVaction value, which can be used
+ * in subsequent calls to modify or remove the action.
+ */
+extern EVaction
+EVassoc_raw_terminal_action(CManager cm, EVstone stone, 
+			    EVRawHandlerFunc handler, void* client_data);
 
 /*!
  * Associate a terminal action (sink) with a new stone.
