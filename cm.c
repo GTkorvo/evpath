@@ -2102,7 +2102,6 @@ INT_CMwrite_raw(CMConnection conn, IOEncodeVector full_vec, IOEncodeVector data_
             queue_remaining_write(conn, full_vec, data_vec, vec_count, 
                                   attrs, actual_bytes, attrs != NULL);
             conn->trans->set_write_notify(conn->trans, &CMstatic_trans_svcs, conn->transport_data, 1);
-            printf("queued write\n");
             conn->write_pending = 1;
             CMtrace_out(conn->cm, CMLowLevelVerbose, 
                         "Partial write, queued %d bytes",
