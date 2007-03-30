@@ -220,6 +220,8 @@ struct _CMConnection {
     struct queued_data_rec queued_data;
     int write_pending;
     int do_non_blocking_write;
+
+    int use_read_thread;
 };
 
 struct _CMFormat {
@@ -294,6 +296,7 @@ extern void free_CMFormat ARGS((CMFormat format));
 extern void CMcomplete_format_registration ARGS((CMFormat format, int lock));
 extern int CMcontrol_list_wait ARGS((CMControlList cl));
 extern int load_transport ARGS((CManager cm, const char *trans_name));
+extern transport_entry add_transport_to_cm ARGS((CManager cm, transport_entry trans));
 
 extern int CMinternal_listen ARGS((CManager cm, attr_list listen_info));
 extern CMConnection CMinternal_get_conn ARGS((CManager cm, attr_list attrs));
@@ -546,6 +549,7 @@ extern int INT_EVstore_count(CManager cm, EVstone stone_num, EVaction action_num
 extern int INT_EVdestroy_stone(CManager cm, EVstone stone_id);
 extern void INT_EVfree_source(EVsource source);
 
+extern void INT_CMstart_read_thread(CMConnection conn);
 extern void INT_EVsend_stored(CManager cm, EVstone stone, EVaction action);
 extern void INT_EVclear_stored(CManager cm, EVstone stone, EVaction action);
 extern EVaction INT_EVassoc_store_action(CManager cm, EVstone stone, EVstone out_stone, int store_limit); 

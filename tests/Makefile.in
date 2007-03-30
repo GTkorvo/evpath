@@ -310,7 +310,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = no-dependencies foreign
 OLD_TESTS = cmtest cmping take_test store_limit_test store_send_test multiq_test congest_bulktest
-LDADD = ../libevpath.la
+LDADD = ../libevpath.la 
 thin_client_LDADD = -L@PBIODIR@ -lIO
 thin_test_DEPENDENCIES = ../libevpath.la thin_client
 all: all-am

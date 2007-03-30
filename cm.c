@@ -761,6 +761,7 @@ attr_list conn_attrs;
 {
     static int first = 1;
     static int non_block_default = 0;
+    static int read_thread_default = 0;
     int blocking_on_conn;
     CMConnection conn = INT_CMmalloc(sizeof(struct _CMConnection));
     if (first) {
@@ -771,6 +772,12 @@ attr_list conn_attrs;
 	    CMtrace_out(trans->cm, CMConnectionVerbose, "CM default blocking %d",
 			non_block_default);
 	}
+        value = cercs_getenv("CMReadThread");
+        if (value != NULL) {
+            sscanf(value, "%d", &read_thread_default);
+            CMtrace_out(trans->cm, CMConnectionVerbose, "CM default read thread %d",
+                        read_thread_default);
+        }
     }
     conn->cm = trans->cm;
     conn->trans = trans;
@@ -797,6 +804,8 @@ attr_list conn_attrs;
     conn->characteristics = NULL;
     conn->write_pending = 0;
     conn->do_non_blocking_write = non_block_default;
+
+    conn->use_read_thread = read_thread_default; 
     
     if (get_int_attr(conn_attrs, CM_CONN_BLOCKING, &blocking_on_conn)) {
 	conn->do_non_blocking_write = !blocking_on_conn;
@@ -1103,6 +1112,10 @@ try_conn_init(CManager cm, transport_entry trans, attr_list attrs)
 			attr_str);
 	    INT_CMfree(attr_str);
 	}
+    }
+
+    if (conn->use_read_thread) {
+        INT_CMstart_read_thread(conn);
     }
     return conn;
 }
@@ -1445,9 +1458,15 @@ CMConnection conn;
 	    int len = conn->buffer_full_point - conn->buffer_data_end;
 	    char *buf = (char*)conn->partial_buffer->buffer + conn->buffer_data_end;
 	    int actual;
+            if (conn->use_read_thread) {
+                CManager_unlock(cm);
+            }
             actual = trans->read_to_buffer_func(&CMstatic_trans_svcs, 
 						conn->transport_data, 
-						buf, len, !use_blocking_reads);
+						buf, len, !(conn->use_read_thread || use_blocking_reads));
+            if (conn->use_read_thread) {
+                CManager_lock(cm);
+            }
 	    if (actual == -1) {
 		CMtrace_out(cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d, failing connection %lx", actual, conn);
@@ -3137,6 +3156,10 @@ select_list_func handler_func;
 void *param1;
 void *param2;
 {
+    if (!handler_func) {
+        CMtrace_out(cm, EVWarning, "INT_CM_fd_add_select called with bogus notification function; ignored");
+        return;
+    }
     if (!cm->control_list->select_initialized) {
 	CM_init_select(cm->control_list, cm);
     }

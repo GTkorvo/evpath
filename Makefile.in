@@ -40,9 +40,9 @@ subdir = .
 DIST_COMMON = $(am__configure_deps) $(include_HEADERS) \
 	$(noinst_HEADERS) $(srcdir)/Makefile.am $(srcdir)/Makefile.in \
 	$(srcdir)/config.h.in $(top_srcdir)/configure ChangeLog \
-	libltdl/m4/config.guess libltdl/m4/config.sub \
-	libltdl/m4/depcomp libltdl/m4/install-sh libltdl/m4/ltmain.sh \
-	libltdl/m4/missing mkinstalldirs
+	libltdl/m4/compile libltdl/m4/config.guess \
+	libltdl/m4/config.sub libltdl/m4/depcomp libltdl/m4/install-sh \
+	libltdl/m4/ltmain.sh libltdl/m4/missing mkinstalldirs
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/config/argz.m4 \
 	$(top_srcdir)/config/cercs.m4 \
@@ -72,7 +72,8 @@ LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 am_libevpath_la_OBJECTS = cm.lo cm_control.lo cm_formats.lo cm_util.lo \
 	cm_transport.lo cm_lock.lo cm_pbio.lo cm_evol.lo evp.lo \
-	response.lo cm_interface.lo thin_server.lo version.lo revp.lo
+	response.lo cm_interface.lo thin_server.lo version.lo revp.lo \
+	cm_threadio.lo
 libevpath_la_OBJECTS = $(am_libevpath_la_OBJECTS)
 libevpath_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -259,7 +260,7 @@ lib_LTLIBRARIES = libevpath.la
 EXTRA_LTLIBRARIES = 
 libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c\
 		       cm_lock.c cm_pbio.c cm_evol.c evp.c response.c \
-		       cm_interface.c thin_server.c version.c revp.c
+		       cm_interface.c thin_server.c version.c revp.c cm_threadio.c
 
 libevpath_la_LDFLAGS = $(MATH_LIB)
 libevpath_la_LIBADD = $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lIO -lecl @SOCKET_LIBS@ @KERNEL_OBJS@ 
@@ -403,6 +404,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_interface.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_lock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_pbio.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_threadio.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_transport.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp.Plo@am__quote@

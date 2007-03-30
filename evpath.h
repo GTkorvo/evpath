@@ -2174,6 +2174,34 @@ EVcreate_auto_stone(CManager cm, int period_sec, int period_usec,
 
 
 /*!
+ * Cause a stone to become "stalled" explicitly. In this state, the stone
+ * will continue processing events as usual, but will propogate backpressure
+ * as if it were overloaded.
+ *
+ * A stone marked as stalled with EVstall_stone will remain stalled
+ * even as other sources of stalling (remote squelching, too many
+ * queued but unprocessed events) change.
+ *
+ * \param cm The CManager in which the stone is registered
+ * \param stone_id The stone to be marked as stalled
+ */
+/*REMOTE*/
+extern void
+EVstall_stone(CManager cm, EVstone stone_id);
+
+/*! 
+ * Undo EVstall_stone(), allowing the stone to become unstalled when other
+ * reasons for stalling are not present.
+ *
+ * \param cm The CManager in which the stone is registered
+ * \param stone_id The stone to unmark as stalled, which should have been marked
+ *                 as stalled with EVstall_stone()
+ */
+/*REMOTE*/
+extern void
+EVunstall_stone(CManager cm, EVstone stone_id); 
+
+/*!
  * Cause a stone to suspend operation
  *
  * This function causes a stone to enter a "suspended" state in which

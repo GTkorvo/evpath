@@ -23,7 +23,7 @@ extern struct CMtrans_services_s CMstatic_trans_svcs;
 
 static transport_entry *global_transports = NULL;
 
-static transport_entry
+transport_entry
 add_transport_to_cm(cm, transport)
 CManager cm;
 transport_entry transport;

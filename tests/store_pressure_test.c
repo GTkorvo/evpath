@@ -412,6 +412,15 @@ static void run_test(CManager cm) {
     else
         EVunfreeze_stone(cm, sink);
 
+    if (use_prefilter) {
+        EVstall_stone(cm, target);
+        last_count = drain(cm, storage);
+        if (last_count == 0) {
+            fail("No items left despite explicitly stalled filter");
+        }
+        EVunstall_stone(cm, target);
+    }
+
     last_count = drain(cm, storage);
 
     if (last_count != 0) {

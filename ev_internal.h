@@ -158,15 +158,24 @@ typedef struct response_cache_element {
     }o;
 } response_cache_element;
 
+typedef enum {
+    Stall_None      = 0,
+    Stall_Overload  = 1 << 0, /* too many queued messages */
+    Stall_Squelch   = 1 << 1, /* squelched by remote stone */
+    Stall_Requested = 1 << 2, /* requested explicitly (EVstall/unstall_stone) */
+    Stall_Upstream  = 1 << 3, /* upstream stalled while we were stalled; thus we need to make
+                                 special considerations when unstalling */
+} stall_source;
+
 typedef struct _stone {
     int local_id;
     int default_action;
     int is_frozen;
     int is_processing;
     int is_outputting;
-    int is_draining;
+    int is_draining; /* this is bizarrely trivalued (0, 1, 2) */
     int is_stalled; /* for backpressure */
-    int is_squelched; /* for backpressure */
+    stall_source stall_from; /* for backpressure */
     int queue_size; /* for backpressure */
     int pending_output; /* for storage; do we have pending events to push */
     int response_cache_count;
@@ -237,3 +246,6 @@ extern void return_event(event_path_data evp, event_item *event);
 extern void ecl_encode_event(CManager cm, event_item *event);
 extern event_item *ecl_decode_event(CManager cm, int stone_num, int act_num, event_item *event);
 extern void EVdiscard_queue_item(CManager cm, int stone, queue_item *item);
+
+extern void INT_EVstall_stone(CManager cm, EVstone stone_id);
+extern void INT_EVunstall_stone(CManager cm, EVstone stone_id);
