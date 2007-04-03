@@ -1463,7 +1463,7 @@ CMConnection conn;
             }
             actual = trans->read_to_buffer_func(&CMstatic_trans_svcs, 
 						conn->transport_data, 
-						buf, len, !(conn->use_read_thread || use_blocking_reads));
+						buf, len, !(conn->use_read_thread || 0));
             if (conn->use_read_thread) {
                 CManager_lock(cm);
             }
