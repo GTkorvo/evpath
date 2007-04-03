@@ -1401,6 +1401,7 @@ CMConnection conn;
     static int read_ahead_msg_limit = 50;
     static int read_ahead_byte_limit = 1024*1024;
     static int use_blocking_reads = 0;
+    int first_four = 0;
     char *buffer = NULL;
     int length;
 
@@ -1440,6 +1441,7 @@ CMConnection conn;
 	conn->partial_buffer = cm_get_data_buf(cm, 4);
 	conn->buffer_full_point = 4;
 	conn->buffer_data_end = 0;
+	first_four = 1;
 	CMtrace_out(cm, CMLowLevelVerbose, "CMdata beginning new read, expect 4");
     } else {
 	if (trans->read_to_buffer_func) {
@@ -1457,13 +1459,20 @@ CMConnection conn;
 	if (trans->read_to_buffer_func) {
 	    int len = conn->buffer_full_point - conn->buffer_data_end;
 	    char *buf = (char*)conn->partial_buffer->buffer + conn->buffer_data_end;
+	    /* 
+	     * non blocking is True only if :
+	     *    - we're reading the first four bytes (first_four is true) and use_read_thread is false
+	     *    - or use_blocking_reads is false and use_read_thread is false
+	     */
+	    int non_blocking = first_four || !use_blocking_reads;
 	    int actual;
             if (conn->use_read_thread) {
+	        non_blocking = 0;
                 CManager_unlock(cm);
             }
             actual = trans->read_to_buffer_func(&CMstatic_trans_svcs, 
 						conn->transport_data, 
-						buf, len, !(conn->use_read_thread || 0));
+						buf, len, non_blocking);
             if (conn->use_read_thread) {
                 CManager_lock(cm);
             }
