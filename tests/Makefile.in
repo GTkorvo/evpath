@@ -42,7 +42,7 @@ noinst_PROGRAMS = $(am__EXEEXT_1) thin_client$(EXEEXT) \
 	congestion_test$(EXEEXT) congest_bulktest$(EXEEXT) \
 	multiq_test$(EXEEXT) store_send_test$(EXEEXT) \
 	store_limit_test$(EXEEXT) store_pressure_test$(EXEEXT) \
-	block_test$(EXEEXT)
+	block_test$(EXEEXT) submit_wait_test$(EXEEXT)
 subdir = tests
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -138,6 +138,10 @@ submit_test_SOURCES = submit_test.c
 submit_test_OBJECTS = submit_test.$(OBJEXT)
 submit_test_LDADD = $(LDADD)
 submit_test_DEPENDENCIES = ../libevpath.la
+submit_wait_test_SOURCES = submit_wait_test.c
+submit_wait_test_OBJECTS = submit_wait_test.$(OBJEXT)
+submit_wait_test_LDADD = $(LDADD)
+submit_wait_test_DEPENDENCIES = ../libevpath.la
 thin_client_SOURCES = thin_client.c
 thin_client_OBJECTS = thin_client.$(OBJEXT)
 thin_client_DEPENDENCIES =
@@ -165,13 +169,13 @@ SOURCES = auto_test.c block_test.c bulktest.c congest_bulktest.c \
 	filter_test.c http_test.c multiq_test.c rawtest.c \
 	router_test.c router_test2.c store_limit_test.c \
 	store_pressure_test.c store_send_test.c submit_test.c \
-	thin_client.c thin_test.c transform_test.c
+	submit_wait_test.c thin_client.c thin_test.c transform_test.c
 DIST_SOURCES = auto_test.c block_test.c bulktest.c congest_bulktest.c \
 	congestion_test.c evtest.c extract_test.c filter2_test.c \
 	filter_test.c http_test.c multiq_test.c rawtest.c \
 	router_test.c router_test2.c store_limit_test.c \
 	store_pressure_test.c store_send_test.c submit_test.c \
-	thin_client.c thin_test.c transform_test.c
+	submit_wait_test.c thin_client.c thin_test.c transform_test.c
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -407,6 +411,9 @@ store_send_test$(EXEEXT): $(store_send_test_OBJECTS) $(store_send_test_DEPENDENC
 submit_test$(EXEEXT): $(submit_test_OBJECTS) $(submit_test_DEPENDENCIES) 
 	@rm -f submit_test$(EXEEXT)
 	$(LINK) $(submit_test_OBJECTS) $(submit_test_LDADD) $(LIBS)
+submit_wait_test$(EXEEXT): $(submit_wait_test_OBJECTS) $(submit_wait_test_DEPENDENCIES) 
+	@rm -f submit_wait_test$(EXEEXT)
+	$(LINK) $(submit_wait_test_OBJECTS) $(submit_wait_test_LDADD) $(LIBS)
 thin_client$(EXEEXT): $(thin_client_OBJECTS) $(thin_client_DEPENDENCIES) 
 	@rm -f thin_client$(EXEEXT)
 	$(LINK) $(thin_client_OBJECTS) $(thin_client_LDADD) $(LIBS)

@@ -66,6 +66,7 @@ INT_EValloc_stone(CManager cm)
     stone->stall_from = Stall_None;
     stone->last_remote_source = NULL;
     stone->squelch_depth = 0;
+    stone->unstall_callbacks = NULL;
     evp->stone_count++;
     return stone_num;
 }
@@ -1332,7 +1333,7 @@ process_events_stone(CManager cm, int s, action_class c)
 	do_output_action(cm, s);
 	return 0;
     }
-    while (item != NULL && stone->is_draining == 0) {
+    while (item != NULL && stone->is_draining == 0 && stone->is_frozen == 0) {
 	queue_item *next = item->next;
 	response_cache_element *resp;
 	response_cache_element *act = NULL;
@@ -1935,7 +1936,7 @@ INT_EVsend_stored(CManager cm, EVstone stone_num, EVaction action_num)
 static void
 deferred_process_actions(CManager cm, void *client_data) {
     CManager_lock(cm);
-    while (process_local_actions(cm)) printf("looping\n");
+    while (process_local_actions(cm));
     CManager_unlock(cm);
 }
 
@@ -2020,14 +2021,13 @@ struct source_info {
     EVstone to_stone;
     void *user_data;
     enum { SOURCE_ACTION, SOURCE_REMOTE } type;
+    EVstone stone;
     union {
         struct {
-            EVstone stone;
             EVaction action;
             int would_recurse;
         } action;
         struct {
-            EVstone target_stone;
             CMConnection conn;
         } remote;
     }u;
@@ -2048,7 +2048,7 @@ foreach_source_inner(CManager cm, EVstone to_stone, char *seen,
         if (cur_stone == to_stone) {
             if (stone->last_remote_source != NULL) {
                 info->type = SOURCE_REMOTE;
-                info->u.remote.target_stone = to_stone;
+                info->stone = cur_stone;
                 info->u.remote.conn = stone->last_remote_source;
                 cb(cm, info);
             }
@@ -2104,7 +2104,7 @@ foreach_source_inner(CManager cm, EVstone to_stone, char *seen,
                 }
                 if (matches) {
                     info->type = SOURCE_ACTION;
-                    info->u.action.stone = cur_stone;
+                    info->stone = cur_stone;
                     info->u.action.action = cur_action;
                     info->u.action.would_recurse = matches_recursive;
                     cb(cm, info);
@@ -2140,6 +2140,35 @@ backpressure_transition(CManager cm, EVstone s, stall_source src, int new_value)
 enum { CONTROL_SQUELCH, CONTROL_UNSQUELCH };
 
 static void
+register_backpressure_callback(CManager cm, EVstone s, EVSubmitCallbackFunc cb, void *user_data) {
+    stall_callback *new_cb = INT_CMmalloc(sizeof(stall_callback));
+    stone_type stone = &cm->evp->stone_map[s];
+    assert(CManager_locked(cm));
+    new_cb->cb = cb;
+    new_cb->user_data = user_data;
+    new_cb->next = stone->unstall_callbacks;
+    stone->unstall_callbacks = new_cb;
+}
+
+static void
+do_backpressure_unstall_callbacks(CManager cm, EVstone stone_id) {
+    stone_type stone = &cm->evp->stone_map[stone_id];
+    stall_callback *cur = stone->unstall_callbacks;
+    assert(CManager_locked(cm));
+    if (!cur) return;
+    stone->unstall_callbacks = NULL;
+    CManager_unlock(cm);
+    while (cur) {
+        stall_callback *next = cur->next;
+        (cur->cb)(cm, stone_id, cur->user_data);
+        INT_CMfree(cur);
+        cur = next;
+    }
+    CManager_lock(cm);
+}
+
+
+static void
 backpressure_set_one(CManager cm, struct source_info *info)
 {
     event_path_data evp = cm->evp;
@@ -2147,9 +2176,9 @@ backpressure_set_one(CManager cm, struct source_info *info)
     assert(as->events_in_play >= 0);
     int s = info->to_stone;
     stone_type to_stone = &evp->stone_map[s];
+    stone_type stone = &evp->stone_map[info->stone];
     switch (info->type) {
     case SOURCE_ACTION: {
-            stone_type stone = &evp->stone_map[info->u.action.stone];
             proto_action *act = &stone->proto_actions[info->u.action.action];
             
             if (info->u.action.would_recurse) {
@@ -2161,12 +2190,16 @@ backpressure_set_one(CManager cm, struct source_info *info)
                  * for them). 
                  */
                 if (to_stone->is_stalled) {
+                    printf("recurse stall %d\n", info->stone);
                     stone->is_stalled = 1;
+                } else {
+                    printf("recurse unstall %d\n", info->stone);
+                    do_backpressure_unstall_callbacks(cm, info->stone);
                 }
                 /* TODO for, e.g., split stones check that we should actually unstall it 
                  * (maybe just count our upstream stall depth?) 
                  */
-                backpressure_transition(cm, info->u.action.stone, Stall_Upstream, to_stone->is_stalled);
+                backpressure_transition(cm, info->stone, Stall_Upstream, to_stone->is_stalled);
             }
             switch (act->action_type) {
             case Action_Store:
@@ -2194,13 +2227,12 @@ backpressure_set_one(CManager cm, struct source_info *info)
         }
         break;
     case SOURCE_REMOTE: {
-            stone_type stone = &evp->stone_map[info->u.remote.target_stone];
             if (to_stone->is_stalled) {
                 if (stone->squelch_depth++ == 0) {
-                    INT_CMwrite_evcontrol(info->u.remote.conn, CONTROL_SQUELCH, info->u.remote.target_stone);
+                    INT_CMwrite_evcontrol(info->u.remote.conn, CONTROL_SQUELCH, info->stone);
                 }
             } else if (0 == --stone->squelch_depth) {
-                INT_CMwrite_evcontrol(info->u.remote.conn, CONTROL_UNSQUELCH, info->u.remote.target_stone);
+                INT_CMwrite_evcontrol(info->u.remote.conn, CONTROL_UNSQUELCH, info->stone);
             }
         }
         break;
@@ -2226,6 +2258,9 @@ backpressure_set(CManager cm, EVstone to_stone, int stalledp) {
     }
     */
     stone->is_stalled = stalledp;
+    if (!stalledp) {
+        do_backpressure_unstall_callbacks(cm, to_stone);
+    }
     foreach_source(cm, to_stone, backpressure_set_one, NULL);
 }
 
@@ -2256,15 +2291,40 @@ backpressure_check(CManager cm, EVstone s) {
     }
 }
 
+int
+INT_EVsubmit_or_wait(EVsource source, void *data, attr_list attrs,
+                    EVSubmitCallbackFunc cb, void *user_data) {
+    CManager cm = source->cm;
+    stone_type stone = &cm->evp->stone_map[source->local_stone_id];
+    if (stone->is_stalled) {
+        register_backpressure_callback(source->cm, source->local_stone_id, cb, user_data);
+        return 0;
+    } else {
+        INT_EVsubmit(source, data, attrs);
+        return 1;
+    }
+}
+
+int
+INT_EVsubmit_encoded_or_wait(CManager cm, EVstone s, void *data, int data_len, 
+                    attr_list attrs, EVSubmitCallbackFunc cb, void *user_data) {
+    stone_type stone = &cm->evp->stone_map[s];
+    if (stone->is_stalled) {
+        register_backpressure_callback(cm, s, cb, user_data);
+        return 0;
+    } else {
+        INT_EVsubmit_encoded(cm, s, data, data_len, attrs);
+        return 1;
+    }
+}
+
 void
 INT_EVstall_stone(CManager cm, EVstone s) {
-    event_path_data evp = cm->evp;
     backpressure_transition(cm, s, Stall_Requested, 1);
 }
 
 void
 INT_EVunstall_stone(CManager cm, EVstone s) {
-    event_path_data evp = cm->evp;
     backpressure_transition(cm, s, Stall_Requested, 0);
 }
 

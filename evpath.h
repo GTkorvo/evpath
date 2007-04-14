@@ -175,6 +175,7 @@ typedef void (*CMWriteCallbackFunc) ARGS((CManager cm, CMConnection conn,
 					  void *client_data));
 
 
+
 /*!
  * create a CManager.
  *
@@ -1496,6 +1497,18 @@ typedef int EVaction;
 typedef struct _EVSource *EVsource;
 
 /*!
+ * The prototype for a EV submit callback function. 
+ *
+ * Used by EVsubmit_or_wait() 
+ * \param cm The CManager with which this callback function was registered.
+ * \param target The target stone that can now submit without stalling.
+ * \param client_data This value is the same client_data value that was
+ * supplied in the call.
+ */
+typedef void (*EVSubmitCallbackFunc) ARGS((CManager cm, EVstone target, 
+					  void *client_data));
+
+/*!
  * The prototype for an EVPath terminal handler function.
  *
  * EVPath allows application-routines matching this prototype to be 
@@ -2200,6 +2213,33 @@ EVstall_stone(CManager cm, EVstone stone_id);
 /*REMOTE*/
 extern void
 EVunstall_stone(CManager cm, EVstone stone_id); 
+
+/*!
+ * If the stone pointed to by the source handle is not stalled, submit normally
+ * and return true; otherwise, return false and call the supplied callback when it
+ * is no longer stalled.
+ * \param source The EVsource handle through which data is to be submitted.
+ * \param data The data to be submitted, represented as a void*.
+ * \param attrs The attribute list to be submitted with the data. 
+ * \param cb The function to call if the submit cannot be performed now.
+ * \param user_data Passed as a parameter to the callback.
+ */
+extern int
+EVsubmit_or_wait(EVsource source, void *data, attr_list attrs, EVSubmitCallbackFunc cb, void *user_data);
+
+/*!
+ * As EVsubmit_or_wait, but as if calling EVsubmit_encoded. 
+ * \param cm The CManager with which the target stone is registered
+ * \param stone The target stone id
+ * \param data The data to be submitted, represented as a void*.
+ * \param data_size The length of the pre-encoded data.
+ * \param attrs The attribute list to be submitted with the data. 
+ * \param cb The function to call if the submit cannot be performed now.
+ * \param user_data Passed as a parameter to the callback.
+ */
+extern int
+EVsubmit_encoded_or_wait(CManager cm, EVstone stone, void *data, int data_len, attr_list attrs,
+                            EVSubmitCallbackFunc cb, void *user_data);
 
 /*!
  * Cause a stone to suspend operation

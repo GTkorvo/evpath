@@ -167,6 +167,13 @@ typedef enum {
                                  special considerations when unstalling */
 } stall_source;
 
+typedef struct _stall_callback {
+    CManager cm;
+    EVSubmitCallbackFunc cb;
+    void *user_data;
+    struct _stall_callback *next;
+} stall_callback;
+
 typedef struct _stone {
     int local_id;
     int default_action;
@@ -190,6 +197,7 @@ typedef struct _stone {
 
     CMConnection last_remote_source;
     int squelch_depth;
+    stall_callback *unstall_callbacks;
 } *stone_type;
     
 typedef struct _event_path_data {
