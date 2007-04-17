@@ -29,7 +29,7 @@ AM_CPPFLAGS =
 
 noinst_HEADERS = assert.h cm_internal.h  ev_internal.h
 
-cm_interface.c: evpath.h gen_interface.pl
+cm_interface.c revp.c revpath.h: evpath.h gen_interface.pl
 	@PERL@ ./gen_interface.pl
 
 if KERNEL

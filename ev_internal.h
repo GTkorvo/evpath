@@ -265,3 +265,4 @@ extern void EVdiscard_queue_item(CManager cm, int stone, queue_item *item);
 
 extern void INT_EVstall_stone(CManager cm, EVstone stone_id);
 extern void INT_EVunstall_stone(CManager cm, EVstone stone_id);
+extern void REVPinit(CManager cm);
