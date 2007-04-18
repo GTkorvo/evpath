@@ -1164,6 +1164,7 @@ ecl_parse_context context;
     static char extern_string[] = "\
 		int printf(string format, ...);\n\
 		void *malloc(int size);\n\
+		void sleep(int seconds);\n\
 		void free(void *pointer);\n\
 		long lrand48();\n\
 		double drand48();\n\
@@ -1178,6 +1179,7 @@ ecl_parse_context context;
 	{"drand48", (void *) 0},
 	{"stone_attrs", (void *) 0},
 	{"EVsubmit", (void *) 0},
+	{"sleep", (void*) 0},
 	{(void *) 0, (void *) 0}
     };
     /* 
@@ -1191,6 +1193,7 @@ ecl_parse_context context;
     externs[4].extern_value = (void *) (long) drand48;
     externs[5].extern_value = (void *) (long) &stone->stone_attrs;
     externs[6].extern_value = (void *) (long) &internal_ecl_submit;
+    externs[7].extern_value = (void *) (long) &sleep;
 
     ecl_assoc_externs(context, externs);
     ecl_parse_for_context(extern_string, context);
