@@ -5,6 +5,9 @@
 #include <memory.h>
 #include <strings.h>
 #include <ctype.h>
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 
 #include "evpath.h"
 #include "cm_internal.h"
