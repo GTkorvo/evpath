@@ -41,6 +41,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
+				AdditionalIncludeDirectories="..\cercs_env;..\atl;..\gen_thread;.\libltdl"
 				PreprocessorDefinitions="WIN32;_DEBUG;_LIB;_CONSOLE;ECL_EXPORTS;_CRT_SECURE_NO_DEPRECATE"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
@@ -232,6 +233,10 @@
 			</File>
 			<File
 				RelativePath=".\evpath.h"
+				>
+			</File>
+			<File
+				RelativePath=".\libltdl\ltdl.h"
 				>
 			</File>
 			<File
