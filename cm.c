@@ -1112,10 +1112,9 @@ try_conn_init(CManager cm, transport_entry trans, attr_list attrs)
 			attr_str);
 	    INT_CMfree(attr_str);
 	}
-    }
-
-    if (conn->use_read_thread) {
-        INT_CMstart_read_thread(conn);
+	if (conn->use_read_thread) {
+	    INT_CMstart_read_thread(conn);
+	}
     }
     return conn;
 }
