@@ -5,7 +5,7 @@ dnl   this macro searches for the files using find_cercs_file().  If
 dnl   found, it adds directory in which the found file resides to either 
 dnl   CPPFLAGS (with a -I prefix)  or LDFLAGS (with a -L prefix)
 dnl
-AC_DEFUN(CERCS_REQUIRE_PACKAGE,
+AC_DEFUN([CERCS_REQUIRE_PACKAGE],
 [
 AC_REQUIRE([CERCS_SET_ARCHIVE])
 AC_REQUIRE([CERCS_HAS_CYGPATH])
@@ -17,7 +17,7 @@ fi
 ])
 dnl
 dnl
-AC_DEFUN(CERCS_REQUIRE_OTHER_PACKAGE,
+AC_DEFUN([CERCS_REQUIRE_OTHER_PACKAGE],
 [
 AC_REQUIRE([CERCS_SET_ARCHIVE])
 AC_REQUIRE([CERCS_HAS_CYGPATH])
@@ -42,7 +42,7 @@ AC_CACHE_VAL(translit(cercs_cv_$1_include_arg, `/',`_'),
 [
 ifelse([$4],1,cercs_tmp=`pwd`/../$1,
 CERCS_FIND_FILE($1, $2, cercs_tmp, $with_translit, include))
-if test -n "$cercs_tmp"; then
+if test -n "$cercs_tmp" -a "$cercs_tmp" != "/usr/include/$2"; then
 translit(cercs_cv_$1_include_arg, `/',`_')=-I`$PATHPROG $cercs_tmp | sed 's#\\\\#/#g' | sed "s#.$2##g"`
 fi
 ])
@@ -114,7 +114,7 @@ dnl    and the usual suspects like:
 dnl    /usr/{include,lib} /usr/local/{include,lib} /opt/<package>/{include,lib}
 dnl    /opt/misc/{include,lib}.
 dnl
-AC_DEFUN(CERCS_FIND_FILE,
+AC_DEFUN([CERCS_FIND_FILE],
 [
 AC_REQUIRE([CERCS_HAS_CSH])
 AC_REQUIRE([CERCS_SET_ARCHIVE])
@@ -153,21 +153,27 @@ tmpdir=`echo ${prefix} |  sed 's%/$%%'`
 search_list="$search_list $tmpdir/$5/$2"
 fi
 if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
-search_list="$search_list $CHAOS_HOMEDIR/$5/$2 $CHAOS_HOMEDIR/$cercs_cv_archive/$5/$2 $CHAOS_HOMEDIR/$1/$cercs_cv_archive/$5/$2 $CHAOS_HOMEDIR/$1/$5/$2"
+search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/$1/$5/$2 $CHAOS_HOMEDIR/$cercs_cv_archive/$5/$2 $CHAOS_HOMEDIR/$1/$cercs_cv_archive/$5/$2 $CHAOS_HOMEDIR/$1/$5/$2 $CHAOS_HOMEDIR/$5/$2"
 fi
+if test "$5" == "lib"; then
+  for tmp_lib_value in $sys_lib_search_path_spec; do
+     search_list="$search_list $tmp_lib_value/$2"
+  done
+fi
+
 search_list="$search_list /usr/$5/$2 /usr/local/$5/$2 /opt/$1/$5/$2 /opt/misc/$5/$2 /opt/misc/$5/$cercs_cv_archive/$2"
 CERCS_SEARCH($search_list)
 if test -n "$tmp_search_results"; then
 $3=$tmp_search_results
 fi
 ])dnl
-AC_DEFUN(CERCS_SET_INSTALLED,[AC_ARG_WITH(installed, [  --with-installed        Don't use local copies of CERCS packages],with_installed_specified=1)])
-AC_DEFUN(CERCS_SET_LOCAL,[AC_ARG_WITH(local, [  --with-local            Use only local copies of CERCS packages],with_local_specified=1)])
+AC_DEFUN([CERCS_SET_INSTALLED],[AC_ARG_WITH(installed, [  --with-installed        Don't use local copies of CERCS packages],with_installed_specified=1)])
+AC_DEFUN([CERCS_SET_LOCAL],[AC_ARG_WITH(local, [  --with-local            Use only local copies of CERCS packages],with_local_specified=1)])
 dnl
 dnl CERCS_SET_ARCHIVE()
 dnl   set the $cercs_cv_machine_target variable to a standard archive name
 dnl
-AC_DEFUN(CERCS_SET_ARCHIVE,[
+AC_DEFUN([CERCS_SET_ARCHIVE],[
 AC_REQUIRE([CERCS_SET_INSTALLED])
 AC_REQUIRE([CERCS_SET_LOCAL])
 AC_REQUIRE([CERCS_HAS_CSH])
@@ -209,7 +215,7 @@ dnl CERCS_LIB_PREFIX
 dnl  this macro tries to set a reasonable default for the prefix value
 dnl  call with two arguments, project name and library name
 dnl
-AC_DEFUN(CERCS_LIB_PREFIX,
+AC_DEFUN([CERCS_LIB_PREFIX],
 [if test "x$prefix" = xNONE; then
 AC_REQUIRE([CERCS_SET_ARCHIVE])
 search_list=""
@@ -228,5 +234,5 @@ if test -n "$tmp_search_results"; then
 fi
 fi
 ])dnl
-AC_DEFUN(CERCS_HAS_CSH, [AC_PATH_PROG(CSH,csh)])dnl
-AC_DEFUN(CERCS_HAS_CYGPATH, [AC_CHECK_PROG(PATHPROG,cygpath,[cygpath -w],[echo])])dnl
+AC_DEFUN([CERCS_HAS_CSH], [AC_PATH_PROG(CSH,csh)])dnl
+AC_DEFUN([CERCS_HAS_CYGPATH], [AC_CHECK_PROG(PATHPROG,cygpath,[cygpath -w],[echo])])dnl
