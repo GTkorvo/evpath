@@ -804,7 +804,7 @@ attr_list conn_attrs;
     conn->characteristics = NULL;
     conn->write_pending = 0;
     conn->do_non_blocking_write = non_block_default;
-
+    conn->XML_output = 0;
     conn->use_read_thread = read_thread_default; 
     
     if (get_int_attr(conn_attrs, CM_CONN_BLOCKING, &blocking_on_conn)) {
@@ -2311,6 +2311,7 @@ attr_list attrs;
     int do_write = 1;
     void *encoded_attrs = NULL;
     int attrs_present = 0;
+    int XML_output = conn->XML_output;
 
     /* ensure conn is open */
     if (conn->closed != 0) {
@@ -2373,15 +2374,35 @@ attr_list attrs;
 	}
     }
 
-    if (!event->encoded_event) {
-	/* encode data with CM context */
-	vec = encode_IOcontext_vectorB(format->IOsubcontext, conn->io_out_buffer,
-				       format->format, event->decoded_event);
-	while(vec[vec_count].iov_base != NULL) {
-	    data_length += vec[vec_count].iov_len;
-	    vec_count++;
+    if (!XML_output) {
+	if (!event->encoded_event) {
+	    /* encode data with CM context */
+	    vec = encode_IOcontext_vectorB(format->IOsubcontext, conn->io_out_buffer,
+					   format->format, event->decoded_event);
+	    while(vec[vec_count].iov_base != NULL) {
+		data_length += vec[vec_count].iov_len;
+		vec_count++;
+	    }
+	} else {
+	    vec = &preencoded_vec[0];
+	    preencoded_vec[0].iov_base = event->encoded_event;
+	    preencoded_vec[0].iov_len = event->event_len;
+	    preencoded_vec[1].iov_base = NULL;
+	    preencoded_vec[1].iov_len = 0;
+	    vec_count = 1;
+	    data_length = event->event_len;
 	}
     } else {
+	/* XML output */
+	char *str;
+	if (!event->encoded_event) {
+	    str = IOunencoded_to_XML_string(format->IOsubcontext, 
+					    format->format,
+					    event->decoded_event);
+	} else {
+	    str = IOencoded_to_XML_string(format->IOsubcontext, 
+					  event->encoded_event);
+	}
 	vec = &preencoded_vec[0];
 	preencoded_vec[0].iov_base = event->encoded_event;
 	preencoded_vec[0].iov_len = event->event_len;
@@ -2450,6 +2471,9 @@ attr_list attrs;
                                     vec == &preencoded_vec[0]);
 	if (tmp_vec != &static_vec[0]) {
 	    INT_CMfree(tmp_vec);
+	}
+	if (XML_output) {
+	    free(preencoded_vec[0].iov_base);
 	}
 	if (actual == 0) {
 	    /* fail */

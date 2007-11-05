@@ -220,7 +220,7 @@ struct _CMConnection {
     struct queued_data_rec queued_data;
     int write_pending;
     int do_non_blocking_write;
-
+    int XML_output;
     int use_read_thread;
 };
 
