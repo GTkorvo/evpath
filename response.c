@@ -957,8 +957,11 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	/* special case for unformatted input */
 	int i;
 	for (i=0 ; i < stone->proto_action_count ; i++) {
-            if (!proto_action_in_stage(&stone->proto_actions[i], stage)) continue;
-	    if (stone->proto_actions[i].matching_reference_formats[0] == NULL) nearest_proto_action = i;
+            if (!proto_action_in_stage(&stone->proto_actions[i], stage)) 
+		continue;
+	    if ((stone->proto_actions[i].matching_reference_formats == NULL) ||
+		(stone->proto_actions[i].matching_reference_formats[0] == NULL))
+		nearest_proto_action = i;
 	}
     } else {
 	int map_entry = IOformat_compat_cmp2(event->reference_format, 
