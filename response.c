@@ -1015,7 +1015,7 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    }
 
 	    instance = generate_filter_code(mrd, stone, conversion_target_format);
-	    if (instance == 0) return 0;
+	    if (instance == NULL) return 0;
 	    instance->stone = stone->local_id;
 	    instance->proto_action_id = nearest_proto_action;
 	    action_generated++;
@@ -1534,7 +1534,18 @@ IOFormat format;
 	    
 	    path = extract_dll_path(mrd->u.filter.function);
 	    symbol_name = extract_symbol_name(mrd->u.filter.function);
+	    if (!path || !symbol_name) {
+		fprintf(stderr, "could not parse string \"%s\" for dll path and symbol information\n", mrd->u.filter.function);
+		free(instance);
+		return NULL;
+	    }
 	    instance->u.filter.func_ptr = (int(*)(void*,attr_list)) load_dll_symbol(path, symbol_name);
+	    if (instance->u.filter.func_ptr == NULL) {
+		fprintf(stderr, "Failed to load symbol \"%s\" from file \"%s\"\n",
+			symbol_name, path);
+		free(instance);
+		return NULL;
+	    }
 	    instance->u.filter.code = NULL;
 	} else {
 	    code = ecl_code_gen(mrd->u.filter.function, parse_context);
