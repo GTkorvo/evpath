@@ -528,9 +528,15 @@ filter_wrapper(CManager cm, struct _event_item *event, void *client_data,
     ev_state.cur_event = event;
     ev_state.out_count = out_count;
     ev_state.out_stones = out_stones;
-    ecl_assoc_client_data(ec, 0x34567890, (long)&ev_state);
+    if (ec != NULL) {
+	/* ECL-based handler */
+	ecl_assoc_client_data(ec, 0x34567890, (long)&ev_state);
 
-    ret = ((int(*)(ecl_exec_context, void *, attr_list))instance->u.filter.code->func)(ec, event->decoded_event, attrs);
+	ret = ((int(*)(ecl_exec_context, void *, attr_list))instance->u.filter.code->func)(ec, event->decoded_event, attrs);
+    } else {
+	/* DLL-based handler */
+	ret = ((int(*)(void *, attr_list))instance->u.filter.code->func)(event->decoded_event, attrs);
+    }
     if (ret) {
 	CMtrace_out(cm, EVerbose, "Filter function returned %d, submitting further to stone %d\n", ret, out_stones[0]);
 	internal_path_submit(cm, out_stones[0], event);
