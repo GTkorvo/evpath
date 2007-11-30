@@ -2694,8 +2694,10 @@ INT_EVtake_event_buffer(CManager cm, void *event)
 		"No event handler with takeable buffer executing on this CM.\n");
 	return 0;
     }
-    if (!((cur->decoded_event <= event) &&
-	  ((char *) event <= ((char *) cur->decoded_event + cur->event_len)))){
+    if (!(((cur->decoded_event <= event) &&
+	   ((char *) event <= ((char *) cur->decoded_event + cur->event_len))) ||
+	  ((cur->encoded_event <= event) &&
+	   ((char *) event <= ((char *) cur->encoded_event + cur->event_len))))) {
 	fprintf(stderr,
 		"Event address (%lx) in INT_EVtake_event_buffer does not match currently executing event on this CM.\n",
 		(long) event);
