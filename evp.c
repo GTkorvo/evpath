@@ -2737,8 +2737,10 @@ void *event;
 
     tmp = evp->taken_events_list;
     while (tmp != NULL) {
-	if ((tmp->item->decoded_event <= event) &&
-	    ((char *) event <= ((char *) tmp->item->decoded_event + tmp->item->event_len))) {
+	if (((tmp->item->decoded_event <= event) &&
+	    ((char *) event <= ((char *) tmp->item->decoded_event + tmp->item->event_len))) ||
+	    ((tmp->item->encoded_event <= event) &&
+	     ((char *) event <= ((char *) tmp->item->encoded_event + tmp->item->event_len)))) {
 	    if (last == NULL) {
 		evp->taken_events_list = tmp->next;
 	    } else {
