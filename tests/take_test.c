@@ -30,16 +30,16 @@ typedef struct _nested_rec {
     complex item;
 } nested, *nested_ptr;
 
-static IOField nested_field_list[] =
+static FMField nested_field_list[] =
 {
-    {"item", "complex", sizeof(complex), IOOffset(nested_ptr, item)},
+    {"item", "complex", sizeof(complex), FMOffset(nested_ptr, item)},
     {NULL, NULL, 0, 0}
 };
 
-static IOField complex_field_list[] =
+static FMField complex_field_list[] =
 {
-    {"r", "double", sizeof(double), IOOffset(complex_ptr, r)},
-    {"i", "double", sizeof(double), IOOffset(complex_ptr, i)},
+    {"r", "double", sizeof(double), FMOffset(complex_ptr, r)},
+    {"i", "double", sizeof(double), FMOffset(complex_ptr, i)},
     {NULL, NULL, 0, 0}
 };
 
@@ -55,39 +55,39 @@ typedef struct _simple_rec {
     IOEncodeVector vecs;
 } simple_rec, *simple_rec_ptr;
 
-IOField event_vec_elem_fields[] =
+FMField event_vec_elem_fields[] =
 {
     {"len", "integer", sizeof(((IOEncodeVector)0)[0].iov_len), 
-     IOOffset(IOEncodeVector, iov_len)},
-    {"elem", "char[len]", sizeof(char), IOOffset(IOEncodeVector,iov_base)},
+     FMOffset(IOEncodeVector, iov_len)},
+    {"elem", "char[len]", sizeof(char), FMOffset(IOEncodeVector,iov_base)},
     {(char *) 0, (char *) 0, 0, 0}
 };
 
-static IOField simple_field_list[] =
+static FMField simple_field_list[] =
 {
     {"integer_field", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
+     sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
     {"short_field", "integer",
-     sizeof(short), IOOffset(simple_rec_ptr, short_field)},
+     sizeof(short), FMOffset(simple_rec_ptr, short_field)},
     {"long_field", "integer",
-     sizeof(long), IOOffset(simple_rec_ptr, long_field)},
+     sizeof(long), FMOffset(simple_rec_ptr, long_field)},
     {"nested_field", "nested",
-     sizeof(nested), IOOffset(simple_rec_ptr, nested_field)},
+     sizeof(nested), FMOffset(simple_rec_ptr, nested_field)},
     {"double_field", "float",
-     sizeof(double), IOOffset(simple_rec_ptr, double_field)},
+     sizeof(double), FMOffset(simple_rec_ptr, double_field)},
     {"char_field", "char",
-     sizeof(char), IOOffset(simple_rec_ptr, char_field)},
+     sizeof(char), FMOffset(simple_rec_ptr, char_field)},
     {"scan_sum", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, scan_sum)},
+     sizeof(int), FMOffset(simple_rec_ptr, scan_sum)},
     {"vec_count", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, vec_count)},
+     sizeof(int), FMOffset(simple_rec_ptr, vec_count)},
     {"vecs", "EventVecElem[vec_count]", sizeof(struct _io_encode_vec), 
-     IOOffset(simple_rec_ptr, vecs)},
+     FMOffset(simple_rec_ptr, vecs)},
     {NULL, NULL, 0, 0},
     {NULL, NULL, 0, 0}
 };
 
-static CMFormatRec simple_format_list[] =
+static FMStructDescRec simple_format_list[] =
 {
     {"complex", complex_field_list},
     {"nested", nested_field_list},

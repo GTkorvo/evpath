@@ -8,7 +8,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <unistd.h>
-#include "io.h"
+#include "ffs.h"
 
 typedef struct _simple_rec {
     int integer_field;
@@ -19,23 +19,26 @@ typedef struct _simple_rec {
     int scan_sum;
 } simple_rec, *simple_rec_ptr;
 
-static IOField simple_field_list[] =
+static FMField simple_field_list[] =
 {
     {"integer_field", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
+     sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
     {"short_field", "integer",
-     sizeof(short), IOOffset(simple_rec_ptr, short_field)},
+     sizeof(short), FMOffset(simple_rec_ptr, short_field)},
     {"long_field", "integer",
-     sizeof(long), IOOffset(simple_rec_ptr, long_field)},
+     sizeof(long), FMOffset(simple_rec_ptr, long_field)},
     {"double_field", "float",
-     sizeof(double), IOOffset(simple_rec_ptr, double_field)},
+     sizeof(double), FMOffset(simple_rec_ptr, double_field)},
     {"char_field", "char",
-     sizeof(char), IOOffset(simple_rec_ptr, char_field)},
+     sizeof(char), FMOffset(simple_rec_ptr, char_field)},
     {"scan_sum", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, scan_sum)},
+     sizeof(int), FMOffset(simple_rec_ptr, scan_sum)},
     {NULL, NULL, 0, 0}
 };
 
+FMStructDescRec thin_formats[] = {
+    {"thin_message", simple_field_list, sizeof(simple_rec), NULL},
+    {NULL, NULL, 0, NULL}};
 
 static int do_connection(char* host, int port);
 static void generate_record (simple_rec_ptr event);
@@ -46,8 +49,9 @@ main(int argc, char **argv)
     char *remote_host;
     int remote_port;
     int stone;
-    IOFile out_connection;
-    IOFormat ioformat;
+    FFSFile out_connection;
+    FMFormat ioformat;
+    FMContext fmc;
     simple_rec rec;
     int conn;
     char *comment = strdup("Stone xxxxx");
@@ -65,15 +69,15 @@ main(int argc, char **argv)
 	printf("Connection to %s:%d failed\n", remote_host, remote_port);
 	exit(1);
     }
-    out_connection = open_IOfd(conn, "w");
+    out_connection = open_FFSfd(conn, "w");
 
     sprintf(comment, "Stone %d", stone);
-    write_comment_IOfile(out_connection, comment);
-    ioformat = register_IOrecord_format("thin_message", simple_field_list, 
-					out_connection);
+    write_comment_FFSfile(out_connection, comment);
+    fmc = FMContext_of_file(out_connection);
+    ioformat = register_data_format(fmc, thin_formats);
     generate_record(&rec);
-    write_IOfile(out_connection, ioformat, &rec);
-    close_IOfile(out_connection);
+    write_FFSfile(out_connection, ioformat, &rec);
+    close_FFSfile(out_connection);
     return 0;
 }
 

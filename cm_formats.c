@@ -1,6 +1,6 @@
 #include "config.h"
 
-#include "io.h"
+#include "ffs.h"
 #include "atl.h"
 #include "evpath.h"
 #include "gen_thread.h"
@@ -23,37 +23,37 @@
 #endif
 
 static void add_format_to_cm ARGS((CManager cm, CMFormat format));
-static void add_user_format_to_cm ARGS((CManager cm, CMFormat format));
 
 CMFormat
-INT_CMlookup_format(cm, field_list)
+INT_CMlookup_format(cm, format_list)
 CManager cm;
-IOFieldList field_list;
+FMStructDescList format_list;
 {
     int i;
     for (i=0; i< cm->reg_format_count; i++) {
-	if (cm->reg_formats[i]->field_list == field_list) {
+	if (cm->reg_formats[i]->format_list == format_list) {
 	    return cm->reg_formats[i];
 	}
     }
     return NULL;
 }
 
-IOFormat
-INT_CMlookup_user_format(cm, field_list)
+#ifdef USER
+FFSFormat
+INT_CMlookup_user_format(cm, format_list)
 CManager cm;
-IOFieldList field_list;
+FMStructDescList format_list;
 {
     int i;
     for (i=0; i< cm->reg_user_format_count; i++) {
-	if (cm->reg_user_formats[i]->field_list == field_list) {
+	if (cm->reg_user_formats[i]->format_list == format_list) {
 	    return cm->reg_user_formats[i]->format;
 	}
     }
     return NULL;
 }
 
-IOContext
+FMContext
 INT_CMget_user_type_context(cm)
 CManager cm;
 {
@@ -96,55 +96,35 @@ IOContext context;
     cm->reg_user_formats = tmp_user_formats;
 
 }
+#endif 
 
 CMFormat
-INT_CMregister_format(cm, format_name, field_list, subformat_list)
+INT_CMregister_format(cm, format_list)
 CManager cm;
-char *format_name;
-IOFieldList field_list;
-CMFormatList subformat_list;
+FMStructDescList format_list;
 {
     CMFormat format;
 
-    if ((field_list == NULL) || (format_name == NULL) || (cm == NULL)) 
+    if ((format_list == NULL) || (cm == NULL)) 
 	return NULL;
 
     format = INT_CMmalloc(sizeof(struct _CMFormat));
     
     format->cm = cm;
-    format->format_name = INT_CMmalloc(strlen(format_name) + 1);
-    strcpy(format->format_name, format_name);
-    /*  create a new subcontext (to localize name resolution) */
-    format->IOsubcontext = create_IOsubcontext(cm->IOcontext);
-    format->format = NULL;
-    format->field_list_addr = field_list;
+    format->format_name = INT_CMmalloc(strlen(format_list[0].format_name) + 1);
+    strcpy(format->format_name, format_list[0].format_name);
+    format->fmformat = NULL;
+    format->format_list_addr = format_list;
     format->handler = (CMHandlerFunc) NULL;
     format->client_data = NULL;
-    format->field_list = field_list;
-    format->subformat_list = subformat_list;
-    format->opt_info = NULL;
+    format->format_list = format_list;
     format->registration_pending = 1;
 
     add_format_to_cm(cm, format);
     return format;
 }
 
-CMFormat
-INT_CMregister_opt_format(cm, format_name, field_list, subformat_list, opt_info)
-CManager cm;
-char *format_name;
-IOFieldList field_list;
-CMFormatList subformat_list;
-IOOptInfo *opt_info;
-{
-    CMFormat format;
-    format = INT_CMregister_format(cm, format_name, field_list, subformat_list);
-    if(format) {
-	format->opt_info = opt_info;
-    }
-    return format;
-}
-
+#ifdef COMPAT
 void *INT_CMcreate_compat_info(format, xform_code, len_p)
 CMFormat format;
 char *xform_code;
@@ -155,55 +135,7 @@ int *len_p;
     if(!format->format) return NULL;
     return create_compat_info(format->format, xform_code, len_p);
 }
-
-static int
-CMregister_subformats(context, field_list, sub_list)
-IOContext context;
-IOFieldList field_list;
-CMFormatList sub_list;
-{
-    char **subformats = get_subformat_names(field_list);
-    char **save_subformats = subformats;
-
-    if (subformats != NULL) {
-	while (*subformats != NULL) {
-	    int i = 0;
-	    if (get_IOformat_by_name_IOcontext(context, *subformats) != NULL) {
-		/* already registered this subformat */
-		goto next_format;
-	    }
-	    while (sub_list && (sub_list[i].format_name != NULL)) {
-		if (strcmp(sub_list[i].format_name, *subformats) == 0) {
-		    IOFormat tmp;
-		    if (CMregister_subformats(context, sub_list[i].field_list,
-					      sub_list) != 1) {
-			fprintf(stderr, "Format registration failed for subformat \"%s\"\n",
-				sub_list[i].format_name);
-			return 0;
-		    }
-		    tmp = register_IOcontext_format(*subformats,
-						    sub_list[i].field_list,
-						    context);
-		    if (tmp == NULL) {
-			fprintf(stderr, "Format registration failed for subformat \"%s\"\n",
-				sub_list[i].format_name);
-			return 0;
-		    }
-		    goto next_format;
-		}
-		i++;
-	    }
-	    fprintf(stderr, "Subformat \"%s\" not found in format list\n",
-		    *subformats);
-	    return 0;
-	next_format:
-	    free(*subformats);
-	    subformats++;
-	}
-    }
-    free(save_subformats);
-    return 1;
-}
+#endif
 
 extern void 
 CMcomplete_format_registration(format, lock)
@@ -211,19 +143,25 @@ CMFormat format;
 int lock;
 {
     
-    if (CMregister_subformats(format->IOsubcontext, format->field_list,
-			      format->subformat_list) != 1) {
-	fprintf(stderr, "Format registration failed for format \"%s\"\n",
-		format->format_name);
-        free_CMFormat (format);
-	if (lock) CManager_unlock(format->cm);
-	format->format = NULL;
-	return;
-    }
-    format->format = register_opt_format(format->format_name, 
-					       format->field_list, format->opt_info, 
-						   format->IOsubcontext);
-    if (format->format == NULL) {
+    CManager cm = format->cm;
+    FMContext c = FMContext_from_FFS(format->cm->FFScontext);
+    format->fmformat = register_data_format(c, format->format_list);
+    format->ffsformat = FFSset_fixed_target(format->cm->FFScontext, 
+					    format->format_list);
+    cm->in_formats = INT_CMrealloc(cm->in_formats,
+			       sizeof(struct _CMincoming_format) *
+			       (cm->in_format_count + 1));
+    cm->in_formats[cm->in_format_count].format = format->ffsformat;
+    cm->in_formats[cm->in_format_count].handler = format->handler;
+    cm->in_formats[cm->in_format_count].client_data = format->client_data;
+    cm->in_formats[cm->in_format_count].older_format = NULL;
+    cm->in_formats[cm->in_format_count].f2_format = format;
+    cm->in_formats[cm->in_format_count].f1_struct_size = 0;
+    cm->in_formats[cm->in_format_count].code = NULL;
+    cm->in_formats[cm->in_format_count].local_iocontext = NULL;
+    cm->in_format_count++;
+
+    if (format->fmformat == NULL) {
 	fprintf(stderr, "Format registration failed for format \"%s\"\n",
 		format->format_name);
         free_CMFormat (format);
@@ -233,6 +171,7 @@ int lock;
     format->registration_pending = 0;
 }
 
+#ifdef USER
 IOFormat
 INT_CMregister_user_format(cm, type_context, format_name, field_list, 
 		       subformat_list)
@@ -273,6 +212,7 @@ CMFormatList subformat_list;
 	return NULL;
     }
 }
+#endif
 
 static void
 add_format_to_cm(cm, format)
@@ -290,15 +230,15 @@ CMFormat format;
 	    break;
 	} else if (order == 0) {
 	    /* have the same name */
-	    IOformat_order suborder;
+	    FMformat_order suborder;
 	    if (format->registration_pending) {
 		CMcomplete_format_registration(format, 0);
 	    }
 	    if (cm->reg_formats[i]->registration_pending) {
 		CMcomplete_format_registration(cm->reg_formats[i], 0);
 	    }
-	    suborder = IOformat_cmp(format->format, 
-				    cm->reg_formats[i]->format);
+	    suborder = FMformat_cmp(format->fmformat, 
+				    cm->reg_formats[i]->fmformat);
 	    if ((suborder == Format_Greater) || 
 		(suborder == Format_Incompatible)) {
 		insert_before = i;
@@ -321,73 +261,21 @@ CMFormat format;
     cm->reg_format_count++;
 }
 
-static void
-add_user_format_to_cm(cm, format)
-CManager cm;
-CMFormat format;
-{
-    char *format_name = name_of_IOformat(format->format);
-    int insert_before = 0, i;
-
-    i = 0;    
-    for (i=0; i< cm->reg_user_format_count; i++) {
-	int order = strcmp(format_name, 
-			   name_of_IOformat(cm->reg_user_formats[i]->format));
-	if (order < 0) {
-	    insert_before = i;
-	    break;
-	} else if (order == 0) {
-	    /* have the same name */
-	    IOformat_order suborder;
-	    suborder = IOformat_cmp(format->format, 
-				    cm->reg_user_formats[i]->format);
-	    if ((suborder == Format_Greater) || 
-		(suborder == Format_Incompatible)) {
-		insert_before = i;
-		break;
-	    } else if (suborder == Format_Equal) {
-                if (cm->reg_user_formats[i]->IOsubcontext == format->IOsubcontext) {
-                    printf("identical formats!\n");
-                }
-                insert_before = i;
-                break;
-	    }
-	}
-    }
-    if (i == cm->reg_user_format_count) {
-	insert_before = i;
-    }
-    cm->reg_user_formats = INT_CMrealloc(cm->reg_user_formats, sizeof(CMFormat) * 
-				(cm->reg_user_format_count + 1));
-    for (i = cm->reg_user_format_count; i > insert_before; i--) {
-	/* move this up */
-	cm->reg_user_formats[i] = cm->reg_user_formats[i-1];
-    }
-    cm->reg_user_formats[insert_before] = format;
-    cm->reg_user_format_count++;
-
-}
-
-
 extern void
 free_CMFormat(format)
 CMFormat format;
 {
-    free_IOsubcontext(format->IOsubcontext);
     INT_CMfree(format);
 }
 
 extern CMincoming_format_list
 CMidentify_CMformat(cm, format)
 CManager cm;
-IOFormat format;
+FFSTypeHandle format;
 {
     int i;
-    char *format_name = name_of_IOformat(format);
-    IOFieldList native_field_list;
-    CMFormatList native_subformat_list;
-    IOFormat* subformat_list, *saved_subformat_list;
-    int native_struct_size;
+    char *format_name = name_of_FMformat(FMFormat_of_original(format));
+    FMStructDescList native_format_list;
 
     for (i=0; i< cm->reg_format_count; i++) {
 	int order = strcmp(format_name, cm->reg_formats[i]->format_name);
@@ -401,10 +289,11 @@ IOFormat format;
 	    if (cm->reg_formats[i]->registration_pending) {
 		CMcomplete_format_registration(cm->reg_formats[i], 0);
 	    }
-	    if (cm->reg_formats[i]->format == NULL) {
+	    if (cm->reg_formats[i]->fmformat == NULL) {
 		continue;
 	    }
-	    switch(IOformat_cmp(format, cm->reg_formats[i]->format)) {
+	    switch(FMformat_cmp(FMFormat_of_original(format), 
+				cm->reg_formats[i]->fmformat)) {
 	    case Format_Equal:
 	    case Format_Greater:
 		/* 
@@ -426,36 +315,9 @@ IOFormat format;
     }
 
     if (i >= cm->reg_format_count) return NULL;
+    native_format_list = cm->reg_formats[i]->format_list;
 
-    native_field_list = cm->reg_formats[i]->field_list;
-    native_subformat_list = cm->reg_formats[i]->subformat_list;
-
-    subformat_list = get_subformats_IOformat(format);
-    saved_subformat_list = subformat_list;
-    while((subformat_list != NULL) && (*subformat_list != NULL)) {
-	char *subformat_name = name_of_IOformat(*subformat_list);
-	int j = 0;
-	while(native_subformat_list && 
-	      (native_subformat_list[j].format_name != NULL)) {
-	    if (strcmp(native_subformat_list[j].format_name, subformat_name) == 0) {
-		IOFieldList sub_field_list;
-		int sub_struct_size;
-		sub_field_list = native_subformat_list[j].field_list;
-		sub_struct_size = struct_size_field_list(sub_field_list, 
-							 sizeof(char*));
-		set_conversion_IOcontext(cm->IOcontext, *subformat_list,
-					 sub_field_list,
-					 sub_struct_size);
-	    }
-	    j++;
-	}
-	subformat_list++;
-    }
-    free(saved_subformat_list);
-    native_struct_size = struct_size_field_list(native_field_list, 
-						sizeof(char*));
-    set_conversion_IOcontext(cm->IOcontext, format, native_field_list,
-					 native_struct_size);
+    establish_conversion(cm->FFScontext, format, native_format_list);
     cm->in_formats = INT_CMrealloc(cm->in_formats, 
 			       sizeof(struct _CMincoming_format) * 
 			       (cm->in_format_count + 1));
@@ -467,98 +329,61 @@ IOFormat format;
     return &cm->in_formats[cm->in_format_count++];
 }
 
-extern IOFormat 
-INT_CMget_IOformat_by_name(cm, context, name)
-CManager cm;
-IOContext context;
-char *name;
-{
-    IOFormat ret;
-    ret = get_IOformat_by_name_IOcontext(context, name);
-    return ret;
-}
-
-extern IOFormat 
+extern FFSTypeHandle
 INT_CMget_format_IOcontext(cm, context, buffer)
 CManager cm;
-IOContext context;
+FFSContext context;
 void *buffer;
 {
-    IOFormat ret;
-    ret = get_format_IOcontext(context, buffer);
+    FFSTypeHandle ret;
+    ret = FFSTypeHandle_from_encode(context, buffer);
     return ret;
 }
 
-extern IOFormat 
+extern FFSTypeHandle
 INT_CMget_format_app_IOcontext(cm, context, buffer, app_context)
 CManager cm;
-IOContext context;
+FFSContext context;
 void *buffer;
 void *app_context;
 {
-    IOFormat ret;
-    ret = get_format_app_IOcontext(context, buffer, app_context);
-    return ret;
-}
-
-extern IOFormat *
-INT_CMget_subformats_IOcontext(cm, context, buffer)
-CManager cm;
-IOContext context;
-void *buffer;
-{
-    IOFormat *ret;
-    ret = get_subformats_IOcontext(context, buffer);
+    FFSTypeHandle ret;
+    ret = FFSTypeHandle_from_encode(context, buffer);
     return ret;
 }
 
 extern void
-INT_CMset_conversion_IOcontext(cm, context, format, field_list,
-			   native_struct_size)
+INT_CMset_conversion_IOcontext(cm, context, format, format_list)
 CManager cm;
-IOContext context;
-IOFormat format;
-IOFieldList field_list;
-int native_struct_size;
+FFSContext context;
+FFSTypeHandle format;
+FMStructDescList format_list;
 {
-    set_conversion_IOcontext(context, format, field_list,
-			     native_struct_size);
+    establish_conversion(context, format, format_list);
 }
 
 extern int CMself_hosted_formats;
 
 static void
-preload_pbio_format(conn, ioformat, context)
+preload_pbio_format(conn, ioformat)
 CMConnection conn;
-IOFormat ioformat;
-IOContext context;
+FMFormat ioformat;
 {
-    IOFormat *subformats, *saved_formats;
     CMtrace_out(conn->cm, CMFormatVerbose, 
 		"CMpbio preloading format %s on connection %lx", 
-		name_of_IOformat(ioformat), conn);
-    saved_formats = subformats = get_subformats_IOformat(ioformat);
-    
-    while ((subformats != NULL) && (*subformats != NULL)) {
-	CMtrace_out(conn->cm, CMFormatVerbose, 
-		    "CMpbio sending subformat %s on connection %lx", 
-		    name_of_IOformat(*subformats), conn);
-	
-	if (CMpbio_send_format_preload(*subformats, conn) != 1) {
-	    CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio preload failed");
-	    return;
-	}
+		name_of_FMformat(ioformat), conn);
+    if (CMpbio_send_format_preload(ioformat, conn) != 1) {
+	CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio preload failed");
+	return;
+    }
 #ifndef MODULE
 	if (CMtrace_on(conn->cm, CMFormatVerbose)) {
 	    int junk;
 	    printf("CMpbio Preload is format ");
-	    print_server_ID((unsigned char *)get_server_ID_IOformat(*subformats, &junk));
+	    print_server_ID((unsigned char *)get_server_ID_FMformat(ioformat, &junk));
 	    printf("\n");
 	}
 #endif
-	subformats++;
-    }
-    free(saved_formats);
 }
 
 extern void
@@ -576,7 +401,7 @@ CMFormat format;
 	load_count++;
     }
     
-    preload_pbio_format(conn, format->format, format->IOsubcontext);
+    preload_pbio_format(conn, format->fmformat);
 
     if (conn->downloaded_formats == NULL) {
 	loaded_list = malloc(2*sizeof(*loaded_list));

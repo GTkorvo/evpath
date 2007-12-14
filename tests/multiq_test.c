@@ -32,46 +32,46 @@ typedef struct _rec_c {
     int c_field;
 } rec_c, *rec_c_ptr;
 
-static IOField a_field_list[] =
+static FMField a_field_list[] =
 {
     {"a_field", "integer",
-     sizeof(int), IOOffset(rec_a_ptr, a_field)},
+     sizeof(int), FMOffset(rec_a_ptr, a_field)},
     {NULL, NULL, 0, 0}
 };
 
-static IOField b_field_list[] =
+static FMField b_field_list[] =
 {
     {"b_field", "integer",
-     sizeof(int), IOOffset(rec_b_ptr, b_field)},
+     sizeof(int), FMOffset(rec_b_ptr, b_field)},
     {NULL, NULL, 0, 0}
 };
 
-static IOField c_field_list[] =
+static FMField c_field_list[] =
 {
     {"c_field", "integer",
-     sizeof(int), IOOffset(rec_c_ptr, c_field)},
+     sizeof(int), FMOffset(rec_c_ptr, c_field)},
     {NULL, NULL, 0, 0}
 };
 
-static CMFormatRec a_format_list[] =
+static FMStructDescRec a_format_list[] =
 {
     {"a_rec", a_field_list},
     {NULL, NULL}
 };
 
-static CMFormatRec b_format_list[] =
+static FMStructDescRec b_format_list[] =
 {
     {"b_rec", b_field_list},
     {NULL, NULL}
 };
 
-static CMFormatRec c_format_list[] =
+static FMStructDescRec c_format_list[] =
 {
     {"c_rec", c_field_list},
     {NULL, NULL}
 };
 
-static CMFormatList queue_list[] = {a_format_list, b_format_list, c_format_list, NULL};
+static FMStructDescList queue_list[] = {a_format_list, b_format_list, c_format_list, NULL};
     
 
 static

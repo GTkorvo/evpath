@@ -29,16 +29,16 @@ typedef struct _nested_rec {
     complex item;
 } nested, *nested_ptr;
 
-static IOField nested_field_list[] =
+static FMField nested_field_list[] =
 {
-    {"item", "complex", sizeof(complex), IOOffset(nested_ptr, item)},
+    {"item", "complex", sizeof(complex), FMOffset(nested_ptr, item)},
     {NULL, NULL, 0, 0}
 };
 
-static IOField complex_field_list[] =
+static FMField complex_field_list[] =
 {
-    {"r", "double", sizeof(double), IOOffset(complex_ptr, r)},
-    {"i", "double", sizeof(double), IOOffset(complex_ptr, i)},
+    {"r", "double", sizeof(double), FMOffset(complex_ptr, r)},
+    {"i", "double", sizeof(double), FMOffset(complex_ptr, i)},
     {NULL, NULL, 0, 0}
 };
 
@@ -63,59 +63,59 @@ typedef struct _output_rec {
     int sum3_field;
 } output_rec, *output_rec_ptr;
 
-static IOField simple_field_list[] =
+static FMField simple_field_list[] =
 {
     {"integer_field", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
+     sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
     {"short_field", "integer",
-     sizeof(short), IOOffset(simple_rec_ptr, short_field)},
+     sizeof(short), FMOffset(simple_rec_ptr, short_field)},
     {"long_field", "integer",
-     sizeof(long), IOOffset(simple_rec_ptr, long_field)},
+     sizeof(long), FMOffset(simple_rec_ptr, long_field)},
     {"nested_field", "nested",
-     sizeof(nested), IOOffset(simple_rec_ptr, nested_field)},
+     sizeof(nested), FMOffset(simple_rec_ptr, nested_field)},
     {"double_field", "float",
-     sizeof(double), IOOffset(simple_rec_ptr, double_field)},
+     sizeof(double), FMOffset(simple_rec_ptr, double_field)},
     {"char_field", "char",
-     sizeof(char), IOOffset(simple_rec_ptr, char_field)},
+     sizeof(char), FMOffset(simple_rec_ptr, char_field)},
     {"scan_sum", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, scan_sum)},
+     sizeof(int), FMOffset(simple_rec_ptr, scan_sum)},
     {NULL, NULL, 0, 0}
 };
 
-static IOField output_field_list[] =
+static FMField output_field_list[] =
 {
     {"random_field", "integer",
-     sizeof(int), IOOffset(output_rec_ptr, random_field)},
+     sizeof(int), FMOffset(output_rec_ptr, random_field)},
     {"integer_field", "integer",
-     sizeof(int), IOOffset(output_rec_ptr, integer_field)},
+     sizeof(int), FMOffset(output_rec_ptr, integer_field)},
     {"sum1_field", "integer",
-     sizeof(short), IOOffset(output_rec_ptr, sum1_field)},
+     sizeof(short), FMOffset(output_rec_ptr, sum1_field)},
     {"sum2_field", "integer",
-     sizeof(long), IOOffset(output_rec_ptr, sum2_field)},
+     sizeof(long), FMOffset(output_rec_ptr, sum2_field)},
     {"nested_field", "nested",
-     sizeof(nested), IOOffset(output_rec_ptr, nested_field)},
+     sizeof(nested), FMOffset(output_rec_ptr, nested_field)},
     {"double_field", "float",
-     sizeof(double), IOOffset(output_rec_ptr, double_field)},
+     sizeof(double), FMOffset(output_rec_ptr, double_field)},
     {"char_field", "char",
-     sizeof(char), IOOffset(output_rec_ptr, char_field)},
+     sizeof(char), FMOffset(output_rec_ptr, char_field)},
     {"sum3_field", "integer",
-     sizeof(int), IOOffset(output_rec_ptr, sum3_field)},
+     sizeof(int), FMOffset(output_rec_ptr, sum3_field)},
     {NULL, NULL, 0, 0}
 };
 
-static CMFormatRec simple_format_list[] =
+static FMStructDescRec simple_format_list[] =
 {
-    {"simple", simple_field_list},
-    {"complex", complex_field_list},
-    {"nested", nested_field_list},
+    {"simple", simple_field_list, sizeof(simple_rec), NULL},
+    {"complex", complex_field_list, sizeof(complex), NULL},
+    {"nested", nested_field_list, sizeof(nested), NULL},
     {NULL, NULL}
 };
 
-static CMFormatRec output_format_list[] =
+static FMStructDescRec output_format_list[] =
 {
-    {"output_struct", output_field_list},
-    {"complex", complex_field_list},
-    {"nested", nested_field_list},
+    {"output_struct", output_field_list, sizeof(output_rec), NULL},
+    {"complex", complex_field_list, sizeof(complex), NULL},
+    {"nested", nested_field_list, sizeof(nested), NULL},
     {NULL, NULL}
 };
 

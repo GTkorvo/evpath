@@ -1,5 +1,5 @@
 #ifndef __I_O__
-#include <io.h>
+#include <ffs.h>
 #endif
 #ifndef CERCS_ENV_H
 #include <cercs_env.h>
@@ -27,15 +27,15 @@ size MsgSize[i].  i=0,1,...,MsgNum.
 
 
 typedef struct _CMincoming_format {
-    IOFormat format;
+    FFSTypeHandle format;
     CMHandlerFunc handler;
     void *client_data;
-    IOcompat_formats older_format;
-	IOFormat local_prior_format;
-	IOContext local_iocontext;
+    FMcompat_formats older_format;
+    FMFormat local_prior_format;
+    FMContext local_iocontext;
     CMFormat f2_format;
     int f1_struct_size;
-    struct _ecl_code_struct *code;
+    struct _cod_code_struct *code;
 } *CMincoming_format_list;
 
 struct _CMControlList;
@@ -83,7 +83,7 @@ typedef struct _CManager {
     int closed;
     int abort_read_ahead;
 
-    IOContext IOcontext;	/* pbio context for data encoding */
+    FFSContext FFScontext;	/* pbio context for data encoding */
     thr_mutex_t context_lock;
 
     CMbuffer taken_buffer_list;
@@ -172,7 +172,7 @@ struct queued_data_rec {
     int rem_header_len;
     char *rem_attr_base;
     int rem_attr_len;
-    IOEncodeVector vector_data;
+    FFSEncodeVector vector_data;
 };
 
 typedef struct _CMCloseHandlerList {
@@ -195,7 +195,7 @@ struct _CMConnection {
     int ref_count;
     thr_mutex_t write_lock;
     thr_mutex_t read_lock;
-    IOBuffer io_out_buffer;
+    FFSBuffer io_out_buffer;
     int closed;
     int failed;
 
@@ -205,7 +205,7 @@ struct _CMConnection {
 
     int write_callback_len;
     CMConnHandlerList write_callbacks;
-    IOContext IOsubcontext;
+    FMContext IOsubcontext;
     AttrBuffer attr_encode_buffer;
     void *foreign_data_handler;
 
@@ -227,14 +227,12 @@ struct _CMConnection {
 struct _CMFormat {
     CManager cm;
     char *format_name;
-    IOContext IOsubcontext;
-    IOFormat  format;
-    void *field_list_addr;
+    FMFormat fmformat;
+    FFSTypeHandle ffsformat;
+    void *format_list_addr;
     CMHandlerFunc handler;
     void *client_data;
-    IOFieldList field_list;
-    CMFormatList subformat_list;
-    IOOptInfo *opt_info;
+    FMStructDescList format_list;
     int registration_pending;
 };
 
@@ -273,7 +271,7 @@ extern void
 CMWriteQueuedData ARGS((transport_entry trans, CMConnection conn));
 
 extern CMincoming_format_list
-CMidentify_CMformat ARGS((CManager cm, IOFormat format));
+CMidentify_CMformat ARGS((CManager cm, FFSTypeHandle format));
 
 extern void CMtransport_trace ARGS((CManager cm, char *format, ...));
 
@@ -301,7 +299,7 @@ extern transport_entry add_transport_to_cm ARGS((CManager cm, transport_entry tr
 extern int CMinternal_listen ARGS((CManager cm, attr_list listen_info));
 extern CMConnection CMinternal_get_conn ARGS((CManager cm, attr_list attrs));
 extern void CMconn_fail_conditions ARGS((CMConnection conn));
-extern int CMpbio_send_format_preload ARGS((IOFormat ioformat, CMConnection conn));
+extern int CMpbio_send_format_preload ARGS((FMFormat ioformat, CMConnection conn));
 extern void CMformat_preload ARGS((CMConnection conn, CMFormat format));
 extern void CMinit_local_formats ARGS((CManager cm));
 
@@ -309,16 +307,12 @@ extern CMbuffer cm_get_data_buf ARGS((CManager cm, int length));
 extern void cm_return_data_buf ARGS((CMbuffer cmb));
 
 extern CMincoming_format_list CMidentify_rollbackCMformat 
-	ARGS((CManager cm, IOFormat format));
+	ARGS((CManager cm, char *data_buffer));
 extern void
 CMcreate_conversion ARGS((CManager cm, CMincoming_format_list cm_format));
 extern int
 process_old_format_data ARGS((CManager cm, CMincoming_format_list cm_format,
 	   	char **decode_buff, CMbuffer *cm_decode_buffer));
-extern int
-internal_write_event(CMConnection conn, CMFormat format, 
-		     void *remote_path_id, int path_len, event_item *event,
-		     attr_list attrs);
 extern void
 internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data);
 extern void
@@ -374,91 +368,43 @@ extern void INT_CMregister_non_CM_message_handler ARGS((int header, CMNonCMHandl
 extern void *INT_CMtake_buffer ARGS((CManager cm, void *data));
 extern void INT_CMreturn_buffer ARGS((CManager cm, void *data));
 extern CMConnection INT_CMget_conn ARGS((CManager cm, attr_list contact_list));
-extern CMFormat INT_CMregister_format ARGS((CManager cm, char *format_name,
-					    IOFieldList field_list,
-					    CMFormatList subformat_list));
+extern CMFormat INT_CMregister_format ARGS((CManager cm, FMStructDescList format_list));
 extern void
 INT_EVforget_connection(CManager, CMConnection);
 extern void
 INT_EVhandle_control_message(CManager, CMConnection, unsigned char type, int arg);
 
-extern EVaction
-INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
-			       EVImmediateHandlerFunc func, void *client_data,
-			       IOFormat reference_format);
-extern void
-INT_EVassoc_conversion_action(CManager cm, int stone_id, int stage, IOFormat target_format,
-			      IOFormat incoming_format);
 extern void
 INT_CMregister_handler ARGS((CMFormat format, CMHandlerFunc handler, 
 			void *client_data));
-extern void
-INT_EVaction_remove_split_target(CManager cm, EVstone stone, EVaction action,
-			  EVstone target_stone);
 extern long INT_CMprobe_latency ARGS((CMConnection conn, int msg_size,
 				  attr_list attrs));
 extern int
 INT_CMwrite ARGS((CMConnection conn, CMFormat format, void *data));
-extern IOFormat
-INT_CMregister_user_format ARGS((CManager cm, IOContext context, char *format_name,
-			      IOFieldList field_list, CMFormatList subformat_list));
-extern void
-INT_CMset_conversion_IOcontext ARGS((CManager cm, IOContext context,
-				 IOFormat format, IOFieldList field_list,
-				 int native_struct_size));
 extern CMConnection
 INT_CMget_indexed_conn ARGS((CManager cm, int i));
-extern EVaction
-INT_EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list, 
-			  EVstone remote_stone);
 extern int
 INT_CMcontact_self_check ARGS((CManager cm, attr_list attrs));
 extern int INT_CMtry_return_buffer ARGS((CManager cm, void *data));
-extern IOFormat INT_CMget_IOformat_by_name ARGS((CManager cm, IOContext context,
+extern FMFormat INT_CMget_IOformat_by_name ARGS((CManager cm, FMContext context,
 					     char *name));
-extern CMFormat
-INT_CMregister_opt_format ARGS((CManager cm, char *format_name,
-		       IOFieldList field_list, CMFormatList subformat_list,
-		       IOOptInfo *opt_info));
 extern 
 void INT_CMpoll_network ARGS((CManager cm));
-extern IOFormat INT_CMlookup_user_format ARGS((CManager cm, IOFieldList field_list));
-extern IOFormat *INT_CMget_subformats_IOcontext ARGS((CManager cm, 
-						  IOContext context,
-						  void *buffer));
-extern EVaction
-INT_EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list, 
-			EVSimpleHandlerFunc handler, void* client_data);
 extern 
 void INT_CMrun_network ARGS((CManager cm));
-extern int
-INT_EVaction_add_split_target(CManager cm, EVstone stone, EVaction action,
-			  EVstone target_stone);
-
-extern int
-INT_EVaction_set_output(CManager cm, EVstone stone, EVaction action, 
-		    int output_index, EVstone output_stone);
 extern void*
 INT_CMget_transport_data ARGS((CMConnection conn));
 
-extern EVaction
-INT_EVassoc_filter_action(CManager cm, EVstone stone, 
-		      CMFormatList incoming_format_list, 
-		      EVSimpleHandlerFunc handler, EVstone out_stone,
-		      void* client_data);
 extern int INT_CMCondition_has_failed ARGS((CManager cm, int condition));
 extern int
 INT_EVtake_event_buffer ARGS((CManager cm, void *event));
 extern void
-INT_EVPsubmit(CManager cm, int local_path_id, void *data, IOFormat format);
+INT_EVPsubmit(CManager cm, int local_path_id, void *data, FMFormat format);
 extern int INT_CMlisten ARGS((CManager cm));
 extern char *
-INT_create_filter_action_spec(CMFormatList format_list, char *function);
+INT_create_filter_action_spec(FMStructDescList format_list, char *function);
 extern char *
-INT_create_router_action_spec(CMFormatList format_list, char *function);
-extern void
-INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
-		    int period_usec);
+INT_create_router_action_spec(FMStructDescList format_list, char *function);
 extern int INT_CMfork_comm_thread ARGS((CManager cm));
 extern int
 INT_CMregister_write_callback ARGS((CMConnection conn, 
@@ -467,48 +413,32 @@ INT_CMregister_write_callback ARGS((CMConnection conn,
 extern void
 INT_CMunregister_write_callback ARGS((CMConnection conn, int id));
 extern void
-INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
-		 attr_list attrs);
-extern void
-INT_EVsubmit_encoded(CManager cm, EVstone stone, void *data, int data_len, attr_list attrs);
-extern EVsource
-INT_EVcreate_submit_handle_free(CManager cm, EVstone stone, CMFormatList data_format,
-			    EVFreeFunction free_func, void *client_data);
-extern void
 INT_CMadd_poll ARGS((CManager cm, CMPollFunc func, void *client_data));
 extern void
 INT_EVPsubmit_encoded(CManager cm, int local_path_id, void *data, int len);
-extern CMFormat INT_CMlookup_format ARGS((CManager cm, IOFieldList field_list));
+extern CMFormat INT_CMlookup_format ARGS((CManager cm, FMStructDescList format_list));
 extern char *
-INT_create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function);
+INT_create_transform_action_spec(FMStructDescList format_list, FMStructDescList out_format_list, char *function);
 extern char *
-INT_create_multityped_action_spec(CMFormatList *input_format_lists, CMFormatList output_format_list, char *function);
+INT_create_multityped_action_spec(FMStructDescList *input_format_lists, FMStructDescList output_format_list, char *function);
 
 extern int INT_CMCondition_has_signaled ARGS((CManager cm, int condition));
 
-extern EVaction
-INT_EVassoc_multi_action(CManager cm, EVstone stone, char *queue_spec, 
-		      void *client_data);
 extern attr_list
 INT_CMget_specific_contact_list ARGS((CManager cm, attr_list attrs));
 
-extern EVaction
-INT_EVassoc_immediate_action(CManager cm, EVstone stone, char *queue_spec, 
-		      void *client_data);
 extern CMtrans_services
 INT_CMget_static_trans_services ARGS(());
 
-extern void INT_EVfree_stone(CManager cm, EVstone stone);
 extern void INT_CMsleep ARGS((CManager cm, int secs));
 extern int INT_CMget_self_ip_addr();
 extern attr_list INT_CMConnection_get_attrs ARGS((CMConnection conn));
-extern EVstone INT_EValloc_stone(CManager cm);
 extern void * INT_CMcreate_compat_info ARGS((CMFormat format, char *xform_code,
 			int *len_p));
-extern IOContext INT_CMget_user_type_context ARGS((CManager cm));
-extern IOFormat INT_CMget_format_app_IOcontext ARGS((CManager cm, IOContext context,
+extern FMContext INT_CMget_user_type_context ARGS((CManager cm));
+extern FFSTypeHandle INT_CMget_format_app_IOcontext ARGS((CManager cm, FFSContext context,
 					     void *buffer, void *app_context));
-extern IOFormat INT_CMget_format_IOcontext ARGS((CManager cm, IOContext context,
+extern FFSTypeHandle INT_CMget_format_IOcontext ARGS((CManager cm, FFSContext context,
 					     void *buffer));
 extern CMConnection
 INT_CMinitiate_conn ARGS((CManager cm, attr_list contact_list));
@@ -522,35 +452,13 @@ extern void
 INT_CMConnection_add_reference ARGS((CMConnection conn));
 extern int
 INT_CMConnection_set_character ARGS((CMConnection conn, attr_list attrs));
-extern EVaction
-INT_EVassoc_split_action(CManager cm, EVstone stone, EVstone *target_list);
 extern void
 INT_CMremove_periodic ARGS((CMTaskHandle handle));
-extern EVsource
-INT_EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format);
-extern void INT_CMfree_user_type_context ARGS((CManager cm, IOContext context));
-extern IOFormat INT_EVget_src_ref_format(EVsource source);
+extern void INT_CMfree_user_type_context ARGS((CManager cm, FMContext context));
 extern long
 INT_CMprobe_bandwidth ARGS((CMConnection conn, int size, attr_list attrs));
 extern int INT_CMConnection_write_would_block ARGS((CMConnection conn));
 extern void INT_CMusleep ARGS((CManager cm, int usecs));
 extern void INT_CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
 extern void INT_CM_fd_add_select ARGS((CManager cm, int fd, select_func handler_func, void *param1, void *param2));
-extern int INT_EVfreeze_stone(CManager cm, EVstone stone_id);
-extern int INT_EVunfreeze_stone(CManager cm, EVstone stone_id);
-extern int INT_EVdrain_stone(CManager cm, EVstone stone_id);
-extern EVevent_list INT_EVextract_stone_events(CManager cm, EVstone stone_id);
-extern attr_list INT_EVextract_attr_list(CManager cm, EVstone stone_id);
-extern void INT_EVset_attr_list(CManager cm, EVstone stone_id, attr_list list);
-extern void INT_EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num, int store_limit);
-extern void INT_EVstore_start_send(CManager cm, EVstone stone_num, EVaction action_num);
-extern int INT_EVstore_is_sending(CManager cm, EVstone stone_num, EVaction action_num);
-extern int INT_EVstore_count(CManager cm, EVstone stone_num, EVaction action_num);
-extern int INT_EVdestroy_stone(CManager cm, EVstone stone_id);
-extern void INT_EVfree_source(EVsource source);
-
 extern void INT_CMstart_read_thread(CMConnection conn);
-extern void INT_EVsend_stored(CManager cm, EVstone stone, EVaction action);
-extern void INT_EVclear_stored(CManager cm, EVstone stone, EVaction action);
-extern EVaction INT_EVassoc_store_action(CManager cm, EVstone stone, EVstone out_stone, int store_limit); 
-

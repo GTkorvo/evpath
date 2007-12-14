@@ -1,6 +1,6 @@
 #include "config.h"
 
-#include "io.h"
+#include "ffs.h"
 #include "gen_thread.h"
 #include "atl.h"
 #include "evpath.h"
@@ -366,7 +366,7 @@ CMConnection conn;
 int cond;
 {
     struct pbio_exchange_msg msg;
-    struct _io_encode_vec vec[2];
+    struct FFSEncodeVec vec[2];
     int actual;
 
     msg.magic = MAGIC;
@@ -392,17 +392,17 @@ int cond;
 
 static int
 CMpbio_send_format_response(ioformat, conn, cond)
-IOFormat ioformat;
+FMFormat ioformat;
 CMConnection conn;
 int cond;
 {
     struct pbio_exchange_msg msg;
-    struct _io_encode_vec vec[2];
+    struct FFSEncodeVec vec[2];
     int actual;
     char *format_body_rep;
     int body_len = 0;
 
-    format_body_rep = get_server_rep_IOformat(ioformat, &body_len);
+    format_body_rep = get_server_rep_FMformat(ioformat, &body_len);
     /*
      * msg_len is (sizeof(msg) minus 8 + whatever) because the msg struct 
      * includes magic and overall len, which is read separately.
@@ -430,19 +430,19 @@ int cond;
 
 extern int
 CMpbio_send_format_preload(ioformat, conn)
-IOFormat ioformat;
+FMFormat ioformat;
 CMConnection conn;
 {
     struct pbio_exchange_msg msg;
-    struct _io_encode_vec vec[3];
+    struct FFSEncodeVec vec[3];
     int actual;
     char *format_body_rep;
     char *server_ID;
     int body_len = 0;
     int id_len = 0;
 
-    format_body_rep = get_server_rep_IOformat(ioformat, &body_len);
-    server_ID = get_server_ID_IOformat(ioformat, &id_len);
+    format_body_rep = get_server_rep_FMformat(ioformat, &body_len);
+    server_ID = get_server_ID_FMformat(ioformat, &id_len);
     /*
      * msg_len is (sizeof(msg) minus 8 + whatever) because the msg struct 
      * includes magic and overall len, which is read separately.
@@ -485,13 +485,14 @@ CManager cm;
 	}
     }
     if (CMself_hosted_formats == 1) {
-	cm->IOcontext = 
-	    create_server_IOcontext(CMpbio_get_format_rep_callback, 
-				    CMpbio_get_port_callback, cm);
+	FMContext fmc = 
+	    create_local_FMcontext(CMpbio_get_format_rep_callback, 
+				   CMpbio_get_port_callback, cm);
+	cm->FFScontext = create_FFSContext_FM(fmc);
 	CMtrace_out(cm, CMFormatVerbose, 
 		    "\nUsing self-hosted PBIO formats\n");
     } else {
-	cm->IOcontext = create_IOcontext();
+	cm->FFScontext = create_FFSContext();
 	CMtrace_out(cm, CMFormatVerbose, 
 		    "\nUsing external PBIO format server\n");
     }
@@ -632,8 +633,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
     case PBIO_QUERY: {
 	char tmp_format_id[64];  /* oversize */
 	char *format_id;
-	IOFormat ioformat;
-	IOFormat *subformats, *tmp_sub;
+	FMFormat ioformat;
 	CMtrace_out(conn->cm, CMFormatVerbose, 
 		    "CMpbio Incoming Query message");
 	if (msg->payload1_length > sizeof(tmp_format_id)) {
@@ -656,36 +656,16 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 	    format_id = buffer + used_length;
 	    used_length += msg->payload1_length;
 	}
-	ioformat = get_local_format_IOcontext(conn->cm->IOcontext, 
-					      &format_id[0]);
+	ioformat = FMformat_from_ID(FMContext_from_FFS(conn->cm->FFScontext), 
+				    &format_id[0]);
 	if (ioformat == NULL) {
 	    CMtrace_out(conn->cm, CMFormatVerbose, 
 			"CMpbio No matching format");
 	} else {
 	    CMtrace_out(conn->cm, CMFormatVerbose, 
 			"CMpbio Returning format %s",
-			name_of_IOformat(ioformat));
+			name_of_FMformat(ioformat));
 	}
-	tmp_sub = subformats = get_subformats_IOformat(ioformat);
-
-	while (*tmp_sub != NULL) {
-	    if (*tmp_sub != ioformat) {
-		CMtrace_out(conn->cm, CMFormatVerbose, 
-			    "CMpbio Preloading subformat %s",
-			    name_of_IOformat(*tmp_sub));
-#ifndef MODULE
-		if (CMtrace_on(conn->cm, CMFormatVerbose)) {
-		    int junk;
-		    printf("CMpbio Preload is format ");
-		    print_server_ID((unsigned char*)get_server_ID_IOformat(*tmp_sub, &junk));
-		    printf("\n");
-		}
-#endif
-		CMpbio_send_format_preload(*tmp_sub, conn);
-	    }
-	    tmp_sub++;
-	}
-	free(subformats);
 	if (CMpbio_send_format_response(ioformat, conn, msg->cond) != 1) {
 	    CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio - Write Failed");
 	    INT_CMConnection_close(conn);
@@ -750,7 +730,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 	    memcpy(server_rep, buffer + used_length, msg->payload2_length);
 	    used_length += msg->payload2_length;
 	}
-	if (!load_external_format_IOcontext(conn->cm->IOcontext, format_ID,
+	if (!load_external_format_FMcontext(FMContext_from_FFS(conn->cm->FFScontext), format_ID,
 					    msg->payload1_length, server_rep)) {
 	    CMtrace_out(conn->cm, CMFormatVerbose, 
 			"CMpbio - cache load failed");

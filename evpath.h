@@ -13,7 +13,7 @@
 #endif
 #endif
 
-#include "io.h"
+#include "ffs.h"
 #include "atl.h"
 #ifdef	__cplusplus
 extern "C" {
@@ -27,48 +27,7 @@ extern "C" {
 #endif
 
 
-/*!
- * A structure to hold Format Name / Field List associations.
- *
- *
- *  This is used to associate type names with type descriptions (field lists).
- *  Together these define structure types that can be composed into larger 
- *  structures.  A CMFormatList should be the transitive closure of the
- *  structure types that are included in the first structure type
- *  (CMFormatList[0]);  The list is terminated with a {NULL, NULL}.
- */
-struct _CMformat_list {
-    /*! the name to be associated with this structure */
-    char *format_name;
-    /*! the PBIO-style list of fields within this structure */
-    IOFieldList field_list;
-};
-/* The above exist for compatibility reasons -sandip */
 
-/*!
- * A structure to hold Format Name / Field List associations.
- *
- *
- *  This is used to associate names with field lists.  Together these define 
- *  a structure that can be composed into larger structures.
- *  This is used to associate type names with type descriptions (field lists).
- *  Together these define structure types that can be composed into larger 
- *  structures.  A CMFormatList should be the transitive closure of the
- *  structure types that are included in the first structure type
- *  (CMFormatList[0]);  The list is terminated with a {NULL, NULL}.
- */
-typedef struct _IOformat_list CMFormatRec;
-
-/*!
- * A list of CMFormatRec structures.
- *
- * In its use in CM, a CMFormatList represents the transitive closure of
- * substructures that compose a larger structure.  The name/field list entry
- * for each particular format should appear before it is used (in the field
- * lists of later entries).  This implies that the first entry has only
- * fields which have atomic data types.
- */
-typedef CMFormatRec *CMFormatList;
 
 struct _CManager;
 struct _CMConnection;
@@ -421,45 +380,8 @@ CMget_indexed_conn ARGS((CManager cm, int i));
  * handler for incoming messages.
  */
 extern CMFormat
-CMregister_format ARGS((CManager cm, char *format_name,
-		       IOFieldList field_list, CMFormatList subformat_list));
+CMregister_format ARGS((CManager cm, FMStructDescList format_list));
 
-
-/*!
- * register a format (with opt_info) with CM.
- *
- * \param cm  The CManager in which to register the format.
- * \param format_name The textual name to associate with the structure
- * format.
- * \param field_list The PBIO field list which describes the structure.
- * \param subformat_list A list of name/field_list pairs that specify the
- * representation of any nested structures in the message.  If the message
- * field types are simple pre-defined PBIO types, #subformat_list can be
- * NULL.  Otherwise it should contain the transitive closure of all data
- * types necessary to specify the message representation.  The list is
- * terminated with a <tt>{NULL, NULL}</tt> value.  
- * \param opt_info This specify the compatability info and/or XML info
- *
- * Registering a format is a precursor to sending a message or registering a
- * handler for incoming messages.
- */
-extern CMFormat
-CMregister_opt_format ARGS((CManager cm, char *format_name,
-		       IOFieldList field_list, CMFormatList subformat_list,
-		       IOOptInfo *opt_info));
-
-/*!
- * Creates and returns compatabilty info.
- *
- * \param format  The CMFormat for which to create compatability info.
- * \param xform_code Code string that does the compatability conversion
- * \param len_p Length of returned buffer
- *
- * Creating compatability info is a precursor to CMregister_opt_format
- */
-extern void *
-CMcreate_compat_info ARGS((CMFormat format, char *xform_code, 
-			int *len_p));
 
 /*!
  * lookup the CMFormat associated with a particular IOFieldList
@@ -483,186 +405,7 @@ CMcreate_compat_info ARGS((CMFormat format, char *xform_code,
  * guarantee that all field lists used to register formats have a unique
  * address. 
  */
-extern CMFormat CMlookup_format ARGS((CManager cm, IOFieldList field_list));
-
-/** @defgroup user User-level Format Functions
- * This is a set of functions related to handling "user formats".  I.E. PBIO
- * formats that might be used by the application or higher level library, but
- * which are *not* used for CM messages. 
- *
- * The formats registered using CMregister_format() are used to
- * encode messages that go directly over the network connections, or to
- * decode messages that come in over those connections.  PBIO manages these
- * formats, gathering formats that it needs and caching them for future use.
- *
- * However, CM also has facilities to support a second class of PBIO
- * formats, called <b>user formats</b>.  Applications using these facilities
- * can take advantage of CM's format management services to encode data that
- * is not transmitted directly over the network links.   
- *
- * To understand when this might be appropriate, consider an remote
- * procedure call library that allows its users to register procedure names
- * and parameter type profiles and make them available for remote access.
- * The library might be implemented in CM using a "RPC Request" message
- * with a the procedure to call specified by a string name and the
- * parameters to that procedure passed as a dynamically sized block of
- * characters.  This is a simple approach to library implementation, but how
- * should the parameter block be encoded?  Leaving the
- * marshalling/unmarshalling to the application is simple, but unappealing.
- * PBIO's IOContext routines were designed for precisely this sort of
- * situation, allowing data to be encoded into an arbitrary memory block,
- * transmitted elsewhere by any mechanism, and then decoded upon arrival.
- * The RPC library could use PBIO for this task independently of CM, but
- * then is loses out on the features that CM provides (such as each CM
- * acting as its own format server instead of using a common format server).
- *
- * CM's user formats support routines allow such a library to leverage CM's
- * format services while still largely using PBIO without interference.
- * Because these facilities are preliminary, subject to change, and unlikely
- * to be required except for the most advanced uses of CM, they are not
- * described here in detail.  Instead we just list the current interface.
- * Users requiring more information are encouraged to contact the author.
- * @{
- */
-/*!
- *  get a PBIO IOContext to be used for user format operations
- * \param cm The CManager from which to acquire the user type context.
- */
-extern
-IOContext CMget_user_type_context ARGS((CManager cm));
-
-/*!
- *  deallocate a PBIO IOContext acquired with CMget_user_type_context()
- * \param cm The CManager from which the context was acquired.
- * \param context the IOContext to free.
- */
-extern
-void CMfree_user_type_context ARGS((CManager cm, IOContext context));
-
-/*!
- * register a user format with CM.
- *
- * \param cm  The CManager from which the IOContext was acquired.
- * \param context The IOContext with which to register the format.
- * \param format_name The textual name to associate with the structure
- * format.
- * \param field_list The PBIO field list which describes the structure.
- * \param subformat_list A list of name/field_list pairs that specify the
- * representation of any nested structures in the message.  If the message
- * field types are simple pre-defined PBIO types, #subformat_list can be
- * NULL.  Otherwise it should contain the transitive closure of all data
- * types necessary to specify the message representation.  The list is
- * terminated with a <tt>{NULL, NULL}</tt> value.  
- */
-extern IOFormat
-CMregister_user_format ARGS((CManager cm, IOContext context, char *format_name,
-			      IOFieldList field_list, CMFormatList subformat_list));
-
-/*!
- * lookup a user format based on the field list.
- * 
- * This call us the user-format analogue of CMlookup_format().
- * \param cm The CManager in which the format was registered.
- * \param field_list The field list which was used in the registration.
- * \return a PBIO IOFormat value
- * \note The return type differs from CMlookup_format() because we expect
- * the application to use PBIO directly for some calls.  For example,  
- * after a format is registered, PBIO encode routines can be used directly. 
- * \warning Using a PBIO-level calls and for which there is a corresponding
- * CM call may result in race conditions and unpleasant consequences.
- */
-extern IOFormat CMlookup_user_format ARGS((CManager cm, IOFieldList field_list));
-
-/*!
- * get a registered IOformat based on its simple name.
- *
- * \param cm The CManager in which the format was registered.
- * \param context The IOContext in which the format was registered.
- * \param name The name that was given the format when it was registered.
- * \return a PBIO IOFormat value.
- *
- * This call maps directly to the PBIO routine get_IOformat_by_name().  A CM
- * version is provided so that CM can protect data structures for thread
- * safety. 
- * \warning Using a PBIO-level calls and for which there is a corresponding
- * CM call may result in race conditions and unpleasant consequences.
- */
-extern IOFormat CMget_IOformat_by_name ARGS((CManager cm, IOContext context,
-					     char *name));
-/*!
- * determine the IOFormat of data in an encoded buffer.
- *
- * \param cm The CManager from which the context was acquired.
- * \param context The IOContext to be used for determining the format.
- * \param buffer The buffer holding the encoded data.
- * \return The IOFormat value that describes the encoded data.
- *
- * This call maps directly to the PBIO routine get_format_IOcontext().  A CM
- * version is provided so that CM can protect data structures for thread
- * safety. 
- * \warning Using a PBIO-level calls and for which there is a corresponding
- * CM call may result in race conditions and unpleasant consequences.
- */
-extern IOFormat CMget_format_IOcontext ARGS((CManager cm, IOContext context,
-					     void *buffer));
-/*!
- * determine the IOFormat of data in an encoded buffer, with context 
- * to recover self formats from.
- *
- * \param cm The CManager from which the context was acquired.
- * \param context The IOContext to be used for determining the format.
- * \param buffer The buffer holding the encoded data.
- * \param app_context Application context to pass to PBIO
- * \return The IOFormat value that describes the encoded data.
- *
- * This call maps directly to the PBIO routine get_format_app_IOcontext().  A CM
- * version is provided so that CM can protect data structures for thread
- * safety. 
- * \warning Using a PBIO-level calls and for which there is a corresponding
- * CM call may result in race conditions and unpleasant consequences.
- */
-extern IOFormat CMget_format_app_IOcontext ARGS((CManager cm, IOContext context,
-					     void *buffer, void *app_context));
-/*!
- * determine the transitive closure of IOFormats used in data in an encoded
- * buffer. 
- *
- * \param cm The CManager from which the context was acquired.
- * \param context The IOContext to be used for determining the format.
- * \param buffer The buffer holding the encoded data.
- * \return A NULL-terminated list of IOFormat values that occur in the
- * encoded data.  The last entry will be the IOFormat that would be returned
- * by CMget_format_IOcontext().  Conversions can be registered in the order
- * they appear in the list.
- *
- * This call maps directly to the PBIO routine get_subformats_IOcontext().
- * A CM version is provided so that CM can protect data structures for
- * thread safety. 
- * \note The IOFormat* value returned should be released with CMfree().
- * \warning Using a PBIO-level calls and for which there is a corresponding
- * CM call may result in race conditions and unpleasant consequences.
- */
-extern IOFormat *CMget_subformats_IOcontext ARGS((CManager cm, 
-						  IOContext context,
-						  void *buffer));
-/*!
- * set a conversion (correspondence between wire and native formats) for an
- * incoming IOFormat.
- *
- * \param cm The CManager from which the context was acquired.
- * \param context The IOContext in which to register the conversion.
- * \param format The IOFormat for which to register a conversion.
- * \param field_list The IOFieldList describing the native structure.
- * \param native_struct_size The sizeof() value for the native structure.
- *
- * \note Once a conversion has been set, the PBIO decode routines can be
- * used directly.
- */
-extern void
-CMset_conversion_IOcontext ARGS((CManager cm, IOContext context,
-				 IOFormat format, IOFieldList field_list,
-				 int native_struct_size));
-/**@} */
+extern CMFormat CMlookup_format ARGS((CManager cm, FMStructDescList format_list));
 
 /*!
  * send a message on a connection.
@@ -1578,14 +1321,14 @@ EVfree_stone(CManager cm, EVstone stone);
  * in subsequent calls to modify or remove the action.
  */
 extern EVaction
-EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list, 
+EVassoc_terminal_action(CManager cm, EVstone stone, FMStructDescList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
 
 /*!
  * Associate a raw terminal action (sink) with a stone.
  *
  * The specified handler will be called when any data.  Data is delivered in
- * PBIO-encoded form using the EVRawHandlerFunc interface. The event data
+ * FFS-encoded form using the EVRawHandlerFunc interface. The event data
  * supplied may not remain valid after the handler call returns.
  * EVtake_event_buffer() may be used to ensure longer-term validity of the
  * event data.  The parameters to the handler are those of
@@ -1622,7 +1365,7 @@ EVassoc_raw_terminal_action(CManager cm, EVstone stone,
  * in subsequent calls.
  */
 extern EVstone
-EVcreate_terminal_action(CManager cm, CMFormatList format_list, 
+EVcreate_terminal_action(CManager cm, FMStructDescList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
 
 extern EVaction
@@ -1728,7 +1471,7 @@ EVaction_set_output(CManager cm, EVstone stone, EVaction action,
  */
 extern EVaction
 EVassoc_filter_action(CManager cm, EVstone stone, 
-		      CMFormatList incoming_format_list, 
+		      FMStructDescList incoming_format_list, 
 		      EVSimpleHandlerFunc handler, EVstone out_stone,
 		      void* client_data);
 
@@ -1980,12 +1723,12 @@ EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num,
  *
  * \param cm The CManager associated with the stone.
  * \param stone The stone to which data is to be submitted.
- * \param data_format The CMFormatList describing the representation of the
+ * \param data_format The FMStructDescList describing the representation of the
  * data. 
  * \return An EVsource handle for use in later EVsubmit() calls.
  */
 extern EVsource
-EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format);
+EVcreate_submit_handle(CManager cm, EVstone stone, FMStructDescList data_format);
 
 /*!
  * Free a source.
@@ -2029,7 +1772,7 @@ typedef void (*EVFreeFunction) ARGS((void *event_data, void *client_data));
  *
  * \param cm The CManager associated with the stone.
  * \param stone The stone to which data is to be submitted.
- * \param data_format The CMFormatList describing the representation of the
+ * \param data_format The FMStructDescList describing the representation of the
  * data. 
  * \param free_func  The EVFreeFunction to call when EVPath has finished
  * processing the submitted data.
@@ -2038,7 +1781,7 @@ typedef void (*EVFreeFunction) ARGS((void *event_data, void *client_data));
  * \return An EVsource handle for use in later EVsubmit() calls.
  */
 extern EVsource
-EVcreate_submit_handle_free(CManager cm, EVstone stone, CMFormatList data_format,
+EVcreate_submit_handle_free(CManager cm, EVstone stone, FMStructDescList data_format,
 			    EVFreeFunction free_func, void *client_data);
 
 /*!
@@ -2088,7 +1831,7 @@ EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
  * Submit a pre-encoded event for processing by EVPath.
  *
  * EVsubmit submits a pre-encoded event for processing by EVPath.  The event 
- * must be a contiguous PBIO-encoded block of data.  The \b attrs parameter
+ * must be a contiguous FFS-encoded block of data.  The \b attrs parameter
  * specifies the attributes (name/value pairs) that the event is submitted
  * with.  These attributes will be delivered to the final terminal, as well
  * as being available at intermediate processing points.  Some attributes
@@ -2139,16 +1882,16 @@ extern void
 EVreturn_event_buffer ARGS((CManager cm, void *event));
 
 /*!
- * return the IOFormat associated with an EVsource handle.
+ * return the FFSDataHandle associated with an EVsource handle.
  *
  * Some middleware may find it useful to access the IOFormat that is
- * produced when the CMFormatList associated with a source is registered
+ * produced when the FMStructDescList associated with a source is registered
  * with PBIO.  This call merely gives access to that information to save a
  * reregistration step.
  * \param source The EVsource value for which to retrieve the associated
  * IOFormat.
  */
-extern IOFormat
+extern FMFormat
 EVget_src_ref_format(EVsource source);
 
 /*!
@@ -2357,7 +2100,7 @@ EVdestroy_stone(CManager cm, EVstone stone_id);
  */
 /*NOLOCK*/
 extern char *
-create_filter_action_spec(CMFormatList format_list, char *function);
+create_filter_action_spec(FMStructDescList format_list, char *function);
 
 /*!
  * create an action specification for a router function.
@@ -2373,7 +2116,7 @@ create_filter_action_spec(CMFormatList format_list, char *function);
  */
 /*NOLOCK*/
 extern char *
-create_router_action_spec(CMFormatList format_list, char *function);
+create_router_action_spec(FMStructDescList format_list, char *function);
 
 /*!
  * create an action specification that transforms event data.
@@ -2387,7 +2130,7 @@ create_router_action_spec(CMFormatList format_list, char *function);
  */
 /*NOLOCK*/
 extern char *
-create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_list, char *function);
+create_transform_action_spec(FMStructDescList format_list, FMStructDescList out_format_list, char *function);
 
 /*!
  * create an action specification that operates on multiple queues of events
@@ -2400,7 +2143,7 @@ create_transform_action_spec(CMFormatList format_list, CMFormatList out_format_l
  */
 /*NOLOCK*/
 extern char *
-create_multityped_action_spec(CMFormatList *input_format_lists, CMFormatList out_format_list, char *function);
+create_multityped_action_spec(FMStructDescList *input_format_lists, FMStructDescList out_format_list, char *function);
 
 /*!
  * Print a description of stone status to standard output.
@@ -2437,7 +2180,7 @@ typedef int (*EVImmediateHandlerFunc) ARGS((CManager cm,
 extern EVaction
 EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
 			   EVImmediateHandlerFunc func, void *client_data,
-			   IOFormat reference_format);
+			   FMFormat reference_format);
 
 /*!
  * Associate a conversion action.
@@ -2448,8 +2191,8 @@ EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
  * moment this is an internal interface.
  */
 extern void
-EVassoc_conversion_action(CManager cm, int stone_id, int stage, IOFormat target_format,
-			  IOFormat incoming_format);
+EVassoc_conversion_action(CManager cm, int stone_id, int stage, FMFormat target_format,
+			  FMFormat incoming_format);
 
 /* @}*/
 

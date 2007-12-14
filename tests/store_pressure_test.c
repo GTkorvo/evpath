@@ -31,16 +31,16 @@ typedef struct _nested_rec {
     complex item;
 } nested, *nested_ptr;
 
-static IOField nested_field_list[] =
+static FMField nested_field_list[] =
 {
-    {"item", "complex", sizeof(complex), IOOffset(nested_ptr, item)},
+    {"item", "complex", sizeof(complex), FMOffset(nested_ptr, item)},
     {NULL, NULL, 0, 0}
 };
 
-static IOField complex_field_list[] =
+static FMField complex_field_list[] =
 {
-    {"r", "double", sizeof(double), IOOffset(complex_ptr, r)},
-    {"i", "double", sizeof(double), IOOffset(complex_ptr, i)},
+    {"r", "double", sizeof(double), FMOffset(complex_ptr, r)},
+    {"i", "double", sizeof(double), FMOffset(complex_ptr, i)},
     {NULL, NULL, 0, 0}
 };
 
@@ -59,32 +59,32 @@ typedef struct _simple_rec {
 } simple_rec, *simple_rec_ptr;
 
 
-static IOField simple_field_list[] =
+static FMField simple_field_list[] =
 {
     {"sequence_number", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, sequence_number)}, 
+     sizeof(int), FMOffset(simple_rec_ptr, sequence_number)}, 
     {"integer_field", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
+     sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
     {"short_field", "integer",
-     sizeof(short), IOOffset(simple_rec_ptr, short_field)},
+     sizeof(short), FMOffset(simple_rec_ptr, short_field)},
     {"long_field", "integer",
-     sizeof(long), IOOffset(simple_rec_ptr, long_field)},
+     sizeof(long), FMOffset(simple_rec_ptr, long_field)},
     {"nested_field", "nested",
-     sizeof(nested), IOOffset(simple_rec_ptr, nested_field)},
+     sizeof(nested), FMOffset(simple_rec_ptr, nested_field)},
     {"double_field", "float",
-     sizeof(double), IOOffset(simple_rec_ptr, double_field)},
+     sizeof(double), FMOffset(simple_rec_ptr, double_field)},
     {"char_field", "char",
-     sizeof(char), IOOffset(simple_rec_ptr, char_field)},
+     sizeof(char), FMOffset(simple_rec_ptr, char_field)},
     {"scan_sum", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, scan_sum)},
+     sizeof(int), FMOffset(simple_rec_ptr, scan_sum)},
     {NULL, NULL, 0, 0}
 };
 
-static CMFormatRec simple_format_list[] =
+static FMStructDescRec simple_format_list[] =
 {
-    {"simple", simple_field_list},
-    {"complex", complex_field_list},
-    {"nested", nested_field_list},
+    {"simple", simple_field_list, sizeof(simple_rec), NULL},
+    {"complex", complex_field_list, sizeof(complex), NULL},
+    {"nested", nested_field_list, sizeof(nested), NULL},
     {NULL, NULL}
 };
 
@@ -126,16 +126,16 @@ typedef struct _control_rec {
     int argument;
 } control_rec, *control_rec_ptr;
 
-static IOField control_field_list[] =
+static FMField control_field_list[] =
 {
     {"command", "integer",
-     sizeof(int), IOOffset(control_rec_ptr, command)}, 
+     sizeof(int), FMOffset(control_rec_ptr, command)}, 
     {"argument", "integer",
-     sizeof(int), IOOffset(control_rec_ptr, argument)},
+     sizeof(int), FMOffset(control_rec_ptr, argument)},
     {NULL, NULL, 0, 0}
 };
 
-static CMFormatRec control_format_list[] =
+static FMStructDescRec control_format_list[] =
 {
     {"contral", control_field_list},
     {NULL, NULL}

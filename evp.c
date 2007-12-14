@@ -11,8 +11,7 @@
 #include "response.h"
 
 extern 
-IOFormat EVregister_format_set(CManager cm, CMFormatList list, 
-				    IOContext *context_ptr);
+FMFormat EVregister_format_set(CManager cm, FMStructDescList list);
 static void reference_event(event_item *event);
 static void dump_action(stone_type stone, response_cache_element *resp, 
 			int a, const char *indent);
@@ -130,7 +129,6 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	INT_CMremove_task(stone->periodic_handle);
 	stone->periodic_handle = NULL;
     }
-    CMtrace_out(cm, EVerbose, "Freeing stone %d", stone_num);
     for(i = 0; i < stone->proto_action_count; i++) {
 	proto_action *act = &stone->proto_actions[i];
 	if (act->attrs != NULL) {
@@ -151,7 +149,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	    break;
 	case Action_Decode:
 	    if (act->o.decode.context) {
-		free_IOcontext(act->o.decode.context);
+		free_FFSContext(act->o.decode.context);
 		act->o.decode.context = NULL;
 	    }
 	    break;
@@ -177,7 +175,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	switch(resp->action_type) {
 	case Action_Decode:
 	    if (resp->o.decode.context) {
-		free_IOcontext(resp->o.decode.context);
+		free_FFSContext(resp->o.decode.context);
 		resp->o.decode.context = NULL;
 	    }
 	    break;
@@ -218,14 +216,14 @@ static void
 clear_response_cache(stone_type stone)
 {
     stone->response_cache_count = 0;
+    /* GSE  free response entitites */
     if (stone->response_cache) free(stone->response_cache);
     stone->response_cache = NULL;
 }
 
 EVstone
-INT_EVcreate_terminal_action(CManager cm, 
-			CMFormatList format_list, EVSimpleHandlerFunc handler,
-			void *client_data)
+INT_EVcreate_terminal_action(CManager cm, FMStructDescList format_list, 
+			     EVSimpleHandlerFunc handler, void *client_data)
 {
     EVstone stone = INT_EValloc_stone(cm);
     (void) INT_EVassoc_terminal_action(cm, stone, format_list, 
@@ -235,8 +233,8 @@ INT_EVcreate_terminal_action(CManager cm,
 
 EVaction
 INT_EVassoc_terminal_action(CManager cm, EVstone stone_num, 
-			CMFormatList format_list, EVSimpleHandlerFunc handler,
-			void *client_data)
+			    FMStructDescList format_list, EVSimpleHandlerFunc handler,
+			    void *client_data)
 {
     event_path_data evp = cm->evp;
     int action_num;
@@ -260,9 +258,9 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone_num,
     if (format_list != NULL) {
 	stone->proto_actions[proto_action_num].requires_decoded = 1;
 	stone->proto_actions[proto_action_num].matching_reference_formats = 
-	    malloc(2*sizeof(IOFormat));
+	    malloc(2*sizeof(FMFormat));
 	stone->proto_actions[proto_action_num].matching_reference_formats[0] = 
-	    EVregister_format_set(cm, format_list, NULL);
+	    EVregister_format_set(cm, format_list);
 	stone->proto_actions[proto_action_num].matching_reference_formats[1] = NULL;
     } else {
 	stone->proto_actions[proto_action_num].requires_decoded = 0;
@@ -395,7 +393,7 @@ INT_EVassoc_congestion_action(CManager cm, EVstone stone_num,
 
 EVstone
 INT_EVassoc_filter_action(CManager cm, EVstone stone_num, 
-		      CMFormatList format_list, EVSimpleHandlerFunc handler,
+		      FMStructDescList format_list, EVSimpleHandlerFunc handler,
 		      EVstone out_stone_num, void *client_data)
 {
     event_path_data evp = cm->evp;
@@ -416,9 +414,9 @@ INT_EVassoc_filter_action(CManager cm, EVstone stone_num,
     stone->proto_actions[proto_action_num].matching_reference_formats = NULL;
     if (format_list != NULL) {
 	stone->proto_actions[proto_action_num].matching_reference_formats = 
-	    malloc(2*sizeof(IOFormat));
+	    malloc(2*sizeof(FMFormat));
 	stone->proto_actions[proto_action_num].matching_reference_formats[0] = 
-	    EVregister_format_set(cm, format_list, NULL);
+	    EVregister_format_set(cm, format_list);
 	stone->proto_actions[proto_action_num].matching_reference_formats[1] = NULL;
     }	
     stone->proto_action_count++;
@@ -443,7 +441,7 @@ INT_EVassoc_store_action(CManager cm, EVstone stone_num, EVstone out_stone,
 
     act->requires_decoded = 0;
     act->action_type = Action_Store;
-    act->matching_reference_formats = malloc(sizeof(IOFormat));
+    act->matching_reference_formats = malloc(sizeof(FMFormat));
     act->matching_reference_formats[0] = NULL; /* signal that we accept all formats */
     storage_queue_init(cm, &act->o.store.queue, &storage_queue_default_ops, NULL);
     act->o.store.target_stone_id = out_stone;
@@ -646,73 +644,25 @@ static storage_queue_ops storage_queue_default_ops = {
 /* }}} */
 
 
-static void
-set_conversions(IOContext ctx, IOFormat src_format, IOFormat target_format)
-{
-    IOFormat* subformat_list, *saved_subformat_list, *target_subformat_list;
-    subformat_list = get_subformats_IOformat(src_format);
-    saved_subformat_list = subformat_list;
-    target_subformat_list = get_subformats_IOformat(target_format);
-    while((subformat_list != NULL) && (*subformat_list != NULL)) {
-	char *subformat_name = name_of_IOformat(*subformat_list);
-	int j = 0, found = 0;
-	while(target_subformat_list && 
-	      (target_subformat_list[j] != NULL)) {
-	    if (strcmp(name_of_IOformat(target_subformat_list[j]), 
-		       subformat_name) == 0) {
-		IOFieldList sub_field_list;
-		int sub_struct_size;
-		sub_field_list = 
-		    field_list_of_IOformat(target_subformat_list[j]);
-		sub_struct_size = struct_size_field_list(sub_field_list, 
-							 sizeof(char*));
-		set_conversion_IOcontext(ctx, *subformat_list,
-					 sub_field_list,
-					 sub_struct_size);
-		found++;
-	    }
-	    j++;
-	}
-	if (!found && (subformat_list[1] != NULL)) {
-	    printf("No match for %s\n", 
-		   global_name_of_IOformat(*subformat_list));
-	}
-	subformat_list++;
-    }
-    if (!has_conversion_IOformat(src_format)) {
-	IOFieldList sub_field_list;
-	int sub_struct_size;
-	sub_field_list = field_list_of_IOformat(target_format);
-	sub_struct_size = struct_size_field_list(sub_field_list, 
-						 sizeof(char*));
-	set_conversion_IOcontext(ctx, src_format, sub_field_list,
-				 sub_struct_size);
-    }
-    free(saved_subformat_list);
-    free(target_subformat_list);
-}
-
 extern void
 INT_EVassoc_conversion_action(cm, stone_id, stage, target_format, incoming_format)
 CManager cm;
 int stone_id;
 int stage;
-IOFormat target_format;
-IOFormat incoming_format;
+FMFormat target_format;
+FMFormat incoming_format;
 {
     response_cache_element *act;
     stone_type stone = &(cm->evp->stone_map[stone_id]);
     int a = stone->response_cache_count;
     int id_len;
-    IOFormat format;
-
-    char *server_id = get_server_ID_IOformat(incoming_format,
-						     &id_len);
+    FFSTypeHandle format;
+    char *server_id = get_server_ID_FMformat(incoming_format, &id_len);
     CMtrace_out(cm, EVerbose, "Adding Conversion action %d to stone %d",
 		a, stone_id);
     if (CMtrace_on(cm, EVerbose)) {
-	char *target_tmp = global_name_of_IOformat(target_format);
-	char *incoming_tmp = global_name_of_IOformat(incoming_format);
+	char *target_tmp = global_name_of_FMFormat(target_format);
+	char *incoming_tmp = global_name_of_FMFormat(incoming_format);
 	printf("   Incoming format is %s, target %s\n", incoming_tmp, 
 	       target_tmp);
     }
@@ -725,13 +675,13 @@ IOFormat incoming_format;
     act->reference_format = incoming_format;
     act->stage = (action_class) stage;
 
-    act->o.decode.context = create_IOsubcontext(cm->evp->root_context);
-    format = get_format_app_IOcontext(act->o.decode.context, 
-				      server_id, NULL);
+    act->o.decode.context = create_FFSContext_FM(cm->evp->fmc);
+    format = FFSTypeHandle_from_encode(act->o.decode.context, 
+				      server_id);
     act->o.decode.decode_format = format;
     act->o.decode.target_reference_format = target_format;
-    set_conversions(act->o.decode.context, format,
-		    act->o.decode.target_reference_format);
+    establish_conversion(act->o.decode.context, format,
+			 format_list_of_FMFormat(act->o.decode.target_reference_format));
     stone->response_cache_count++;
 }
 
@@ -783,7 +733,7 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
 	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is NULL");
     } else {
 	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %lx (%s)",
-	   event->reference_format, name_of_IOformat(event->reference_format));
+	   event->reference_format, name_of_FMformat(event->reference_format));
     }
     for (i=0; i < stone->response_cache_count; i++) {
         if (!compatible_stages(stage, stone->response_cache[i].stage)) {
@@ -816,6 +766,7 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
      * don't search again.
      */
     if (stone->response_cache_count == 0) {
+	if (stone->response_cache != NULL) free(stone->response_cache);
 	stone->response_cache = malloc(sizeof(stone->response_cache[0]));
     } else {
 	stone->response_cache = 
@@ -913,6 +864,7 @@ return_event(event_path_data evp, event_item *event)
 	}
 	if (event->attrs != NULL) INT_CMfree_attr_list(event->cm, event->attrs);
 	if (event->ioBuffer != NULL)
+	    free_FFSBuffer(event->ioBuffer);
 	free(event);
     }
 }
@@ -929,9 +881,9 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
     case Event_CM_Owned:
 	if (decode_in_place_possible(act->o.decode.decode_format)) {
 	    void *decode_buffer;
-	    if (!decode_in_place_IOcontext(act->o.decode.context,
-					   event->encoded_event, 
-					   (void**) (long) &decode_buffer)) {
+	    if (!FFSdecode_in_place(act->o.decode.context,
+				    event->encoded_event, 
+				    (void**) (long) &decode_buffer)) {
 		printf("Decode failed\n");
 		return 0;
 	    }
@@ -941,14 +893,14 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
 	    event->reference_format = act->o.decode.target_reference_format;
 	    return event;
 	} else {
-	    int decoded_length = this_IOrecord_length(act->o.decode.context, 
-						      event->encoded_event,
-						      event->event_len);
+	    int decoded_length = FFS_est_decode_length(act->o.decode.context, 
+						       event->encoded_event,
+						       event->event_len);
 	    CMbuffer cm_decode_buf = cm_get_data_buf(cm, decoded_length);
 	    void *decode_buffer = cm_decode_buf->buffer;
 	    if (event->event_len == -1) printf("BAD LENGTH\n");
-	    decode_to_buffer_IOcontext(act->o.decode.context, 
-				       event->encoded_event, decode_buffer);
+	    FFSdecode_to_buffer(act->o.decode.context, event->encoded_event, 
+				decode_buffer);
 	    INT_CMtake_buffer(cm, decode_buffer);
 	    event->decoded_event = decode_buffer;
 	    event->event_encoded = 0;
@@ -960,15 +912,15 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
     case Event_App_Owned:
     {
 	/* can't do anything with the old event, make a new one */
-	int decoded_length = this_IOrecord_length(act->o.decode.context, 
-						  event->encoded_event,
-						  event->event_len);
+	int decoded_length = FFS_est_decode_length(act->o.decode.context, 
+						   event->encoded_event,
+						   event->event_len);
 	event_item *new_event = get_free_event(evp);
 	CMbuffer cm_decode_buf = cm_get_data_buf(cm, decoded_length);
 	void *decode_buffer = cm_decode_buf->buffer;
 	if (event->event_len == -1) printf("BAD LENGTH\n");
-	decode_to_buffer_IOcontext(act->o.decode.context, 
-				   event->encoded_event, decode_buffer);
+	FFSdecode_to_buffer(act->o.decode.context, 
+			    event->encoded_event, decode_buffer);
 	INT_CMtake_buffer(cm, decode_buffer);
 	new_event->decoded_event = decode_buffer;
 	new_event->event_encoded = 0;
@@ -993,21 +945,20 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
 static void
 encode_event(CManager cm, event_item *event)
 {
-    event_path_data evp = cm->evp;
     if (event->event_encoded) {
 	assert(0);
     }
 	
     if (event->ioBuffer != NULL) return;  /* already encoded */
-    event->ioBuffer = create_IOBuffer();
+    event->ioBuffer = create_FFSBuffer();
     event->encoded_event = 
-	encode_IOcontext_bufferB(evp->root_context, event->reference_format,
-				 event->ioBuffer, event->decoded_event,
-				 &event->event_len);
+	FFSencode(event->ioBuffer, event->reference_format,
+		  event->decoded_event,
+		  &event->event_len);
 }
 
 extern void
-ecl_encode_event(CManager cm, event_item *event)
+cod_encode_event(CManager cm, event_item *event)
 {
     encode_event(cm, event);
 }
@@ -1033,7 +984,7 @@ cached_stage_for_action(proto_action *act) {
 }
 
 extern event_item * 
-ecl_decode_event(CManager cm, int stone_num, int act_num, event_item *event) {
+cod_decode_event(CManager cm, int stone_num, int act_num, event_item *event) {
     event_path_data evp = cm->evp;
     stone_type stone;
     action_class stage;
@@ -1076,7 +1027,7 @@ dump_action(stone_type stone, response_cache_element *resp, int a, const char *i
 	int i = 0;
 	while (act->matching_reference_formats[i] != NULL) {
 	    char *tmp;
-	    printf("\"%s\" ", tmp = global_name_of_IOformat(act->matching_reference_formats[i]));
+	    printf("\"%s\" ", tmp = global_name_of_FMFormat(act->matching_reference_formats[i]));
 	    i++;
 	    free(tmp);
 	}
@@ -1350,7 +1301,7 @@ process_events_stone(CManager cm, int s, action_class c)
                 /* ignore event */
                 char *tmp = NULL;
                 if (event->reference_format)
-                    tmp = global_name_of_IOformat(event->reference_format);
+                    tmp = global_name_of_FMFormat(event->reference_format);
                 printf("No action found for event %lx submitted to stone %d\n",
                        (long)event, s);
                 dump_stone(&evp->stone_map[s]);
@@ -1373,6 +1324,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		event_item *event_to_submit;
 		CMtrace_out(cm, EVerbose, "Decoding event, action id %d", resp_id);
 		event_to_submit = decode_action(cm, event, resp);
+		if (event_to_submit == NULL) return more_pending;
 		item->item = event_to_submit;
 		resp_id = determine_action(cm, stone, c, event_to_submit, 0);
 		resp = &stone->response_cache[resp_id];
@@ -1664,9 +1616,8 @@ do_output_action(CManager cm, int s)
 		if (event->reference_format == NULL) {
 		    CMtrace_out(cm, EVWarning, "Tried to output event with NULL reference format.  Event discarded.\n");
 		} else {
-		    tmp_format.format = event->reference_format;
-		    tmp_format.format_name = name_of_IOformat(event->reference_format);
-		    tmp_format.IOsubcontext = (IOContext) iofile_of_IOformat(event->reference_format);
+		    tmp_format.fmformat = event->reference_format;
+		    tmp_format.format_name = name_of_FMformat(event->reference_format);
 		    tmp_format.registration_pending = 0;
 		    ret = internal_write_event(act->o.out.conn, &tmp_format,
 					       &act->o.out.remote_stone_id, 4, 
@@ -1717,8 +1668,8 @@ INT_EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num, int n
 
 extern EVaction
 INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
-			   EVImmediateHandlerFunc func, void *client_data, 
-			   IOFormat reference_format)
+			       EVImmediateHandlerFunc func, void *client_data, 
+			       FMFormat reference_format)
 {
     event_path_data evp = cm->evp;
     stone_type stone = &evp->stone_map[stone_id];
@@ -1739,7 +1690,7 @@ INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
 extern EVaction
 INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
 				  EVMultiHandlerFunc func, void *client_data, 
-				  IOFormat *reference_formats)
+				  FMFormat *reference_formats)
 {
     event_path_data evp = cm->evp;
     stone_type stone = &evp->stone_map[stone_id];
@@ -2350,81 +2301,12 @@ INT_EVhandle_control_message(CManager cm, CMConnection conn, unsigned char type,
     }
 }
 
-static int
-register_subformats(context, field_list, sub_list)
-IOContext context;
-IOFieldList field_list;
-CMFormatList sub_list;
+extern FMFormat
+EVregister_format_set(CManager cm, FMStructDescList list)
 {
-    char **subformats = get_subformat_names(field_list);
-    char **save_subformats = subformats;
+    FMFormat format;
 
-    if (subformats != NULL) {
-	while (*subformats != NULL) {
-	    int i = 0;
-	    if (get_IOformat_by_name_IOcontext(context, *subformats) != NULL) {
-		/* already registered this subformat */
-		goto next_format;
-	    }
-	    while (sub_list && (sub_list[i].format_name != NULL)) {
-		if (strcmp(sub_list[i].format_name, *subformats) == 0) {
-		    IOFormat tmp;
-		    if (register_subformats(context, sub_list[i].field_list,
-					      sub_list) != 1) {
-			fprintf(stderr, "Format registration failed for subformat \"%s\"\n",
-				sub_list[i].format_name);
-			return 0;
-		    }
-		    tmp = register_IOcontext_format(*subformats,
-						    sub_list[i].field_list,
-						    context);
-		    if (tmp == NULL) {
-			fprintf(stderr, "Format registration failed for subformat \"%s\"\n",
-				sub_list[i].format_name);
-			return 0;
-		    }
-		    goto next_format;
-		}
-		i++;
-	    }
-	    fprintf(stderr, "Subformat \"%s\" not found in format list\n",
-		    *subformats);
-	    return 0;
-	next_format:
-	    free(*subformats);
-	    subformats++;
-	}
-    }
-    free(save_subformats);
-    return 1;
-}
-
-extern IOFormat
-EVregister_format_set(CManager cm, CMFormatList list, IOContext *context_ptr)
-{
-    event_path_data evp = cm->evp;
-    char *server_id;
-    int id_len;
-    IOFormat format;
-    IOContext tmp_context = create_IOsubcontext(evp->root_context);
-
-    if (register_subformats(tmp_context, list[0].field_list, list) != 1) {
-	fprintf(stderr, "Format registration failed for format \"%s\"\n",
-		list[0].format_name);
-	return 0;
-    }
-    format = register_opt_format(list[0].format_name, 
-				 list[0].field_list, NULL, 
-				 tmp_context);
-    server_id = get_server_ID_IOformat(format, &id_len);
-    if (context_ptr == NULL) {
-	/* replace original ref with ref in base context */
-	format = get_format_app_IOcontext(evp->root_context, server_id, NULL);
-
-	free_IOsubcontext(tmp_context);
-    } else {
-	*context_ptr = tmp_context;
-    }
+    format = register_data_format(cm->evp->fmc, list);
     return format;
 }
 
@@ -2473,7 +2355,7 @@ INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec,
 
 
 extern EVsource
-INT_EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format)
+INT_EVcreate_submit_handle(CManager cm, EVstone stone, FMStructDescList data_format)
 {
     EVsource source = malloc(sizeof(*source));
     memset(source, 0, sizeof(*source));
@@ -2481,26 +2363,23 @@ INT_EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList data_format)
     source->cm = cm;
     source->preencoded = 0;
     if (data_format != NULL) {
-	source->format = INT_CMregister_format(cm, data_format[0].format_name,
-					   data_format[0].field_list,
-					   data_format);
-	source->reference_format = EVregister_format_set(cm, data_format, NULL);
+	source->format = INT_CMregister_format(cm, data_format);
+	source->reference_format = EVregister_format_set(cm, data_format);
     };
     return source;
 }
 
 extern EVsource
 INT_EVcreate_submit_handle_free(CManager cm, EVstone stone, 
-			    CMFormatList data_format, 
+			    FMStructDescList data_format, 
 			    EVFreeFunction free_func, void *free_data)
 {
     EVsource source = malloc(sizeof(*source));
     memset(source, 0, sizeof(*source));
     source->local_stone_id = stone;
     source->cm = cm;
-    source->format = INT_CMregister_format(cm, data_format[0].format_name,
-					    data_format[0].field_list, data_format);
-    source->reference_format = EVregister_format_set(cm, data_format, NULL);
+    source->format = INT_CMregister_format(cm, data_format);
+    source->reference_format = EVregister_format_set(cm, data_format);
     source->free_func = free_func;
     source->free_data = free_data;
     source->preencoded = 0;
@@ -2530,8 +2409,8 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     event->event_encoded = 1;
     event->event_len = length;
     event->encoded_event = buffer;
-    event->reference_format = get_format_app_IOcontext(evp->root_context, 
-					     buffer, conn);
+    event->reference_format = FMFormat_of_original(FFSTypeHandle_from_encode(evp->ffsc, 
+							buffer));
     event->attrs = CMadd_ref_attr_list(cm, attrs);
     event->format = NULL;
     CMtrace_out(cm, EVerbose, "Event coming in from network to stone %d", 
@@ -2549,9 +2428,8 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
 	    }
 	}
 	printf("CM - record contents are:\n  ");
-	r = dump_limited_encoded_IOrecord((IOFile)evp->root_context, 
-					  event->reference_format,
-					  event->encoded_event, dump_char_limit);
+	r = FMdump_encoded_data(event->reference_format,
+				event->encoded_event, dump_char_limit);
 	if (r && !warned) {
 	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
 	    printf("  To change size limits, set CMDumpSize environment variable.\n\n\n");
@@ -2601,8 +2479,8 @@ INT_EVsubmit(EVsource source, void *data, attr_list attrs)
     if (source->preencoded) {
 	event->event_encoded = 1;
 	event->encoded_event = data;
-	event->reference_format = get_format_app_IOcontext(evp->root_context, 
-							   data, NULL);
+	event->reference_format = FMFormat_of_original(FFSTypeHandle_from_encode(evp->ffsc, 
+							    data));
     } else {
 	event->event_encoded = 0;
 	event->decoded_event = data;
@@ -2629,8 +2507,8 @@ INT_EVsubmit_encoded(CManager cm, EVstone stone, void *data, int data_len, attr_
     event->event_encoded = 1;
     event->encoded_event = data;
     event->event_len = data_len;
-    event->reference_format = get_format_app_IOcontext(evp->root_context, 
-						       data, NULL);
+    event->reference_format = FMFormat_of_original(FFSTypeHandle_from_encode(evp->ffsc, 
+							data));
 
     event->attrs = CMadd_ref_attr_list(cm, attrs);
     internal_path_submit(cm, stone, event);
@@ -2650,7 +2528,9 @@ free_evp(CManager cm, void *not_used)
     cm->evp = NULL;
     if (evp == NULL) return;
     free(evp->stone_map);
-    free_IOcontext(evp->root_context);
+    free(evp->as);
+    /* freed when CM frees it */
+    /*  free_FFSContext(evp->ffsc);*/
     while (evp->queue_items_free_list != NULL) {
 	queue_item *tmp = evp->queue_items_free_list->next;
 	free(evp->queue_items_free_list);
@@ -2665,7 +2545,8 @@ EVPinit(CManager cm)
 {
     cm->evp = INT_CMmalloc(sizeof( struct _event_path_data));
     memset(cm->evp, 0, sizeof( struct _event_path_data));
-    cm->evp->root_context = create_IOsubcontext(cm->IOcontext);
+    cm->evp->ffsc = cm->FFScontext;
+    cm->evp->fmc = FMContext_from_FFS(cm->evp->ffsc);
     cm->evp->queue_items_free_list = NULL;
     cm->evp->lock = thr_mutex_alloc();
     internal_add_shutdown_task(cm, free_evp, NULL);
@@ -2758,7 +2639,7 @@ void *event;
 	    (long) event);
 }
 
-extern IOFormat
+extern FMFormat
 INT_EVget_src_ref_format(EVsource source)
 {
     return source->reference_format;

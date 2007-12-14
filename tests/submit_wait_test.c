@@ -44,16 +44,16 @@ typedef struct send_request {
     int target_stone;
 } send_request, *send_request_ptr;
 
-static IOField send_request_field_list[] = {
-    {"start_seqno", "integer", sizeof(int), IOOffset(send_request_ptr, start_seqno)},
-    {"size", "integer", sizeof(int), IOOffset(send_request_ptr, size)},
-    {"count", "integer", sizeof(int), IOOffset(send_request_ptr, count)},
-    {"target_contact", "string", sizeof(char*), IOOffset(send_request_ptr, target_contact)},
-    {"target_stone", "integer", sizeof(int), IOOffset(send_request_ptr, target_stone)},
+static FMField send_request_field_list[] = {
+    {"start_seqno", "integer", sizeof(int), FMOffset(send_request_ptr, start_seqno)},
+    {"size", "integer", sizeof(int), FMOffset(send_request_ptr, size)},
+    {"count", "integer", sizeof(int), FMOffset(send_request_ptr, count)},
+    {"target_contact", "string", sizeof(char*), FMOffset(send_request_ptr, target_contact)},
+    {"target_stone", "integer", sizeof(int), FMOffset(send_request_ptr, target_stone)},
     {NULL, NULL, 0, 0}
 };
 
-static CMFormatRec send_request_format_list[] = {
+static FMStructDescRec send_request_format_list[] = {
     {"send_request", send_request_field_list},
     {NULL, NULL}
 };
@@ -64,14 +64,14 @@ typedef struct data_event {
     int data_size;
 } data_event, *data_event_ptr;
 
-static IOField data_event_field_list[] = {
-    {"seqno", "integer", sizeof(int), IOOffset(data_event_ptr, seqno)},
-    {"data_size", "integer", sizeof(int), IOOffset(data_event_ptr, data_size)},
-    {"data", "char[data_size]", sizeof(char), IOOffset(data_event_ptr, data)},
+static FMField data_event_field_list[] = {
+    {"seqno", "integer", sizeof(int), FMOffset(data_event_ptr, seqno)},
+    {"data_size", "integer", sizeof(int), FMOffset(data_event_ptr, data_size)},
+    {"data", "char[data_size]", sizeof(char), FMOffset(data_event_ptr, data)},
     {NULL, NULL}
 };
 
-static CMFormatRec data_event_format_list[] = {
+static FMStructDescRec data_event_format_list[] = {
     {"data_event", data_event_field_list},
     {NULL, NULL}
 };

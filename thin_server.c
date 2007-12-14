@@ -82,11 +82,11 @@ EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
 
 
 typedef struct thin_conn {
-    IOFile iofile;
+    FFSFile ffsfile;
     int fd;
     int target_stone;
     int format_count;
-    IOFormatList format_list;
+    FMStructDescList *format_list;
     int max_src_list;
     EVsource *src_list;
 } *thin_conn_data;
@@ -103,14 +103,22 @@ thin_data_available(void *cmv, void * conn_datav)
     CManager cm = (CManager) cmv;
     int i;
 
-    switch(next_IOrecord_type(cd->iofile)) {
-    case IOend:
-    case IOerror:
-	close_IOfile(cd->iofile);
-	free_IOfile(cd->iofile);
+    switch(FFSnext_record_type(cd->ffsfile)) {
+    case FFSend:
+    case FFSerror:
+	close_FFSfile(cd->ffsfile);
+	free_FFSfile(cd->ffsfile);
 	for (i=0; i < cd->format_count; i++) {
-	    free(cd->format_list[i].format_name);
-	    free_field_list(cd->format_list[i].field_list);
+	    int j = 0;
+	    while((cd->format_list[i])[j].format_name != NULL) {
+		int k = 0;
+		free(cd->format_list[i][j].format_name);
+		while (cd->format_list[i][j].field_list[k].field_name != NULL) {
+		    free((char*)cd->format_list[i][j].field_list[k].field_name);
+		    free((char*)cd->format_list[i][j].field_list[k].field_type);
+		}
+		j++;
+	    }
 	}
 	free(cd->format_list);
 	for (i=0; i <= cd->max_src_list; i++) {
@@ -122,33 +130,35 @@ thin_data_available(void *cmv, void * conn_datav)
 	CM_fd_remove_select(cm, cd->fd);
 	free(cd);
 	break;
-    case IOformat: {
-	IOFormat next_format = read_format_IOfile(cd->iofile);
-	if (cd->format_count == 0) {
+    case FFSformat: {
+	FFSTypeHandle next_format = FFSread_format(cd->ffsfile);
+	FMStructDescList formats = 
+	    get_localized_formats(FMFormat_of_original(next_format));
+	FFSTypeHandle target = 
+	    FFSset_fixed_target(FFSContext_of_file(cd->ffsfile), 
+				formats);
+	int format_num = FMformat_index(FMFormat_of_original(target));
+	if (cd->format_list == NULL) {
 	    cd->format_list = malloc(sizeof(cd->format_list[0]));
-	} else {
+	    cd->format_count = 1;
+	}
+	if (cd->format_count < format_num) {
 	    cd->format_list = 
 		realloc(cd->format_list, 
-			(cd->format_count + 1) * sizeof(cd->format_list[0]));
+			(format_num + 1) * sizeof(cd->format_list[0]));
+	    memset(cd->format_list + cd->format_count, 0,
+		   sizeof(cd->format_list[0]) * (format_num -cd->format_count ));
+	    cd->format_count = format_num + 1;
 	}
-	cd->format_list[cd->format_count].format_name = 
-	    strdup(name_of_IOformat(next_format));
-	cd->format_list[cd->format_count].field_list =
-	    get_local_field_list(next_format);
-	set_IOconversion(cd->iofile, name_of_IOformat(next_format),
-			 cd->format_list[cd->format_count].field_list,
-			 struct_size_field_list(cd->format_list[cd->format_count].field_list, sizeof(char*)));
-	cd->format_count++;
+	cd->format_list[format_num] = formats;
 	break;
     }
-    case IOdata: {
-	IOFormat next_format = next_IOrecord_format(cd->iofile);
-	IOFormatList data_format;
-	int format_index, i;
-	int len = next_IOrecord_length(cd->iofile);
-	int format_num = index_of_IOformat(next_format);
+    case FFSdata: {
+	FFSTypeHandle next_format = FFSnext_type_handle(cd->ffsfile);
+	int len = FFSnext_data_length(cd->ffsfile);
+	int format_num = FMformat_index(FMFormat_of_original(next_format));
 	void *data = malloc(len);
-	read_IOfile(cd->iofile, data);
+	FFSread(cd->ffsfile, data);
 	if (cd->max_src_list < format_num) {
 	    cd->src_list = realloc(cd->src_list, 
 				   (format_num+1) * sizeof(cd->src_list[0]));
@@ -157,25 +167,16 @@ thin_data_available(void *cmv, void * conn_datav)
 	    cd->max_src_list = format_num;
 	}
 	if (cd->src_list[format_num] == NULL) {
-	    data_format = malloc(sizeof(data_format[0]) * (cd->format_count + 2));
-	    format_index = 0;
-	    while(strcmp(name_of_IOformat(next_format), 
-			 cd->format_list[format_index].format_name) != 0) format_index++;
-	    for (i=0; i==format_index; i++) {
-		data_format[i] = cd->format_list[format_index - i];
-	    }
-	    data_format[format_index+1].format_name = NULL;
-	    data_format[format_index+1].field_list = NULL;
 	    cd->src_list[format_num] = 
-		EVcreate_submit_handle_free(cm, cd->target_stone, data_format,
+		EVcreate_submit_handle_free(cm, cd->target_stone, 
+					    cd->format_list[format_num],
 					    thin_free_func, cd);
-	    free(data_format);
 	}
 	EVsubmit(cd->src_list[format_num], data, NULL);
 	break;
     }
-    case IOcomment: {
-	char *comment = read_comment_IOfile(cd->iofile);
+    case FFScomment: {
+	char *comment = FFSread_comment(cd->ffsfile);
 	if (strncmp(comment, "Stone ", 6) == 0) {
 	    int tmp_stone;
 	    if (sscanf(comment, "Stone %d", &tmp_stone) == 1) {
@@ -239,7 +240,7 @@ socket_accept_thin_client(void *cmv, void * sockv)
 
     cd = malloc(sizeof(*cd));
     memset(cd, 0, sizeof(*cd));
-    cd->iofile = open_IOfd(sock, "r");
+    cd->ffsfile = open_FFSfd((void*)(long)sock, "r");
     cd->fd = sock;
     cd->src_list = malloc(sizeof(cd->src_list[0]));
     cd->src_list[0] = NULL;

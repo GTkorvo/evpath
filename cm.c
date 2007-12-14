@@ -18,7 +18,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #endif
-#include <io.h>
+#include <ffs.h>
 #include <atl.h>
 #include "evpath.h"
 #include "gen_thread.h"
@@ -546,7 +546,9 @@ INT_CManager_create()
 
     cm->contact_lists = NULL;
     cm->shutdown_functions = NULL;
+#ifdef EV_INTERNAL_H
     EVPinit(cm);
+#endif
     return cm;
 }
 
@@ -571,7 +573,6 @@ CManager cm;
     INT_CMfree(cm->in_formats);
 
     for (i=0 ; i < cm->reg_format_count; i++) {
-	free_IOsubcontext(cm->reg_formats[i]->IOsubcontext);
 	INT_CMfree(cm->reg_formats[i]->format_name);
 	INT_CMfree(cm->reg_formats[i]);
     }
@@ -597,7 +598,7 @@ CManager cm;
      */
     /* thr_mutex_free(cm->exchange_lock);*/
 
-    free_IOcontext(cm->IOcontext);
+    free_FFSContext(cm->FFScontext);
     thr_mutex_free(cm->context_lock);
 
     i = 0;
@@ -788,9 +789,8 @@ attr_list conn_attrs;
     conn->closed = 0;
     conn->failed = 0;
     conn->downloaded_formats = NULL;
-    conn->IOsubcontext = create_IOsubcontext(trans->cm->IOcontext);
     conn->foreign_data_handler = NULL;
-    conn->io_out_buffer = create_IOBuffer();
+    conn->io_out_buffer = create_FFSBuffer();
     conn->close_list = NULL;
     conn->write_callback_len = 0;
     conn->write_callbacks = NULL;
@@ -969,12 +969,13 @@ CMConnection conn;
     if (conn->write_callbacks) INT_CMfree(conn->write_callbacks);
     thr_mutex_free(conn->write_lock);
     thr_mutex_free(conn->read_lock);
-    free_IOsubcontext(conn->IOsubcontext);
     INT_CMfree(conn->downloaded_formats);
     conn->foreign_data_handler = NULL;
-    free_IOBuffer(conn->io_out_buffer);
+    free_FFSBuffer(conn->io_out_buffer);
     free_AttrBuffer(conn->attr_encode_buffer);
+#ifdef EV_INTERNAL_H
     INT_EVforget_connection(conn->cm, conn);
+#endif
     INT_CMfree(conn);
 }
 
@@ -1562,7 +1563,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     int header_len;
     int stone_id;
     char *decode_buffer = NULL, *data_buffer;
-    IOFormat format;
+    FFSTypeHandle format;
     CManager cm = conn->cm;
     CMincoming_format_list cm_format = NULL;
 
@@ -1683,7 +1684,9 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	} else {
 	    arg = ((int *) base)[0];
 	}
+#ifdef EV_INTERNAL_H
         INT_EVhandle_control_message(conn->cm, conn, performance_func, arg);
+#endif
         return 0;
     }
     data_buffer = base + attr_length;
@@ -1706,54 +1709,63 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	conn->buffer_full_point = 0;
 	conn->buffer_data_end = 0;
 	conn->partial_buffer = NULL;
+#ifdef EV_INTERNAL_H	
 	internal_cm_network_submit(cm, cm_data_buf, attrs, conn, data_buffer,
 				   data_length, stone_id);
+#endif
 	cm_return_data_buf(cm_data_buf);
 	return 0;
     }
-    format = get_format_app_IOcontext(conn->cm->IOcontext, data_buffer, conn);
+    for (i = 0; i < cm->reg_format_count; i++) {
+	if (cm->reg_formats[i]->registration_pending)
+	    CMcomplete_format_registration(cm->reg_formats[i], 0);
+
+    }
+    format = FFS_target_from_encode(conn->cm->FFScontext, data_buffer);
     if (format == NULL) {
 	fprintf(stderr, "invalid format in incoming buffer\n");
 	return 0;
     }
     CMtrace_out(cm, CMDataVerbose, "CM - Receiving record of type %s", 
-		name_of_IOformat(format));
+		name_of_FMformat(FMFormat_of_original(format)));
     for (i=0; i< cm->in_format_count; i++) {
 	if (cm->in_formats[i].format == format) {
 	    cm_format = &cm->in_formats[i];
 	}
     }
     if (cm_format == NULL) {
-	cm_format = CMidentify_rollbackCMformat(cm, format);
+	cm_format = CMidentify_rollbackCMformat(cm, data_buffer);
 	if(cm_format)
-		CMcreate_conversion(cm, cm_format);
+	    CMcreate_conversion(cm, cm_format);
     }
 
     if ((cm_format == NULL) || (cm_format->handler == NULL)) {
 	fprintf(stderr, "CM - No handler for incoming data of this version of format \"%s\"\n",
-		name_of_IOformat(format));
+		name_of_FMformat(FMFormat_of_original(format)));
 	return 0;
     }
-    assert(has_conversion_IOformat(format));
+    assert(FFShas_conversion(format));
 
     if (decode_in_place_possible(format)) {
-	if (!decode_in_place_IOcontext(cm->IOcontext, data_buffer, 
+	if (!FFSdecode_in_place(cm->FFScontext, data_buffer, 
 				       (void**) (long) &decode_buffer)) {
 	    printf("Decode failed\n");
 	    return 0;
 	}
     } else {
-	decoded_length = this_IOrecord_length(cm->IOcontext, data_buffer, data_length);
+	decoded_length = FFS_est_decode_length(cm->FFScontext, data_buffer, data_length);
 	cm_decode_buf = cm_get_data_buf(cm, decoded_length);
 	decode_buffer = cm_decode_buf->buffer;
-	decode_to_buffer_IOcontext(cm->IOcontext, data_buffer, decode_buffer);
+	FFSdecode_to_buffer(cm->FFScontext, data_buffer, decode_buffer);
 	cm_return_data_buf(conn->partial_buffer);
 	conn->partial_buffer = NULL;
     }
     if(cm_format->older_format) {
+#ifdef EVOL
 	if(!process_old_format_data(cm, cm_format, &decode_buffer, &cm_decode_buf)){
 	    return 0;
 	}
+#endif
     }
     if (CMtrace_on(conn->cm, CMDataVerbose)) {
 	static int dump_char_limit = 256;
@@ -1768,8 +1780,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	    }
 	}
 	printf("CM - record contents are:\n  ");
-	r = dump_limited_unencoded_IOrecord((IOFile)cm->IOcontext, format,
-					    decode_buffer, dump_char_limit);
+	r = FMdump_data(FMFormat_of_original(cm_format->format), decode_buffer, dump_char_limit);
 	if (r && !warned) {
 	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
 	    printf("  To change size limits, set CMDumpSize environment variable.\n\n\n");
@@ -1809,7 +1820,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	attrs = NULL;
     }
     CMtrace_out(cm, CMDataVerbose, "CM - Finish processing - record of type %s", 
-		name_of_IOformat(format));
+		name_of_FMformat(FMFormat_of_original(format)));
     return 0;
 }
 
@@ -1885,7 +1896,7 @@ CMConnection conn;
 		conn->queued_data.rem_attr_len);
     CManager_lock(conn->cm);
     if (conn->queued_data.rem_header_len != 0) {
-	struct _io_encode_vec tmp_vec[1];
+	struct FFSEncodeVec tmp_vec[1];
 	int actual;
 	tmp_vec[0].iov_base = conn->queued_data.rem_header;
 	tmp_vec[0].iov_len = conn->queued_data.rem_header_len;
@@ -1905,7 +1916,7 @@ CMConnection conn;
 	}
     }
     if (conn->queued_data.rem_attr_len != 0) {
-	struct _io_encode_vec tmp_vec[1];
+	struct FFSEncodeVec tmp_vec[1];
 	int actual;
 	tmp_vec[0].iov_base = conn->queued_data.rem_attr_base;
 	tmp_vec[0].iov_len = conn->queued_data.rem_attr_len;
@@ -1925,7 +1936,7 @@ CMConnection conn;
     {
 	int vec_count = 0;
 	int length = 0;
-	IOEncodeVector vec = conn->queued_data.vector_data;
+	FFSEncodeVector vec = conn->queued_data.vector_data;
 	int actual = 0;
 	
 	while(vec[vec_count].iov_base != NULL) {
@@ -1983,8 +1994,8 @@ static void
 queue_remaining_write(conn, tmp_vec, pbio_vec, vec_count, attrs, 
 		      actual_bytes_written, attrs_present)
 CMConnection conn;
-IOEncodeVector tmp_vec;
-IOEncodeVector pbio_vec;
+FFSEncodeVector tmp_vec;
+FFSEncodeVector pbio_vec;
 int vec_count;
 attr_list attrs;
 int actual_bytes_written;
@@ -2032,7 +2043,7 @@ int attrs_present;
      * PBIO buffer as well.
      */
     conn->queued_data.vector_data = 
-	copy_all_to_IOBuffer(conn->io_out_buffer, &pbio_vec[j]);
+	copy_all_to_FFSBuffer(conn->io_out_buffer, &pbio_vec[j]);
 }
 
 static void
@@ -2108,7 +2119,7 @@ CMConnection conn;
 
 /* Returns 1 if successful, -1 if deferred, 0 on error */
 static int
-INT_CMwrite_raw(CMConnection conn, IOEncodeVector full_vec, IOEncodeVector data_vec,
+INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector data_vec,
                 int vec_count, int byte_count, attr_list attrs, int nowp, int data_vec_stack)
 {
     int actual = 0;
@@ -2124,7 +2135,7 @@ INT_CMwrite_raw(CMConnection conn, IOEncodeVector full_vec, IOEncodeVector data_
             /* copy remaining and send it later */
             if (actual_bytes < 0 ) actual_bytes = 0;
             if (data_vec_stack) {
-                data_vec = copy_vector_to_IOBuffer(conn->io_out_buffer, data_vec);
+                data_vec = copy_vector_to_FFSBuffer(conn->io_out_buffer, data_vec);
             }
             queue_remaining_write(conn, full_vec, data_vec, vec_count, 
                                   attrs, actual_bytes, attrs != NULL);
@@ -2152,9 +2163,9 @@ INT_CMwrite_raw(CMConnection conn, IOEncodeVector full_vec, IOEncodeVector data_
 extern int
 INT_CMwrite_evcontrol(CMConnection conn, unsigned char type, int argument) {
     int evcontrol_header[2] = {0x45564300, 0};
-    struct _io_encode_vec static_vec[3];
+    struct FFSEncodeVec static_vec[3];
     int success;
-    IOEncodeVector vec = &static_vec[0];
+    FFSEncodeVector vec = &static_vec[0];
     assert(sizeof(int) == 4);
     vec[0].iov_base = evcontrol_header;
     vec[0].iov_len = sizeof(evcontrol_header);
@@ -2177,7 +2188,7 @@ attr_list attrs;
 {
     int no_attr_header[2] = {0x434d4400, 0};  /* CMD\0 in first entry */
     int attr_header[3] = {0x434d4100, 0, 0};  /* CMA\0 in first entry */
-    IOEncodeVector vec;
+    FFSEncodeVector vec;
     int length = 0, vec_count = 0, actual;
     int do_write = 1;
     void *encoded_attrs = NULL;
@@ -2198,7 +2209,7 @@ attr_list attrs;
     if (format->registration_pending) {
 	CMcomplete_format_registration(format, 1);
     }
-    if (format->format == NULL) {
+    if (format->fmformat == NULL) {
 	printf("Format registration has failed for format \"%s\" - write aborted\n",
 	       format->format_name);
 	return 0;
@@ -2218,15 +2229,13 @@ attr_list attrs;
 	    }
 	}
 	printf("CM - Writing record of type %s\n",
-	       name_of_IOformat(format->format));
+	       name_of_FMformat(format->fmformat));
 	if (attrs != NULL) {
 	    printf("CM - write attributes are:");
 	    dump_attr_list(attrs);
 	}
 	printf("CM - record contents are:\n  ");
-	r = dump_limited_unencoded_IOrecord((IOFile)format->IOsubcontext, 
-					    format->format,
-					    data, dump_char_limit);
+	r = FMdump_data(format->fmformat, data, dump_char_limit);
 	if (r && !warned) {
 	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
 	    printf("  To change size limits, set CMDumpSize environment variable.\n\n\n");
@@ -2235,8 +2244,7 @@ attr_list attrs;
     }
 
     /* encode data with CM context */
-    vec = encode_IOcontext_vectorB(format->IOsubcontext, conn->io_out_buffer,
-				   format->format, data);
+    vec = FFSencode_vector(conn->io_out_buffer, format->fmformat, data);
     while(vec[vec_count].iov_base != NULL) {
 	length += vec[vec_count].iov_len;
 	vec_count++;
@@ -2254,8 +2262,8 @@ attr_list attrs;
 	do_write = cm_write_hook(length);
     }
     if (do_write) {
-	struct _io_encode_vec static_vec[100];
-	IOEncodeVector tmp_vec = &static_vec[0];
+	struct FFSEncodeVec static_vec[100];
+	FFSEncodeVector tmp_vec = &static_vec[0];
 	int byte_count = length;/* sum lengths */
 	if (vec_count >= sizeof(static_vec)/ sizeof(static_vec[0])) {
 	    tmp_vec = INT_CMmalloc((vec_count+1) * sizeof(*tmp_vec));
@@ -2296,6 +2304,7 @@ attr_list attrs;
     return 1;
 }
 
+#ifdef EV_INTERNAL_H
 extern int
 internal_write_event(conn, format, remote_path_id, path_len, event, attrs)
 CMConnection conn;
@@ -2305,13 +2314,12 @@ int path_len;
 event_item *event;
 attr_list attrs;
 {
-    IOEncodeVector vec;
-    struct _io_encode_vec preencoded_vec[2];
+    FFSEncodeVector vec;
+    struct FFSEncodeVec preencoded_vec[2];
     int data_length = 0, vec_count = 0, actual, attr_len = 0;
     int do_write = 1;
     void *encoded_attrs = NULL;
     int attrs_present = 0;
-    int XML_output = conn->XML_output;
 
     /* ensure conn is open */
     if (conn->closed != 0) {
@@ -2328,7 +2336,7 @@ attr_list attrs;
     if (format->registration_pending) {
 	CMcomplete_format_registration(format, 1);
     }
-    if (format->format == NULL) {
+    if (format->fmformat == NULL) {
 	printf("Format registration has failed for format \"%s\" - write aborted\n",
 	       format->format_name);
 	return 0;
@@ -2348,7 +2356,7 @@ attr_list attrs;
 	    }
 	}
 	printf("CM - Writing record %lx of type %s\n", (long)event,
-	       name_of_IOformat(format->format));
+	       name_of_FMformat(format->fmformat));
 	if (attrs != NULL) {
 	    printf("CM - write attributes are:");
 	    dump_attr_list(attrs);
@@ -2358,14 +2366,12 @@ attr_list attrs;
 	printf("CM - record contents ");
 	if (event->decoded_event) {
 	    printf("DECODED are:\n  ");
-	    r = dump_limited_unencoded_IOrecord((IOFile)format->IOsubcontext, 
-						format->format,
-						event->decoded_event, dump_char_limit);
+	    r = FMdump_data(format->fmformat, event->decoded_event,
+			    dump_char_limit);
 	} else {
 	    printf("ENCODED are:\n  ");
-	    r = dump_limited_encoded_IOrecord((IOFile)format->IOsubcontext, 
-					      format->format,
-					      event->encoded_event, dump_char_limit);
+	    r = FMdump_encoded_data(format->fmformat,
+				    event->encoded_event, dump_char_limit);
 	}	    
 	if (r && !warned) {
 	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
@@ -2374,35 +2380,15 @@ attr_list attrs;
 	}
     }
 
-    if (!XML_output) {
-	if (!event->encoded_event) {
-	    /* encode data with CM context */
-	    vec = encode_IOcontext_vectorB(format->IOsubcontext, conn->io_out_buffer,
-					   format->format, event->decoded_event);
-	    while(vec[vec_count].iov_base != NULL) {
-		data_length += vec[vec_count].iov_len;
-		vec_count++;
-	    }
-	} else {
-	    vec = &preencoded_vec[0];
-	    preencoded_vec[0].iov_base = event->encoded_event;
-	    preencoded_vec[0].iov_len = event->event_len;
-	    preencoded_vec[1].iov_base = NULL;
-	    preencoded_vec[1].iov_len = 0;
-	    vec_count = 1;
-	    data_length = event->event_len;
+    if (!event->encoded_event) {
+	/* encode data with CM context */
+	vec = FFSencode_vector(conn->io_out_buffer,
+			       format->fmformat, event->decoded_event);
+	while(vec[vec_count].iov_base != NULL) {
+	    data_length += vec[vec_count].iov_len;
+	    vec_count++;
 	}
     } else {
-	/* XML output */
-	char *str;
-	if (!event->encoded_event) {
-	    str = IOunencoded_to_XML_string(format->IOsubcontext, 
-					    format->format,
-					    event->decoded_event);
-	} else {
-	    str = IOencoded_to_XML_string(format->IOsubcontext, 
-					  event->encoded_event);
-	}
 	vec = &preencoded_vec[0];
 	preencoded_vec[0].iov_base = event->encoded_event;
 	preencoded_vec[0].iov_len = event->event_len;
@@ -2422,8 +2408,8 @@ attr_list attrs;
 	do_write = cm_write_hook(data_length);
     }
     if (do_write) {
-	struct _io_encode_vec static_vec[100];
-	IOEncodeVector tmp_vec = &static_vec[0];
+	struct FFSEncodeVec static_vec[100];
+	FFSEncodeVector tmp_vec = &static_vec[0];
 	int byte_count = data_length;/* sum lengths */
 	int header[4] = {0x434d4C00, 0, 0, 0};  /* CML\0 in first entry */
 	if (vec_count >= sizeof(static_vec)/ sizeof(static_vec[0])) {
@@ -2438,7 +2424,7 @@ attr_list attrs;
 	    header[3] = *((int*)remote_path_id);
 	}
 	if (attrs == NULL) {
-	    IOEncodeVector assign_vec = tmp_vec;
+	    FFSEncodeVector assign_vec = tmp_vec;
 	    header[2] = 0;
 	    if (path_len != 4) {
 		tmp_vec[1].iov_base = remote_path_id;
@@ -2472,9 +2458,6 @@ attr_list attrs;
 	if (tmp_vec != &static_vec[0]) {
 	    INT_CMfree(tmp_vec);
 	}
-	if (XML_output) {
-	    free(preencoded_vec[0].iov_base);
-	}
 	if (actual == 0) {
 	    /* fail */
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, 
@@ -2485,6 +2468,7 @@ attr_list attrs;
     CMtrace_out(conn->cm, CMLowLevelVerbose, "Writev success");
     return 1;
 }
+#endif
 
 static void
 init_non_blocking_conn(CMConnection conn)
@@ -2550,7 +2534,7 @@ char *buffer;
     case CMPerfProbe:
 	/* first half of latency probe arriving */
 	{
-	    struct _io_encode_vec tmp_vec[2];
+	    struct FFSEncodeVec tmp_vec[2];
 	    int header[2];
 	    int actual;
 	    tmp_vec[0].iov_base = &header;

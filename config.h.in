@@ -1,40 +1,13 @@
 /* config.h.in.  Generated from configure.in by autoheader.  */
 
-/* define if sys/socket.h declares accept */
-#undef ACCEPT_DEFINED
-
-/* define if sys/socket.h declares bind */
-#undef BIND_DEFINED
-
-/* define if string.h declares bzero */
-#undef BZERO_DEFINED
-
 /* Place where cm transport libraries are built */
 #undef CM_LIBRARY_BUILD_DIR
 
 /* Place where cm transport libraries are installed */
 #undef CM_LIBRARY_INSTALL_DIR
 
-/* define if sys/socket.h declares connect */
-#undef CONNECT_DEFINED
-
-/* define if stdio.h declares fprintf */
-#undef FPRINTF_DEFINED
-
 /* define if unistd.h declares getdomainname */
 #undef GETDOMAINNAME_DEFINED
-
-/* define if unistd.h declares gethostname */
-#undef GETHOSTNAME_DEFINED
-
-/* define if sys/socket.h declares getpeername */
-#undef GETPEERNAME_DEFINED
-
-/* define if sys/socket.h declares getsockname */
-#undef GETSOCKNAME_DEFINED
-
-/* define if sys/time.h declares gettimeofday */
-#undef GETTIMEOFDAY_DEFINED
 
 /* define if struct hostent is declared in netdb.h or winsock.h */
 #undef HAS_STRUCT_HOSTENT
@@ -90,9 +63,6 @@
 /* Define to 1 if you have the <gen_thread.h> header file. */
 #undef HAVE_GEN_THREAD_H
 
-/* Define to 1 if you have the <hostLib.h> header file. */
-#undef HAVE_HOSTLIB_H
-
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
@@ -129,9 +99,6 @@
 /* Define if libtool can extract symbol lists from object files. */
 #undef HAVE_PRELOADED_SYMBOLS
 
-/* Define to 1 if you have the <pwd.h> header file. */
-#undef HAVE_PWD_H
-
 /* Define to 1 if you have the `readdir' function. */
 #undef HAVE_READDIR
 
@@ -143,9 +110,6 @@
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
-
-/* Define to 1 if you have the <streams/un.h> header file. */
-#undef HAVE_STREAMS_UN_H
 
 /* Define to 1 if you have the <strings.h> header file. */
 #undef HAVE_STRINGS_H
@@ -162,41 +126,20 @@
 /* Define to 1 if you have the <sys/dl.h> header file. */
 #undef HAVE_SYS_DL_H
 
-/* Define to 1 if you have the <sys/resource.h> header file. */
-#undef HAVE_SYS_RESOURCE_H
-
-/* Define to 1 if you have the <sys/select.h> header file. */
-#undef HAVE_SYS_SELECT_H
-
 /* Define to 1 if you have the <sys/sockio.h> header file. */
 #undef HAVE_SYS_SOCKIO_H
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
 
-/* Define to 1 if you have the <sys/times.h> header file. */
-#undef HAVE_SYS_TIMES_H
-
-/* Define to 1 if you have the <sys/time.h> header file. */
-#undef HAVE_SYS_TIME_H
-
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
-
-/* Define to 1 if you have the <sys/uio.h> header file. */
-#undef HAVE_SYS_UIO_H
-
-/* Define to 1 if you have the <sys/un.h> header file. */
-#undef HAVE_SYS_UN_H
 
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
 /* Define to 1 if you have the <windows.h> header file. */
 #undef HAVE_WINDOWS_H
-
-/* define if listen is declared in sys/socket.h */
-#undef LISTEN_DEFINED
 
 /* Define if the OS needs help to load dependent libraries for dlopen(). */
 #undef LTDL_DLOPEN_DEPLIBS
@@ -236,50 +179,14 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
-/* define if stdio.h declares printf */
-#undef PRINTF_DEFINED
-
-/* define if unistd.h or stdlib.h declares putenv */
-#undef PUTENV_DEFINED
-
-/* define if unistd.h declares read */
-#undef READ_DEFINED
-
-/* define if unistd.h or sys/select.h declares select */
-#undef SELECT_DEFINED
-
-/* define if sys/socket.h declares sendto */
-#undef SENDTO_DEFINED
-
-/* define if setrlimit is declared in sys/resource.h */
-#undef SETRLIMIT_DEFINED
-
-/* define if sys/socket.h declares setsockopt */
-#undef SETSOCKOPT_DEFINED
-
-/* define if sprintf is declared in stdio.h */
-#undef SPRINTF_DEFINED
-
-/* define if stdio.h declares sscanf */
-#undef SSCANF_DEFINED
-
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
-
-/* define if string.h declares strdup */
-#undef STRDUP_DEFINED
 
 /* Define this if Pthreads should be used for running tests */
 #undef USE_PTHREADS
 
 /* Version number of package */
 #undef VERSION
-
-/* define if unistd.h declares write */
-#undef WRITE_DEFINED
-
-/* Define this if compiling for linux kernel */
-#undef __KERNEL__
 
 /* Define so that glibc/gnulib argp.h does not typedef error_t. */
 #undef __error_t_defined

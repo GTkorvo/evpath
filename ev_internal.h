@@ -1,13 +1,14 @@
 #ifndef GEN_THREAD_H
 #include "gen_thread.h"
 #endif
+#define EV_INTERNAL_H
 
 typedef struct ev_free_block_rec {
     int ref_count;
     CManager cm;
     void *free_arg;
     void *block;
-    IOFormat ioformat;
+    FMFormat ioformat;
 /*    EControlContext locking_context;*/
     attr_list attrs;
     struct free_block_rec *next;
@@ -22,9 +23,9 @@ typedef struct _event_item {
     void *encoded_event;
     int event_len;
     void *decoded_event;
-    IOEncodeVector encoded_eventv;
-    IOFormat reference_format;
-    IOBuffer ioBuffer;
+    FFSEncodeVector encoded_eventv;
+    FMFormat reference_format;
+    FFSBuffer ioBuffer;
     CMFormat format;
     attr_list attrs;
 
@@ -64,9 +65,9 @@ typedef struct output_action_struct {
 } output_action_vals;
 
 typedef struct decode_action_struct {
-    IOFormat decode_format; /* has conversion registered */
-    IOFormat target_reference_format;
-    IOContext context;
+    FFSTypeHandle decode_format; /* has conversion registered */
+    FMFormat target_reference_format;
+    FFSContext context;
 } decode_action_vals;
 
 typedef struct immediate_cache_vals {
@@ -130,8 +131,8 @@ struct storage_proto_vals {
 
 typedef struct _proto_action {
     action_value action_type;
-    CMFormatList input_format_requirements;
-    IOFormat *matching_reference_formats;
+    FMStructDescList input_format_requirements;
+    FMFormat *matching_reference_formats;
     union {
 	struct terminal_proto_vals term;
 	output_action_vals out;
@@ -146,7 +147,7 @@ typedef struct _proto_action {
 } proto_action;
 
 typedef struct response_cache_element {
-    IOFormat reference_format;
+    FMFormat reference_format;
     action_class stage;
     action_value action_type;		/* if -1, no action */
     int proto_action_id;
@@ -204,7 +205,8 @@ typedef struct _event_path_data {
     int stone_count;
     stone_type stone_map;
     void *as;
-    IOContext root_context;
+    FMContext fmc;
+    FFSContext ffsc;
     queue_item *queue_items_free_list;
     event_item *current_event_item;
     queue_item *taken_events_list;
@@ -215,7 +217,7 @@ typedef struct _event_path_data {
 struct _EVSource {
     CManager cm;
     CMFormat format;
-    IOFormat reference_format;
+    FMFormat reference_format;
     int local_stone_id;
     int preencoded;
     EVFreeFunction free_func;
@@ -224,8 +226,8 @@ struct _EVSource {
 
 
 extern void EVPinit(CManager cm);
-extern IOFormat
-EVregister_format_set(CManager cm, CMFormatList list, IOContext *context_ptr);
+extern FMFormat
+EVregister_format_set(CManager cm, FMStructDescList list);
 
 extern int
 internal_path_submit(CManager cm, int local_path_id, event_item *event);
@@ -241,7 +243,7 @@ extern int INT_EVsubmit_encoded_or_wait ( CManager cm, EVstone stone, void *data
 extern EVstone INT_EVcreate_output_action(CManager cm, attr_list contact_list, EVstone remote_stone);
 extern EVstone INT_EVcreate_immediate_action(CManager cm, char *action_spec, EVstone *target_list);
 extern EVstone INT_EVcreate_split_action(CManager cm, EVstone *target_list);
-extern EVstone INT_EVcreate_terminal_action(CManager cm, CMFormatList format_list, 
+extern EVstone INT_EVcreate_terminal_action(CManager cm, FMStructDescList format_list, 
 					    EVSimpleHandlerFunc handler, 
 					    void *client_data);
 extern EVstone INT_EVcreate_auto_stone(CManager cm, int period_sec, 
@@ -251,7 +253,7 @@ extern EVstone INT_EVcreate_store_action(CManager cm, EVstone out_tsone, int sto
 extern EVaction
 INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
 				  EVMultiHandlerFunc func, void *client_data, 
-				  IOFormat *reference_formats);
+				  FMFormat *reference_formats);
 extern EVaction
 INT_EVassoc_congestion_action(CManager cm, EVstone stone_num, 
 			      char *action_spec, void *client_data);
@@ -259,10 +261,82 @@ INT_EVassoc_congestion_action(CManager cm, EVstone stone_num,
 extern EVevent_list extract_events_from_queue(CManager cm, queue_ptr que, EVevent_list list);
 extern event_item * get_free_event(event_path_data evp);
 extern void return_event(event_path_data evp, event_item *event);
-extern void ecl_encode_event(CManager cm, event_item *event);
-extern event_item *ecl_decode_event(CManager cm, int stone_num, int act_num, event_item *event);
+extern void cod_encode_event(CManager cm, event_item *event);
+extern event_item *cod_decode_event(CManager cm, int stone_num, int act_num, event_item *event);
 extern void EVdiscard_queue_item(CManager cm, int stone, queue_item *item);
 
 extern void INT_EVstall_stone(CManager cm, EVstone stone_id);
 extern void INT_EVunstall_stone(CManager cm, EVstone stone_id);
 extern void REVPinit(CManager cm);
+extern int
+internal_write_event(CMConnection conn, CMFormat format, 
+		     void *remote_path_id, int path_len, event_item *event,
+		     attr_list attrs);
+extern EVaction
+INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
+			       EVImmediateHandlerFunc func, void *client_data,
+			       FMFormat reference_format);
+extern void
+INT_EVassoc_conversion_action(CManager cm, int stone_id, int stage, FMFormat target_format,
+			      FMFormat incoming_format);
+extern void
+INT_EVaction_remove_split_target(CManager cm, EVstone stone, EVaction action,
+			  EVstone target_stone);
+extern EVaction
+INT_EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list, 
+			  EVstone remote_stone);
+extern EVaction
+INT_EVassoc_terminal_action(CManager cm, EVstone stone, FMStructDescList format_list, 
+			    EVSimpleHandlerFunc handler, void* client_data);
+extern int
+INT_EVaction_add_split_target(CManager cm, EVstone stone, EVaction action,
+			  EVstone target_stone);
+
+extern int
+INT_EVaction_set_output(CManager cm, EVstone stone, EVaction action, 
+		    int output_index, EVstone output_stone);
+extern EVaction
+INT_EVassoc_filter_action(CManager cm, EVstone stone, 
+			  FMStructDescList incoming_format_list, 
+			  EVSimpleHandlerFunc handler, EVstone out_stone,
+			  void* client_data);
+extern void
+INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec, 
+		    int period_usec);
+extern void
+INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
+		 attr_list attrs);
+extern void
+INT_EVsubmit_encoded(CManager cm, EVstone stone, void *data, int data_len, attr_list attrs);
+extern EVsource
+
+INT_EVcreate_submit_handle_free(CManager cm, EVstone stone, FMStructDescList data_format,
+			    EVFreeFunction free_func, void *client_data);
+extern EVaction
+INT_EVassoc_multi_action(CManager cm, EVstone stone, char *queue_spec, 
+		      void *client_data);
+extern EVaction
+INT_EVassoc_immediate_action(CManager cm, EVstone stone, char *queue_spec, 
+		      void *client_data);
+extern void INT_EVfree_stone(CManager cm, EVstone stone);
+extern EVstone INT_EValloc_stone(CManager cm);
+extern void INT_EVsend_stored(CManager cm, EVstone stone, EVaction action);
+extern void INT_EVclear_stored(CManager cm, EVstone stone, EVaction action);
+extern EVaction INT_EVassoc_store_action(CManager cm, EVstone stone, EVstone out_stone, int store_limit); 
+extern EVaction
+INT_EVassoc_split_action(CManager cm, EVstone stone, EVstone *target_list);
+extern EVsource
+INT_EVcreate_submit_handle(CManager cm, EVstone stone, FMStructDescList data_format);
+extern FMFormat INT_EVget_src_ref_format(EVsource source);
+extern int INT_EVfreeze_stone(CManager cm, EVstone stone_id);
+extern int INT_EVunfreeze_stone(CManager cm, EVstone stone_id);
+extern int INT_EVdrain_stone(CManager cm, EVstone stone_id);
+extern EVevent_list INT_EVextract_stone_events(CManager cm, EVstone stone_id);
+extern attr_list INT_EVextract_attr_list(CManager cm, EVstone stone_id);
+extern void INT_EVset_attr_list(CManager cm, EVstone stone_id, attr_list list);
+extern void INT_EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num, int store_limit);
+extern void INT_EVstore_start_send(CManager cm, EVstone stone_num, EVaction action_num);
+extern int INT_EVstore_is_sending(CManager cm, EVstone stone_num, EVaction action_num);
+extern int INT_EVstore_count(CManager cm, EVstone stone_num, EVaction action_num);
+extern int INT_EVdestroy_stone(CManager cm, EVstone stone_id);
+extern void INT_EVfree_source(EVsource source);

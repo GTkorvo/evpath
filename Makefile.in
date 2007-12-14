@@ -71,9 +71,9 @@ libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
 am_libevpath_la_OBJECTS = cm.lo cm_control.lo cm_formats.lo cm_util.lo \
-	cm_transport.lo cm_lock.lo cm_pbio.lo cm_evol.lo evp.lo \
-	response.lo cm_interface.lo thin_server.lo version.lo revp.lo \
-	cm_threadio.lo
+	cm_transport.lo cm_lock.lo cm_pbio.lo cm_interface.lo \
+	version.lo cm_threadio.lo cm_evol.lo evp.lo response.lo \
+	revp.lo evp_compat.lo thin_server.lo
 libevpath_la_OBJECTS = $(am_libevpath_la_OBJECTS)
 libevpath_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -144,6 +144,7 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
+FFSDIR = @FFSDIR@
 FGREP = @FGREP@
 GREP = @GREP@
 INCLTDL = @INCLTDL@
@@ -152,9 +153,6 @@ INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
-KERNEL_OBJS = @KERNEL_OBJS@
-KERNEL_TARGET_MOD = @KERNEL_TARGET_MOD@
-KERNEL_VERSION = @KERNEL_VERSION@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
 LIBADD_DL = @LIBADD_DL@
@@ -189,14 +187,12 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATHPROG = @PATHPROG@
 PATH_SEPARATOR = @PATH_SEPARATOR@
-PBIODIR = @PBIODIR@
 PERL = @PERL@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 SOCKET_LIBS = @SOCKET_LIBS@
-STATIC = @STATIC@
 STRIP = @STRIP@
 TAGS = @TAGS@
 VERSION = @VERSION@
@@ -253,25 +249,24 @@ target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign
-SUBDIRS = libltdl . tests rtests examples
+SUBDIRS = libltdl . mtests tests rtests otests
 INCLUDES = $(INCLTDL)
 EXTRA_DIST = 
 lib_LTLIBRARIES = libevpath.la
 EXTRA_LTLIBRARIES = 
 libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c\
-		       cm_lock.c cm_pbio.c cm_evol.c evp.c response.c \
-		       cm_interface.c thin_server.c version.c revp.c cm_threadio.c
+		       cm_lock.c cm_pbio.c cm_interface.c version.c \
+		       cm_threadio.c cm_evol.c evp.c response.c revp.c \
+		       evp_compat.c thin_server.c 
 
-libevpath_la_LDFLAGS = $(MATH_LIB)
-libevpath_la_LIBADD = $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lIO -lecl @SOCKET_LIBS@ @KERNEL_OBJS@ 
-libevpath_la_DEPENDENCIES = $(LIBLTDL) $(LTLIBS) @KERNEL_OBJS@
-include_HEADERS = evpath.h revpath.h
+libevpath_la_LDFLAGS = $(MATH_LIB) -version-info 1:0:0
+libevpath_la_LIBADD = $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lffs -lcod @SOCKET_LIBS@ 
+libevpath_la_DEPENDENCIES = $(LIBLTDL) $(LTLIBS)
+include_HEADERS = evpath.h evpath_old.h revpath.h
 AM_CPPFLAGS = 
 noinst_HEADERS = assert.h cm_internal.h  ev_internal.h
-@KERNEL_TRUE@BUILT_SOURCES = env.c kcm.c presym.c
-@KERNEL_FALSE@MOSTLYCLEANFILES = cm_interface.c
-@KERNEL_TRUE@MOSTLYCLEANFILES = cm_module.o
-all: $(BUILT_SOURCES) config.h
+MOSTLYCLEANFILES = cm_interface.c revp.c revpath.h
+all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
 
 .SUFFIXES:
@@ -408,6 +403,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_transport.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_util.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp_compat.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/response.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/revp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thin_server.Plo@am__quote@
@@ -735,8 +731,7 @@ distcleancheck: distclean
 	       exit 1; } >&2
 check-am: all-am
 	$(MAKE) $(AM_MAKEFLAGS) check-local
-check: $(BUILT_SOURCES)
-	$(MAKE) $(AM_MAKEFLAGS) check-recursive
+check: check-recursive
 all-am: Makefile $(LTLIBRARIES) $(PROGRAMS) $(HEADERS) config.h \
 		all-local
 install-binPROGRAMS: install-libLTLIBRARIES
@@ -746,8 +741,7 @@ installdirs-am:
 	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" "$(DESTDIR)$(includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
-install: $(BUILT_SOURCES)
-	$(MAKE) $(AM_MAKEFLAGS) install-recursive
+install: install-recursive
 install-exec: install-exec-recursive
 install-data: install-data-recursive
 uninstall: uninstall-recursive
@@ -772,7 +766,6 @@ distclean-generic:
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
-	-test -z "$(BUILT_SOURCES)" || rm -f $(BUILT_SOURCES)
 clean: clean-recursive
 
 clean-am: clean-binPROGRAMS clean-generic clean-libLTLIBRARIES \
@@ -864,53 +857,12 @@ uninstall-am: uninstall-binPROGRAMS uninstall-includeHEADERS \
 
 cm_interface.c revp.c revpath.h: evpath.h gen_interface.pl
 	@PERL@ ./gen_interface.pl
-@KERNEL_TRUE@install-exec-local: cm_module.o
-@KERNEL_TRUE@		install -d /lib/modules/@KERNEL_VERSION@/misc /lib/modules/misc
-@KERNEL_TRUE@		install -c cm_module.o /lib/modules/@KERNEL_VERSION@/misc
-@KERNEL_TRUE@		install -c cm_module.o /lib/modules/misc
-@KERNEL_TRUE@all-local: cm_module.o
-@KERNEL_TRUE@check-local: kernel_check_target
-@KERNEL_FALSE@all-local:
-@KERNEL_FALSE@check-local:
-@KERNEL_FALSE@install-exec-local:
+all-local:
+check-local:
+install-exec-local:
 
 libtool: $(LIBTOOL_DEPS)
 	$(SHELL) ./config.status --recheck
-
-cm.::
-
-kernel_check_target: cm_module.o kernel/undefined_syms
-	nm cm_module.o | grep U > /tmp/cur_undefined_syms
-	cmp /tmp/cur_undefined_syms kernel/undefined_syms
-	rm /tmp/cur_undefined_syms
-
-cm_module.o:	libcm.la libcmsockets.la libcmselect.la
-	rm -fr /tmp/cm_build
-	mkdir /tmp/cm_build
-	cp .libs/libcm.a /tmp/cm_build
-	cp .libs/libcmselect.a /tmp/cm_build
-	cp .libs/libcmsockets.a /tmp/cm_build
-	cd /tmp/cm_build ; ar x libcm.a ; ar x libcmselect.a ;  ar x libcmsockets.a
-	cd /tmp/cm_build ; rm libcm.a libcmselect.a libcmsockets.a
-	cd /tmp/cm_build ; ld -r *.o -o $@
-	cp /tmp/cm_build/cm_module.o .
-	rm -fr /tmp/cm_build 
-
-env.c: kcm.h
-	rm -f env.c
-	$(LN_S) kernel/env.c env.c
-
-presym.c: kcm.h
-	rm -f presym.c
-	$(LN_S) kernel/presym.c presym.c
-
-kcm.c: kcm.h
-	rm -f kcm.c
-	$(LN_S) kernel/kcm.c kcm.c
-
-kcm.h:
-	rm -f kcm.h
-	$(LN_S) kernel/kcm.h kcm.h
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

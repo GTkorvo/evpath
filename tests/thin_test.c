@@ -29,26 +29,26 @@ typedef struct _simple_rec {
     int scan_sum;
 } simple_rec, *simple_rec_ptr;
 
-static IOField simple_field_list[] =
+static FMField simple_field_list[] =
 {
     {"integer_field", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
+     sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
     {"short_field", "integer",
-     sizeof(short), IOOffset(simple_rec_ptr, short_field)},
+     sizeof(short), FMOffset(simple_rec_ptr, short_field)},
     {"long_field", "integer",
-     sizeof(long), IOOffset(simple_rec_ptr, long_field)},
+     sizeof(long), FMOffset(simple_rec_ptr, long_field)},
     {"double_field", "float",
-     sizeof(double), IOOffset(simple_rec_ptr, double_field)},
+     sizeof(double), FMOffset(simple_rec_ptr, double_field)},
     {"char_field", "char",
-     sizeof(char), IOOffset(simple_rec_ptr, char_field)},
+     sizeof(char), FMOffset(simple_rec_ptr, char_field)},
     {"scan_sum", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, scan_sum)},
+     sizeof(int), FMOffset(simple_rec_ptr, scan_sum)},
     {NULL, NULL, 0, 0}
 };
 
-static CMFormatRec simple_format_list[] =
+static FMStructDescRec simple_format_list[] =
 {
-    {"thin_message", simple_field_list},
+    {"thin_message", simple_field_list, sizeof(simple_rec), NULL},
     {NULL, NULL}
 };
 
@@ -234,7 +234,7 @@ do_regression_master_test()
     free(hostname);
 
     /* give him time to start */
-    CMsleep(cm, 10);
+    CMsleep(cm, 100);
 /* stuff */
     if (quiet <= 0) {
 	printf("Waiting for remote....\n");

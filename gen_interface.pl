@@ -44,7 +44,7 @@ sub gen_field_list
 {
     my($subr, $arg_str) = @_;
     my(@args);
-    print REVP "\nIOField  ${subr}_req_flds[] = {\n";
+    print REVP "\nFMField  ${subr}_req_flds[] = {\n";
     print REVP "    {\"condition_var\", \"integer\", sizeof(int), IOOffset(${subr}_request*, condition_var)},\n";
     @args = split( ", ",  $arg_str,2);
     foreach $arg (split (", ", $args[1])) {
@@ -68,6 +68,9 @@ sub gen_field_list
 	print REVP "    {\"$argname\", \"$iotype\", sizeof($sizetype), IOOffset(${subr}_request*,$argname)},\n";
     }
     print REVP "    {NULL, NULL, 0, 0}\n};\n";
+    print REVP "\nFMStructDescRec  ${subr}_req_formats[] = {\n";
+    print REVP "    {\"EV_${subr}_request\", ${subr}_req_flds, sizeof(${subr}_request), NULL},\n";
+    print REVP "    {NULL, NULL, 0, NULL}\n};\n";
 }
 
 sub gen_stub {
@@ -94,7 +97,7 @@ sub gen_stub {
       /EVaction/ && do {$retsubtype = "int"; $ret_type="EVaction"; last;};
     }
     print REVP "    int cond = CMCondition_get(conn->cm, conn);\n";
-    print REVP "    CMFormat f = CMlookup_format(conn->cm, ${subr}_req_flds);\n";
+    print REVP "    CMFormat f = CMlookup_format(conn->cm, ${subr}_req_formats);\n";
     print REVP "    EV_${retsubtype}_response *response;\n" unless ($return_type{$subr} eq "void");
     print REVP "    ${subr}_request request;\n";
     foreach $arg (split (", ", $args[1])) {
@@ -114,8 +117,7 @@ sub gen_stub {
     }
     print REVP "    request.condition_var = cond;\n";
     print REVP "    if (f == NULL) {\n";
-    print REVP "        f = CMregister_format(conn->cm, \"EV_${subr}_request\", ${subr}_req_flds,\n";
-    print REVP "			      all_subformats_list);\n";
+    print REVP "        f = CMregister_format(conn->cm, ${subr}_req_formats);\n";
     print REVP "    }\n";
     if ($return_type{$subr} eq "void") {
 	print REVP "    CMCondition_set_client_data(conn->cm, cond, NULL);\n";
@@ -142,8 +144,7 @@ sub gen_handler {
     print REVP "\nstatic void\n";
     print REVP "R${subr}_handler(CManager cm, CMConnection conn, void *data,void *client_data,attr_list attrs)\n";
     $handler_register_string = "$handler_register_string\
-    tmp_format = CMregister_format(cm, \"EV_${subr}_request\",\
-				   ${subr}_req_flds, NULL);\
+    tmp_format = CMregister_format(cm, ${subr}_req_formats);\
     CMregister_handler(tmp_format, R${subr}_handler, cm->evp);\n";
 
     print REVP "{\n";
@@ -161,10 +162,9 @@ sub gen_handler {
     print REVP "    EV_${retsubtype}_response response;\n";
     print REVP "    ${subr}_request *request = (${subr}_request *) data;\n";
     print REVP "    $return_type{$subr} ret;\n" unless ($return_type{$subr} eq "void");
-    print REVP "    CMFormat f = CMlookup_format(conn->cm, EV_${retsubtype}_response_flds);\n";
+    print REVP "    CMFormat f = CMlookup_format(conn->cm, EV_${retsubtype}_response_formats);\n";
     print REVP "    if (f == NULL) {\n";
-    print REVP "        f = CMregister_format(conn->cm, \"EV_${retsubtype}_response\", EV_${retsubtype}_response_flds,\n";
-    print REVP "			      all_subformats_list);\n";
+    print REVP "        f = CMregister_format(conn->cm, EV_${retsubtype}_response_formats);\n";
     print REVP "    }\n";
     foreach $arg (split (", ", $args[1])) {
 	$_ = $arg;
@@ -309,7 +309,7 @@ print INT<<EOF;
  *  DO NOT EDIT
  *
  */
-#include "io.h"
+#include "ffs.h"
 #include "atl.h"
 #include "evpath.h"
 #include "cm_internal.h"
@@ -421,7 +421,7 @@ print REVP<<EOF;
  *  DO NOT EDIT
  *
  */
-#include "io.h"
+#include "ffs.h"
 #include "atl.h"
 #include "evpath.h"
 #include "cm_internal.h"
@@ -429,15 +429,18 @@ print REVP<<EOF;
 extern "C" \{
 #endif
 
-CMFormatRec all_subformats_list[] = {{NULL, NULL}};
-
 typedef struct _EV_void_response {
     int condition_var;
 } EV_void_response;
 
-IOField  EV_void_response_flds[] = {
-    {"condition_var", "integer", sizeof(int), IOOffset(EV_void_response*, condition_var)},
+FMField  EV_void_response_flds[] = {
+    {"condition_var", "integer", sizeof(int), FMOffset(EV_void_response*, condition_var)},
     {NULL, NULL, 0, 0}
+};
+
+FMStructDescRec  EV_void_response_formats[] = {
+    {"EV_void_response", EV_void_response_flds, sizeof(EV_void_response), NULL},
+    {NULL, NULL, 0, NULL}
 };
 
 typedef struct _EV_int_response {
@@ -445,10 +448,15 @@ typedef struct _EV_int_response {
     int  ret;
 } EV_int_response;
 
-IOField  EV_int_response_flds[] = {
-    {"condition_var", "integer", sizeof(int), IOOffset(EV_int_response*, condition_var)},
-    {"ret", "integer", sizeof(EVstone), IOOffset(EV_int_response*,ret)},
+FMField  EV_int_response_flds[] = {
+    {"condition_var", "integer", sizeof(int), FMOffset(EV_int_response*, condition_var)},
+    {"ret", "integer", sizeof(EVstone), FMOffset(EV_int_response*,ret)},
     {NULL, NULL, 0, 0}
+};
+
+FMStructDescRec  EV_int_response_formats[] = {
+    {"EV_int_response", EV_int_response_flds, sizeof(EV_int_response), NULL},
+    {NULL, NULL, 0, NULL}
 };
 
 typedef struct _EV_string_response {
@@ -456,10 +464,15 @@ typedef struct _EV_string_response {
     char *ret;
 } EV_string_response;
 
-IOField  EV_string_response_flds[] = {
-    {"condition_var", "integer", sizeof(int), IOOffset(EV_string_response*, condition_var)},
-    {"ret", "string", sizeof(char*), IOOffset(EV_string_response*,ret)},
+FMField  EV_string_response_flds[] = {
+    {"condition_var", "integer", sizeof(int), FMOffset(EV_string_response*, condition_var)},
+    {"ret", "string", sizeof(char*), FMOffset(EV_string_response*,ret)},
     {NULL, NULL, 0, 0}
+};
+
+FMStructDescRec  EV_string_response_formats[] = {
+    {"EV_string_response", EV_string_response_flds, sizeof(EV_string_response), NULL},
+    {NULL, NULL, 0, NULL}
 };
 
 typedef struct _EV_EVevent_list_response {
@@ -468,11 +481,16 @@ typedef struct _EV_EVevent_list_response {
     EVevent_list ret;
 } EV_EVevent_list_response;
 
-IOField  EV_EVevent_list_response_flds[] = {
-    {"condition_var", "integer", sizeof(int), IOOffset(EV_EVevent_list_response*, condition_var)},
-    {"ret_len", "integer", sizeof(int), IOOffset(EV_EVevent_list_response*,ret_len)},
-    {"ret", "string", sizeof(char*), IOOffset(EV_EVevent_list_response*,ret)},
+FMField  EV_EVevent_list_response_flds[] = {
+    {"condition_var", "integer", sizeof(int), FMOffset(EV_EVevent_list_response*, condition_var)},
+    {"ret_len", "integer", sizeof(int), FMOffset(EV_EVevent_list_response*,ret_len)},
+    {"ret", "string", sizeof(char*), FMOffset(EV_EVevent_list_response*,ret)},
     {NULL, NULL, 0, 0}
+};
+
+FMStructDescRec  EV_EVevent_list_response_formats[] = {
+    {"EV_EVevent_response", EV_EVevent_list_response_flds, sizeof(EV_EVevent_list_response), NULL},
+    {NULL, NULL, 0, NULL}
 };
 
 EOF
@@ -517,20 +535,16 @@ REVPinit(CManager cm)
 {
     CMFormat tmp_format;
 $handler_register_string
-    tmp_format = CMregister_format(cm, "EV_int_response",
-				   EV_int_response_flds, NULL);
+    tmp_format = CMregister_format(cm, EV_int_response_formats);
     CMregister_handler(tmp_format, REV_response_handler, cm->evp);
 
-    tmp_format = CMregister_format(cm, "EV_void_response",
-				   EV_void_response_flds, NULL);
+    tmp_format = CMregister_format(cm, EV_void_response_formats);
     CMregister_handler(tmp_format, REV_response_handler, cm->evp);
 
-    tmp_format = CMregister_format(cm, "EV_string_response",
-				   EV_string_response_flds, NULL);
+    tmp_format = CMregister_format(cm, EV_string_response_formats);
     CMregister_handler(tmp_format, REV_response_handler, cm->evp);
 
-    tmp_format = CMregister_format(cm, "EV_EVevent_list_response",
-				   EV_EVevent_list_response_flds, NULL);
+    tmp_format = CMregister_format(cm, EV_EVevent_list_response_formats);
     CMregister_handler(tmp_format, REV_response_handler, cm->evp);
 }
 EOF

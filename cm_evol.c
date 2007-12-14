@@ -17,46 +17,35 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #endif
-#include <io.h>
+#include <ffs.h>
 #include <atl.h>
 #include "evpath.h"
 #include "gen_thread.h"
 #include "cercs_env.h"
 #include "cm_internal.h"
 #include "cm_transport.h"
-#include "ecl.h"
+#include "cod.h"
 
 /* 
  * Creates the context of conversion for the incoming 'format',
  * caches it and returns a pointer to the cached context
  * */
 extern CMincoming_format_list
-CMidentify_rollbackCMformat(cm, format)
+CMidentify_rollbackCMformat(cm, data_buffer)
 CManager cm;
-IOFormat format;
+char *data_buffer;
 {
     int i;
     int nearest_format = -1;
-    IOcompat_formats older_format = NULL;
-    IOFormat *formatList;
-
-    formatList =
-	(IOFormat *) malloc(cm->reg_format_count * sizeof(IOFormat));
+    FMcompat_formats older_format = NULL;
+    FFSTypeHandle format;
 
     for (i = 0; i < cm->reg_format_count; i++) {
 	if (cm->reg_formats[i]->registration_pending)
 	    CMcomplete_format_registration(cm->reg_formats[i], 0);
 
-	formatList[i] = cm->reg_formats[i]->format;
     }
-    nearest_format = IOformat_compat_cmp(format, formatList,
-					 cm->reg_format_count,
-					 &older_format);
-
-    free(formatList);
-
-    if (nearest_format == -1)
-	return NULL;
+    format = FFS_target_from_encode(cm->FFScontext, data_buffer);
 
     cm->in_formats = INT_CMrealloc(cm->in_formats,
 			       sizeof(struct _CMincoming_format) *
@@ -78,8 +67,8 @@ IOFormat format;
 /* 
  * Creates the conversion context as specified by "cm_format".
  * If no rollback to older format is required, set the normal conversion
- * using set_conversion_IOcontext, else use IOlocalize_conv and 
- * IOlocalize_register_conv pair to localize and register wire format 
+ * using set_conversion_FMcontext, else use FMlocalize_conv and 
+ * FMlocalize_register_conv pair to localize and register wire format 
  * and set conversion to native format.
  * Then invoke gen_rollback_code to inorder to generate the rollback 
  * conversion code.
@@ -87,50 +76,19 @@ IOFormat format;
 extern void
 CMcreate_conversion(CManager cm, CMincoming_format_list cm_format)
 {
-    IOFormatList local_f0_formats, local_f1_formats;
-    IOFormat *wire_subformats, *saved_subformats;
-    IOFieldList native_field_list = cm_format->f2_format->field_list;
-    IOFormatList native_subformat_list =
-	cm_format->f2_format->subformat_list;
-    IOFormat format = cm_format->format;
-    IOContext iocontext = cm->IOcontext;
-    IOcompat_formats older_format = cm_format->older_format;
-    int native_struct_size = struct_size_field_list(native_field_list,
-						    sizeof(char *));
-
-    saved_subformats = wire_subformats = get_subformats_IOformat(format);
+    FMStructDescList native_format_list = cm_format->f2_format->format_list;
+    FFSTypeHandle format = cm_format->format;
+    FFSContext context = cm->FFScontext;
+    FMcompat_formats older_format = cm_format->older_format;
 
     if (!older_format) {
-	while ((wire_subformats != NULL) && (*wire_subformats != NULL)) {
-	    char *subformat_name = name_of_IOformat(*wire_subformats);
-	    int j = 0;
-	    while (native_subformat_list &&
-		   (native_subformat_list[j].format_name != NULL)) {
-		if (!strcmp
-		    (native_subformat_list[j].format_name,
-		     subformat_name)) {
-		    IOFieldList sub_field_list;
-		    int sub_struct_size;
-		    sub_field_list = native_subformat_list[j].field_list;
-		    sub_struct_size =
-			struct_size_field_list(sub_field_list,
-					       sizeof(char *));
-		    set_conversion_IOcontext(iocontext, *wire_subformats,
-					     sub_field_list,
-					     sub_struct_size);
-		    break;
-		}
-		j++;
-	    }
-	    wire_subformats++;
-	}
-	set_conversion_IOcontext(iocontext, format,
-				 native_field_list, native_struct_size);
-	free(saved_subformats);
+	establish_conversion(context, format,
+			     native_format_list);
 	return;
     }
-    local_f0_formats = IOlocalize_conv(iocontext, format);
-    cm_format->local_iocontext = create_IOsubcontext(iocontext);
+#ifdef EVOL
+    FMStructDescList local_f0_formats, local_f1_formats;
+    local_f0_formats = IOlocalize_conv(context, format);
     local_f1_formats = IOlocalize_register_conv(cm_format->local_iocontext,
 						older_format->prior_format,
 						native_field_list,
@@ -142,8 +100,9 @@ CMcreate_conversion(CManager cm, CMincoming_format_list cm_format)
     cm_format->code =
 	gen_rollback_code(local_f0_formats, local_f1_formats,
 			  older_format->xform_code);
-    free_IOFormatList(local_f0_formats);
-    free_IOFormatList(local_f1_formats);
+    free_FMStructDescList(local_f0_formats);
+    free_FMStructDescList(local_f1_formats);
+#endif
 }
 
 /* 
@@ -161,6 +120,7 @@ CMcreate_conversion(CManager cm, CMincoming_format_list cm_format)
  * '*cm_decode_buffer' is set so that the above buffer can be freed when the 
  * application handler returns.
  * */
+#ifdef EVOL
 extern int
 process_old_format_data(CManager cm, CMincoming_format_list cm_format,
 			char **decode_buff, CMbuffer * cm_decode_buffer)
@@ -220,3 +180,4 @@ process_old_format_data(CManager cm, CMincoming_format_list cm_format,
     *decode_buff = decode_buffer;
     return 1;			/* SUCCESS */
 }
+#endif

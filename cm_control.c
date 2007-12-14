@@ -10,7 +10,7 @@
 #include <unistd.h>
 #endif
 #include <stdlib.h>
-#include <io.h>
+#include <ffs.h>
 #include <atl.h>
 #include "evpath.h"
 #include "gen_thread.h"
