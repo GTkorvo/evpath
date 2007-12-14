@@ -31,14 +31,14 @@ typedef struct _nested_rec {
 
 static FMField nested_field_list[] =
 {
-    {"item", "complex", sizeof(complex), IOOffset(nested_ptr, item)},
+    {"item", "complex", sizeof(complex), FMOffset(nested_ptr, item)},
     {NULL, NULL, 0, 0}
 };
 
 static FMField complex_field_list[] =
 {
-    {"r", "double", sizeof(double), IOOffset(complex_ptr, r)},
-    {"i", "double", sizeof(double), IOOffset(complex_ptr, i)},
+    {"r", "double", sizeof(double), FMOffset(complex_ptr, r)},
+    {"i", "double", sizeof(double), FMOffset(complex_ptr, i)},
     {NULL, NULL, 0, 0}
 };
 
@@ -55,19 +55,19 @@ typedef struct _simple_rec {
 static FMField simple_field_list[] =
 {
     {"integer_field", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
+     sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
     {"short_field", "integer",
-     sizeof(short), IOOffset(simple_rec_ptr, short_field)},
+     sizeof(short), FMOffset(simple_rec_ptr, short_field)},
     {"long_field", "integer",
-     sizeof(long), IOOffset(simple_rec_ptr, long_field)},
+     sizeof(long), FMOffset(simple_rec_ptr, long_field)},
     {"nested_field", "nested",
-     sizeof(nested), IOOffset(simple_rec_ptr, nested_field)},
+     sizeof(nested), FMOffset(simple_rec_ptr, nested_field)},
     {"double_field", "float",
-     sizeof(double), IOOffset(simple_rec_ptr, double_field)},
+     sizeof(double), FMOffset(simple_rec_ptr, double_field)},
     {"char_field", "char",
-     sizeof(char), IOOffset(simple_rec_ptr, char_field)},
+     sizeof(char), FMOffset(simple_rec_ptr, char_field)},
     {"scan_sum", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, scan_sum)},
+     sizeof(int), FMOffset(simple_rec_ptr, scan_sum)},
     {NULL, NULL, 0, 0}
 };
 

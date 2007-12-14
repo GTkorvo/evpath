@@ -45,7 +45,7 @@ sub gen_field_list
     my($subr, $arg_str) = @_;
     my(@args);
     print REVP "\nFMField  ${subr}_req_flds[] = {\n";
-    print REVP "    {\"condition_var\", \"integer\", sizeof(int), IOOffset(${subr}_request*, condition_var)},\n";
+    print REVP "    {\"condition_var\", \"integer\", sizeof(int), FMOffset(${subr}_request*, condition_var)},\n";
     @args = split( ", ",  $arg_str,2);
     foreach $arg (split (", ", $args[1])) {
 	$_ = $arg;
@@ -65,7 +65,7 @@ sub gen_field_list
 	      /EVaction/ && do {$iotype = "integer"; $argtype="EVaction"; last;};
 	  }
 	}
-	print REVP "    {\"$argname\", \"$iotype\", sizeof($sizetype), IOOffset(${subr}_request*,$argname)},\n";
+	print REVP "    {\"$argname\", \"$iotype\", sizeof($sizetype), FMOffset(${subr}_request*,$argname)},\n";
     }
     print REVP "    {NULL, NULL, 0, 0}\n};\n";
     print REVP "\nFMStructDescRec  ${subr}_req_formats[] = {\n";
