@@ -116,6 +116,7 @@ thin_data_available(void *cmv, void * conn_datav)
 		while (cd->format_list[i][j].field_list[k].field_name != NULL) {
 		    free((char*)cd->format_list[i][j].field_list[k].field_name);
 		    free((char*)cd->format_list[i][j].field_list[k].field_type);
+		    k++;
 		}
 		j++;
 	    }
