@@ -74,9 +74,9 @@ static FMField simple_field_list[] =
 
 static FMStructDescRec simple_format_list[] =
 {
-    {"simple", simple_field_list},
-    {"complex", complex_field_list},
-    {"nested", nested_field_list},
+    {"simple", simple_field_list, sizeof(simple_rec), NULL},
+    {"complex", complex_field_list, sizeof(complex), NULL},
+    {"nested", nested_field_list, sizeof(nested), NULL},
     {NULL, NULL}
 };
 
