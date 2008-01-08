@@ -1873,8 +1873,17 @@ CMFormat format;
 CMHandlerFunc handler;
 void *client_data;
 {
+    CManager cm = format->cm;
+    int i;
     format->handler = handler;
     format->client_data = client_data;
+
+    for (i=0; i< cm->in_format_count; i++) {
+	if (cm->in_formats[i].format == format->ffsformat) {
+	    cm->in_formats[i].handler = handler;
+	    cm->in_formats[i].client_data = client_data;
+	}
+    }
 }
 
 extern int
