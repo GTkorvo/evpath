@@ -358,7 +358,7 @@ char **argv;
 	thr_thread_join(thr1, &status);
 	thr_thread_join(thr2, &status);
 
-	CMsleep(cm, 10);
+	CMsleep(cm, 60);
     }
     CManager_close(cm);
     return 0;
