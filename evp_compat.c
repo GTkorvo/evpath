@@ -45,7 +45,7 @@ is_var_array_field(FMFieldList field_list, int field)
 
 #define Max(i,j) ((i<j) ? j : i)
 
-extern
+static
 int
 struct_size_field_list(list, pointer_size)
 FMFieldList list;
