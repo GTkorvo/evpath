@@ -23,9 +23,6 @@
 #include "kernel/library.h"
 #endif
 
-extern int vfprintf();
-
-
 int trace_val[CMLastTraceType] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 extern void EVprint_version();
