@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include "config.h"
 
-static char *EVPath_version = "EVPath Version 3.0.4 -- Tue Jan 22 13:04:14 EST 2008\n";
+static char *EVPath_version = "EVPath Version 3.0.5 -- Wed Jan 23 15:04:31 EST 2008\n";
 
 void EVprint_version(){
     printf("%s",EVPath_version);
