@@ -49,6 +49,7 @@ AC_CHECK_HEADERS(math.h)
 AC_GETDOMAINNAME_DEFINED
 
 checkBoth=0
+AC_CHECK_FUNCS(writev)
 AC_CHECK_FUNC(connect, checkSocket=0, checkSocket=1)
 if test "$checkSocket" = 1; then
     AC_CHECK_LIB(socket, connect, LIBS="$LIBS -lsocket", checkBoth=1)
@@ -83,7 +84,7 @@ AC_DEFINE_UNQUOTED(CM_LIBRARY_INSTALL_DIR,["$CMDIR"],[Place where cm transport l
 
 dnl maintain the BUILD_DIR definition so our sources are compatable with CM
 AC_DEFINE_UNQUOTED(CM_LIBRARY_BUILD_DIR,["$CMDIR"],[Place where cm transport libraries are built])
-AC_CHECK_HEADERS(gen_thread.h)
+AC_CHECK_HEADERS(gen_thread.h sys/un.h)
 
 CERCS_REQUIRE_PACKAGE(atl,atl.h,libatl.la)
 dnl can't use CHECK_LIB on libtool libraries, just add it to LTLIBS

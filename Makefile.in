@@ -70,6 +70,33 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" \
 libLTLIBRARIES_INSTALL = $(INSTALL)
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
+libcmmulticast_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+am_libcmmulticast_la_OBJECTS = cmmulticast.lo
+libcmmulticast_la_OBJECTS = $(am_libcmmulticast_la_OBJECTS)
+libcmmulticast_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libcmmulticast_la_LDFLAGS) $(LDFLAGS) -o $@
+libcmselect_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+am_libcmselect_la_OBJECTS = cmselect.lo
+libcmselect_la_OBJECTS = $(am_libcmselect_la_OBJECTS)
+libcmselect_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libcmselect_la_LDFLAGS) $(LDFLAGS) -o $@
+libcmsockets_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+am_libcmsockets_la_OBJECTS = cmsockets.lo
+libcmsockets_la_OBJECTS = $(am_libcmsockets_la_OBJECTS)
+libcmsockets_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libcmsockets_la_LDFLAGS) $(LDFLAGS) -o $@
+libcmudp_la_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+am_libcmudp_la_OBJECTS = cmudp.lo
+libcmudp_la_OBJECTS = $(am_libcmudp_la_OBJECTS)
+libcmudp_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libcmudp_la_LDFLAGS) $(LDFLAGS) -o $@
 am_libevpath_la_OBJECTS = cm.lo cm_control.lo cm_formats.lo cm_util.lo \
 	cm_transport.lo cm_lock.lo cm_pbio.lo cm_interface.lo \
 	version.lo cm_threadio.lo cm_evol.lo evp.lo response.lo \
@@ -92,8 +119,12 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(libevpath_la_SOURCES)
-DIST_SOURCES = $(libevpath_la_SOURCES)
+SOURCES = $(libcmmulticast_la_SOURCES) $(libcmselect_la_SOURCES) \
+	$(libcmsockets_la_SOURCES) $(libcmudp_la_SOURCES) \
+	$(libevpath_la_SOURCES)
+DIST_SOURCES = $(libcmmulticast_la_SOURCES) $(libcmselect_la_SOURCES) \
+	$(libcmsockets_la_SOURCES) $(libcmudp_la_SOURCES) \
+	$(libevpath_la_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-dvi-recursive install-exec-recursive \
@@ -252,7 +283,7 @@ AUTOMAKE_OPTIONS = foreign
 SUBDIRS = libltdl . mtests tests rtests otests
 INCLUDES = $(INCLTDL)
 EXTRA_DIST = 
-lib_LTLIBRARIES = libevpath.la
+lib_LTLIBRARIES = libevpath.la libcmsockets.la libcmselect.la libcmmulticast.la libcmudp.la
 EXTRA_LTLIBRARIES = 
 libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c\
 		       cm_lock.c cm_pbio.c cm_interface.c version.c \
@@ -265,6 +296,18 @@ libevpath_la_DEPENDENCIES = $(LIBLTDL) $(LTLIBS)
 include_HEADERS = evpath.h evpath_old.h revpath.h
 AM_CPPFLAGS = 
 noinst_HEADERS = assert.h cm_internal.h  ev_internal.h
+libcmsockets_la_SOURCES = cmsockets.c
+libcmsockets_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env
+libcmsockets_la_LDFLAGS = -module -export-symbols-regex "libcmsockets.*"
+libcmselect_la_SOURCES = cmselect.c
+libcmselect_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@
+libcmselect_la_LDFLAGS = -module -export-symbols-regex "libcmselect.*" -lgen_thread
+libcmmulticast_la_SOURCES = cmmulticast.c
+libcmmulticast_la_LIBADD = $(LTLIBS) $(LIBS)
+libcmmulticast_la_LDFLAGS = -module -export-symbols-regex "libcmmulticast.*"
+libcmudp_la_SOURCES = cmudp.c
+libcmudp_la_LIBADD = $(LTLIBS) $(LIBS)
+libcmudp_la_LDFLAGS = -module -export-symbols-regex "libcmudp.*"
 MOSTLYCLEANFILES = cm_interface.c revp.c revpath.h
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
@@ -348,6 +391,14 @@ clean-libLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
+libcmmulticast.la: $(libcmmulticast_la_OBJECTS) $(libcmmulticast_la_DEPENDENCIES) 
+	$(libcmmulticast_la_LINK) -rpath $(libdir) $(libcmmulticast_la_OBJECTS) $(libcmmulticast_la_LIBADD) $(LIBS)
+libcmselect.la: $(libcmselect_la_OBJECTS) $(libcmselect_la_DEPENDENCIES) 
+	$(libcmselect_la_LINK) -rpath $(libdir) $(libcmselect_la_OBJECTS) $(libcmselect_la_LIBADD) $(LIBS)
+libcmsockets.la: $(libcmsockets_la_OBJECTS) $(libcmsockets_la_DEPENDENCIES) 
+	$(libcmsockets_la_LINK) -rpath $(libdir) $(libcmsockets_la_OBJECTS) $(libcmsockets_la_LIBADD) $(LIBS)
+libcmudp.la: $(libcmudp_la_OBJECTS) $(libcmudp_la_DEPENDENCIES) 
+	$(libcmudp_la_LINK) -rpath $(libdir) $(libcmudp_la_OBJECTS) $(libcmudp_la_LIBADD) $(LIBS)
 libevpath.la: $(libevpath_la_OBJECTS) $(libevpath_la_DEPENDENCIES) 
 	$(libevpath_la_LINK) -rpath $(libdir) $(libevpath_la_OBJECTS) $(libevpath_la_LIBADD) $(LIBS)
 install-binPROGRAMS: $(bin_PROGRAMS)
@@ -402,6 +453,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_threadio.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_transport.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_util.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmmulticast.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmselect.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmsockets.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmudp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp_compat.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/response.Plo@am__quote@
