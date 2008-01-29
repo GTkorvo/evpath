@@ -59,7 +59,7 @@
 
 #include <atl.h>
 #include "cercs_env.h"
-#include "cm.h"
+#include "evpath.h"
 #include "cm_transport.h"
 
 #ifndef SOCKET_ERROR
