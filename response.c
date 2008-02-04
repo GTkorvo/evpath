@@ -532,7 +532,7 @@ filter_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	ret = ((int(*)(cod_exec_context, void *, attr_list))instance->u.filter.code->func)(ec, event->decoded_event, attrs);
     } else {
 	/* DLL-based handler */
-	ret = ((int(*)(void *, attr_list))instance->u.filter.code->func)(event->decoded_event, attrs);
+	ret = ((int(*)(void *, attr_list))instance->u.filter.func_ptr)(event->decoded_event, attrs);
     }
     if (ret) {
 	CMtrace_out(cm, EVerbose, "Filter function returned %d, submitting further to stone %d\n", ret, out_stones[0]);
