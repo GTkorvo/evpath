@@ -594,8 +594,7 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
     response_instance instance = (response_instance)client_data;
     int ret;
     void *out_event = malloc(instance->u.transform.out_size);
-    int(*func)(cod_exec_context, void *, void*, attr_list) = 
-	(int(*)(cod_exec_context, void *, void*, attr_list))instance->u.transform.code->func;
+    int(*func)(cod_exec_context, void *, void*, attr_list) = NULL;
     cod_exec_context ec = instance->u.transform.ec;
     struct ev_state_data ev_state;
 
@@ -616,6 +615,7 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
     }
     memset(out_event, 0, instance->u.transform.out_size);
     if (ec != NULL) {
+	func = (int(*)(cod_exec_context, void *, void*, attr_list))instance->u.transform.code->func;
 	cod_assoc_client_data(ec, 0x34567890, (long)&ev_state);
 	ret = func(ec, event->decoded_event, out_event, attrs);
     } else {
@@ -846,15 +846,15 @@ dump_mrd(void *mrdv)
     struct response_spec *mrd = (struct response_spec *) mrdv;
     switch (mrd->response_type) {
     case Response_Filter:
-	printf("Reponse Filter, code is %s\n",
+	printf("Response Filter, code is %s\n",
 	       mrd->u.filter.function);
 	break;
     case Response_Router:
-	printf("Reponse Router, code is %s\n",
+	printf("Response Router, code is %s\n",
 	       mrd->u.filter.function);
 	break;
     case Response_Transform:
-	printf("Reponse Transform, code is %s\n",
+	printf("Response Transform, code is %s\n",
 	       mrd->u.transform.function);
 	break;
     case Response_Multityped:
