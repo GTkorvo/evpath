@@ -66,6 +66,7 @@ struct filter_instance {
 };
 
 struct transform_instance {
+    int (*func_ptr)(void *, void*, attr_list);
     cod_code code;
     cod_exec_context ec;
     int out_size;
@@ -604,7 +605,6 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
     ev_state.proto_action_id = instance->proto_action_id;
     ev_state.out_count = out_count;
     ev_state.out_stones = out_stones;
-    cod_assoc_client_data(ec, 0x34567890, (long)&ev_state);
 
     if (CMtrace_on(cm, EVerbose)) {
 	printf("Input Transform Event is :\n");
@@ -615,7 +615,14 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	}
     }
     memset(out_event, 0, instance->u.transform.out_size);
-    ret = func(ec, event->decoded_event, out_event, attrs);
+    if (ec != NULL) {
+	cod_assoc_client_data(ec, 0x34567890, (long)&ev_state);
+	ret = func(ec, event->decoded_event, out_event, attrs);
+    } else {
+	/* DLL-based handler */
+	ret = ((int(*)(void *, void *, attr_list))instance->u.transform.func_ptr)(event->decoded_event, out_event, attrs);
+    }
+
     if (ret) {
 	struct _EVSource s;
 	if (CMtrace_on(cm, EVerbose)) {
@@ -1367,12 +1374,12 @@ add_param_list(cod_parse_context parse_context, char *name, int param_num,
 #endif
 
 static int
-check_filter_string(filter)
+dll_prefix_present(filter)
 char *filter;
 {
 
     if (filter[0] == 'd' && filter[1] == 'l' && filter[2] == 'l' && filter[3] == ':') {
-    return 1;
+	return 1;
     }
     return 0;
 }
@@ -1495,8 +1502,7 @@ FMFormat format;
     switch(mrd->response_type) {
     case Response_Filter:
     case Response_Router:
-
-	if (check_filter_string(mrd->u.filter.function)) {
+	if (dll_prefix_present(mrd->u.filter.function)) {
 	    /* it is a dll */
 	    char *path = NULL;
 	    char *symbol_name = NULL;
@@ -1527,15 +1533,38 @@ FMFormat format;
 	}
 	break;
     case Response_Transform:
-	code = cod_code_gen(mrd->u.transform.function, parse_context);
-	instance->response_type = Response_Transform;
-	instance->u.transform.code = code;
-	if (code)
-	    instance->u.transform.ec = cod_create_exec_context(code);
-	instance->u.transform.out_size = 
-	    mrd->u.transform.output_base_struct_size;
-	instance->u.transform.out_format = 
-	    mrd->u.transform.reference_output_format;
+	if (dll_prefix_present(mrd->u.transform.function)) {
+	    /* it is a dll */
+	    char *path = NULL;
+	    char *symbol_name = NULL;
+	    
+	    path = extract_dll_path(mrd->u.transform.function);
+	    symbol_name = extract_symbol_name(mrd->u.transform.function);
+	    if (!path || !symbol_name) {
+		fprintf(stderr, "could not parse string \"%s\" for dll path and symbol information\n", mrd->u.transform.function);
+		free(instance);
+		return NULL;
+	    }
+	    instance->u.transform.func_ptr = 
+		(int(*)(void*,void*,attr_list)) load_dll_symbol(path, symbol_name);
+	    if (instance->u.transform.func_ptr == NULL) {
+		fprintf(stderr, "Failed to load symbol \"%s\" from file \"%s\"\n",
+			symbol_name, path);
+		free(instance);
+		return NULL;
+	    }
+	    instance->u.transform.code = NULL;
+	} else {
+	    code = cod_code_gen(mrd->u.transform.function, parse_context);
+	    instance->response_type = Response_Transform;
+	    instance->u.transform.code = code;
+	    if (code)
+		instance->u.transform.ec = cod_create_exec_context(code);
+	    instance->u.transform.out_size = 
+		mrd->u.transform.output_base_struct_size;
+	    instance->u.transform.out_format = 
+		mrd->u.transform.reference_output_format;
+	}
 	break;
     case Response_Multityped:
 	break;
