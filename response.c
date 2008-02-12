@@ -1560,11 +1560,11 @@ FMFormat format;
 	    instance->u.transform.code = code;
 	    if (code)
 		instance->u.transform.ec = cod_create_exec_context(code);
-	    instance->u.transform.out_size = 
-		mrd->u.transform.output_base_struct_size;
-	    instance->u.transform.out_format = 
-		mrd->u.transform.reference_output_format;
 	}
+	instance->u.transform.out_size = 
+	    mrd->u.transform.output_base_struct_size;
+	instance->u.transform.out_format = 
+	    mrd->u.transform.reference_output_format;
 	break;
     case Response_Multityped:
 	break;
