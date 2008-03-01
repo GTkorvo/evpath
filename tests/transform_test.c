@@ -212,6 +212,7 @@ char **argv;
 {
     CManager cm;
     int regression_master = 1;
+    int do_dll = 0;
 
     while (argv[1] && (argv[1][0] == '-')) {
 	if (argv[1][1] == 'c') {
@@ -220,6 +221,8 @@ char **argv;
 	    regression_master = 0;
 	} else if (argv[1][1] == 'q') {
 	    quiet++;
+	} else if (argv[1][1] == 'd') {
+	    do_dll++;
 	} else if (argv[1][1] == 'v') {
 	    quiet--;
 	} else if (argv[1][1] == 'n') {
@@ -234,7 +237,9 @@ char **argv;
     gen_pthread_init();
 #endif
     if (regression && regression_master) {
-	return do_regression_master_test();
+	int result = do_regression_master_test(0);
+	result |= do_regression_master_test(1);
+	return result;
     }
     cm = CManager_create();
 /*    (void) CMfork_comm_thread(cm);*/
@@ -280,9 +285,15 @@ char **argv;
 	}	
 	term = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, term, output_format_list, output_handler, NULL);
-	filter = create_transform_action_spec(simple_format_list, 
-					      output_format_list, trans);
-	
+	if (do_dll) {
+	    if (quiet <= 0) printf("\nCreating DLL-based transform\n\n");
+	    filter = create_transform_action_spec(simple_format_list, 
+						  output_format_list, "dll:./testdll/libfoo.la:transform");
+	} else {
+	    if (quiet <= 0) printf("\nCreating COD-based transform\n\n");
+	    filter = create_transform_action_spec(simple_format_list, 
+						  output_format_list, trans);
+	}
 	fstone = EValloc_stone(cm);
 	faction = EVassoc_immediate_action(cm, fstone, filter, NULL);
 	EVaction_set_output(cm, fstone, faction, 0, term);
@@ -365,7 +376,8 @@ char **args;
 }
 
 static int
-do_regression_master_test()
+do_regression_master_test(do_dll)
+int do_dll;
 {
     CManager cm;
     char *args[] = {"transform_test", "-c", NULL, NULL};
@@ -389,7 +401,7 @@ do_regression_master_test()
     alarm(300);
 #endif
     cm = CManager_create();
-    forked = CMfork_comm_thread(cm);
+/*    forked = CMfork_comm_thread(cm);*/
     if ((transport = getenv("CMTransport")) != NULL) {
 	listen_list = create_attr_list();
 	add_attr(listen_list, CM_TRANSPORT, Attr_String,
@@ -434,8 +446,15 @@ do_regression_master_test()
 
     term = EValloc_stone(cm);
     EVassoc_terminal_action(cm, term, output_format_list, output_handler, &message_count);
-    filter = create_transform_action_spec(simple_format_list, 
-					  output_format_list, trans);
+    if (do_dll) {
+	if (quiet <= 0) printf("\nCreating DLL-based transform\n\n");
+	filter = create_transform_action_spec(simple_format_list, 
+					      output_format_list, "dll:./testdll/libfoo.la:transform");
+    } else {
+	if (quiet <= 0) printf("\nCreating COD-based transform\n\n");
+	filter = create_transform_action_spec(simple_format_list, 
+					      output_format_list, trans);
+    }
     
     fstone = EValloc_stone(cm);
     faction = EVassoc_immediate_action(cm, fstone, filter, NULL);

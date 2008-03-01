@@ -245,8 +245,10 @@ char **argv;
 	term = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, term, simple_format_list, simple_handler, NULL);
 	if (do_dll) {
+	    if (quiet <= 0) printf("\nCreating DLL-based filter\n\n");
 	    filter = create_filter_action_spec(filter_format_list, "dll:./testdll/libfoo.la:filter");
 	} else {	
+	    if (quiet <= 0) printf("\nCreating COD-based filter\n\n");
 	    filter = create_filter_action_spec(filter_format_list, "{int ret = input.long_field % 2;return ret;}\0\0");
 	}
 	
