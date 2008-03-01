@@ -15610,7 +15610,7 @@ fi
 
 fi
 
-ac_config_files="$ac_config_files Makefile libltdl/Makefile mtests/Makefile tests/Makefile rtests/Makefile examples/Makefile otests/Makefile"
+ac_config_files="$ac_config_files Makefile libltdl/Makefile mtests/Makefile tests/Makefile tests/testdll/Makefile rtests/Makefile examples/Makefile otests/Makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -16457,6 +16457,7 @@ do
     "libltdl/Makefile") CONFIG_FILES="$CONFIG_FILES libltdl/Makefile" ;;
     "mtests/Makefile") CONFIG_FILES="$CONFIG_FILES mtests/Makefile" ;;
     "tests/Makefile") CONFIG_FILES="$CONFIG_FILES tests/Makefile" ;;
+    "tests/testdll/Makefile") CONFIG_FILES="$CONFIG_FILES tests/testdll/Makefile" ;;
     "rtests/Makefile") CONFIG_FILES="$CONFIG_FILES rtests/Makefile" ;;
     "examples/Makefile") CONFIG_FILES="$CONFIG_FILES examples/Makefile" ;;
     "otests/Makefile") CONFIG_FILES="$CONFIG_FILES otests/Makefile" ;;

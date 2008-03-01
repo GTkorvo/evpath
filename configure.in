@@ -106,5 +106,5 @@ USE_PTHREADS="yes"
 fi
 
 dnl Output the makefile
-AC_CONFIG_FILES([Makefile libltdl/Makefile mtests/Makefile tests/Makefile rtests/Makefile examples/Makefile otests/Makefile])
+AC_CONFIG_FILES([Makefile libltdl/Makefile mtests/Makefile tests/Makefile tests/testdll/Makefile rtests/Makefile examples/Makefile otests/Makefile])
 AC_OUTPUT
