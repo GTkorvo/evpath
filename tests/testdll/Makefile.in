@@ -32,126 +32,27 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-TESTS = evtest$(EXEEXT) bulktest$(EXEEXT) http_test$(EXEEXT) \
-	filter_test$(EXEEXT) router_test$(EXEEXT) \
-	router_test2$(EXEEXT) filter2_test$(EXEEXT) \
-	transform_test$(EXEEXT) auto_test$(EXEEXT) \
-	extract_test$(EXEEXT) submit_test$(EXEEXT) thin_test$(EXEEXT) \
-	rawtest$(EXEEXT)
-noinst_PROGRAMS = $(am__EXEEXT_1) thin_client$(EXEEXT) \
-	congestion_test$(EXEEXT) congest_bulktest$(EXEEXT) \
-	multiq_test$(EXEEXT) store_send_test$(EXEEXT) \
-	store_limit_test$(EXEEXT) store_pressure_test$(EXEEXT) \
-	block_test$(EXEEXT) submit_wait_test$(EXEEXT)
-subdir = tests
+subdir = tests/dlltest
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/config/argz.m4 \
-	$(top_srcdir)/config/cercs.m4 \
+am__aclocal_m4_deps = $(top_srcdir)/config/cercs.m4 \
 	$(top_srcdir)/config/definitions.m4 \
-	$(top_srcdir)/config/libtool.m4 $(top_srcdir)/config/ltdl.m4 \
+	$(top_srcdir)/config/libtool.m4 \
 	$(top_srcdir)/config/ltoptions.m4 \
 	$(top_srcdir)/config/ltsugar.m4 \
-	$(top_srcdir)/config/ltversion.m4 $(top_srcdir)/acinclude.m4 \
-	$(top_srcdir)/configure.in
+	$(top_srcdir)/config/ltversion.m4 $(top_srcdir)/configure.in
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-am__EXEEXT_1 = evtest$(EXEEXT) bulktest$(EXEEXT) http_test$(EXEEXT) \
-	filter_test$(EXEEXT) router_test$(EXEEXT) \
-	router_test2$(EXEEXT) filter2_test$(EXEEXT) \
-	transform_test$(EXEEXT) auto_test$(EXEEXT) \
-	extract_test$(EXEEXT) submit_test$(EXEEXT) thin_test$(EXEEXT) \
-	rawtest$(EXEEXT)
-PROGRAMS = $(noinst_PROGRAMS)
-auto_test_SOURCES = auto_test.c
-auto_test_OBJECTS = auto_test.$(OBJEXT)
-auto_test_LDADD = $(LDADD)
-auto_test_DEPENDENCIES = ../libevpath.la
-block_test_SOURCES = block_test.c
-block_test_OBJECTS = block_test.$(OBJEXT)
-block_test_LDADD = $(LDADD)
-block_test_DEPENDENCIES = ../libevpath.la
-bulktest_SOURCES = bulktest.c
-bulktest_OBJECTS = bulktest.$(OBJEXT)
-bulktest_LDADD = $(LDADD)
-bulktest_DEPENDENCIES = ../libevpath.la
-congest_bulktest_SOURCES = congest_bulktest.c
-congest_bulktest_OBJECTS = congest_bulktest.$(OBJEXT)
-congest_bulktest_LDADD = $(LDADD)
-congest_bulktest_DEPENDENCIES = ../libevpath.la
-congestion_test_SOURCES = congestion_test.c
-congestion_test_OBJECTS = congestion_test.$(OBJEXT)
-congestion_test_LDADD = $(LDADD)
-congestion_test_DEPENDENCIES = ../libevpath.la
-evtest_SOURCES = evtest.c
-evtest_OBJECTS = evtest.$(OBJEXT)
-evtest_LDADD = $(LDADD)
-evtest_DEPENDENCIES = ../libevpath.la
-extract_test_SOURCES = extract_test.c
-extract_test_OBJECTS = extract_test.$(OBJEXT)
-extract_test_LDADD = $(LDADD)
-extract_test_DEPENDENCIES = ../libevpath.la
-filter2_test_SOURCES = filter2_test.c
-filter2_test_OBJECTS = filter2_test.$(OBJEXT)
-filter2_test_LDADD = $(LDADD)
-filter2_test_DEPENDENCIES = ../libevpath.la
-filter_test_SOURCES = filter_test.c
-filter_test_OBJECTS = filter_test.$(OBJEXT)
-filter_test_LDADD = $(LDADD)
-filter_test_DEPENDENCIES = ../libevpath.la
-http_test_SOURCES = http_test.c
-http_test_OBJECTS = http_test.$(OBJEXT)
-http_test_LDADD = $(LDADD)
-http_test_DEPENDENCIES = ../libevpath.la
-multiq_test_SOURCES = multiq_test.c
-multiq_test_OBJECTS = multiq_test.$(OBJEXT)
-multiq_test_LDADD = $(LDADD)
-multiq_test_DEPENDENCIES = ../libevpath.la
-rawtest_SOURCES = rawtest.c
-rawtest_OBJECTS = rawtest.$(OBJEXT)
-rawtest_LDADD = $(LDADD)
-rawtest_DEPENDENCIES = ../libevpath.la
-router_test_SOURCES = router_test.c
-router_test_OBJECTS = router_test.$(OBJEXT)
-router_test_LDADD = $(LDADD)
-router_test_DEPENDENCIES = ../libevpath.la
-router_test2_SOURCES = router_test2.c
-router_test2_OBJECTS = router_test2.$(OBJEXT)
-router_test2_LDADD = $(LDADD)
-router_test2_DEPENDENCIES = ../libevpath.la
-store_limit_test_SOURCES = store_limit_test.c
-store_limit_test_OBJECTS = store_limit_test.$(OBJEXT)
-store_limit_test_LDADD = $(LDADD)
-store_limit_test_DEPENDENCIES = ../libevpath.la
-store_pressure_test_SOURCES = store_pressure_test.c
-store_pressure_test_OBJECTS = store_pressure_test.$(OBJEXT)
-store_pressure_test_LDADD = $(LDADD)
-store_pressure_test_DEPENDENCIES = ../libevpath.la
-store_send_test_SOURCES = store_send_test.c
-store_send_test_OBJECTS = store_send_test.$(OBJEXT)
-store_send_test_LDADD = $(LDADD)
-store_send_test_DEPENDENCIES = ../libevpath.la
-submit_test_SOURCES = submit_test.c
-submit_test_OBJECTS = submit_test.$(OBJEXT)
-submit_test_LDADD = $(LDADD)
-submit_test_DEPENDENCIES = ../libevpath.la
-submit_wait_test_SOURCES = submit_wait_test.c
-submit_wait_test_OBJECTS = submit_wait_test.$(OBJEXT)
-submit_wait_test_LDADD = $(LDADD)
-submit_wait_test_DEPENDENCIES = ../libevpath.la
-thin_client_SOURCES = thin_client.c
-thin_client_OBJECTS = thin_client.$(OBJEXT)
-thin_client_DEPENDENCIES =
-thin_test_SOURCES = thin_test.c
-thin_test_OBJECTS = thin_test.$(OBJEXT)
-thin_test_LDADD = $(LDADD)
-transform_test_SOURCES = transform_test.c
-transform_test_OBJECTS = transform_test.$(OBJEXT)
-transform_test_LDADD = $(LDADD)
-transform_test_DEPENDENCIES = ../libevpath.la
+LTLIBRARIES = $(noinst_LTLIBRARIES)
+libfoo_la_LIBADD =
+am_libfoo_la_OBJECTS = foo.lo
+libfoo_la_OBJECTS = $(am_libfoo_la_OBJECTS)
+libfoo_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libfoo_la_LDFLAGS) $(LDFLAGS) -o $@
 DEFAULT_INCLUDES = -I. -I$(top_builddir)@am__isrc@
 depcomp =
 am__depfiles_maybe =
@@ -164,18 +65,8 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = auto_test.c block_test.c bulktest.c congest_bulktest.c \
-	congestion_test.c evtest.c extract_test.c filter2_test.c \
-	filter_test.c http_test.c multiq_test.c rawtest.c \
-	router_test.c router_test2.c store_limit_test.c \
-	store_pressure_test.c store_send_test.c submit_test.c \
-	submit_wait_test.c thin_client.c thin_test.c transform_test.c
-DIST_SOURCES = auto_test.c block_test.c bulktest.c congest_bulktest.c \
-	congestion_test.c evtest.c extract_test.c filter2_test.c \
-	filter_test.c http_test.c multiq_test.c rawtest.c \
-	router_test.c router_test2.c store_limit_test.c \
-	store_pressure_test.c store_send_test.c submit_test.c \
-	submit_wait_test.c thin_client.c thin_test.c transform_test.c
+SOURCES = $(libfoo_la_SOURCES)
+DIST_SOURCES = $(libfoo_la_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-dvi-recursive install-exec-recursive \
@@ -192,7 +83,6 @@ DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AR = @AR@
-ARGZ_H = @ARGZ_H@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -200,13 +90,11 @@ AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
-CMDIR = @CMDIR@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CSH = @CSH@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
-DEMO_LIBS = @DEMO_LIBS@
 DEPDIR = @DEPDIR@
 DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
@@ -214,38 +102,24 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
-FFSDIR = @FFSDIR@
 FGREP = @FGREP@
 GREP = @GREP@
-INCLTDL = @INCLTDL@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LD = @LD@
-LDFLAGS = -static
-LIBADD_DL = @LIBADD_DL@
-LIBADD_DLD_LINK = @LIBADD_DLD_LINK@
-LIBADD_DLOPEN = @LIBADD_DLOPEN@
-LIBADD_SHL_LOAD = @LIBADD_SHL_LOAD@
-LIBLTDL = @LIBLTDL@
+LDFLAGS = @LDFLAGS@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LIBTOOL_DEPS = @LIBTOOL_DEPS@
 LN_S = @LN_S@
-LTDLINCL = @LTDLINCL@
-LTDLOPEN = @LTDLOPEN@
 LTLIBOBJS = @LTLIBOBJS@
-LTLIBS = @LTLIBS@
-LT_CONFIG_H = @LT_CONFIG_H@
-LT_DLLOADERS = @LT_DLLOADERS@
-LT_DLPREOPEN = @LT_DLPREOPEN@
 MAINT = @MAINT@
 MAKEDEPEND = @MAKEDEPEND@
 MAKEINFO = @MAKEINFO@
-MATH_LIB = @MATH_LIB@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
 OBJEXT = @OBJEXT@
@@ -257,12 +131,10 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATHPROG = @PATHPROG@
 PATH_SEPARATOR = @PATH_SEPARATOR@
-PERL = @PERL@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
-SOCKET_LIBS = @SOCKET_LIBS@
 STRIP = @STRIP@
 TAGS = @TAGS@
 VERSION = @VERSION@
@@ -313,17 +185,15 @@ psdir = @psdir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
-sys_symbol_underscore = @sys_symbol_underscore@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = no-dependencies foreign
-SUBDIRS = testdll .
-OLD_TESTS = cmtest cmping take_test store_limit_test store_send_test multiq_test congest_bulktest
-LDADD = ../libevpath.la 
-thin_client_LDADD = -L@FFSDIR@ -lffs
-thin_test_DEPENDENCIES = ../libevpath.la thin_client
+SUBDIRS = . 
+noinst_LTLIBRARIES = libfoo.la
+libfoo_la_SOURCES = foo.c
+libfoo_la_LDFLAGS = -module -export-dynamic -rpath /dev/null
 all: all-recursive
 
 .SUFFIXES:
@@ -337,9 +207,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  tests/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  tests/dlltest/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign  tests/Makefile
+	  $(AUTOMAKE) --foreign  tests/dlltest/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
@@ -358,78 +228,16 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 
-clean-noinstPROGRAMS:
-	@list='$(noinst_PROGRAMS)'; for p in $$list; do \
-	  f=`echo $$p|sed 's/$(EXEEXT)$$//'`; \
-	  echo " rm -f $$p $$f"; \
-	  rm -f $$p $$f ; \
+clean-noinstLTLIBRARIES:
+	-test -z "$(noinst_LTLIBRARIES)" || rm -f $(noinst_LTLIBRARIES)
+	@list='$(noinst_LTLIBRARIES)'; for p in $$list; do \
+	  dir="`echo $$p | sed -e 's|/[^/]*$$||'`"; \
+	  test "$$dir" != "$$p" || dir=.; \
+	  echo "rm -f \"$${dir}/so_locations\""; \
+	  rm -f "$${dir}/so_locations"; \
 	done
-auto_test$(EXEEXT): $(auto_test_OBJECTS) $(auto_test_DEPENDENCIES) 
-	@rm -f auto_test$(EXEEXT)
-	$(LINK) $(auto_test_OBJECTS) $(auto_test_LDADD) $(LIBS)
-block_test$(EXEEXT): $(block_test_OBJECTS) $(block_test_DEPENDENCIES) 
-	@rm -f block_test$(EXEEXT)
-	$(LINK) $(block_test_OBJECTS) $(block_test_LDADD) $(LIBS)
-bulktest$(EXEEXT): $(bulktest_OBJECTS) $(bulktest_DEPENDENCIES) 
-	@rm -f bulktest$(EXEEXT)
-	$(LINK) $(bulktest_OBJECTS) $(bulktest_LDADD) $(LIBS)
-congest_bulktest$(EXEEXT): $(congest_bulktest_OBJECTS) $(congest_bulktest_DEPENDENCIES) 
-	@rm -f congest_bulktest$(EXEEXT)
-	$(LINK) $(congest_bulktest_OBJECTS) $(congest_bulktest_LDADD) $(LIBS)
-congestion_test$(EXEEXT): $(congestion_test_OBJECTS) $(congestion_test_DEPENDENCIES) 
-	@rm -f congestion_test$(EXEEXT)
-	$(LINK) $(congestion_test_OBJECTS) $(congestion_test_LDADD) $(LIBS)
-evtest$(EXEEXT): $(evtest_OBJECTS) $(evtest_DEPENDENCIES) 
-	@rm -f evtest$(EXEEXT)
-	$(LINK) $(evtest_OBJECTS) $(evtest_LDADD) $(LIBS)
-extract_test$(EXEEXT): $(extract_test_OBJECTS) $(extract_test_DEPENDENCIES) 
-	@rm -f extract_test$(EXEEXT)
-	$(LINK) $(extract_test_OBJECTS) $(extract_test_LDADD) $(LIBS)
-filter2_test$(EXEEXT): $(filter2_test_OBJECTS) $(filter2_test_DEPENDENCIES) 
-	@rm -f filter2_test$(EXEEXT)
-	$(LINK) $(filter2_test_OBJECTS) $(filter2_test_LDADD) $(LIBS)
-filter_test$(EXEEXT): $(filter_test_OBJECTS) $(filter_test_DEPENDENCIES) 
-	@rm -f filter_test$(EXEEXT)
-	$(LINK) $(filter_test_OBJECTS) $(filter_test_LDADD) $(LIBS)
-http_test$(EXEEXT): $(http_test_OBJECTS) $(http_test_DEPENDENCIES) 
-	@rm -f http_test$(EXEEXT)
-	$(LINK) $(http_test_OBJECTS) $(http_test_LDADD) $(LIBS)
-multiq_test$(EXEEXT): $(multiq_test_OBJECTS) $(multiq_test_DEPENDENCIES) 
-	@rm -f multiq_test$(EXEEXT)
-	$(LINK) $(multiq_test_OBJECTS) $(multiq_test_LDADD) $(LIBS)
-rawtest$(EXEEXT): $(rawtest_OBJECTS) $(rawtest_DEPENDENCIES) 
-	@rm -f rawtest$(EXEEXT)
-	$(LINK) $(rawtest_OBJECTS) $(rawtest_LDADD) $(LIBS)
-router_test$(EXEEXT): $(router_test_OBJECTS) $(router_test_DEPENDENCIES) 
-	@rm -f router_test$(EXEEXT)
-	$(LINK) $(router_test_OBJECTS) $(router_test_LDADD) $(LIBS)
-router_test2$(EXEEXT): $(router_test2_OBJECTS) $(router_test2_DEPENDENCIES) 
-	@rm -f router_test2$(EXEEXT)
-	$(LINK) $(router_test2_OBJECTS) $(router_test2_LDADD) $(LIBS)
-store_limit_test$(EXEEXT): $(store_limit_test_OBJECTS) $(store_limit_test_DEPENDENCIES) 
-	@rm -f store_limit_test$(EXEEXT)
-	$(LINK) $(store_limit_test_OBJECTS) $(store_limit_test_LDADD) $(LIBS)
-store_pressure_test$(EXEEXT): $(store_pressure_test_OBJECTS) $(store_pressure_test_DEPENDENCIES) 
-	@rm -f store_pressure_test$(EXEEXT)
-	$(LINK) $(store_pressure_test_OBJECTS) $(store_pressure_test_LDADD) $(LIBS)
-store_send_test$(EXEEXT): $(store_send_test_OBJECTS) $(store_send_test_DEPENDENCIES) 
-	@rm -f store_send_test$(EXEEXT)
-	$(LINK) $(store_send_test_OBJECTS) $(store_send_test_LDADD) $(LIBS)
-submit_test$(EXEEXT): $(submit_test_OBJECTS) $(submit_test_DEPENDENCIES) 
-	@rm -f submit_test$(EXEEXT)
-	$(LINK) $(submit_test_OBJECTS) $(submit_test_LDADD) $(LIBS)
-submit_wait_test$(EXEEXT): $(submit_wait_test_OBJECTS) $(submit_wait_test_DEPENDENCIES) 
-	@rm -f submit_wait_test$(EXEEXT)
-	$(LINK) $(submit_wait_test_OBJECTS) $(submit_wait_test_LDADD) $(LIBS)
-thin_client$(EXEEXT): $(thin_client_OBJECTS) $(thin_client_DEPENDENCIES) 
-	@rm -f thin_client$(EXEEXT)
-	$(LINK) $(thin_client_OBJECTS) $(thin_client_LDADD) $(LIBS)
-thin_test$(EXEEXT): $(thin_test_OBJECTS) $(thin_test_DEPENDENCIES) 
-	@rm -f thin_test$(EXEEXT)
-	$(LINK) $(thin_test_OBJECTS) $(thin_test_LDADD) $(LIBS)
-transform_test$(EXEEXT): $(transform_test_OBJECTS) $(transform_test_DEPENDENCIES) 
-	@rm -f transform_test$(EXEEXT)
-	$(LINK) $(transform_test_OBJECTS) $(transform_test_LDADD) $(LIBS)
+libfoo.la: $(libfoo_la_OBJECTS) $(libfoo_la_DEPENDENCIES) 
+	$(libfoo_la_LINK)  $(libfoo_la_OBJECTS) $(libfoo_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -583,79 +391,6 @@ GTAGS:
 distclean-tags:
 	-rm -f TAGS ID GTAGS GRTAGS GSYMS GPATH tags
 
-check-TESTS: $(TESTS)
-	@failed=0; all=0; xfail=0; xpass=0; skip=0; ws='[	 ]'; \
-	srcdir=$(srcdir); export srcdir; \
-	list=' $(TESTS) '; \
-	if test -n "$$list"; then \
-	  for tst in $$list; do \
-	    if test -f ./$$tst; then dir=./; \
-	    elif test -f $$tst; then dir=; \
-	    else dir="$(srcdir)/"; fi; \
-	    if $(TESTS_ENVIRONMENT) $${dir}$$tst; then \
-	      all=`expr $$all + 1`; \
-	      case " $(XFAIL_TESTS) " in \
-	      *$$ws$$tst$$ws*) \
-		xpass=`expr $$xpass + 1`; \
-		failed=`expr $$failed + 1`; \
-		echo "XPASS: $$tst"; \
-	      ;; \
-	      *) \
-		echo "PASS: $$tst"; \
-	      ;; \
-	      esac; \
-	    elif test $$? -ne 77; then \
-	      all=`expr $$all + 1`; \
-	      case " $(XFAIL_TESTS) " in \
-	      *$$ws$$tst$$ws*) \
-		xfail=`expr $$xfail + 1`; \
-		echo "XFAIL: $$tst"; \
-	      ;; \
-	      *) \
-		failed=`expr $$failed + 1`; \
-		echo "FAIL: $$tst"; \
-	      ;; \
-	      esac; \
-	    else \
-	      skip=`expr $$skip + 1`; \
-	      echo "SKIP: $$tst"; \
-	    fi; \
-	  done; \
-	  if test "$$failed" -eq 0; then \
-	    if test "$$xfail" -eq 0; then \
-	      banner="All $$all tests passed"; \
-	    else \
-	      banner="All $$all tests behaved as expected ($$xfail expected failures)"; \
-	    fi; \
-	  else \
-	    if test "$$xpass" -eq 0; then \
-	      banner="$$failed of $$all tests failed"; \
-	    else \
-	      banner="$$failed of $$all tests did not behave as expected ($$xpass unexpected passes)"; \
-	    fi; \
-	  fi; \
-	  dashes="$$banner"; \
-	  skipped=""; \
-	  if test "$$skip" -ne 0; then \
-	    skipped="($$skip tests were not run)"; \
-	    test `echo "$$skipped" | wc -c` -le `echo "$$banner" | wc -c` || \
-	      dashes="$$skipped"; \
-	  fi; \
-	  report=""; \
-	  if test "$$failed" -ne 0 && test -n "$(PACKAGE_BUGREPORT)"; then \
-	    report="Please report to $(PACKAGE_BUGREPORT)"; \
-	    test `echo "$$report" | wc -c` -le `echo "$$banner" | wc -c` || \
-	      dashes="$$report"; \
-	  fi; \
-	  dashes=`echo "$$dashes" | sed s/./=/g`; \
-	  echo "$$dashes"; \
-	  echo "$$banner"; \
-	  test -z "$$skipped" || echo "$$skipped"; \
-	  test -z "$$report" || echo "$$report"; \
-	  echo "$$dashes"; \
-	  test "$$failed" -eq 0; \
-	else :; fi
-
 distdir: $(DISTFILES)
 	@srcdirstrip=`echo "$(srcdir)" | sed 's/[].[^$$\\*]/\\\\&/g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's/[].[^$$\\*]/\\\\&/g'`; \
@@ -700,9 +435,8 @@ distdir: $(DISTFILES)
 	  fi; \
 	done
 check-am: all-am
-	$(MAKE) $(AM_MAKEFLAGS) check-TESTS check-local
 check: check-recursive
-all-am: Makefile $(PROGRAMS)
+all-am: Makefile $(LTLIBRARIES)
 installdirs: installdirs-recursive
 installdirs-am:
 install: install-recursive
@@ -731,7 +465,7 @@ maintainer-clean-generic:
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-recursive
 
-clean-am: clean-generic clean-libtool clean-noinstPROGRAMS \
+clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
 	mostlyclean-am
 
 distclean: distclean-recursive
@@ -790,28 +524,20 @@ uninstall-am:
 	install-strip
 
 .PHONY: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) CTAGS GTAGS \
-	all all-am check check-TESTS check-am check-local clean \
-	clean-generic clean-libtool clean-noinstPROGRAMS ctags \
-	ctags-recursive distclean distclean-compile distclean-generic \
-	distclean-libtool distclean-tags distdir dvi dvi-am html \
-	html-am info info-am install install-am install-data \
-	install-data-am install-dvi install-dvi-am install-exec \
-	install-exec-am install-html install-html-am install-info \
-	install-info-am install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs installdirs-am maintainer-clean \
-	maintainer-clean-generic mostlyclean mostlyclean-compile \
-	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags tags-recursive uninstall uninstall-am
+	all all-am check check-am clean clean-generic clean-libtool \
+	clean-noinstLTLIBRARIES ctags ctags-recursive distclean \
+	distclean-compile distclean-generic distclean-libtool \
+	distclean-tags distdir dvi dvi-am html html-am info info-am \
+	install install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am install-man \
+	install-pdf install-pdf-am install-ps install-ps-am \
+	install-strip installcheck installcheck-am installdirs \
+	installdirs-am maintainer-clean maintainer-clean-generic \
+	mostlyclean mostlyclean-compile mostlyclean-generic \
+	mostlyclean-libtool pdf pdf-am ps ps-am tags tags-recursive \
+	uninstall uninstall-am
 
-
-check-local: block_test evtest
-	@if CMTransport=udp ./evtest$(EXEEXT) ; then\
-	 echo "PASS: evtest(udp)";\
-	else echo "FAIL: evtest(udp)"; fi
-	@if CMNonBlockWrite=1 CMReadAheadMsgLimit=1 ./block_test$(EXEEXT) ; then\
-	 echo "PASS: block_test";\
-	else echo "FAIL: block_test"; fi
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
