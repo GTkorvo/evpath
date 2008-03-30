@@ -1134,10 +1134,33 @@ attr_list listen_info;
 	fprintf(stderr, "Failed to set 1REUSEADDR on INET socket\n");
 	return NULL;
     }
-    if (bind(conn_sock, (struct sockaddr *) &sock_addr,
-	     sizeof sock_addr) == SOCKET_ERROR) {
-	fprintf(stderr, "Cannot bind INET socket\n");
-	return NULL;
+    if (sock_addr.sin_port != 0) {
+	/* specific port requested */
+	if (bind(conn_sock, (struct sockaddr *) &sock_addr,
+		 sizeof sock_addr) == SOCKET_ERROR) {
+	    fprintf(stderr, "Cannot bind INET socket\n");
+	    return NULL;
+	}
+    } else {
+	/* port num is free.  Constrain to range 26000 : 26100 */
+	srand(time());
+	int low_bound = 26000;
+	int high_bound = 26100;
+	int size = high_bound - low_bound;
+	int tries = 10;
+	int result = SOCKET_ERROR;
+	while (tries > 0) {
+	    int target = low_bound + size * drand48();
+	    sock_addr.sin_port = htons(target);
+	    result = bind(conn_sock, (struct sockaddr *) &sock_addr,
+			  sizeof sock_addr);
+	    tries--;
+	    if (result != SOCKET_ERROR) tries = 0;
+	}
+	if (result == SOCKET_ERROR) {
+	    fprintf(stderr, "Cannot bind INET socket\n");
+	    return NULL;
+	}
     }
     sock_opt_val = 1;
     if (setsockopt(conn_sock, SOL_SOCKET, SO_REUSEADDR, (char *) &sock_opt_val,
