@@ -66,31 +66,34 @@ AC_CHECK_FUNC(inet_aton,,[LIBS="$LIBS -lresolv"])
 CERCS_REQUIRE_PACKAGE(ffs, ffs.h, libffs.la)
 CERCS_REQUIRE_PACKAGE(gen_thread, gen_thread.h,libgen_thread.la)
 CERCS_REQUIRE_PACKAGE(cercs_env, cercs_env.h,libcercs_env.la)
-CERCS_REQUIRE_PACKAGE(cm, , libcm.la)
 if test -n "$cercs_cv_gen_thread_link_dir"; then
 LDFLAGS="$LDFLAGS -L$cercs_cv_gen_thread_link_dir"
 fi
 if test -n "$cercs_cv_cercs_env_link_dir"; then
 LDFLAGS="$LDFLAGS -L$cercs_cv_cercs_env_link_dir"
 fi
-if test -n "$cercs_cv_cm_link_dir"; then
-CMDIR="$cercs_cv_cm_link_dir"
-fi
 if test -n "$cercs_cv_ffs_link_dir"; then
 FFSDIR="$cercs_cv_ffs_link_dir"
 fi
 AC_SUBST(FFSDIR)
-AC_DEFINE_UNQUOTED(CM_LIBRARY_INSTALL_DIR,["$CMDIR"],[Place where cm transport libraries are installed])
+evlibdir=`(
+                   test "x$prefix" = xNONE && prefix="$ac_default_prefix"
+                   test "x$exec_prefix" = xNONE && exec_prefix="${prefix}"
+                   eval echo \""$libdir"\"
+               )`
+test -n "$ac_cv_prog_PATHPROG" && evlibdir=`$ac_cv_prog_PATHPROG $evlibdir | tr '\134' /`
+AC_DEFINE_UNQUOTED(EVPATH_LIBRARY_INSTALL_DIR,["$evlibdir"],[Place where evpath transport libraries are installed])
 
-dnl maintain the BUILD_DIR definition so our sources are compatable with CM
-AC_DEFINE_UNQUOTED(CM_LIBRARY_BUILD_DIR,["$CMDIR"],[Place where cm transport libraries are built])
+evbuilddir=`pwd`
+test -n "$ac_cv_prog_PATHPROG" && evbuilddir=`$ac_cv_prog_PATHPROG $evbuilddir | tr '\134' /`
+AC_DEFINE_UNQUOTED(EVPATH_LIBRARY_BUILD_DIR,["$evbuilddir"],[Place where evpath transport libraries are built])
 AC_CHECK_HEADERS(gen_thread.h sys/un.h)
 
 CERCS_REQUIRE_PACKAGE(atl,atl.h,libatl.la)
 dnl can't use CHECK_LIB on libtool libraries, just add it to LTLIBS
 LTLIBS="$cercs_cv_atl_link_dir/libatl.la $LTLIBS"
 
-AC_SUBST(CMDIR)
+AC_SUBST(EVDIR)
 AC_SUBST(LTLIBS)
 AC_SUBST(DEMO_LIBS)
 AC_SUBST(SOCKET_LIBS)

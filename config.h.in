@@ -1,10 +1,10 @@
 /* config.h.in.  Generated from configure.in by autoheader.  */
 
-/* Place where cm transport libraries are built */
-#undef CM_LIBRARY_BUILD_DIR
+/* Place where evpath transport libraries are built */
+#undef EVPATH_LIBRARY_BUILD_DIR
 
-/* Place where cm transport libraries are installed */
-#undef CM_LIBRARY_INSTALL_DIR
+/* Place where evpath transport libraries are installed */
+#undef EVPATH_LIBRARY_INSTALL_DIR
 
 /* define if unistd.h declares getdomainname */
 #undef GETDOMAINNAME_DEFINED

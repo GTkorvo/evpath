@@ -91,14 +91,14 @@ const char *trans_name;
 	return 0;
     }
 
-    lt_dladdsearchdir(CM_LIBRARY_BUILD_DIR);
-    lt_dladdsearchdir(CM_LIBRARY_INSTALL_DIR);
+    lt_dladdsearchdir(EVPATH_LIBRARY_BUILD_DIR);
+    lt_dladdsearchdir(EVPATH_LIBRARY_INSTALL_DIR);
     handle = lt_dlopen(libname);
     if (!handle) {
 	fprintf(stderr, "Failed to load required '%s' dll.  Error \"%s\".\n",
 		trans_name, lt_dlerror());
-	fprintf(stderr, "Search path includes '.', '%s', '%s' and any default search paths supported by ld.so\n", CM_LIBRARY_BUILD_DIR, 
-		CM_LIBRARY_INSTALL_DIR);
+	fprintf(stderr, "Search path includes '.', '%s', '%s' and any default search paths supported by ld.so\n", EVPATH_LIBRARY_BUILD_DIR, 
+		EVPATH_LIBRARY_INSTALL_DIR);
 
     } else {
 	CMtrace_out(cm, CMTransportVerbose, "Loading local or staticly linked version of \"%s\" transport",

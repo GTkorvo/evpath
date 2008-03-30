@@ -1143,7 +1143,7 @@ attr_list listen_info;
 	}
     } else {
 	/* port num is free.  Constrain to range 26000 : 26100 */
-	srand(time());
+	srand(time(NULL));
 	int low_bound = 26000;
 	int high_bound = 26100;
 	int size = high_bound - low_bound;
@@ -1631,7 +1631,7 @@ CMtrans_services svc;
 
     socket_client_data_ptr socket_data;
     svc->trace_out(cm, "Initialize TCP/IP Socket transport built in %s",
-		   CM_LIBRARY_BUILD_DIR);
+		   EVPATH_LIBRARY_BUILD_DIR);
     if (socket_global_init == 0) {
 #ifdef HAVE_WINDOWS_H
 	int nErrorStatus;
