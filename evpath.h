@@ -366,15 +366,10 @@ CMget_indexed_conn ARGS((CManager cm, int i));
  * register a format with CM.
  *
  * \param cm  The CManager in which to register the format.
- * \param format_name The textual name to associate with the structure
- * format.
- * \param field_list The PBIO field list which describes the structure.
- * \param subformat_list A list of name/field_list pairs that specify the
- * representation of any nested structures in the message.  If the message
- * field types are simple pre-defined PBIO types, #subformat_list can be
- * NULL.  Otherwise it should contain the transitive closure of all data
- * types necessary to specify the message representation.  The list is
- * terminated with a <tt>{NULL, NULL}</tt> value.  
+ * \param format_list The FM format list which describes the structure.
+ * It should contain the transitive closure of all data types necessary to
+ * specify the message representation.  The list is terminated with a
+ * <tt>{NULL, NULL, 0, NULL}</tt> value.
  *
  * Registering a format is a precursor to sending a message or registering a
  * handler for incoming messages.
@@ -387,7 +382,7 @@ CMregister_format ARGS((CManager cm, FMStructDescList format_list));
  * lookup the CMFormat associated with a particular IOFieldList
  *
  * \param cm The CManager in which the format was registered.
- * \param field_list The field list which was used in the registration.
+ * \param format_list The format list which was used in the registration.
  *
  * CMLookup_format() addresses a specific problem particular to libraries.
  * CMwrite() requires a CMFormat value that results from a
@@ -1368,13 +1363,32 @@ extern EVstone
 EVcreate_terminal_action(CManager cm, FMStructDescList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
 
+/*!
+ * Associate a multiple-event action with a stone.
+ *
+ * EVassoc_multi_action() can be used to install handlers which
+ * potentially consume multiple events as input and will not necessarily
+ * consume any event immediately.  In evpath, these handlers are run
+ * whenever a new event arrives in their queue, but that handler must
+ * explicitly dequeue an event to consume it.  There is no declaration of
+ * conditions under which a handler is to run.  It is expected to inspect
+ * its queue upon activation and simply return without action if conditions
+ * are not suitable for it to act (I.E. it needs more events, a different
+ * set of events, etc.).  While the stone has only one real queue, events in
+ * that queue are segregated into the types specified in the action_spec and
+ * presented as being in multiple queues.
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The stone to which to register the action.
+ * \param action_spec An action specification of the sort created by
+ * create_multityped_action_spec().
+ * \param client_data An uninterpreted value that is passed to the handler
+ * function when it is called.
+ * \return An action identifier, an integer EVaction value, which can be used
+ * in subsequent calls to modify or remove the action.
+ */
 extern EVaction
-EVassoc_congestion_action(CManager cm, EVstone stone, char *multiqueue_spec,
-			  void* client_data);
-
-extern EVaction
-EVassoc_multi_action(CManager cm, EVstone stone, char *queue_spec, 
-		      void *client_data);
+EVassoc_multi_action(CManager cm, EVstone stone, char *action_spec, 
+		     void *client_data);
 
 /*!
  * Associate an immediate non-terminal action with a stone.
@@ -1607,6 +1621,28 @@ EVaction_add_split_target(CManager cm, EVstone stone, EVaction action,
 extern void
 EVaction_remove_split_target(CManager cm, EVstone stone, EVaction action,
 			  EVstone target_stone);
+
+/*!
+ * Associate a congestion-event action with an output stone.
+ *
+ * EVassoc_congestion_action() can be used to install a handler which
+ * should run when the events queued on an output stone cannot be
+ * transmitted immediately (usually because of network congestion).
+ * Like the multi_action, there is only real queue for output stones, but
+ * for congestion actions events in that queue are segregated into the types
+ * specified in the action_spec and presented as being in multiple queues.
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The stone to which to register the action.
+ * \param action_spec An action specification of the sort created by
+ * create_multityped_action_spec().
+ * \param client_data An uninterpreted value that is passed to the handler
+ * function when it is called.
+ * \return An action identifier, an integer EVaction value, which can be used
+ * in subsequent calls to modify or remove the action.
+ */
+extern EVaction
+EVassoc_congestion_action(CManager cm, EVstone stone, char *action_spec,
+			  void* client_data);
 
 /*!
  * Create a new storage stone.
@@ -1975,7 +2011,7 @@ EVsubmit_or_wait(EVsource source, void *data, attr_list attrs, EVSubmitCallbackF
  * \param cm The CManager with which the target stone is registered
  * \param stone The target stone id
  * \param data The data to be submitted, represented as a void*.
- * \param data_size The length of the pre-encoded data.
+ * \param data_len The length of the pre-encoded data.
  * \param attrs The attribute list to be submitted with the data. 
  * \param cb The function to call if the submit cannot be performed now.
  * \param user_data Passed as a parameter to the callback.
@@ -2070,7 +2106,7 @@ EVextract_attr_list(CManager cm, EVstone stone_id);
  * recreate a stone elsewhere. 
  * \param cm The CManager in which the stone is registered
  * \param stone_id The stone whose attributes are to be extracted
- * \param attr_list The attribute list to be associated with the stone
+ * \param list The attribute list to be associated with the stone
  */
 /*REMOTE*/
 extern void
@@ -2138,6 +2174,8 @@ create_transform_action_spec(FMStructDescList format_list, FMStructDescList out_
  * \param input_format_lists A null-terminated list of null-terminated lists
  *  of descriptions of  the incoming event data types that the transformation
  *  expects. 
+ * \param out_format_list A description of the outgoing event data that the
+ * transformation will produce. 
  * \param function The processing that will perform the transformation.  A
  * zero return value means that the output data should be ignored/discarded.
  */
