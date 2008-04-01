@@ -7,14 +7,14 @@ typedef struct _simple_rec {
     int integer_field;
 } simple_rec, *simple_rec_ptr;
 
-static IOField simple_field_list[] =
+static FMField simple_field_list[] =
 {
-    {"integer_field", "integer", sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
+    {"integer_field", "integer", sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
     {NULL, NULL, 0, 0}
 };
-static CMFormatRec simple_format_list[] =
+static FMStructDescRec simple_format_list[] =
 {
-    {"simple", simple_field_list},
+    {"simple", simple_field_list, sizeof(simple_rec), NULL},
     {NULL, NULL}
 };
 
@@ -23,15 +23,15 @@ typedef struct _second_rec {
     char data_type;
 } second_rec, *second_rec_ptr;
 
-static IOField second_field_list[] =
+static FMField second_field_list[] =
 {
-    {"data_field", "float", sizeof(double), IOOffset(second_rec_ptr, data_field)},
-    {"data_type", "char", sizeof(char), IOOffset(second_rec_ptr, data_type)},
+    {"data_field", "float", sizeof(double), FMOffset(second_rec_ptr, data_field)},
+    {"data_type", "char", sizeof(char), FMOffset(second_rec_ptr, data_type)},
     {NULL, NULL, 0, 0}
 };
-static CMFormatRec second_format_list[] =
+static FMStructDescRec second_format_list[] =
 {
-    {"second", second_field_list},
+    {"second", second_field_list, sizeof(second_rec), NULL},
     {NULL, NULL}
 };
 
@@ -40,15 +40,15 @@ typedef struct _output_rec {
     double average;
 } output_rec, *output_rec_ptr;
 
-static IOField output_field_list[] =
+static FMField output_field_list[] =
 {
-    {"integer_field", "integer", sizeof(int), IOOffset(output_rec_ptr, integer_field)},
-    {"average", "double", sizeof(double), IOOffset(output_rec_ptr, average)},
+    {"integer_field", "integer", sizeof(int), FMOffset(output_rec_ptr, integer_field)},
+    {"average", "double", sizeof(double), FMOffset(output_rec_ptr, average)},
     {NULL, NULL, 0, 0}
 };
-static CMFormatRec output_format_list[] =
+static FMStructDescRec output_format_list[] =
 {
-    {"simple2", output_field_list},
+    {"simple2", output_field_list, sizeof(output_rec), NULL},
     {NULL, NULL}
 };
 

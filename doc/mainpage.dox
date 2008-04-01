@@ -60,7 +60,7 @@ Include evpath.h and define the data structure we're using:
 \until NULL}
 \until };
 
-Here, IOField and CMFormatRec declarations describe to EVPath the data
+Here, FMField and FMStructDescRec declarations describe to EVPath the data
 structure (simple_rec) that is to be transmitted.  EVPath deals with
 structured data and that it provides the the safe marshalling of complex
 structures, even between architectures with different machine

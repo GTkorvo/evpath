@@ -5,15 +5,15 @@ typedef struct _simple_rec {
     char *str;
 } simple_rec, *simple_rec_ptr;
 
-static IOField simple_field_list[] =
+static FMField simple_field_list[] =
 {
-    {"integer_field", "integer", sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
-    {"str", "string", sizeof(char*), IOOffset(simple_rec_ptr, str)},
+    {"integer_field", "integer", sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
+    {"str", "string", sizeof(char*), FMOffset(simple_rec_ptr, str)},
     {NULL, NULL, 0, 0}
 };
-static CMFormatRec simple_format_list[] =
+static FMStructDescRec simple_format_list[] =
 {
-    {"simple", simple_field_list},
+    {"simple", simple_field_list, sizeof(simple_rec), NULL},
     {NULL, NULL}
 };
 
@@ -24,16 +24,16 @@ typedef struct _output_rec {
     char *str;
 } output_rec, *output_rec_ptr;
 
-static IOField output_field_list[] =
+static FMField output_field_list[] =
 {
-    {"integer_field", "integer", sizeof(int), IOOffset(output_rec_ptr, integer_field)},
-    {"average", "double", sizeof(double), IOOffset(output_rec_ptr, average)},
-    {"str", "string", sizeof(char*), IOOffset(output_rec_ptr, str)},
+    {"integer_field", "integer", sizeof(int), FMOffset(output_rec_ptr, integer_field)},
+    {"average", "double", sizeof(double), FMOffset(output_rec_ptr, average)},
+    {"str", "string", sizeof(char*), FMOffset(output_rec_ptr, str)},
     {NULL, NULL, 0, 0}
 };
-static CMFormatRec output_format_list[] =
+static FMStructDescRec output_format_list[] =
 {
-    {"simple2", output_field_list},
+    {"simple2", output_field_list, sizeof(output_rec), NULL},
     {NULL, NULL}
 };
 

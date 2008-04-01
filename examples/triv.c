@@ -5,14 +5,14 @@ typedef struct _simple_rec {
     int integer_field;
 } simple_rec, *simple_rec_ptr;
 
-static IOField simple_field_list[] =
+static FMField simple_field_list[] =
 {
-    {"integer_field", "integer", sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
+    {"integer_field", "integer", sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
     {NULL, NULL, 0, 0}
 };
-static CMFormatRec simple_format_list[] =
+static FMStructDescRec simple_format_list[] =
 {
-    {"simple", simple_field_list},
+    {"simple", simple_field_list, sizeof(simple_rec), NULL},
     {NULL, NULL}
 };
 
