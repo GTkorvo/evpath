@@ -23,7 +23,7 @@ libevpath_la_LDFLAGS = $(MATH_LIB) -version-info 1:0:0
 libevpath_la_LIBADD =  $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lffs -lcod @SOCKET_LIBS@ 
 libevpath_la_DEPENDENCIES = $(LIBLTDL) $(LTLIBS)
 
-include_HEADERS = evpath.h evpath_old.h revpath.h
+include_HEADERS = evpath.h evpath_old.h revpath.h cm_transport.h
 
 AM_CPPFLAGS =
 
