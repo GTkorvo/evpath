@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <strings.h>
+#include <string.h>
 #include <ctype.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -1145,6 +1146,7 @@ cod_parse_context context;
 		void *malloc(int size);\n\
 		void sleep(int seconds);\n\
 		void free(void *pointer);\n\
+		char * strstr(char * haystack, char * needle);\n\
 		long lrand48();\n\
 		double drand48();\n\
 		void EVsubmit(cod_exec_context ec, int port, void* d, cod_type_spec dt);\n\
@@ -1154,6 +1156,7 @@ cod_parse_context context;
 	{"printf", (void *) 0},
 	{"malloc", (void*) 0},
 	{"free", (void*) 0},
+	{"strstr", (void*) 0},
 	{"lrand48", (void *) 0},
 	{"drand48", (void *) 0},
 	{"stone_attrs", (void *) 0},
@@ -1168,11 +1171,12 @@ cod_parse_context context;
     externs[0].extern_value = (void *) (long) printf;
     externs[1].extern_value = (void *) (long) malloc;
     externs[2].extern_value = (void *) (long) free;
-    externs[3].extern_value = (void *) (long) lrand48;
-    externs[4].extern_value = (void *) (long) drand48;
-    externs[5].extern_value = (void *) (long) &stone->stone_attrs;
-    externs[6].extern_value = (void *) (long) &internal_cod_submit;
-    externs[7].extern_value = (void *) (long) &sleep;
+    externs[3].extern_value = (void *) (long) strstr;
+    externs[4].extern_value = (void *) (long) lrand48;
+    externs[5].extern_value = (void *) (long) drand48;
+    externs[6].extern_value = (void *) (long) &stone->stone_attrs;
+    externs[7].extern_value = (void *) (long) &internal_cod_submit;
+    externs[8].extern_value = (void *) (long) &sleep;
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
