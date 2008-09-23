@@ -157,6 +157,11 @@ FMField alive_fields[] = {{"contact", "string", sizeof(char*), FMOffset(alive_ms
 			  {NULL, NULL, 0, 0}};
 FMStructDescRec alive_formats[]= {{"alive",alive_fields, sizeof(alive_msg_t), NULL}, {NULL,NULL,0,NULL}};
 
+static atom_t CM_TRANSPORT;
+static atom_t CM_NETWORK_POSTFIX;
+static atom_t CM_MCAST_ADDR;
+static atom_t CM_MCAST_PORT;
+
 static void
 handshake_with_parent(CManager cm, attr_list parent_contact_list)
 {
@@ -193,6 +198,11 @@ char **argv;
 #ifdef USE_PTHREADS
     gen_pthread_init();
 #endif
+    CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
+    CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
+    CM_MCAST_PORT = attr_atom_from_string("MCAST_PORT");
+    CM_MCAST_ADDR = attr_atom_from_string("MCAST_ADDR");
+
     if (be_the_child) {
 	CManager cm = CManager_create();
 	attr_list parent_contact_list = attr_list_from_string(argv[1]);

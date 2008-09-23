@@ -32,15 +32,18 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-subdir = tests/dlltest
+subdir = tests/testdll
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/config/cercs.m4 \
+am__aclocal_m4_deps = $(top_srcdir)/config/argz.m4 \
+	$(top_srcdir)/config/cercs.m4 \
 	$(top_srcdir)/config/definitions.m4 \
-	$(top_srcdir)/config/libtool.m4 \
+	$(top_srcdir)/config/libtool.m4 $(top_srcdir)/config/ltdl.m4 \
 	$(top_srcdir)/config/ltoptions.m4 \
 	$(top_srcdir)/config/ltsugar.m4 \
-	$(top_srcdir)/config/ltversion.m4 $(top_srcdir)/configure.in
+	$(top_srcdir)/config/ltversion.m4 \
+	$(top_srcdir)/config/lt~obsolete.m4 $(top_srcdir)/acinclude.m4 \
+	$(top_srcdir)/configure.in
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -83,6 +86,7 @@ DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
 AR = @AR@
+ARGZ_H = @ARGZ_H@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -95,15 +99,20 @@ CPPFLAGS = @CPPFLAGS@
 CSH = @CSH@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
+DEMO_LIBS = @DEMO_LIBS@
 DEPDIR = @DEPDIR@
+DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
+EVDIR = @EVDIR@
 EXEEXT = @EXEEXT@
+FFSDIR = @FFSDIR@
 FGREP = @FGREP@
 GREP = @GREP@
+INCLTDL = @INCLTDL@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -111,18 +120,36 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
+LIBADD_DL = @LIBADD_DL@
+LIBADD_DLD_LINK = @LIBADD_DLD_LINK@
+LIBADD_DLOPEN = @LIBADD_DLOPEN@
+LIBADD_SHL_LOAD = @LIBADD_SHL_LOAD@
+LIBLTDL = @LIBLTDL@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LIBTOOL_DEPS = @LIBTOOL_DEPS@
+LIPO = @LIPO@
 LN_S = @LN_S@
+LTDLDEPS = @LTDLDEPS@
+LTDLINCL = @LTDLINCL@
+LTDLOPEN = @LTDLOPEN@
 LTLIBOBJS = @LTLIBOBJS@
+LTLIBS = @LTLIBS@
+LT_CONFIG_H = @LT_CONFIG_H@
+LT_DLLOADERS = @LT_DLLOADERS@
+LT_DLPREOPEN = @LT_DLPREOPEN@
 MAINT = @MAINT@
 MAKEDEPEND = @MAKEDEPEND@
 MAKEINFO = @MAKEINFO@
+MATH_LIB = @MATH_LIB@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
+NMEDIT = @NMEDIT@
+OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OTOOL = @OTOOL@
+OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
@@ -131,10 +158,12 @@ PACKAGE_TARNAME = @PACKAGE_TARNAME@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATHPROG = @PATHPROG@
 PATH_SEPARATOR = @PATH_SEPARATOR@
+PERL = @PERL@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
+SOCKET_LIBS = @SOCKET_LIBS@
 STRIP = @STRIP@
 TAGS = @TAGS@
 VERSION = @VERSION@
@@ -175,6 +204,8 @@ libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
 lt_ECHO = @lt_ECHO@
+ltdl_LIBOBJS = @ltdl_LIBOBJS@
+ltdl_LTLIBOBJS = @ltdl_LTLIBOBJS@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
@@ -185,6 +216,8 @@ psdir = @psdir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
+subdirs = @subdirs@
+sys_symbol_underscore = @sys_symbol_underscore@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 top_builddir = @top_builddir@
@@ -207,9 +240,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  tests/dlltest/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  tests/testdll/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign  tests/dlltest/Makefile
+	  $(AUTOMAKE) --foreign  tests/testdll/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \

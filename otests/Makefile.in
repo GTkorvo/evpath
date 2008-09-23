@@ -43,7 +43,7 @@ noinst_PROGRAMS = $(am__EXEEXT_1) congestion_test$(EXEEXT) \
 	store_pressure_test$(EXEEXT) block_test$(EXEEXT) \
 	submit_wait_test$(EXEEXT)
 subdir = otests
-DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
+DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/config/argz.m4 \
 	$(top_srcdir)/config/cercs.m4 \
@@ -51,7 +51,8 @@ am__aclocal_m4_deps = $(top_srcdir)/config/argz.m4 \
 	$(top_srcdir)/config/libtool.m4 $(top_srcdir)/config/ltdl.m4 \
 	$(top_srcdir)/config/ltoptions.m4 \
 	$(top_srcdir)/config/ltsugar.m4 \
-	$(top_srcdir)/config/ltversion.m4 $(top_srcdir)/acinclude.m4 \
+	$(top_srcdir)/config/ltversion.m4 \
+	$(top_srcdir)/config/lt~obsolete.m4 $(top_srcdir)/acinclude.m4 \
 	$(top_srcdir)/configure.in
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
@@ -185,6 +186,7 @@ CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEMO_LIBS = @DEMO_LIBS@
 DEPDIR = @DEPDIR@
+DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
@@ -212,7 +214,9 @@ LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
 LIBTOOL = @LIBTOOL@
 LIBTOOL_DEPS = @LIBTOOL_DEPS@
+LIPO = @LIPO@
 LN_S = @LN_S@
+LTDLDEPS = @LTDLDEPS@
 LTDLINCL = @LTDLINCL@
 LTDLOPEN = @LTDLOPEN@
 LTLIBOBJS = @LTLIBOBJS@
@@ -226,7 +230,11 @@ MAKEINFO = @MAKEINFO@
 MATH_LIB = @MATH_LIB@
 MKDIR_P = @MKDIR_P@
 NM = @NM@
+NMEDIT = @NMEDIT@
+OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OTOOL = @OTOOL@
+OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
@@ -281,6 +289,8 @@ libexecdir = @libexecdir@
 localedir = @localedir@
 localstatedir = @localstatedir@
 lt_ECHO = @lt_ECHO@
+ltdl_LIBOBJS = @ltdl_LIBOBJS@
+ltdl_LTLIBOBJS = @ltdl_LTLIBOBJS@
 mandir = @mandir@
 mkdir_p = @mkdir_p@
 oldincludedir = @oldincludedir@
@@ -291,6 +301,7 @@ psdir = @psdir@
 sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 srcdir = @srcdir@
+subdirs = @subdirs@
 sys_symbol_underscore = @sys_symbol_underscore@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@

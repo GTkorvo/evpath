@@ -181,6 +181,8 @@ attr_list attrs;
 
 static int do_regression_master_test();
 static int regression = 1;
+static atom_t CM_TRANSPORT;
+static atom_t CM_NETWORK_POSTFIX;
 
 int
 main(argc, argv)
@@ -225,6 +227,9 @@ char **argv;
 #ifdef USE_PTHREADS
     gen_pthread_init();
 #endif
+    CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
+    CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
+
     if (regression && regression_master) {
 	return do_regression_master_test();
     }

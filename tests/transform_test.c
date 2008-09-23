@@ -191,6 +191,10 @@ attr_list attrs;
 static int do_regression_master_test();
 static int regression = 1;
 static int repeat_count = 10;
+static atom_t CM_TRANSPORT;
+static atom_t CM_NETWORK_POSTFIX;
+static atom_t CM_MCAST_ADDR;
+static atom_t CM_MCAST_PORT;
 
 static char *trans = "{\
     output.random_field = (lrand48() % 10);\n\
@@ -236,6 +240,11 @@ char **argv;
 #ifdef USE_PTHREADS
     gen_pthread_init();
 #endif
+    CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
+    CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
+    CM_MCAST_PORT = attr_atom_from_string("MCAST_PORT");
+    CM_MCAST_ADDR = attr_atom_from_string("MCAST_ADDR");
+
     if (regression && regression_master) {
 	int result = do_regression_master_test(0);
 	result |= do_regression_master_test(1);
