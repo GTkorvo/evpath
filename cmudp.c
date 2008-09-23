@@ -767,7 +767,7 @@ CMtrans_services svc;
     if (atom_init == 0) {
 	CM_UDP_PORT = attr_atom_from_string("UDP_PORT");
 	CM_UDP_ADDR = attr_atom_from_string("UDP_ADDR");
-	CM_IP_HOSTNAME = attr_atom_from_string("CM_IP_HOSTNAME");
+	CM_IP_HOSTNAME = attr_atom_from_string("IP_HOST");
 	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
 	atom_init++;
     }
