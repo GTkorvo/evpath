@@ -32,6 +32,22 @@ extern int getdomainname ARGS((char *name, int namelen));
 
 static void CMinitialize ARGS((CManager cm));
 
+static atom_t CM_TRANSPORT = -1;
+static atom_t CM_NETWORK_POSTFIX = -1;
+static atom_t CM_CONN_BLOCKING = -1;
+static atom_t CM_IP_HOSTNAME = -1;
+static atom_t CM_IP_PORT = -1;
+static atom_t CM_REBWM_RLEN = -1;
+static atom_t CM_REBWM_REPT = -1;
+static atom_t CM_BW_MEASURE_INTERVAL = -1;
+static atom_t CM_BW_MEASURE_TASK = -1;
+static atom_t CM_BW_MEASURED_VALUE = -1;
+static atom_t CM_BW_MEASURED_COF = -1;
+static atom_t CM_BW_MEASURE_SIZE = -1;
+static atom_t CM_BW_MEASURE_SIZEINC = -1;
+static atom_t CM_EVENT_SIZE = -1;
+static atom_t EV_EVENT_LSUM = -1;
+
 struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, INT_CMfree, 
 					       INT_CM_fd_add_select, 
 					       CM_fd_write_select, 
@@ -486,28 +502,21 @@ INT_CManager_create()
 	return NULL;
 
     if (atom_init == 0) {
-	set_attr_atom_and_string("CM_TRANSPORT", CM_TRANSPORT);
-	set_attr_atom_and_string("CM_NETWORK_POSTFIX", CM_NETWORK_POSTFIX);
-	set_attr_atom_and_string("IP_HOST", CM_IP_HOSTNAME);
-	set_attr_atom_and_string("IP_PORT", CM_IP_PORT);
-	set_attr_atom_and_string("CM_REG_BW_RUN_LEN", CM_REBWM_RLEN );
-	set_attr_atom_and_string("CM_REG_BW_REPEAT_CNT", CM_REBWM_REPT);
-	set_attr_atom_and_string("CM_BW_MEASURE_INTERVAL",
-				 CM_BW_MEASURE_INTERVAL);
-	set_attr_atom_and_string("CM_BW_MEASURE_TASK",
-				 CM_BW_MEASURE_TASK);
-	set_attr_atom_and_string("CM_BW_MEASURED_VALUE",
-				 CM_BW_MEASURED_VALUE);
-	set_attr_atom_and_string("CM_BW_MEASURED_COF",
-				 CM_BW_MEASURED_COF);
-	set_attr_atom_and_string("CM_BW_MEASURE_SIZE",
-				 CM_BW_MEASURE_SIZE);
-	set_attr_atom_and_string("CM_BW_MEASURE_SIZEINC",
-				 CM_BW_MEASURE_SIZEINC);
-	set_attr_atom_and_string("CM_EVENT_SIZE",
-                                 CM_EVENT_SIZE);
-	set_attr_atom_and_string("EV_EVENT_LSUM",
-                                 EV_EVENT_LSUM);
+	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
+	CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
+	CM_CONN_BLOCKING = attr_atom_from_string("CM_CONN_BLOCKING");
+	CM_IP_HOSTNAME = attr_atom_from_string("IP_HOST");
+	CM_IP_PORT = attr_atom_from_string("IP_PORT");
+	CM_REBWM_RLEN = attr_atom_from_string("CM_REG_BW_RUN_LEN");
+	CM_REBWM_REPT = attr_atom_from_string("CM_REG_BW_REPEAT_CNT");
+	CM_BW_MEASURE_INTERVAL = attr_atom_from_string("CM_BW_MEASURE_INTERVAL");
+	CM_BW_MEASURE_TASK = attr_atom_from_string("CM_BW_MEASURE_TASK");
+	CM_BW_MEASURED_VALUE = attr_atom_from_string("CM_BW_MEASURED_VALUE");
+	CM_BW_MEASURED_COF = attr_atom_from_string("CM_BW_MEASURED_COF");
+	CM_BW_MEASURE_SIZE = attr_atom_from_string("CM_BW_MEASURE_SIZE");
+	CM_BW_MEASURE_SIZEINC = attr_atom_from_string("CM_BW_MEASURE_SIZEINC");
+	CM_EVENT_SIZE = attr_atom_from_string("CM_EVENT_SIZE");
+	EV_EVENT_LSUM = attr_atom_from_string("EV_EVENT_LSUM");
     }
 
     /* initialize data structs */

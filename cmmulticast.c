@@ -102,6 +102,10 @@ typedef struct mcast_connection_data {
 #define write(fd, buf, len) send(fd, buf, len, 0)
 #endif
 
+static atom_t CM_MCAST_PORT = -1;
+static atom_t CM_MCAST_ADDR = -1;
+static atom_t CM_FD = -1;
+
 static mcast_conn_data_ptr
 create_mcast_conn_data(svc)
 CMtrans_services svc;
@@ -543,8 +547,9 @@ CMtrans_services svc;
     }
 #endif
     if (atom_init == 0) {
-	set_attr_atom_and_string("MCAST_PORT", CM_MCAST_PORT);
-	set_attr_atom_and_string("MCAST_ADDR", CM_MCAST_ADDR);
+	CM_MCAST_PORT = attr_atom_from_string("MCAST_PORT");
+	CM_MCAST_ADDR = attr_atom_from_string("MCAST_ADDR");
+	CM_FD = attr_atom_from_string("CM_FD");
 	atom_init++;
     }
     mcast_data = svc->malloc_func(sizeof(struct multicast_transport_data));

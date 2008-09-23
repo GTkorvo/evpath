@@ -1,34 +1,36 @@
 /* loader-dyld.c -- dynamic linking on darwin and OS X
-   Copyright (C) 1998, 1999, 2000, 2004, 2006 Free Software Foundation, Inc.
-   Originally by Peter O'Gorman <peter@pogma.com>
+
+   Copyright (C) 1998, 1999, 2000, 2004, 2006,
+                 2007, 2008 Free Software Foundation, Inc.
+   Written by Peter O'Gorman, 1998
 
    NOTE: The canonical source of this file is maintained with the
    GNU Libtool package.  Report bugs to bug-libtool@gnu.org.
 
-This library is free software; you can redistribute it and/or
+GNU Libltdl is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
 License as published by the Free Software Foundation; either
 version 2 of the License, or (at your option) any later version.
 
 As a special exception to the GNU Lesser General Public License,
 if you distribute this file as part of a program or library that
-is built using GNU libtool, you may include it under the same
-distribution terms that you use for the rest of that program.
+is built using GNU Libtool, you may include this file under the
+same distribution terms that you use for the rest of that program.
 
-This library is distributed in the hope that it will be useful,
+GNU Libltdl is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-Lesser General Public License for more details.
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public
-License along with this library; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301  USA
-
+License along with GNU Libltdl; see the file COPYING.LIB.  If not, a
+copy can be downloaded from  http://www.gnu.org/licenses/lgpl.html,
+or obtained by writing to the Free Software Foundation, Inc.,
+51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#include "lt_dlloader.h"
 #include "lt__private.h"
+#include "lt_dlloader.h"
 
 /* Use the preprocessor to rename non-static symbols to avoid namespace
    collisions when the loader code is statically linked into libltdl.
@@ -45,10 +47,13 @@ LT_END_C_DECLS
    libltdl's loader list:  */
 static int	 vl_init  (lt_user_data loader_data);
 static int	 vl_exit  (lt_user_data loader_data);
-static lt_module vm_open  (lt_user_data loader_data, const char *filename);
+static lt_module vm_open  (lt_user_data loader_data, const char *filename,
+                           lt_dladvise advise);
 static int	 vm_close (lt_user_data loader_data, lt_module module);
 static void *	 vm_sym   (lt_user_data loader_data, lt_module module,
 			  const char *symbolname);
+
+static lt_dlvtable *vtable = 0;
 
 /* Return the vtable for this loader, only the name and sym_prefix
    attributes (plus the virtual function implementations, obviously)
@@ -56,8 +61,6 @@ static void *	 vm_sym   (lt_user_data loader_data, lt_module module,
 lt_dlvtable *
 get_vtable (lt_user_data loader_data)
 {
-  static lt_dlvtable *vtable = 0;
-
   if (!vtable)
     {
       vtable = lt__zalloc (sizeof *vtable);
@@ -71,6 +74,7 @@ get_vtable (lt_user_data loader_data)
       vtable->module_open	= vm_open;
       vtable->module_close	= vm_close;
       vtable->find_sym		= vm_sym;
+      vtable->dlloader_exit	= vl_exit;
       vtable->dlloader_data	= loader_data;
       vtable->priority		= LT_DLLOADER_APPEND;
     }
@@ -178,6 +182,15 @@ static enum DYLD_BOOL (*lt__module_export)	(NSModule module) = 0;
 static int dyld_cannot_close				  = 0;
 
 
+/* A function called through the vtable when this loader is no
+   longer needed by the application.  */
+static int
+vl_exit (lt_user_data LT__UNUSED loader_data)
+{
+  vtable = NULL;
+  return 0;
+}
+
 /* A function called through the vtable to initialise this loader.  */
 static int
 vl_init (lt_user_data loader_data)
@@ -212,7 +225,8 @@ vl_init (lt_user_data loader_data)
    loader.  Returns an opaque representation of the newly opened
    module for processing with this loader's other vtable functions.  */
 static lt_module
-vm_open (lt_user_data loader_data, const char *filename)
+vm_open (lt_user_data loader_data, const char *filename,
+         lt_dladvise LT__UNUSED advise)
 {
   lt_module module = 0;
   NSObjectFileImage ofi = 0;

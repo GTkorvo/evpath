@@ -68,6 +68,11 @@
 
 struct udp_connection_data;
 
+static atom_t CM_UDP_PORT = -1;
+static atom_t CM_UDP_ADDR = -1;
+static atom_t CM_IP_HOSTNAME = -1;
+static atom_t CM_TRANSPORT = -1;
+
 typedef struct udp_transport_data {
     CManager cm;
     CMtrans_services svc;
@@ -760,8 +765,10 @@ CMtrans_services svc;
     }
 #endif
     if (atom_init == 0) {
-	set_attr_atom_and_string("UDP_PORT", CM_UDP_PORT);
-	set_attr_atom_and_string("UDP_ADDR", CM_UDP_ADDR);
+	CM_UDP_PORT = attr_atom_from_string("UDP_PORT");
+	CM_UDP_ADDR = attr_atom_from_string("UDP_ADDR");
+	CM_IP_HOSTNAME = attr_atom_from_string("CM_IP_HOSTNAME");
+	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
 	atom_init++;
     }
     udp_data = svc->malloc_func(sizeof(struct udp_transport_data));

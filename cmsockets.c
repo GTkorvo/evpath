@@ -103,6 +103,17 @@ typedef struct socket_connection_data {
 #define write(fd, buf, len) send(fd, buf, len, 0)
 #endif
 
+static atom_t CM_FD = -1;
+static atom_t CM_THIS_CONN_PORT = -1;
+static atom_t CM_PEER_CONN_PORT = -1;
+static atom_t CM_PEER_IP = -1;
+static atom_t CM_PEER_HOSTNAME = -1;
+static atom_t CM_PEER_LISTEN_PORT = -1;
+static atom_t CM_NETWORK_POSTFIX = -1;
+static atom_t CM_IP_PORT = -1;
+static atom_t CM_IP_HOSTNAME = -1;
+static atom_t CM_IP_ADDR = -1;
+
 static int
 check_host(hostname, sin_addr)
 char *hostname;
@@ -1652,18 +1663,16 @@ CMtrans_services svc;
 #endif
     }
     if (atom_init == 0) {
-	set_attr_atom_and_string("IP_HOST", CM_IP_HOSTNAME);
-	set_attr_atom_and_string("IP_PORT", CM_IP_PORT);
-	set_attr_atom_and_string("IP_ADDR", CM_IP_ADDR);
-	set_attr_atom_and_string("CONNECTION_FILE_DESCRIPTOR",
-				 CM_FD);
-	set_attr_atom_and_string("THIS_CONN_PORT",
-				 CM_THIS_CONN_PORT);
-	set_attr_atom_and_string("PEER_CONN_PORT", CM_PEER_CONN_PORT);
-	set_attr_atom_and_string("PEER_IP", CM_PEER_IP);
-	set_attr_atom_and_string("PEER_HOSTNAME", CM_PEER_HOSTNAME);
-	set_attr_atom_and_string("PEER_LISTEN_PORT",
-				 CM_PEER_LISTEN_PORT);
+	CM_IP_HOSTNAME = attr_atom_from_string("IP_HOST");
+	CM_IP_PORT = attr_atom_from_string("IP_PORT");
+	CM_IP_ADDR = attr_atom_from_string("IP_ADDR");
+	CM_FD = attr_atom_from_string("CONNECTION_FILE_DESCRIPTOR");
+	CM_THIS_CONN_PORT = attr_atom_from_string("THIS_CONN_PORT");
+	CM_PEER_CONN_PORT = attr_atom_from_string("PEER_CONN_PORT");
+	CM_PEER_IP = attr_atom_from_string("PEER_IP");
+	CM_PEER_HOSTNAME = attr_atom_from_string("PEER_HOSTNAME");
+	CM_PEER_LISTEN_PORT = attr_atom_from_string("PEER_LISTEN_PORT");
+	CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
 	atom_init++;
     }
     socket_data = svc->malloc_func(sizeof(struct socket_client_data));

@@ -278,9 +278,15 @@ void *client_data;
     if (request_in_pending(cm, format_ID, format_ID_length) == -1) {
         add_request_to_pending(cm, format_ID, format_ID_length, cond);
 	if ((conn == NULL) || (conn->closed)) {
+	    static atom_t CM_IP_HOSTNAME = -1;
+	    static atom_t CM_IP_PORT = -1;
 	    CMtrace_out(cm, CMFormatVerbose, 
 			"CMpbio connection not available, trying to reestablish, conn %lx, host %s, port %d", 
 			conn, host_string, host_port);
+	    if (CM_IP_HOSTNAME == -1) {
+		CM_IP_HOSTNAME = attr_atom_from_string("IP_HOST");
+		CM_IP_PORT = attr_atom_from_string("IP_PORT");
+	    }
 	    set_string_attr(contact_attrs, CM_IP_HOSTNAME, 
 			    strdup(host_string));
 	    set_int_attr(contact_attrs, CM_IP_PORT, host_port);
@@ -326,12 +332,16 @@ void *client_data;
 {
     CManager cm = (CManager) client_data;
     attr_list contact_attrs = INT_CMget_contact_list(cm);
+    atom_t CM_IP_PORT = -1;
     int int_port_num;
 
     if (contact_attrs == NULL) {
 	CMinternal_listen(cm, NULL);
     }
     contact_attrs = INT_CMget_contact_list(cm);
+    if (CM_IP_PORT == -1) {
+	CM_IP_PORT = attr_atom_from_string("IP_PORT");
+    }
     if (!get_int_attr(contact_attrs, CM_IP_PORT, &int_port_num)) {
 	CMtrace_out(cm, CMFormatVerbose, "CMpbio port callback found no IP_PORT attribute");
 	return 0;

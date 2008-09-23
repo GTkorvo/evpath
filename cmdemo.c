@@ -195,7 +195,7 @@ char **argv;
 	generate_record(&data);
 	attrs = create_attr_list();
 #define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
-	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
+	CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");
 	add_int_attr(attrs, CMDEMO_TEST_ATOM, 45678);
 	CMwrite_attr(conn, format, &data, attrs);
 	free_attr_list(attrs);

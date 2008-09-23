@@ -138,13 +138,13 @@ main(argc, argv)
 
 
     if (atom_init == 0) {
-	set_attr_atom_and_string("CM_REBWM_RLEN", CM_REBWM_RLEN);
-	set_attr_atom_and_string("CM_REBWM_REPT", CM_REBWM_REPT);
-	set_attr_atom_and_string("CM_BW_MEASURE_INTERVAL", CM_BW_MEASURE_INTERVAL);	
-	set_attr_atom_and_string("CM_BW_MEASURE_SIZE", CM_BW_MEASURE_SIZE);	
-	set_attr_atom_and_string("CM_BW_MEASURE_SIZEINC", CM_BW_MEASURE_SIZEINC);
-	set_attr_atom_and_string("CM_BW_MEASURED_VALUE", CM_BW_MEASURED_VALUE);	
-	set_attr_atom_and_string("CM_BW_MEASURED_COF", CM_BW_MEASURED_COF);
+	CM_REBWM_RLEN = atom_from_string("CM_REBWM_RLEN");
+	CM_REBWM_REPT = atom_from_string("CM_REBWM_REPT");
+	CM_BW_MEASURE_INTERVAL = atom_from_string("CM_BW_MEASURE_INTERVAL");
+	CM_BW_MEASURE_SIZE = atom_from_string("CM_BW_MEASURE_SIZE");
+	CM_BW_MEASURE_SIZEINC = atom_from_string("CM_BW_MEASURE_SIZEINC");
+	CM_BW_MEASURED_VALUE = atom_from_string("CM_BW_MEASURED_VALUE");
+	CW_BW_MEASURED_COF = atom_from_string("CM_BW_MEASURED_COF");
 
 	atom_init++;
     }

@@ -1,34 +1,35 @@
 /* lt_dlloader.c -- dynamic library loader interface
-   Copyright (C) 2004 Free Software Foundation, Inc.
-   Originally by Gary V. Vaughan  <gary@gnu.org>
+
+   Copyright (C) 2004, 2007, 2008 Free Software Foundation, Inc.
+   Written by Gary V. Vaughan, 2004
 
    NOTE: The canonical source of this file is maintained with the
    GNU Libtool package.  Report bugs to bug-libtool@gnu.org.
 
-This library is free software; you can redistribute it and/or
+GNU Libltdl is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
 License as published by the Free Software Foundation; either
 version 2 of the License, or (at your option) any later version.
 
 As a special exception to the GNU Lesser General Public License,
 if you distribute this file as part of a program or library that
-is built using GNU libtool, you may include it under the same
-distribution terms that you use for the rest of that program.
+is built using GNU Libtool, you may include this file under the
+same distribution terms that you use for the rest of that program.
 
-This library is distributed in the hope that it will be useful,
+GNU Libltdl is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-Lesser General Public License for more details.
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public
-License along with this library; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301  USA
-
+License along with GNU Libltdl; see the file COPYING.LIB.  If not, a
+copy can be downloaded from  http://www.gnu.org/licenses/lgpl.html,
+or obtained by writing to the Free Software Foundation, Inc.,
+51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
-#include "lt_dlloader.h"
 #include "lt__private.h"
+#include "lt_dlloader.h"
 
 #define RETURN_SUCCESS 0
 #define RETURN_FAILURE 1
@@ -51,7 +52,7 @@ loader_callback (SList *item, void *userdata)
 
   assert (vtable);
 
-  return streq (vtable->name, name) ? (void *) item : 0;
+  return streq (vtable->name, name) ? (void *) item : NULL;
 }
 
 
@@ -96,6 +97,33 @@ lt_dlloader_add (const lt_dlvtable *vtable)
   return RETURN_SUCCESS;
 }
 
+#ifdef LT_DEBUG_LOADERS
+static void *
+loader_dump_callback (SList *item, void *userdata)
+{
+  const lt_dlvtable *vtable = (const lt_dlvtable *) item->userdata;
+  fprintf (stderr, ", %s", (vtable && vtable->name) ? vtable->name : "(null)");
+  return 0;
+}
+
+void
+lt_dlloader_dump (void)
+{
+  fprintf (stderr, "loaders: ");
+  if (!loaders)
+    {
+      fprintf (stderr, "(empty)");
+    }
+  else
+    {
+      const lt_dlvtable *head = (const lt_dlvtable *) loaders->userdata;
+      fprintf (stderr, "%s", (head && head->name) ? head->name : "(null)");
+      if (slist_tail (loaders))
+	slist_foreach (slist_tail (loaders), loader_dump_callback, NULL);
+    }
+  fprintf (stderr, "\n");
+}
+#endif
 
 /* An iterator for the global loader list: if LOADER is NULL, then
    return the first element, otherwise the following element.  */
@@ -111,20 +139,25 @@ lt_dlloader_next (lt_dlloader loader)
 const lt_dlvtable *
 lt_dlloader_get	(lt_dlloader loader)
 {
-  return (const lt_dlvtable *) (loader ? ((SList *) loader)->userdata : 0);
+  return (const lt_dlvtable *) (loader ? ((SList *) loader)->userdata : NULL);
 }
 
 
 /* Return the contents of the first item in the global loader list
    with a matching NAME after removing it from that list.  If there
    was no match, return NULL; if there is an error, return NULL and
-   set an error for lt_dlerror; in either case, the loader list is
-   not changed if NULL is returned.  */
+   set an error for lt_dlerror; do not set an error if only resident
+   modules need this loader; in either case, the loader list is not
+   changed if NULL is returned.  */
 lt_dlvtable *
 lt_dlloader_remove (char *name)
 {
   const lt_dlvtable *	vtable	= lt_dlloader_find (name);
-  lt__handle *		handle	= 0;
+  static const char	id_string[] = "lt_dlloader_remove";
+  lt_dlinterface_id	iface;
+  lt_dlhandle		handle = 0;
+  int			in_use = 0;
+  int			in_use_by_resident = 0;
 
   if (!vtable)
     {
@@ -133,13 +166,23 @@ lt_dlloader_remove (char *name)
     }
 
   /* Fail if there are any open modules which use this loader.  */
-  for  (handle = 0; handle; handle = handle->next)
+  iface = lt_dlinterface_register (id_string, NULL);
+  while ((handle = lt_dlhandle_iterate (iface, handle)))
     {
-      if (handle->vtable == vtable)
+      lt_dlhandle cur = handle;
+      if (cur->vtable == vtable)
 	{
-	  LT__SETERROR (REMOVE_LOADER);
-	  return 0;
+	  in_use = 1;
+	  if (lt_dlisresident (handle))
+	    in_use_by_resident = 1;
 	}
+    }
+  lt_dlinterface_free (iface);
+  if (in_use)
+    {
+      if (!in_use_by_resident)
+	LT__SETERROR (REMOVE_LOADER);
+      return 0;
     }
 
   /* Call the loader finalisation function.  */

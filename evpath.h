@@ -379,7 +379,7 @@ CMregister_format ARGS((CManager cm, FMStructDescList format_list));
 
 
 /*!
- * lookup the CMFormat associated with a particular IOFieldList
+ * lookup the CMFormat associated with a particular FMStructDescList
  *
  * \param cm The CManager in which the format was registered.
  * \param format_list The format list which was used in the registration.
@@ -990,217 +990,6 @@ CMregressive_probe_bandwidth ARGS((CMConnection conn, int size, attr_list attrs)
 /*NOLOCK*/
 extern int
 CMget_self_ip_addr();
-/** @defgroup attrs Attributes used in various portions of CM
- * @{
- */
-/** @defgroup sockattr Sockets attributes
- * @{
- */
-/*! "CONNECTION_FILE_DESCRIPTOR" */
-#define CM_FD ATL_CHAR_CONS('C','S','F','D')
-
-/*! "THIS_CONN_PORT" */
-#define CM_THIS_CONN_PORT ATL_CHAR_CONS('C','S','C','P')
-
-/*! "PEER_CONN_PORT" */
-#define CM_PEER_CONN_PORT ATL_CHAR_CONS('C','S','P','P')
-
-/*! "PEER_IP" */
-#define CM_PEER_IP ATL_CHAR_CONS('C','P','I','P')
-
-/*! "PEER_LISTEN_PORT" */
-#define CM_PEER_LISTEN_PORT ATL_CHAR_CONS('C','S','P','L')
-
-/*! "PEER_HOSTNAME" */
-#define CM_PEER_HOSTNAME ATL_CHAR_CONS('C','P','H','O')
-
-/*! "IP_HOST" */
-#define CM_IP_HOSTNAME ATL_CHAR_CONS('C','I','P','H')
-
-/*! "IP_ADDR" */
-#define CM_IP_ADDR ATL_CHAR_CONS('C','I','P','A')
-
-/*! "IP_PORT" */
-#define CM_IP_PORT ATL_CHAR_CONS('C','I','P','P')
-
-/*! "CONN_BLOCKING" */
-#define CM_CONN_BLOCKING ATL_CHAR_CONS('C','n','B','l')
-/*! @}*/
-
-/*! "UDP_PORT" */
-#define CM_UDP_PORT ATL_CHAR_CONS('C','U','P','P')
-
-/*! "CM_TRANSPORT */
-#define CM_TRANSPORT ATL_CHAR_CONS('C','T','r','a')
-
-/*! "CM_NETWORK_POSTSCRIPT */
-#define CM_NETWORK_POSTFIX ATL_CHAR_CONS('C','N','P','f')
-
-/*! "ATM_ADDRESS" */
-#define CM_ATM_ADDRESS ATL_CHAR_CONS('C','A','T','A')
-
-/*! "ATM_SELECTOR" */
-#define CM_ATM_SELECTOR ATL_CHAR_CONS('C','A','T','S')
-
-/*! "ATM_BHLI" */
-#define CM_ATM_BHLI ATL_CHAR_CONS('C','A','T','B')
-
-/*! "QOS_CLASS" */
-#define CM_ATM_QOS_CLASS ATL_CHAR_CONS('C','A','Q','C')
-
-/*! "QOS_PCR" */
-#define CM_ATM_QOS_PCR ATL_CHAR_CONS('C','A','Q','P')
-
-/*! "QOS_SCR" */
-#define CM_ATM_QOS_SCR ATL_CHAR_CONS('C','A','Q','S')
-/*! "QOS_MBS" */
-
-#define CM_ATM_QOS_MBS ATL_CHAR_CONS('C','A','Q','M')
-/*! "CONN_FD" */
-
-#define CM_ATM_FD ATL_CHAR_CONS('C','A','F','D')
-
-/*! "PEER_ATM_ADDRESS" */
-#define CM_ATM_REMOTE_ADDRESS ATL_CHAR_CONS('C','A','R','A')
-
-/*! "PEER_ATM_SELECTOR" */
-#define CM_ATM_REMOTE_SELECTOR ATL_CHAR_CONS('C','A','R','S')
-
-/*! "PEER_ATM_BHLI" */
-#define CM_ATM_REMOTE_BHLI ATL_CHAR_CONS('C','A','R','B')
-
-/*! "CONN_VPI" */
-#define CM_ATM_CONN_VPI ATL_CHAR_CONS('C','A','C','V')
-
-/*! "CONN_VCI" */
-#define CM_ATM_CONN_VCI ATL_CHAR_CONS('C','A','C','v')
-
-/*! "MTP_HOST" */
-#define CM_MTP_HOSTNAME ATL_CHAR_CONS('C','M','H','o')
-
-/*! "MTP_ADDR" */
-#define CM_MTP_ADDR ATL_CHAR_CONS('C','M','A','d')
-
-/*! "MTP_PORT" */
-#define CM_MTP_PORT ATL_CHAR_CONS('C','M','P','o')
-
-/*! "CM_RECV_ERR" */
-#define CM_RECV_ERR ATL_CHAR_CONS('C','R','R','E')
-
-/*! "CM_SEND_ERR" */
-#define CM_SEND_ERR ATL_CHAR_CONS('C','R','S','E')
-
-/*! "CM_RECV_RATE" */
-#define CM_RECV_RATE ATL_CHAR_CONS('C','R','R','R')
-
-/*! "CM_SEND_RATE" */
-#define CM_SEND_RATE ATL_CHAR_CONS('C','R','S','R')
-
-/*! "CM_RTT" */
-#define CM_RTT ATL_CHAR_CONS('C','R','R', 't')
-
-
-/*! "CM_PROG_RATE" */
-#define CM_PROG_RATE ATL_CHAR_CONS('C','R','P','R')
-
-/*! "CM_QOS" */
-#define CM_QOS ATL_CHAR_CONS('C','Q','O','S')
-
-/*! "CM_MAX_SEG" */
-#define CM_MAX_SEG ATL_CHAR_CONS('C','R','M','S')
-
-/*! "CM_MARK" */
-#define CM_MARK ATL_CHAR_CONS('C','R','M','a')
-
-/*! "CM_START_ADAPT" */
-#define CM_START_ADAPT ATL_CHAR_CONS('C','R','S','A')
-
-/*! "CM_ADAPT_DEGREE" */
-#define CM_ADAPT_DEGREE ATL_CHAR_CONS('C','R','A','D')
-
-/*! "CM_ADAPT_COND" */
-#define CM_ADAPT_COND ATL_CHAR_CONS('C','R','A','C')
-
-/*! "CM_REBWM_RLEN" */
-#define CM_REBWM_RLEN ATL_CHAR_CONS('C','R', 'B', 'L')
-
-/*! "CM_REBWM_REPT" */
-#define CM_REBWM_REPT ATL_CHAR_CONS('C','R', 'B', 'R')
-
-/*! "CM_BW_MEASURE_SIZE" */
-#define CM_BW_MEASURE_SIZE ATL_CHAR_CONS('C','B', 'M', 'S')
-
-/*! "CM_BW_MEASURE_SIZEINC" */
-#define CM_BW_MEASURE_SIZEINC ATL_CHAR_CONS('C','B', 'M', 'N')
-
-/*! "CM_BW_MEASURE_INTERVAL" */
-#define CM_BW_MEASURE_INTERVAL ATL_CHAR_CONS('C','B', 'M', 'I')
-
-/*! "CM_BW_MEASURE_TASK" */
-#define CM_BW_MEASURE_TASK ATL_CHAR_CONS('C','B', 'M', 'T')
-
-/*! "CM_BW_MEASURED_VALUE" */
-#define CM_BW_MEASURED_VALUE ATL_CHAR_CONS('C','B', 'M', 'V')
-
-/*! "CM_BW_MEASURED_COF" */
-#define CM_BW_MEASURED_COF ATL_CHAR_CONS('C','B', 'M', 'C')
-
-
-/* @}*/
-
-/** @defgroup mcastattr Multicast attributes
- * @{
- */
-/*! "MCAST_ADDR" */
-#define CM_MCAST_ADDR ATL_CHAR_CONS('C','M','C','A')
-
-/*! "MCAST_PORT" */
-#define CM_MCAST_PORT ATL_CHAR_CONS('C','M','C','P')
-/* @}*/
-
-/** @defgroup udpattr UDP attributes
- * @{
- */
-/*! "UDP_ADDR" */
-#define CM_UDP_ADDR ATL_CHAR_CONS('C','U','U','A')
-
-/* @}*/
-
-/** @defgroup rudpattr RUDP attributes
- * @{
- */
-/*! "CM_FREEZE_WND" */
-#define CM_FREEZE_WND ATL_CHAR_CONS('C', 'R', 'F', 'W') 
-
-/*! "CM_MEASURE" */
-#define CM_MEASURE ATL_CHAR_CONS('C', 'R', 'M', 'e')
-
-/*! "CM_BW" */
-#define CM_BW ATL_CHAR_CONS('C', 'R', 'B', 'W')
-
-/*! "CM_SNDWND" */
-#define CM_SNDWND ATL_CHAR_CONS('C', 'R', 'S', 'W')
-
-/*! "CM_EVENT_SIZE" */
-#define CM_EVENT_SIZE ATL_CHAR_CONS('C', 'E', 'T', 'S')
-
-/*! "EV_EVENT_LSUM" */
-#define EV_EVENT_LSUM ATL_CHAR_CONS('E', 'E', 'L', 'S')
-
-/*! "CM_PATHRATE" */
-#define CM_PATHRATE ATL_CHAR_CONS('P','T','R', 'T')
-/* @}*/
-
-/** @defgroup evattr EVPath attributes
- * @{
- */
-/*! "EV_BACKPRESSURE_LOW" Low watermark for backpressure */
-#define EV_BACKPRESSURE_LOW ATL_CHAR_CONS('E','B','k','L')
-
-/*! "EV_BACKPRESSURE_HIGH" High watermark for backpressure */
-#define EV_BACKPRESSURE_HIGH ATL_CHAR_CONS('E','B','k','H')
-
-/* @} */
 
 /** @defgroup evpath EVPath functions and types
  * @{
@@ -1920,12 +1709,12 @@ EVreturn_event_buffer ARGS((CManager cm, void *event));
 /*!
  * return the FFSDataHandle associated with an EVsource handle.
  *
- * Some middleware may find it useful to access the IOFormat that is
+ * Some middleware may find it useful to access the FMFormat that is
  * produced when the FMStructDescList associated with a source is registered
  * with PBIO.  This call merely gives access to that information to save a
  * reregistration step.
  * \param source The EVsource value for which to retrieve the associated
- * IOFormat.
+ * FMFormat.
  */
 extern FMFormat
 EVget_src_ref_format(EVsource source);

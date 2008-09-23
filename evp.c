@@ -1193,7 +1193,13 @@ event_item *event;
 {
     int eventlength;
     int totallength; 
+    static atom_t CM_EVENT_SIZE = -1;
+    static atom_t EV_EVENT_LSUM = -1;
 
+    if (CM_EVENT_SIZE == -1) {
+	CM_EVENT_SIZE = attr_atom_from_string("CM_EVENT_SIZE");
+	EV_EVENT_LSUM = attr_atom_from_string("EV_EVENT_LSUM");
+    }
     /*update act->event_length_sum:*/
     if (get_int_attr(event->attrs, CM_EVENT_SIZE, & eventlength)) {
 	if (eventlength >= 0 )
@@ -2234,6 +2240,12 @@ backpressure_check(CManager cm, EVstone s) {
         int old_stalled = stone->is_stalled;
         int low_threshold = 50, high_threshold = 200;
         if (stone->stone_attrs) {
+	    static atom_t EV_BACKPRESSURE_HIGH = -1;
+	    static atom_t EV_BACKPRESSURE_LOW = -1;
+	    if (EV_BACKPRESSURE_HIGH == -1) {
+		EV_BACKPRESSURE_HIGH = attr_atom_from_string("EV_BACKPRESSURE_HIGH");
+		EV_BACKPRESSURE_LOW = attr_atom_from_string("EV_BACKPRESSURE_LOW");
+	    }
             get_int_attr(stone->stone_attrs, EV_BACKPRESSURE_HIGH, &high_threshold);
             get_int_attr(stone->stone_attrs, EV_BACKPRESSURE_LOW, &low_threshold);
         }

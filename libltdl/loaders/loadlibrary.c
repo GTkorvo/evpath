@@ -1,30 +1,32 @@
 /* loader-loadlibrary.c --  dynamic linking for Win32
-   Copyright (C) 1998, 1999, 2000, 2004, 2005, 2006 Free Software Foundation, Inc.
-   Originally by Thomas Tanner <tanner@ffii.org>
+
+   Copyright (C) 1998, 1999, 2000, 2004, 2005, 2006,
+                 2007, 2008 Free Software Foundation, Inc.
+   Written by Thomas Tanner, 1998
 
    NOTE: The canonical source of this file is maintained with the
    GNU Libtool package.  Report bugs to bug-libtool@gnu.org.
 
-This library is free software; you can redistribute it and/or
+GNU Libltdl is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
 License as published by the Free Software Foundation; either
 version 2 of the License, or (at your option) any later version.
 
 As a special exception to the GNU Lesser General Public License,
 if you distribute this file as part of a program or library that
-is built using GNU libtool, you may include it under the same
-distribution terms that you use for the rest of that program.
+is built using GNU Libtool, you may include this file under the
+same distribution terms that you use for the rest of that program.
 
-This library is distributed in the hope that it will be useful,
+GNU Libltdl is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-Lesser General Public License for more details.
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Lesser General Public License for more details.
 
 You should have received a copy of the GNU Lesser General Public
-License along with this library; if not, write to the Free Software
-Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301  USA
-
+License along with GNU Libltdl; see the file COPYING.LIB.  If not, a
+copy can be downloaded from  http://www.gnu.org/licenses/lgpl.html,
+or obtained by writing to the Free Software Foundation, Inc.,
+51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
 #include "lt__private.h"
@@ -47,12 +49,15 @@ LT_END_C_DECLS
 
 /* Boilerplate code to set up the vtable for hooking this loader into
    libltdl's loader list:  */
-static lt_module vm_open  (lt_user_data loader_data, const char *filename);
+static int	 vl_exit  (lt_user_data loader_data);
+static lt_module vm_open  (lt_user_data loader_data, const char *filename,
+                           lt_dladvise advise);
 static int	 vm_close (lt_user_data loader_data, lt_module module);
 static void *	 vm_sym   (lt_user_data loader_data, lt_module module,
 			  const char *symbolname);
 
 static lt_dlinterface_id iface_id = 0;
+static lt_dlvtable *vtable = 0;
 
 /* Return the vtable for this loader, only the name and sym_prefix
    attributes (plus the virtual function implementations, obviously)
@@ -60,8 +65,6 @@ static lt_dlinterface_id iface_id = 0;
 lt_dlvtable *
 get_vtable (lt_user_data loader_data)
 {
-  static lt_dlvtable *vtable = 0;
-
   if (!vtable)
     {
       vtable = (lt_dlvtable *) lt__zalloc (sizeof *vtable);
@@ -74,6 +77,7 @@ get_vtable (lt_user_data loader_data)
       vtable->module_open	= vm_open;
       vtable->module_close	= vm_close;
       vtable->find_sym		= vm_sym;
+      vtable->dlloader_exit	= vl_exit;
       vtable->dlloader_data	= loader_data;
       vtable->priority		= LT_DLLOADER_APPEND;
     }
@@ -94,11 +98,21 @@ get_vtable (lt_user_data loader_data)
 
 #include <windows.h>
 
+/* A function called through the vtable when this loader is no
+   longer needed by the application.  */
+static int
+vl_exit (lt_user_data LT__UNUSED loader_data)
+{
+  vtable = NULL;
+  return 0;
+}
+
 /* A function called through the vtable to open a module with this
    loader.  Returns an opaque representation of the newly opened
    module for processing with this loader's other vtable functions.  */
 static lt_module
-vm_open (lt_user_data LT__UNUSED loader_data, const char *filename)
+vm_open (lt_user_data LT__UNUSED loader_data, const char *filename,
+         lt_dladvise LT__UNUSED advise)
 {
   lt_module	module	   = 0;
   char		*ext;
@@ -122,7 +136,14 @@ vm_open (lt_user_data LT__UNUSED loader_data, const char *filename)
 	  return 0;
 	}
 
-#if defined(__CYGWIN__)
+#if HAVE_DECL_CYGWIN_CONV_PATH
+      if (cygwin_conv_path (CCP_POSIX_TO_WIN_A, filename, wpath, MAX_PATH))
+	{
+	  LT__SETERROR (CANNOT_OPEN);
+	  return 0;
+	}
+      len = 0;
+#elif defined(__CYGWIN__)
       cygwin_conv_to_full_win32_path (filename, wpath);
       len = 0;
 #else
@@ -170,9 +191,9 @@ vm_open (lt_user_data LT__UNUSED loader_data, const char *filename)
      an already loaded module, and simulate failure if we
      find one. */
   {
-    lt__handle *        cur        = 0;
+    lt_dlhandle cur = 0;
 
-    while ((cur = (lt__handle *) lt_dlhandle_iterate (iface_id, (lt_dlhandle) cur)))
+    while ((cur = lt_dlhandle_iterate (iface_id, cur)))
       {
         if (!cur->module)
           {

@@ -237,6 +237,10 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 	}
     }
     if (network_string == NULL) {
+	static atom_t CM_NETWORK_POSTFIX = -1;
+	if (CM_NETWORK_POSTFIX == -1) {
+	    CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
+	}
 	if (!get_string_attr(attrs, CM_NETWORK_POSTFIX, &network_string)) {
 	    svc->trace_out(NULL, "TCP/IP transport found no NETWORK POSTFIX attribute");
 	} else {
