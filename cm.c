@@ -30,6 +30,27 @@
 extern int getdomainname ARGS((char *name, int namelen));
 #endif
 
+#if defined(NO_DYNAMIC_LINKING)
+struct select_data;
+extern void libcmselect_LTX_add_select(CMtrans_services svc, struct select_data *sdp, int fd, 
+				       select_list_func func, void *arg1, void *arg2);
+extern void libcmselect_LTX_write_select(CMtrans_services svc, struct select_data *sdp, int fd, 
+			     select_list_func func, void *arg1, void *arg2);
+extern periodic_task_handle libcmselect_LTX_add_periodic(CMtrans_services svc, struct select_data *sdp, int interval_sec, int interval_usec, select_list_func func, void *arg1, void *arg2);
+extern periodic_task_handle libcmselect_LTX_add_delayed_task(CMtrans_services svc, 
+struct select_data *sdp, int delay_sec, int delay_usec, select_list_func func,void *arg1, 
+void *arg2);
+extern void libcmselect_LTX_remove_periodic(CMtrans_services svc, struct select_data *sdp, periodic_task_handle handle);
+extern void libcmselect_LTX_remove_select(CMtrans_services svc, struct select_data *sdp, int fd);
+extern void libcmselect_LTX_wake_function(CMtrans_services svc, struct select_data *sdp);
+extern void libcmselect_LTX_blocking_function(CMtrans_services svc, void *client_data);
+extern void libcmselect_LTX_polling_function(CMtrans_services svc,void *client_data);
+extern void libcmselect_LTX_select_initialize(CMtrans_services svc,CManager cm,void *client_data);
+extern void libcmselect_LTX_select_shutdown(CMtrans_services svc,CManager cm,void *client_data);
+extern void libcmselect_LTX_select_stop(CMtrans_services svc,void *client_data);
+#endif
+
+
 static void CMinitialize ARGS((CManager cm));
 
 static atom_t CM_TRANSPORT = -1;
@@ -3349,6 +3370,8 @@ CManager cm;
     SelectInitFunc shutdown_function;
     lt_dlhandle handle;	
 
+#if !defined(NO_DYNAMIC_LINKING)
+
     if (lt_dlinit() != 0) {
 	fprintf (stderr, "error during initialization: %s\n", lt_dlerror());
 	return;
@@ -3376,6 +3399,23 @@ CManager cm;
     init_function = (SelectInitFunc)lt_dlsym(handle, "select_initialize");
     shutdown_function = (SelectInitFunc)lt_dlsym(handle, "select_shutdown");
     cl->stop_select = (CMWakeSelectFunc)lt_dlsym(handle, "select_stop");
+#else
+    cl->add_select = (CMAddSelectFunc)libcmselect_LTX_add_select;
+    cl->remove_select = (CMRemoveSelectFunc)libcmselect_LTX_remove_select;
+    cl->write_select = (CMAddSelectFunc) libcmselect_LTX_write_select;
+    cl->add_periodic = (CMAddPeriodicFunc)libcmselect_LTX_add_periodic;
+    cl->add_delayed_task = 
+	(CMAddPeriodicFunc)libcmselect_LTX_add_delayed_task;
+    cl->remove_periodic = (CMRemovePeriodicFunc)libcmselect_LTX_remove_periodic;
+    cl->wake_select = (CMWakeSelectFunc)libcmselect_LTX_wake_function;
+    blocking_function = (CMPollFunc)libcmselect_LTX_blocking_function;
+    polling_function = (CMPollFunc)libcmselect_LTX_polling_function;
+    init_function = (SelectInitFunc)libcmselect_LTX_select_initialize;
+    shutdown_function = (SelectInitFunc) libcmselect_LTX_select_shutdown;
+    cl->stop_select = (CMWakeSelectFunc) libcmselect_LTX_select_stop;
+    
+
+#endif
     if ((cl->add_select == NULL) || (cl->remove_select == NULL) || 
 	(blocking_function == NULL) || (cl->add_periodic == NULL) ||
 	(cl->remove_periodic == NULL)) {
