@@ -57,6 +57,7 @@ const char *trans_name;
     char *libname;
     lt_dlhandle handle;	
 
+
     while ((trans_list != NULL) && (*trans_list != NULL)) {
 	if (strcmp((*trans_list)->trans_name, trans_name) == 0) {
 	    transport_entry trans = add_transport_to_cm(cm, *trans_list);
@@ -86,6 +87,7 @@ const char *trans_name;
     strcat(libname, trans_name);
     strcat(libname, ".la");
 
+#if !defined(NO_DYNAMIC_LINKING) 
     if (lt_dlinit() != 0) {
 	fprintf (stderr, "error during initialization: %s\n", lt_dlerror());
 	return 0;
@@ -143,5 +145,34 @@ const char *trans_name;
 	    transport->transport_init(cm, &CMstatic_trans_svcs);
     }
     transport = add_transport_to_cm(cm, transport);
+#else
+
+    transport->trans_name = strdup("socket");
+    transport->cm = cm;
+    transport->data_available = CMDataAvailable;  /* callback pointer */
+    transport->write_possible = CMWriteQueuedData;  /* callback pointer */
+    transport->transport_init = (CMTransport_func)libcmsockets_LTX_initialize;
+    transport->listen = (CMTransport_listen_func)libcmsockets_LTX_non_blocking_listen;
+    transport->initiate_conn = (CMConnection(*)())libcmsockets_LTX_initiate_conn;
+    transport->self_check = (int(*)())libcmsockets_LTX_self_check;
+    transport->connection_eq = (int(*)())libcmsockets_LTX_connection_eq;
+    transport->shutdown_conn = (CMTransport_shutdown_conn_func)libcmsockets_LTX_shutdown_conn;
+    transport->read_to_buffer_func = (CMTransport_read_to_buffer_func)libcmsockets_LTX_read_to_buffer_func;
+    transport->read_block_func = (CMTransport_read_block_func)NULL;
+    transport->write_func = (CMTransport_write_func)libcmsockets_LTX_write_func;
+    
+    transport->writev_func = (CMTransport_writev_func)libcmsockets_LTX_writev_func;
+    transport->writev_attr_func = (CMTransport_writev_attr_func)libcmsockets_LTX_writev_attr_func;
+    transport->NBwritev_attr_func = (CMTransport_writev_attr_func)libcmsockets_LTX_NBwritev_attr_func;
+    
+    transport->set_write_notify = (CMTransport_set_write_notify_func)    libcmsockets_LTX_set_write_notify;
+    CMtrace_out(cm, CMTransportVerbose, "Listen is %lx", transport->listen);
+    if (transport->transport_init) {
+	transport->trans_data = 
+	    transport->transport_init(cm, &CMstatic_trans_svcs);
+    }
+    transport = add_transport_to_cm(cm, transport);
+
+#endif
     return 1;
 }
