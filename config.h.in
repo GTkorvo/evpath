@@ -183,6 +183,9 @@
 /* Define if dlsym() requires a leading underscore in symbol names. */
 #undef NEED_USCORE
 
+/* Building normally */
+#undef NO_DYNAMIC_LINKING
+
 /* Name of package */
 #undef PACKAGE
 
