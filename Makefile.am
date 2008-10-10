@@ -10,16 +10,30 @@ INCLUDES = $(INCLTDL)
 
 EXTRA_DIST = 
 
-lib_LTLIBRARIES = libevpath.la libcmsockets.la libcmselect.la libcmmulticast.la libcmudp.la
+if CNL
+lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la 
+else
+lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la libcmsockets.la libcmselect.la
+endif 
 EXTRA_LTLIBRARIES = 
 
 LIBS=@LIBS@
 LTLIBS=@LTLIBS@
 
-libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c\
+if CNL
+libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c \
+	               cmsockets.c cmselect.c\
 		       cm_lock.c cm_pbio.c cm_interface.c version.c \
 		       cm_threadio.c cm_evol.c evp.c response.c revp.c \
 		       evp_compat.c thin_server.c 
+else
+libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c \
+		       cm_lock.c cm_pbio.c cm_interface.c version.c \
+		       cm_threadio.c cm_evol.c evp.c response.c revp.c \
+		       evp_compat.c thin_server.c 
+
+
+endif
 
 libevpath_la_LDFLAGS = $(MATH_LIB) -version-info 1:0:0
 libevpath_la_LIBADD =  $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lffs -lcod @SOCKET_LIBS@ 
@@ -34,6 +48,7 @@ noinst_HEADERS = assert.h cm_internal.h  ev_internal.h
 cm_interface.c revp.c revpath.h: evpath.h gen_interface.pl
 	@PERL@ ./gen_interface.pl
 
+if !CNL
 libcmsockets_la_SOURCES = cmsockets.c
 libcmsockets_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env
 libcmsockets_la_LDFLAGS = -module -export-symbols-regex "libcmsockets.*"
@@ -41,6 +56,7 @@ libcmsockets_la_LDFLAGS = -module -export-symbols-regex "libcmsockets.*"
 libcmselect_la_SOURCES = cmselect.c
 libcmselect_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@
 libcmselect_la_LDFLAGS = -module -export-symbols-regex "libcmselect.*" -lgen_thread
+endif
 
 libcmmulticast_la_SOURCES = cmmulticast.c
 libcmmulticast_la_LIBADD = $(LTLIBS) $(LIBS)
