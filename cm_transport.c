@@ -87,7 +87,7 @@ const char *trans_name;
     strcat(libname, trans_name);
     strcat(libname, ".la");
 
-#if !defined(NO_DYNAMIC_LINKING) 
+#if !NO_DYNAMIC_LINKING 
     if (lt_dlinit() != 0) {
 	fprintf (stderr, "error during initialization: %s\n", lt_dlerror());
 	return 0;

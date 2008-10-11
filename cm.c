@@ -30,7 +30,7 @@
 extern int getdomainname ARGS((char *name, int namelen));
 #endif
 
-#if defined(NO_DYNAMIC_LINKING)
+#if NO_DYNAMIC_LINKING
 struct select_data;
 extern void libcmselect_LTX_add_select(CMtrans_services svc, struct select_data *sdp, int fd, 
 				       select_list_func func, void *arg1, void *arg2);
@@ -3370,7 +3370,7 @@ CManager cm;
     SelectInitFunc shutdown_function;
     lt_dlhandle handle;	
 
-#if !defined(NO_DYNAMIC_LINKING)
+#if !NO_DYNAMIC_LINKING
 
     if (lt_dlinit() != 0) {
 	fprintf (stderr, "error during initialization: %s\n", lt_dlerror());

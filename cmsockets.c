@@ -1213,7 +1213,7 @@ attr_list listen_info;
 	svc->trace_out(cm, "CMSocket listen succeeded on port %d, fd %d",
 		       int_port_num, conn_sock);
 	ret_list = create_attr_list();
-#if !defined(NO_DYNAMIC_LINKING)
+#if NO_DYNAMIC_LINKING
 	get_qual_hostname(host_name, sizeof(host_name), svc, listen_info, 
 			  &network_added);
 #endif 

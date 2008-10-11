@@ -126,7 +126,7 @@ struct _transport_item {
 }
 #endif
 
-#if defined(NO_DYNAMIC_LINKING) 
+#if NO_DYNAMIC_LINKING 
 struct socket_connection_data;
 
 extern void libcmsockets_LTX_shutdown_conn(CMtrans_services svc, struct socket_connection_data * scd);
