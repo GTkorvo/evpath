@@ -16117,28 +16117,33 @@ LTLIBS="$cercs_cv_atl_link_dir/libatl.la $LTLIBS"
 
 
 computenode=disable
-# Check whether --enable-computenode was given.
-if test "${enable_computenode+set}" = set; then
-  enableval=$enable_computenode;  if test "x$enableval" = "xtrue"; then
+
+cat >>confdefs.h <<\_ACEOF
+#define NO_DYNAMIC_LINKING 0
+_ACEOF
+
+# Check whether --enable-CNL was given.
+if test "${enable_CNL+set}" = set; then
+  enableval=$enable_CNL;  if test "x$enableval" = "xtrue"; then
 		echo "Configuring for compute node linux"
 
 cat >>confdefs.h <<\_ACEOF
 #define NO_DYNAMIC_LINKING 1
 _ACEOF
 
-		computenode=true
+		computenode=enable
 	else
 
 cat >>confdefs.h <<\_ACEOF
 #define NO_DYNAMIC_LINKING 0
 _ACEOF
 
-		computenode=false
+		computenode=disable
 	fi
 fi
 
 
- if test x$computenode = xtrue; then
+ if test x$computenode = xenable; then
   CNL_TRUE=
   CNL_FALSE='#'
 else
