@@ -55,27 +55,27 @@ static FMField c_field_list[] =
 
 static FMStructDescRec a_format_list[] =
 {
-    {"a_rec", a_field_list},
-    {NULL, NULL}
+    {"a_rec", a_field_list, sizeof(rec_a), NULL},
+    {NULL, NULL, 0, NULL}
 };
 
 static FMStructDescRec b_format_list[] =
 {
-    {"b_rec", b_field_list},
-    {NULL, NULL}
+    {"b_rec", b_field_list, sizeof(rec_b), NULL},
+    {NULL, NULL, 0, NULL}
 };
 
 static FMStructDescRec c_format_list[] =
 {
-    {"c_rec", c_field_list},
-    {NULL, NULL}
+    {"c_rec", c_field_list, sizeof(rec_c), NULL},
+    {NULL, NULL, 0, NULL}
 };
 
 static FMStructDescList queue_list[] = {a_format_list, b_format_list, c_format_list, NULL};
-    
+
 
 static
-void 
+void
 generate_a_record(event)
 rec_a_ptr event;
 {
@@ -84,7 +84,7 @@ rec_a_ptr event;
 }
 
 static
-void 
+void
 generate_b_record(event)
 rec_b_ptr event;
 {
@@ -250,16 +250,16 @@ char **argv;
 /*	    conn = CMinitiate_conn(cm, contact_list);*/
 	    string_list = attr_list_to_string(contact_list);
 	    free_attr_list(contact_list);
-	}	
+	}
 	term = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, term, c_format_list, output_handler, NULL);
-	filter = create_multityped_action_spec(queue_list, 
+	filter = create_multityped_action_spec(queue_list,
 						c_format_list, trans);
-	
+
 	fstone = EValloc_stone(cm);
 	faction = EVassoc_multi_action(cm, fstone, filter, NULL);
 	EVaction_set_output(cm, fstone, faction, 0, term);
-	
+
 	printf("Contact list \"%d:%s\"\n", fstone, string_list);
 	CMsleep(cm, 120);
     } else {
@@ -414,7 +414,7 @@ do_regression_master_test()
 	(void) CMinitiate_conn(cm, contact_list);
 	string_list = attr_list_to_string(contact_list);
 	free_attr_list(contact_list);
-    }	
+    }
 
     if (quiet <= 0) {
 	if (forked) {
@@ -428,9 +428,9 @@ do_regression_master_test()
     term = EValloc_stone(cm);
     EVassoc_terminal_action(cm, term, c_format_list, output_handler, &message_count);
 
-    filter = create_multityped_action_spec(queue_list, 
+    filter = create_multityped_action_spec(queue_list,
 					    c_format_list, trans);
-    
+
     fstone = EValloc_stone(cm);
     faction = EVassoc_multi_action(cm, fstone, filter, NULL);
     EVaction_set_output(cm, fstone, faction, 0, term);
@@ -451,7 +451,7 @@ do_regression_master_test()
 	perror("cwait");
     }
     if (exit_state == 0) {
-	if (quiet <= 0) 
+	if (quiet <= 0)
 	    printf("Passed single remote subproc test\n");
     } else {
 	printf("Single remote subproc exit with status %d\n",
@@ -463,7 +463,7 @@ do_regression_master_test()
     }
     if (WIFEXITED(exit_state)) {
 	if (WEXITSTATUS(exit_state) == 0) {
-	    if (quiet <- 1) 
+	    if (quiet <- 1)
 		printf("Passed single remote subproc test\n");
 	} else {
 	    printf("Single remote subproc exit with status %d\n",
