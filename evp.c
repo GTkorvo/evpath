@@ -788,6 +788,10 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
         if (!compatible_stages(stage, stone->response_cache[i].stage)) {
             continue;
         }
+        if ((stage != stone->response_cache[i].stage) && 
+	    (stone->response_cache[i].action_type == Action_NoAction)) {
+            continue;
+        }
 	if (stone->response_cache[i].reference_format == event->reference_format) {
 	    /* 
 	     * if the event is encoded and the action requires decoded data,
