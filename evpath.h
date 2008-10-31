@@ -1104,6 +1104,7 @@ EVfree_stone(CManager cm, EVstone stone);
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
  */
+/*REMOTE*/
 extern EVaction
 EVassoc_terminal_action(CManager cm, EVstone stone, FMStructDescList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
@@ -1148,6 +1149,7 @@ EVassoc_raw_terminal_action(CManager cm, EVstone stone,
  * \return The stone identifier, an integer EVstone value, which can be used
  * in subsequent calls.
  */
+/*REMOTE*/
 extern EVstone
 EVcreate_terminal_action(CManager cm, FMStructDescList format_list, 
 			EVSimpleHandlerFunc handler, void* client_data);
@@ -1175,6 +1177,7 @@ EVcreate_terminal_action(CManager cm, FMStructDescList format_list,
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
  */
+/*REMOTE*/
 extern EVaction
 EVassoc_multi_action(CManager cm, EVstone stone, char *action_spec, 
 		     void *client_data);
@@ -1272,6 +1275,7 @@ EVaction_set_output(CManager cm, EVstone stone, EVaction action,
  * should be integrated into a new create_*_action_spec() call that would
  * then be passed to EVassoc_immediate_action().
  */
+/*REMOTE*/
 extern EVaction
 EVassoc_filter_action(CManager cm, EVstone stone, 
 		      FMStructDescList incoming_format_list, 
