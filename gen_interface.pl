@@ -530,11 +530,17 @@ static EVSimpleHandlerFunc
 lookup_handler(char *name)
 {
     static lt_dlhandle h = NULL;
+    EVSimpleHandlerFunc f = NULL;
     if (h == NULL) {
 	lt_dlinit();
-	lt_dlopen(NULL);
+	h = lt_dlopen(NULL);
     }
-    return lt_dlsym(h, name);
+    f = lt_dlsym(h, name);
+    if (f == NULL) {
+	printf("Dynamic symbol lookup for \"%s\" failed.\n\tEither the symbol is invalid, or symbol lookup is not enabled.\n", name);
+	printf("Try linking the program with either \"-rdynamic\" (GCC) or \"-dlopen self\" (libtool)\n");
+    }
+    return f;
 }
 
 static char *
