@@ -182,8 +182,8 @@ sub gen_handler {
 	    $argright = $argname;
 	  switch:for ($argtype) {
 	      /attr_list/ && do {print REVP "    attr_list $argname = attr_list_from_string(request->$argname);\n"; last;};
-	      /EVSimpleHandlerFunc/ && do {print REVP "    EVSimpleHandlerFunc $argname = lookup_handler(request->$argname);\n"; last;};
-	      /FMStructDescList/ && do {print REVP "    FMStructDescList $argname = lookup_format_structs(conn->cm, request->$argname);\n"; last;};
+	      /EVSimpleHandlerFunc/ && do {print REVP "    EVSimpleHandlerFunc $argname = REVPlookup_handler(request->$argname);\n"; last;};
+	      /FMStructDescList/ && do {print REVP "    FMStructDescList $argname = REVPlookup_format_structs(conn->cm, request->$argname);\n"; last;};
 	  }
 	}
     }
@@ -527,8 +527,8 @@ FMStructDescRec  EV_EVevent_list_response_formats[] = {
     {NULL, NULL, 0, NULL}
 };
 
-static EVSimpleHandlerFunc
-lookup_handler(char *name)
+EVSimpleHandlerFunc
+REVPlookup_handler(char *name)
 {
     static lt_dlhandle h = NULL;
     EVSimpleHandlerFunc f = NULL;
@@ -564,8 +564,8 @@ get_format_name(CManager cm, FMStructDescList structs)
     return str_tmp;
 }
 
-static FMStructDescList
-lookup_format_structs(CManager cm, char *format_name)
+extern FMStructDescList
+REVPlookup_format_structs(CManager cm, char *format_name)
 {
     FMFormat format;
     int slen = strlen(format_name);
