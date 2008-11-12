@@ -1525,7 +1525,7 @@ attr_list attrs;
 	if (iget == left) {
 	    return iovcnt;
 	}
-	svc->trace_out(scd->sd->cm, "	writev partial success, %d bygtes written", iget);
+	svc->trace_out(scd->sd->cm, "	writev partial success, %d bytes written", iget);
 	left -= iget;
 	while (iget > 0) {
 	    iget -= iov[iovcnt - iovleft].iov_len;
