@@ -1193,7 +1193,7 @@ add_typed_queued_routines(cod_parse_context context, int index, FMFormat format)
         "void EVdiscard_%s(cod_exec_context ec, cod_closure_context type, int index);\n"
         "int EVcount_%s(cod_exec_context ec, cod_closure_context type);\n"
         "int EVpresent_%s(cod_exec_context ec, cod_closure_context queue, int index);\n"
-        "void EVdiscard_and_submit_%s(cod_exec_context ec, cod_closure_context queue, int index);\n"
+        "void EVdiscard_and_submit_%s(cod_exec_context ec, int target, cod_closure_context queue, int index);\n"
         "attr_list EVget_attrs_%s(cod_exec_context ec, cod_closure_context queue, int index);\n";
     static cod_extern_entry externs_fmt[] = {
         {"EVdata_%s", (void *) 0},
