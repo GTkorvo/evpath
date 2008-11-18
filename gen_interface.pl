@@ -443,7 +443,12 @@ print REVPH<<EOF;
  *  DO NOT EDIT
  *
  */
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 EOF
+
 unless (open (REVP, ">revp.c")) { die "Failed to open revp.c";}
 print REVP<<EOF;
 /*
@@ -639,4 +644,10 @@ $handler_register_string
     tmp_format = CMregister_format(cm, EV_EVevent_list_response_formats);
     CMregister_handler(tmp_format, REV_response_handler, cm->evp);
 }
+EOF
+print REVPH<<EOF;
+
+#ifdef	__cplusplus
+\}
+#endif
 EOF
