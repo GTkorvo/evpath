@@ -717,6 +717,11 @@ static void cod_ev_discard_and_submit(cod_exec_context ec,
 
     item = cod_find_index(absp, ev_state, queue, index);
 
+    if (item == NULL) {
+        printf("Item %x not found on queue %d, stone %d\n", index, queue, stone);
+	return;
+    }
+
     item->action_id = -1;
 
     internal_path_submit(cm, stone, item->item);
@@ -790,7 +795,15 @@ static int cod_ev_count(cod_exec_context ec, int queue) {
 
 static attr_list cod_ev_get_attrs(cod_exec_context ec, int queue, int index) {
     struct ev_state_data *ev_state = (void*) cod_get_client_data(ec, 0x34567890);
-    attr_list *pattr = &cod_find_index_rel(ev_state, queue, index)->item->attrs;
+    queue_item *item = cod_find_index_rel(ev_state, queue, index);
+    attr_list *pattr;
+
+    if (NULL == item) {
+	printf("No item at index %d on queue %d\n", index, queue);
+
+	return NULL;
+    }
+    pattr = &item->item->attrs;
     if (!*pattr) {
         *pattr = CMcreate_attr_list(ev_state->cm);
     }
@@ -953,7 +966,7 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
             if (!proto_action_in_stage(&stone->proto_actions[i], stage)) continue;
             if (stone->proto_actions[i].matching_reference_formats 
                 && stone->proto_actions[i].matching_reference_formats[0] == NULL
-                && !stone->proto_actions[i].requires_decoded) {
+                && stone->proto_actions[i].data_state != Requires_Decoded) {
                 nearest_proto_action = i;
             }
         }
@@ -1053,7 +1066,7 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    resp->reference_format = conversion_target_format;
 	    resp->proto_action_id = nearest_proto_action;
 	    resp->action_type = proto->action_type;
-	    resp->requires_decoded = proto->requires_decoded;
+	    resp->requires_decoded = (proto->data_state == Requires_Decoded);
             resp->stage = stage;
 	}
 	if (conversion_target_format != NULL) {

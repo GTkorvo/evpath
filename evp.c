@@ -266,19 +266,19 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone_num,
 				   sizeof(stone->response_cache[0]));
     memset(&stone->response_cache[action_num], 0, sizeof(stone->response_cache[0]));
     if (format_list != NULL) {
-	stone->proto_actions[proto_action_num].requires_decoded = 1;
+	stone->proto_actions[proto_action_num].data_state = Requires_Decoded;
 	stone->proto_actions[proto_action_num].matching_reference_formats = 
 	    malloc(2*sizeof(FMFormat));
 	stone->proto_actions[proto_action_num].matching_reference_formats[0] = 
 	    EVregister_format_set(cm, format_list);
 	stone->proto_actions[proto_action_num].matching_reference_formats[1] = NULL;
     } else {
-	stone->proto_actions[proto_action_num].requires_decoded = 0;
+	stone->proto_actions[proto_action_num].data_state = Requires_Contig_Encoded;
 	stone->default_action = action_num;
     }
     stone->response_cache[action_num].action_type = Action_Terminal;
     stone->response_cache[action_num].requires_decoded =
-	stone->proto_actions[proto_action_num].requires_decoded;
+	stone->proto_actions[proto_action_num].data_state;
     if (stone->proto_actions[proto_action_num].matching_reference_formats) {
 	stone->response_cache[action_num].reference_format = 
 	    stone->proto_actions[proto_action_num].matching_reference_formats[0];
@@ -340,7 +340,7 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
     memset(&stone->proto_actions[action_num], 0, sizeof(stone->proto_actions[0]));
-    stone->proto_actions[action_num].requires_decoded = 1;
+    stone->proto_actions[action_num].data_state = Requires_Decoded;
     stone->proto_actions[action_num].action_type = Action_Immediate;
     stone->proto_actions[action_num].o.imm.output_count = 0;
     stone->proto_actions[action_num].o.imm.output_stone_ids = malloc(sizeof(int));
@@ -371,7 +371,7 @@ INT_EVassoc_multi_action(CManager cm, EVstone stone_num,
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
     memset(&stone->proto_actions[action_num], 0, sizeof(stone->proto_actions[0]));
-    stone->proto_actions[action_num].requires_decoded = 1;
+    stone->proto_actions[action_num].data_state = Requires_Decoded;
     stone->proto_actions[action_num].action_type = Action_Multi;
     stone->proto_actions[action_num].o.imm.output_count = 0;
     stone->proto_actions[action_num].o.imm.output_stone_ids = malloc(sizeof(int));
@@ -402,7 +402,7 @@ INT_EVassoc_congestion_action(CManager cm, EVstone stone_num,
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
     memset(&stone->proto_actions[action_num], 0, sizeof(stone->proto_actions[0]));
-    stone->proto_actions[action_num].requires_decoded = 1;
+    stone->proto_actions[action_num].data_state = Requires_Decoded;
     stone->proto_actions[action_num].action_type = Action_Congestion;
     stone->proto_actions[action_num].o.imm.output_count = 0;
     stone->proto_actions[action_num].o.imm.output_stone_ids = malloc(sizeof(int));
@@ -439,7 +439,7 @@ INT_EVassoc_filter_action(CManager cm, EVstone stone_num,
     stone->proto_actions[proto_action_num].o.term.handler = handler;
     stone->proto_actions[proto_action_num].o.term.client_data = client_data;
     stone->proto_actions[proto_action_num].o.term.target_stone_id = out_stone_num;
-    stone->proto_actions[proto_action_num].requires_decoded = 1;
+    stone->proto_actions[proto_action_num].data_state = Requires_Decoded;
     stone->proto_actions[proto_action_num].matching_reference_formats = NULL;
     if (format_list != NULL) {
 	stone->proto_actions[proto_action_num].matching_reference_formats = 
@@ -473,7 +473,7 @@ INT_EVassoc_store_action(CManager cm, EVstone stone_num, EVstone out_stone,
     stone = &evp->stone_map[stone_num];
     action_num = add_proto_action(cm, stone, &act);
 
-    act->requires_decoded = 0;
+    act->data_state = Accepts_All;
     act->action_type = Action_Store;
     act->matching_reference_formats = malloc(sizeof(FMFormat));
     act->matching_reference_formats[0] = NULL; /* signal that we accept all formats */
@@ -840,7 +840,7 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
 	proto_action *proto = &stone->proto_actions[stone->default_action];
 	resp->proto_action_id = stone->default_action;
 	resp->action_type = proto->action_type;
-	resp->requires_decoded = proto->requires_decoded;
+	resp->requires_decoded = proto->data_state;
         resp->stage = stage;
 	return return_response;
     }
@@ -1070,10 +1070,14 @@ dump_action(stone_type stone, response_cache_element *resp, int a, const char *i
     }
     act = &stone->proto_actions[a];
     printf(" Action %d - %s  ", a, action_str[act->action_type]);
-    if (act->requires_decoded) {
-	printf("requires decoded\n");
-    } else {
-	printf("accepts encoded\n");
+    if (act->data_state == Accepts_All) {
+	printf("accepts any encode state\n");
+    } else if (act->data_state == Requires_Decoded) {
+	printf("requires encoded\n");
+    } else if (act->data_state == Requires_Contig_Encoded) {
+	printf("requires contiguous encoded\n");
+    } else if (act->data_state == Requires_Vector_Encoded) {
+	printf("requires vector encoded\n");
     }
     printf("  expects formats ");
     if (act->matching_reference_formats) {

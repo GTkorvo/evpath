@@ -129,6 +129,8 @@ struct storage_proto_vals {
     storage_queue queue;
 };
 
+typedef enum {Accepts_All, Requires_Decoded, Requires_Contig_Encoded, Requires_Vector_Encoded} encode_state;
+
 typedef struct _proto_action {
     action_value action_type;
     FMStructDescList input_format_requirements;
@@ -141,7 +143,7 @@ typedef struct _proto_action {
 	int *split_stone_targets;
         struct storage_proto_vals store;
     }o;
-    int requires_decoded;
+    encode_state data_state;
     attr_list attrs;
     double event_length_sum;  /*in KBytes*/
 } proto_action;
