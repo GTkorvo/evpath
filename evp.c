@@ -18,7 +18,7 @@ static void dump_action(stone_type stone, response_cache_element *resp,
 static void dump_stone(stone_type stone);
 static int is_output_stone(CManager cm, EVstone stone_num);
 
-static const char *action_str[] = { "Action_NoAction","Action_Output", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Split", "Action_Store"};
+static const char *action_str[] = { "Action_NoAction","Action_Output", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Encode_to_Buffer", "Action_Split", "Action_Store", "Action_Congestion"};
 
 void
 EVPSubmit_encoded(CManager cm, int local_path_id, void *data, int len)
@@ -142,6 +142,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	    free(act->matching_reference_formats);
 	switch(act->action_type) {
 	case Action_NoAction:
+	case Action_Encode_to_Buffer:
 	    break;
 	case Action_Output:
 	    if (act->o.out.remote_path) 
@@ -1008,6 +1009,7 @@ encode_event(CManager cm, event_item *event)
 	FFSencode(event->ioBuffer, event->reference_format,
 		  event->decoded_event,
 		  &event->event_len);
+    event->event_encoded = 1;
 }
 
 extern void
@@ -1423,6 +1425,10 @@ process_events_stone(CManager cm, int s, action_class c)
 		update_event_length_sum(cm, p, event);
 		cm->evp->current_event_item = event;
 		CManager_unlock(cm);
+		if ((p->data_state == Requires_Contig_Encoded) && 
+		    (event->event_encoded == 0)) {
+		    encode_event(cm, event);
+		}
 		if (event->event_encoded == 0) {
 		    out = (handler)(cm, event->decoded_event, client_data,
 				    event->attrs);

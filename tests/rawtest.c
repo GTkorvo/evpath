@@ -172,10 +172,6 @@ attr_list attrs;
 
 static int do_regression_master_test();
 static int regression = 1;
-static atom_t CM_TRANSPORT;
-static atom_t CM_NETWORK_POSTFIX;
-static atom_t CM_MCAST_ADDR;
-static atom_t CM_MCAST_PORT;
 
 int
 main(argc, argv)
@@ -205,11 +201,6 @@ char **argv;
 #ifdef USE_PTHREADS
     gen_pthread_init();
 #endif
-    CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
-    CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
-    CM_MCAST_PORT = attr_atom_from_string("MCAST_PORT");
-    CM_MCAST_ADDR = attr_atom_from_string("MCAST_ADDR");
-
     if (regression && regression_master) {
 	return do_regression_master_test();
     }
@@ -217,47 +208,20 @@ char **argv;
 /*    (void) CMfork_comm_thread(cm);*/
 
     if (argc == 1) {
-	attr_list contact_list, listen_list = NULL;
-	char *transport = NULL;
-	char *postfix = NULL;
+	attr_list contact_list;
 	char *string_list;
 	EVstone stone;
-	if ((transport = getenv("CMTransport")) != NULL) {
-	    if (listen_list == NULL) listen_list = create_attr_list();
-	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
-		     (attr_value) strdup(transport));
-	}
-	if ((postfix = getenv("CMNetworkPostfix")) != NULL) {
-	    if (listen_list == NULL) listen_list = create_attr_list();
-	    add_attr(listen_list, CM_NETWORK_POSTFIX, Attr_String,
-		     (attr_value) strdup(postfix));
-	}
-	CMlisten_specific(cm, listen_list);
+
+	CMlisten(cm);
 	contact_list = CMget_contact_list(cm);
-	if (contact_list) {
-	    string_list = attr_list_to_string(contact_list);
-	} else {
-	    /* must be multicast, hardcode a contact list */
-#define HELLO_PORT 12345
-#define HELLO_GROUP "225.0.0.37"
-	    int addr;
-	    (void) inet_aton(HELLO_GROUP, (struct in_addr *)&addr);
-	    contact_list = create_attr_list();
-	    add_attr(contact_list, CM_MCAST_ADDR, Attr_Int4,
-		     (attr_value) (long)addr);
-	    add_attr(contact_list, CM_MCAST_PORT, Attr_Int4,
-		     (attr_value) HELLO_PORT);
-	    add_attr(contact_list, CM_TRANSPORT, Attr_String,
-		     (attr_value) "multicast");
-/*	    conn = CMinitiate_conn(cm, contact_list);*/
-	    string_list = attr_list_to_string(contact_list);
-	    free_attr_list(contact_list);
-	}	
+	string_list = attr_list_to_string(contact_list);
+	
 	stone = EValloc_stone(cm);
 	EVassoc_raw_terminal_action(cm, stone, raw_handler, NULL);
 	printf("Contact list \"%d:%s\"\n", stone, string_list);
 	CMsleep(cm, 120);
     } else {
+	static atom_t CMDEMO_TEST_ATOM;
 	simple_rec data;
 	attr_list attrs;
 	int remote_stone, stone = 0;
@@ -273,8 +237,7 @@ char **argv;
 	}
 	generate_record(&data);
 	attrs = create_attr_list();
-#define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
-	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
+	CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");
 	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
 	source_handle = EVcreate_submit_handle(cm, stone, simple_format_list);
 	if (quiet <= 0) printf("submitting %d\n", data.integer_field);
@@ -331,10 +294,12 @@ do_regression_master_test()
     char *args[] = {"evtest", "-c", NULL, NULL};
     int exit_state;
     int forked = 0;
-    attr_list contact_list, listen_list = NULL;
-    char *string_list, *transport, *postfix;
+    attr_list contact_list;
+    char *string_list;
     int message_count = 0;
     EVstone handle;
+    simple_rec data;
+    EVsource source_handle;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
 #else
@@ -348,38 +313,11 @@ do_regression_master_test()
 #endif
     cm = CManager_create();
     forked = CMfork_comm_thread(cm);
-    if ((transport = getenv("CMTransport")) != NULL) {
-	listen_list = create_attr_list();
-	add_attr(listen_list, CM_TRANSPORT, Attr_String,
-		 (attr_value) strdup(transport));
-    }
-    if ((postfix = getenv("CMNetworkPostfix")) != NULL) {
-	if (listen_list == NULL) listen_list = create_attr_list();
-	add_attr(listen_list, CM_NETWORK_POSTFIX, Attr_String,
-		 (attr_value) strdup(postfix));
-    }
-    CMlisten_specific(cm, listen_list);
+
+    CMlisten(cm);
     contact_list = CMget_contact_list(cm);
-    if (contact_list) {
-	string_list = attr_list_to_string(contact_list);
-	free_attr_list(contact_list);
-    } else {
-	/* must be multicast, hardcode a contact list */
-#define HELLO_PORT 12345
-#define HELLO_GROUP "225.0.0.37"
-	int addr;
-	(void) inet_aton(HELLO_GROUP, (struct in_addr *)&addr);
-	contact_list = create_attr_list();
-	add_attr(contact_list, CM_MCAST_ADDR, Attr_Int4,
-		 (attr_value) (long)addr);
-	add_attr(contact_list, CM_MCAST_PORT, Attr_Int4,
-		 (attr_value) HELLO_PORT);
-	add_attr(contact_list, CM_TRANSPORT, Attr_String,
-		 (attr_value) "multicast");
-	(void) CMinitiate_conn(cm, contact_list);
-	string_list = attr_list_to_string(contact_list);
-	free_attr_list(contact_list);
-    }	
+    string_list = attr_list_to_string(contact_list);
+    free_attr_list(contact_list);
 
     if (quiet <= 0) {
 	if (forked) {
@@ -393,6 +331,13 @@ do_regression_master_test()
     handle = EValloc_stone(cm);
     EVassoc_raw_terminal_action(cm, handle, raw_handler, &message_count);
     
+    /* do a local test */
+    generate_record(&data);
+    source_handle = EVcreate_submit_handle(cm, handle, simple_format_list);
+    if (quiet <= 0) printf("submitting %d\n", data.integer_field);
+    EVsubmit(source_handle, &data, NULL);
+    CMsleep(cm, 1);
+
     args[2] = string_list;
     args[2] = malloc(10 + strlen(string_list));
     sprintf(args[2], "%d:%s", handle, string_list);
@@ -435,6 +380,6 @@ do_regression_master_test()
     free(string_list);
     EVfree_stone(cm, handle);
     CManager_close(cm);
-    if (message_count != 1) printf("Message count == %d\n", message_count);
-    return !(message_count == 1);
+    if (message_count != 2) printf("Message count == %d\n", message_count);
+    return !(message_count == 2);
 }

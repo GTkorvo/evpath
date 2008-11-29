@@ -35,7 +35,7 @@ typedef struct _event_item {
     EVFreeFunction free_func;
 } event_item, *event_queue;
 
-typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filter, Action_Immediate, Action_Multi, Action_Decode, Action_Split, Action_Store, Action_Congestion } action_value;
+typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filter, Action_Immediate, Action_Multi, Action_Decode, Action_Encode_to_Buffer, Action_Split, Action_Store, Action_Congestion } action_value;
 
 typedef enum {Immediate, Immediate_and_Multi, Output, Congestion} action_class;
 
