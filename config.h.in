@@ -1,4 +1,4 @@
-/* config.h.in.  Generated from configure.in by autoheader. */
+/* config.h.in.  Generated from configure.in by autoheader.  */
 
 /* Place where evpath transport libraries are built */
 #undef EVPATH_LIBRARY_BUILD_DIR
@@ -144,6 +144,9 @@
 
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
+
+/* Define to 1 if you have the <sys/uio.h> header file. */
+#undef HAVE_SYS_UIO_H
 
 /* Define to 1 if you have the <sys/un.h> header file. */
 #undef HAVE_SYS_UN_H

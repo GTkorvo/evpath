@@ -214,7 +214,7 @@ void *void_conn_sock;
     socket_conn_data_ptr socket_conn_data;
     int sock;
     struct sockaddr sock_addr;
-    int sock_len = sizeof(sock_addr);
+    unsigned int sock_len = sizeof(sock_addr);
     int int_port_num;
     struct linger linger_val;
     int sock_opt_val = 1;
@@ -228,7 +228,7 @@ void *void_conn_sock;
     svc->trace_out(NULL, "Trying to accept something, socket %d\n", conn_sock);
     linger_val.l_onoff = 1;
     linger_val.l_linger = 60;
-    if ((sock = accept(conn_sock, (struct sockaddr *) 0, (int *) 0)) == SOCKET_ERROR) {
+    if ((sock = accept(conn_sock, (struct sockaddr *) 0, (unsigned int *) 0)) == SOCKET_ERROR) {
 	perror("Cannot accept socket connection");
 	svc->fd_remove_select(sd->cm, conn_sock);
 	fprintf(stderr, "failure in CMsockets  removing socket connection\n");
@@ -265,8 +265,7 @@ void *void_conn_sock;
 
     memset(&sock_addr, 0, sizeof(sock_addr));
     sock_len = sizeof(sock_addr);
-    if (getpeername(sock, &sock_addr,
-		    &sock_len) == 0) {
+    if (getpeername(sock, &sock_addr, &sock_len) == 0) {
 	int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
 	add_attr(conn_attr_list, CM_PEER_CONN_PORT, Attr_Int4,
 		 (attr_value) (long)int_port_num);
@@ -416,7 +415,7 @@ CManager cm;
 CMtrans_services svc;
 attr_list attrs;
 {
-    int length;
+    unsigned int length;
     struct sockaddr_in sock_addr;
     int conn_sock;
     int int_port_num = 0;
@@ -538,7 +537,7 @@ attr_list attrs;
 
     if (redir_response == REDIRECTION_REQUESTED) {
 	int redirect_sock;
-	int client_len;
+	unsigned int client_len;
 	struct sockaddr_in client;
 
 	client_len = sizeof(client);
@@ -596,7 +595,7 @@ int no_more_redirect;
     int remote_IP = -1;
     int IP = get_self_ip_addr(svc);
     static int host_ip = 0;
-    int sock_len;
+    unsigned int sock_len;
     struct sockaddr sock_addr;
     struct sockaddr_in *sock_addri = (struct sockaddr_in *) &sock_addr;
 
@@ -781,8 +780,7 @@ int no_more_redirect;
 	     (attr_value) (long)int_port_num);
     add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
 	     (attr_value) (long)socket_conn_data->remote_IP);
-    if (getpeername(sock, &sock_addr,
-		    &sock_len) == 0) {
+    if (getpeername(sock, &sock_addr, &sock_len) == 0) {
 	int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
 	add_attr(conn_attr_list, CM_PEER_CONN_PORT, Attr_Int4,
 		 (attr_value) (long)int_port_num);
@@ -1107,7 +1105,7 @@ transport_entry trans;
 attr_list listen_info;
 {
     socket_client_data_ptr sd = trans->trans_data;
-    int length;
+    unsigned int length;
     struct sockaddr_in sock_addr;
     int sock_opt_val = 1;
     int conn_sock;

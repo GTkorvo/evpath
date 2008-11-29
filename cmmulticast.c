@@ -250,6 +250,7 @@ int no_more_redirect;
     }
     /* set up destination address */
     memset(&addr, 0, sizeof(addr));
+    memset(&output_addr, 0, sizeof(output_addr));
     output_addr.sin_family = AF_INET;
     output_addr.sin_addr.s_addr = htonl(mcast_ip);
     output_addr.sin_port = htons(port_num);
@@ -275,7 +276,7 @@ libcmmulticast_data_available(void *vtrans, void *vmcd)
     int nbytes;
     mcast_conn_data_ptr mcd = vmcd;
     struct sockaddr_in addr;
-    int addrlen = sizeof(addr);
+    unsigned int addrlen = sizeof(addr);
 
     char *msgbuf = &mcd->read_buffer[0];
     if ((nbytes = recvfrom(mcd->input_fd, msgbuf, MSGBUFSIZE, 0,
@@ -284,7 +285,7 @@ libcmmulticast_data_available(void *vtrans, void *vmcd)
 	exit(1);
     }
     if (mcd->my_addr.sin_port == 0) {
-	int nl;
+	unsigned int nl;
 	int IP = get_self_ip_addr(mcd->mtd->svc);
 	nl = sizeof(struct sockaddr_in);
 	if (getsockname(mcd->output_fd, (struct sockaddr *) &mcd->my_addr, &nl) != 0)
@@ -447,7 +448,7 @@ int length;
 	exit(1);
     }
     if (mcd->my_addr.sin_port == 0) {
-	int nl;
+	unsigned int nl;
 	int IP = get_self_ip_addr(svc);
 	nl = sizeof(struct sockaddr_in);
 	if (getsockname(fd, (struct sockaddr *) &mcd->my_addr, &nl) != 0)
@@ -487,7 +488,7 @@ attr_list attrs;
 	exit(1);
     }
     if (mcd->my_addr.sin_port == 0) {
-	int nl;
+	unsigned int nl;
 	int IP = get_self_ip_addr(svc);
 	nl = sizeof(struct sockaddr_in);
 	if (getsockname(fd, (struct sockaddr *) &mcd->my_addr, &nl) != 0)

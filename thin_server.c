@@ -23,7 +23,7 @@ extern int
 EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
 {
 
-    int length;
+    unsigned int length;
     struct sockaddr_in sock_addr;
     int sock_opt_val = 1;
     int conn_sock;
@@ -196,7 +196,7 @@ socket_accept_thin_client(void *cmv, void * sockv)
     int conn_sock = (int) (long)sockv;
     int sock;
     struct sockaddr sock_addr;
-    int sock_len = sizeof(sock_addr);
+    unsigned int sock_len = sizeof(sock_addr);
     int int_port_num;
     struct linger linger_val;
     int sock_opt_val = 1;
@@ -208,7 +208,7 @@ socket_accept_thin_client(void *cmv, void * sockv)
 
     linger_val.l_onoff = 1;
     linger_val.l_linger = 60;
-    if ((sock = accept(conn_sock, (struct sockaddr *) 0, (int *) 0)) == SOCKET_ERROR) {
+    if ((sock = accept(conn_sock, (struct sockaddr *) 0, (unsigned int *) 0)) == SOCKET_ERROR) {
 	perror("Cannot accept socket connection");
 	CM_fd_remove_select(cm, conn_sock);
 	fprintf(stderr, "failure in CMsockets  removing socket connection\n");

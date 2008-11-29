@@ -332,7 +332,7 @@ libcmudp_data_available(void *vtrans, void *vinput)
     udp_transport_data_ptr utd = (udp_transport_data_ptr) trans->trans_data;
     udp_conn_data_ptr ucd = utd->connections;
     struct sockaddr_in addr;
-    int addrlen = sizeof(addr);
+    unsigned int addrlen = sizeof(addr);
     int key = 0;
     char *msgbuf;
     int read_pointer = 0;
@@ -552,7 +552,8 @@ attr_list listen_info;
     int int_port_num = 0;
     u_short port_num;
     attr_list listen_list;
-    int nl, one = 1;
+    unsigned int nl;
+    int one = 1;
     int socket_fd;
     struct sockaddr_in addr;
     int IP = get_self_ip_addr(svc);
