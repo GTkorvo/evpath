@@ -648,8 +648,8 @@ install-includeHEADERS: $(include_HEADERS)
 	@list='$(include_HEADERS)'; for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  f=$(am__strip_dir) \
-	  echo " cmp -s '$$d$$p' '$(DESTDIR)$(includedir)/$$f' || $(includeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(includedir)/$$f'"; \
-	   cmp -s "$$d$$p" "$(DESTDIR)$(includedir)/$$f" || $(includeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(includedir)/$$f"; \
+	  echo " $(includeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(includedir)/$$f'"; \
+	  $(includeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(includedir)/$$f"; \
 	done
 
 uninstall-includeHEADERS:
@@ -665,8 +665,8 @@ install-ltdlincludeHEADERS: $(ltdlinclude_HEADERS)
 	@list='$(ltdlinclude_HEADERS)'; for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  f=$(am__strip_dir) \
-	  echo " cmp -s '$$d$$p' '$(DESTDIR)$(ltdlincludedir)/$$f' || $(ltdlincludeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(ltdlincludedir)/$$f'"; \
-	   cmp -s "$$d$$p" "$(DESTDIR)$(ltdlincludedir)/$$f" || $(ltdlincludeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(ltdlincludedir)/$$f"; \
+	  echo " $(ltdlincludeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(ltdlincludedir)/$$f'"; \
+	  $(ltdlincludeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(ltdlincludedir)/$$f"; \
 	done
 
 uninstall-ltdlincludeHEADERS:
