@@ -8,6 +8,7 @@
 #ifndef MODULE
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
 #ifdef HAVE_WINDOWS_H
 #include <winsock.h>
@@ -263,7 +264,7 @@ void *client_data;
 
     in.s_addr = host_IP;
     host_string =  inet_ntoa(in);
-    CMtrace_out(cm, CMFormatVerbose, "CMpbio request for format from host %lx, port %d", host_IP, host_port);
+    CMtrace_out(cm, CMFormatVerbose, "CMpbio request for format from host %x, port %d", host_IP, host_port);
 #ifndef MODULE
     if (CMtrace_on(cm, CMFormatVerbose)) {
 	printf("CMpbio request is for format ");
@@ -281,7 +282,7 @@ void *client_data;
 	    static atom_t CM_IP_HOSTNAME = -1;
 	    static atom_t CM_IP_PORT = -1;
 	    CMtrace_out(cm, CMFormatVerbose, 
-			"CMpbio connection not available, trying to reestablish, conn %lx, host %s, port %d", 
+			"CMpbio connection not available, trying to reestablish, conn %p, host %s, port %d", 
 			conn, host_string, host_port);
 	    if (CM_IP_HOSTNAME == -1) {
 		CM_IP_HOSTNAME = attr_atom_from_string("IP_HOST");
@@ -297,11 +298,11 @@ void *client_data;
 		CMtrace_out(cm, CMFormatVerbose, "CMpbio failed to reestablish connection, returning NULL\n");
 		return NULL;
 	    }
-	    CMtrace_out(cm, CMFormatVerbose, "CMpbio got connection %lx", 
+	    CMtrace_out(cm, CMFormatVerbose, "CMpbio got connection %p", 
 			conn);
 	} else {
 	    conn->ref_count++;
-	    CMtrace_out(cm, CMFormatVerbose, "CMpbio Request format on connection %lx",
+	    CMtrace_out(cm, CMFormatVerbose, "CMpbio Request format on connection %p",
 			conn);
 	}
 	if (CMpbio_send_format_request(format_ID, format_ID_length, conn,
@@ -317,7 +318,7 @@ void *client_data;
     CMtrace_out(cm, CMFormatVerbose, "CMpbio waiting on condition %d", cond);
     CManager_unlock(cm);
     if (INT_CMCondition_wait(cm, cond) != 1) {
-	CMtrace_out(cm, CMFormatVerbose, "CMpbio Connection failed %lx",
+	CMtrace_out(cm, CMFormatVerbose, "CMpbio Connection failed %p",
 		    conn);
 	return NULL;
     } else {
@@ -389,7 +390,7 @@ int cond;
     vec[0].iov_len = sizeof(msg);
     vec[1].iov_base = format_ID;
     vec[1].iov_len = format_ID_length;
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format request - total %d bytes in writev", format_ID_length + sizeof(msg));
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format request - total %ld bytes in writev", format_ID_length + sizeof(msg));
     actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
 				      conn->transport_data, 
 				      &vec[0], 2);
@@ -427,7 +428,7 @@ int cond;
     vec[0].iov_len = sizeof(msg);
     vec[1].iov_base = format_body_rep;
     vec[1].iov_len = body_len;
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format response - total %d bytes in writev", body_len + sizeof(msg));
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format response - total %ld bytes in writev", body_len + sizeof(msg));
     actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
 				      conn->transport_data, 
 				      &vec[0], 2);
@@ -469,7 +470,7 @@ CMConnection conn;
     vec[1].iov_len = id_len;
     vec[2].iov_base = format_body_rep;
     vec[2].iov_len = body_len;
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format preload - total %d bytes in writev", body_len + id_len + sizeof(msg));
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format preload - total %ld bytes in writev", body_len + id_len + sizeof(msg));
     actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
 				      conn->transport_data, 
 				      &vec[0], 3);
@@ -604,7 +605,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
 						    conn->transport_data,
 						    ((char*)&tmp_msg) + 8, 
 						    (int)sizeof(tmp_msg) - 8, 0);
-	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio reading %d msg bytes",
+	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio reading %ld msg bytes",
 			sizeof(tmp_msg) - 8);
 	    if (actual != (sizeof(tmp_msg) - 8)) {
 		CMtrace_out(conn->cm, CMLowLevelVerbose, 

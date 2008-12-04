@@ -571,7 +571,7 @@ router_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	} else if (out_stones[ret] == -1) {
 	    CMtrace_out(cm, EVerbose, "Router function returned %d, which has not been set with EVaction_set_output()\n", ret);
 	} else {
-	    CMtrace_out(cm, EVerbose, "Router function returned %d, submitting further to stone %d\n", ret);
+	    CMtrace_out(cm, EVerbose, "Router function returned %d, submitting further to stone %d\n", ret, out_stones[ret]);
 	    internal_path_submit(cm, out_stones[ret], event);
 	}
     } else {

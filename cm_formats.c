@@ -12,6 +12,7 @@
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
 #endif
+#include <unistd.h>
 #include <stdlib.h>
 
 #else
@@ -370,7 +371,7 @@ CMConnection conn;
 FMFormat ioformat;
 {
     CMtrace_out(conn->cm, CMFormatVerbose, 
-		"CMpbio preloading format %s on connection %lx", 
+		"CMpbio preloading format %s on connection %p", 
 		name_of_FMformat(ioformat), conn);
     if (CMpbio_send_format_preload(ioformat, conn) != 1) {
 	CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio preload failed");

@@ -9,6 +9,7 @@
 #ifndef MODULE
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #else
 #include "kernel/kcm.h"
 #include "kernel/library.h"

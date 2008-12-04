@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #else
 #include "kernel/kcm.h"
 #include "kernel/cm_kernel.h"
@@ -139,7 +140,7 @@ const char *trans_name;
 	lt_dlsym(handle, "NBwritev_attr_func");  
     transport->set_write_notify = (CMTransport_set_write_notify_func)
 	lt_dlsym(handle, "set_write_notify");
-    CMtrace_out(cm, CMTransportVerbose, "Listen is %lx", transport->listen);
+    CMtrace_out(cm, CMTransportVerbose, "Listen is %p", transport->listen);
     if (transport->transport_init) {
 	transport->trans_data = 
 	    transport->transport_init(cm, &CMstatic_trans_svcs);

@@ -462,3 +462,7 @@ extern void INT_CMusleep ARGS((CManager cm, int usecs));
 extern void INT_CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
 extern void INT_CM_fd_add_select ARGS((CManager cm, int fd, select_func handler_func, void *param1, void *param2));
 extern void INT_CMstart_read_thread(CMConnection conn);
+extern int CMtrace_val[];
+extern int CMtrace_init(CMTraceType t);
+#define CMtrace_on(cm, trace_type)  ((CMtrace_val[0] == -1) ? CMtrace_init(trace_type) : CMtrace_val[trace_type])
+#define CMtrace_out(cm, trace_type, ...) (CMtrace_on(cm,trace_type) ? (CMtrace_on(cm,CMLowLevelVerbose) ? printf("P%lxT%lx - ", (long) getpid(), (long)thr_thread_self()) : 0) , printf(__VA_ARGS__) : 0)

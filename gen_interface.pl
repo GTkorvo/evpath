@@ -584,7 +584,7 @@ REVPlookup_format_structs(CManager cm, char *format_name)
 	sscanf(tmp, "%x", &x);
 	id[i] = x;
     }
-    format = FMformat_from_ID(cm->evp->fmc, id);
+    format = FMformat_from_ID(cm->evp->fmc, (char*)id);
     free(id);
     return format_list_of_FMFormat(format);
 }
