@@ -782,7 +782,7 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
     if (event->reference_format == NULL) {
 	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is NULL");
     } else {
-	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %lx (%s)",
+	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %p (%s)",
 	   event->reference_format, name_of_FMformat(event->reference_format));
     }
     for (i=0; i < stone->response_cache_count; i++) {
@@ -1597,7 +1597,7 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
     event_path_data evp = cm->evp;
     int s = (long)client_data;  /* stone ID */
     int a = 0;
-    CMtrace_out(cm, EVerbose, "Got a close for connection %lx on stone %d, shutting down",
+    CMtrace_out(cm, EVerbose, "Got a close for connection %p on stone %d, shutting down",
 		conn, s);
     for (a=0 ; a < evp->stone_map[s].proto_action_count; a++) {
 	proto_action *act = &evp->stone_map[s].proto_actions[a];
@@ -2892,6 +2892,7 @@ INT_EVset_attr_list(CManager cm, EVstone stone_id, attr_list stone_attrs)
     }
     stone = &(evp->stone_map[stone_id]);
     stone->stone_attrs = stone_attrs;
+    add_ref_attr_list(stone_attrs);
 }
 
 EVevent_list
