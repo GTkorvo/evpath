@@ -62,6 +62,7 @@ IOField event_vec_elem_fields[] =
     {"len", "integer", sizeof(((IOEncodeVector)0)[0].iov_len), 
      IOOffset(IOEncodeVector, iov_len)},
     {"elem", "char[len]", sizeof(char), IOOffset(IOEncodeVector,iov_base)},
+    {(char *) 0, (char *) 0, 0, 0},
     {(char *) 0, (char *) 0, 0, 0}
 };
 
@@ -224,6 +225,16 @@ char **argv;
 #ifdef USE_PTHREADS
     gen_pthread_init();
 #endif
+    if (sizeof(char*) == 8) {
+      /* UGLY HACK
+       * fill in imaginary field in IOEncodeVector so that its 
+       * size gets calculated correctly by our stupid algorithm
+       */
+      event_vec_elem_fields[2].field_name = "dummy";
+      event_vec_elem_fields[2].field_type = "integer";
+      event_vec_elem_fields[2].field_size = 4;
+      event_vec_elem_fields[2].field_offset = 12;
+    }
     if (regression && regression_master) {
 	return do_regression_master_test();
     }
