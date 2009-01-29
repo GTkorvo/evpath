@@ -340,7 +340,7 @@ print INT<<EOF;
 extern "C" \{
 #endif
 EOF
-    foreach $subr (keys %return_type) {
+    foreach $subr (sort (keys %return_type)) {
 	print INT "\nextern $return_type{$subr}\n";
 	print INT "$subr ( $arguments{$subr} )\n";
 	print INT "{\n";
@@ -590,7 +590,7 @@ REVPlookup_format_structs(CManager cm, char *format_name)
 }
 
 EOF
-    foreach $subr (keys %return_type) {
+    foreach $subr (sort (keys %return_type)) {
 	defined($remote_enabled{$subr}) || next;
 
 	print REVPH "\nextern $return_type{$subr}\n";
