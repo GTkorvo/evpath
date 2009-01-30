@@ -225,7 +225,7 @@ char **argv;
 #ifdef USE_PTHREADS
     gen_pthread_init();
 #endif
-    if (sizeof(char*) == 8) {
+    if (event_vec_elem_fields[0].field_size + event_vec_elem_fields[0].field_offset == 12) {
       /* UGLY HACK
        * fill in imaginary field in IOEncodeVector so that its 
        * size gets calculated correctly by our stupid algorithm
