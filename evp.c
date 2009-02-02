@@ -36,6 +36,16 @@ EVPSubmit_general(CManager cm, int local_path_id, event_item *event)
     
 }
 
+stone_type
+stone_struct(event_path_data evp, int stone_num)
+{
+    if (evp->stone_count < stone_num - evp->stone_base_num) {
+	printf("EVPATH: Invalid stone ID %d\n", stone_num);
+        return NULL;
+    }
+    return &evp->stone_map[stone_num - evp->stone_base_num];
+}
+
 EVstone
 INT_EValloc_stone(CManager cm)
 {
@@ -46,6 +56,7 @@ INT_EValloc_stone(CManager cm)
     evp->stone_map = realloc(evp->stone_map, 
 			     (evp->stone_count + 1) * sizeof(evp->stone_map[0]));
     stone = &evp->stone_map[stone_num];
+    stone_num += evp->stone_base_num;
     memset(stone, 0, sizeof(*stone));
     stone->local_id = stone_num;
     stone->default_action = -1;
@@ -124,11 +135,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
     stone_type stone;
     int i;
 
-    stone = &evp->stone_map[stone_num];
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return;
-    }
+    stone = stone_struct(evp, stone_num);
     if (stone->local_id == -1) return;
     if (stone->periodic_handle != NULL) {
 	INT_CMremove_task(stone->periodic_handle);
@@ -246,11 +253,8 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone_num,
     int action_num;
     stone_type stone;
     int proto_action_num;
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return -1;
-    }
-    stone = &evp->stone_map[stone_num];
+
+    stone = stone_struct(evp, stone_num);
     proto_action_num = stone->proto_action_count;
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (proto_action_num + 1) * 
@@ -331,11 +335,9 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
     proto_action *act;
     stone_type stone;
 
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return -1;
-    }
-    stone = &evp->stone_map[stone_num];
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return -1;
+
     action_num = add_proto_action(cm, stone, &act);
     CMtrace_out(cm, EVerbose, "Adding Immediate action %d to stone %d",
 		action_num, stone_num);
@@ -362,11 +364,8 @@ INT_EVassoc_multi_action(CManager cm, EVstone stone_num,
     int action_num;
     stone_type stone;
 
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return -1;
-    }
-    stone = &evp->stone_map[stone_num];
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return -1;
     action_num = stone->proto_action_count;
     CMtrace_out(cm, EVerbose, "Adding Multi action %d to stone %d",
 		action_num, stone_num);
@@ -393,11 +392,10 @@ INT_EVassoc_congestion_action(CManager cm, EVstone stone_num,
     event_path_data evp = cm->evp;
     int action_num;
     stone_type stone;
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return -1;
-    }
-    stone = &evp->stone_map[stone_num];
+
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return -1;
+
     action_num = stone->proto_action_count;
     CMtrace_out(cm, EVerbose, "Adding Congestion action %d to stone %d",
 		action_num, stone_num);
@@ -424,11 +422,10 @@ INT_EVassoc_filter_action(CManager cm, EVstone stone_num,
 {
     event_path_data evp = cm->evp;
     stone_type stone;
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return -1;
-    }
-    stone = &evp->stone_map[stone_num];
+
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return -1;
+
     int proto_action_num = stone->proto_action_count;
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (proto_action_num + 1) * 
@@ -468,11 +465,9 @@ INT_EVassoc_store_action(CManager cm, EVstone stone_num, EVstone out_stone,
     proto_action *act;
     int action_num;
 
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return -1;
-    }
-    stone = &evp->stone_map[stone_num];
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return -1;
+
     action_num = add_proto_action(cm, stone, &act);
 
     act->data_state = Accepts_All;
@@ -504,11 +499,9 @@ INT_EVclear_stored(CManager cm, EVstone stone_num, EVaction action_num)
     stone_type stone;
     storage_queue_ptr queue;
 
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return;
-    }
-    stone = &evp->stone_map[stone_num];
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return;
+
     queue = &stone->proto_actions[action_num].o.store.queue;
 
     storage_queue_empty(cm, queue);
@@ -552,7 +545,7 @@ static void
 enqueue_event(CManager cm, int stone_id, int action_id, event_item *event)
 {
     event_path_data evp = cm->evp;
-    stone_type stone = &evp->stone_map[stone_id];
+    stone_type stone = stone_struct(evp, stone_id);
     action_state as = evp->as;
     if (as == NULL) {
 	as = evp->as = malloc(sizeof(*as));
@@ -641,7 +634,7 @@ dequeue_item(CManager cm, stone_type stone, queue_item *to_dequeue)
 
 void
 EVdiscard_queue_item(CManager cm, int s, queue_item *item) {
-    stone_type stone = &cm->evp->stone_map[s];
+    stone_type stone = stone_struct(cm->evp, s);
     (void) dequeue_item(cm, stone, item);
 }
 
@@ -699,11 +692,10 @@ FMFormat incoming_format;
     int id_len;
     FFSTypeHandle format;
     char *server_id;
-    if (cm->evp->stone_count < stone_id) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_id);
-        return;
-    }
-    stone = &(cm->evp->stone_map[stone_id]);
+
+    stone = stone_struct(cm->evp, stone_id);
+    if (!stone) return;
+
     a = stone->response_cache_count;
     server_id = get_server_ID_FMformat(incoming_format, &id_len);
     CMtrace_out(cm, EVerbose, "Adding Conversion action %d to stone %d",
@@ -739,11 +731,9 @@ INT_EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num,
 {
     stone_type stone;
     int output_count = 0;
-    if (cm->evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return -1;
-    }
-    stone = &(cm->evp->stone_map[stone_num]);
+
+    stone = stone_struct(cm->evp, stone_num);
+    if (!stone) return -1;
     if (act_num > stone->proto_action_count) return 0;
     if (stone->proto_actions[act_num].action_type == Action_Store) {
         assert(output_index == 0); /* more than one storage output not supported */
@@ -1041,14 +1031,13 @@ cached_stage_for_action(proto_action *act) {
 
 extern event_item * 
 cod_decode_event(CManager cm, int stone_num, int act_num, event_item *event) {
-    event_path_data evp = cm->evp;
     stone_type stone;
     action_class stage;
     int resp_id;
 
     assert(!event->decoded_event);
 
-    stone = &evp->stone_map[stone_num];
+    stone = stone_struct(cm->evp, stone_num);
     stage = cached_stage_for_action(&stone->proto_actions[act_num]);
 
     resp_id = determine_action(cm, stone, stage, event, 0);
@@ -1183,23 +1172,18 @@ dump_stone(stone_type stone)
 void
 EVdump_stone(CManager cm,  EVstone stone_num)
 {
-    event_path_data evp = cm->evp;
-    stone_type stone = &evp->stone_map[stone_num];
+    stone_type stone = stone_struct(cm->evp, stone_num);
     dump_stone(stone);
 }
 
 int
 internal_path_submit(CManager cm, int local_path_id, event_item *event)
 {
-    event_path_data evp = cm->evp;
     event_item *event_to_submit = event;
 
     assert(evpath_locked());
     assert(CManager_locked(cm));
-    if (evp->stone_count < local_path_id) {
-	return -1;
-    }
-/*    stone = &(evp->stone_map[local_path_id]);
+/*    stone =     stone = stone_struct(cm->evp, stone_num);
     resp_id = determine_action(cm, stone, event, 0);
     if (stone->response_cache[resp_id].action_type == Action_NoAction) {
 	char *tmp = NULL;
@@ -1334,18 +1318,19 @@ process_events_stone(CManager cm, int s, action_class c)
     CMtrace_out(cm, EVerbose, "Considering events on stone %d\n", s);
     if (s == -1) return 0;
     if (as->last_active_stone == s) as->last_active_stone = -1;
-    if (evp->stone_map[s].local_id == -1) return 0;
-    if (evp->stone_map[s].is_draining == 1) return 0;
-    if (evp->stone_map[s].is_frozen == 1) return 0;
-    if (c == Immediate_and_Multi && evp->stone_map[s].pending_output) {
+    stone = stone_struct(cm->evp, s);
+    if (!stone) return 0;
+    if (stone->local_id == -1) return 0;
+    if (stone->is_draining == 1) return 0;
+    if (stone->is_frozen == 1) return 0;
+    if (c == Immediate_and_Multi && stone->pending_output) {
         more_pending += process_stone_pending_output(cm, s);
     }
     if (is_output_stone(cm, s) && (c != Output) && (c != Congestion)) return 0;
-    evp->stone_map[s].is_processing = 1;
+    stone->is_processing = 1;
     
     CMtrace_out(cm, EVerbose, "Process events stone %d\n", s);
-    item = evp->stone_map[s].queue->queue_head;
-    stone = &(evp->stone_map[s]);
+    item = stone->queue->queue_head;
     if (is_output_stone(cm, s) && (c == Output)) {
 	do_bridge_action(cm, s);
 	return 0;
@@ -1370,7 +1355,7 @@ process_events_stone(CManager cm, int s, action_class c)
                     tmp = global_name_of_FMFormat(event->reference_format);
                 printf("No action found for event %lx submitted to stone %d\n",
                        (long)event, s);
-                dump_stone(&evp->stone_map[s]);
+                dump_stone(stone_struct(evp, s));
                 if (tmp != NULL) {
                     static int first = 1;
                     printf("    Unhandled incoming event format was \"%s\"\n", tmp);
@@ -1550,10 +1535,11 @@ CManager cm;
     }
     if (as->events_in_play > 0) {
 	/* check all stones */
-	for (s = 0; s < evp->stone_count; s++) {
-	    if (evp->stone_map[s].local_id == -1) continue;
-	    if (evp->stone_map[s].is_draining == 1) continue;
-	    if (evp->stone_map[s].is_frozen == 1) continue;
+	for (s = evp->stone_base_num; s < evp->stone_count + evp->stone_base_num; s++) {
+	    stone_type stone = stone_struct(evp, s);
+	    if (stone->local_id == -1) continue;
+	    if (stone->is_draining == 1) continue;
+	    if (stone->is_frozen == 1) continue;
 	    CMtrace_out(cm, EVerbose, "1 - in-play %d", as->events_in_play);
 	    more_pending += process_events_stone(cm, s, Immediate_and_Multi);
 	    if (more_pending && (as->last_active_stone != -1)) goto restart;
@@ -1567,9 +1553,10 @@ CManager cm;
     }
     if (as->events_in_play > 0) {
 	/* check all stones */
-	for (s = 0; s < evp->stone_count; s++) {
-	    if (evp->stone_map[s].local_id == -1) continue;
-	    if (evp->stone_map[s].is_frozen == 1) continue;
+	for (s = evp->stone_base_num; s < evp->stone_count + evp->stone_base_num; s++) {
+	    stone_type stone = stone_struct(evp, s);
+	    if (stone->local_id == -1) continue;
+	    if (stone->is_frozen == 1) continue;
 	    CMtrace_out(cm, EVerbose, "3 - in-play %d", as->events_in_play);
 	    more_pending += process_events_stone(cm, s, Output);
 	}
@@ -1583,10 +1570,11 @@ INT_EVforget_connection(CManager cm, CMConnection conn)
 {
     event_path_data evp = cm->evp;
     int s;
-    for (s = 0; s < evp->stone_count; ++s)  {
-        if (evp->stone_map[s].last_remote_source == conn) {
-            evp->stone_map[s].last_remote_source = NULL;
-            evp->stone_map[s].squelch_depth = 0;
+    for (s = evp->stone_base_num; s < evp->stone_count + evp->stone_base_num; ++s)  {
+	stone_type stone = stone_struct(evp, s);
+        if (stone->last_remote_source == conn) {
+            stone->last_remote_source = NULL;
+            stone->squelch_depth = 0;
         }
     }
 }
@@ -1598,10 +1586,11 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
     event_path_data evp = cm->evp;
     int s = (long)client_data;  /* stone ID */
     int a = 0;
+    stone_type stone = stone_struct(evp, s);
     CMtrace_out(cm, EVerbose, "Got a close for connection %p on stone %d, shutting down",
 		conn, s);
-    for (a=0 ; a < evp->stone_map[s].proto_action_count; a++) {
-	proto_action *act = &evp->stone_map[s].proto_actions[a];
+    for (a=0 ; a < stone->proto_action_count; a++) {
+	proto_action *act = &stone->proto_actions[a];
 	if ((act->action_type == Action_Output) && 
 	    (act->o.out.conn == conn)) {
 	    act->o.out.conn_failed = 1;
@@ -1619,8 +1608,9 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
 static void
 write_callback_handler(CManager cm, CMConnection conn, void *client_data)
 {
+    event_path_data evp = cm->evp;
     int s = (int)(long) client_data;
-    stone_type stone = &cm->evp->stone_map[s];
+    stone_type stone = stone_struct(evp, s);
     CMtrace_out(cm, EVerbose, "In Write callback, write_pending is %d, stone is %d\n", conn->write_pending, s);
     if (conn->write_pending) {
 	/* nothing for EVPath level to do yet */
@@ -1641,28 +1631,31 @@ do_bridge_action(CManager cm, int s)
 {
     event_path_data evp = cm->evp;
     proto_action *act = NULL;
+    stone_type stone;
     int a;
     CMtrace_out(cm, EVerbose, "Process output action on stone %d", s);
-    if (evp->stone_map[s].is_frozen || evp->stone_map[s].is_draining) return 0;
-    evp->stone_map[s].is_outputting = 1;
-    for (a=0 ; a < evp->stone_map[s].proto_action_count && evp->stone_map[s].is_frozen == 0 && evp->stone_map[s].is_draining == 0; a++) {
-	if (evp->stone_map[s].proto_actions[a].action_type == Action_Output) {
-	    act = &evp->stone_map[s].proto_actions[a];
+    stone = stone_struct(evp, s);
+
+    if (stone->is_frozen || stone->is_draining) return 0;
+    stone->is_outputting = 1;
+    for (a=0 ; a < stone->proto_action_count && stone->is_frozen == 0 && stone->is_draining == 0; a++) {
+	if (stone->proto_actions[a].action_type == Action_Output) {
+	    act = &stone->proto_actions[a];
 	}
     }
-    while (evp->stone_map[s].queue->queue_head != NULL) {
+    while (stone->queue->queue_head != NULL) {
 	int action_id, ret = 1;
 	if (act->o.out.conn && 
 	    INT_CMConnection_write_would_block(act->o.out.conn)) {
-            queue_item *q = evp->stone_map[s].queue->queue_head;
+            queue_item *q = stone->queue->queue_head;
 	    int i = 0;
-	    CMtrace_out(cm, EVerbose, "Would call congestion_handler, new flag %d\n", evp->stone_map[s].new_enqueue_flag);
-/*	    if (evp->stone_map[s].new_enqueue_flag == 1) {*/
-		evp->stone_map[s].new_enqueue_flag = 0;
+	    CMtrace_out(cm, EVerbose, "Would call congestion_handler, new flag %d\n", stone->new_enqueue_flag);
+/*	    if (stone->new_enqueue_flag == 1) {*/
+		stone->new_enqueue_flag = 0;
                 while (q != NULL) {q = q->next; i++;}
 		CMtrace_out(cm, EVerbose, "Would call congestion_handler, %d items queued\n", i);
-		if (evp->stone_map[s].write_callback == -1) {
-		    evp->stone_map[s].write_callback = 
+		if (stone->write_callback == -1) {
+		    stone->write_callback = 
                         INT_CMregister_write_callback(act->o.out.conn, 
 						  write_callback_handler, 
 						  (void*)(long)s);
@@ -1671,7 +1664,7 @@ do_bridge_action(CManager cm, int s)
 		return 0;
 /*	    }*/
 	}
-	event_item *event = dequeue_event(cm, &evp->stone_map[s], &action_id);
+	event_item *event = dequeue_event(cm, stone, &action_id);
 	if (act->o.out.conn == NULL) {
 	    CMtrace_out(cm, EVerbose, "Output stone %d has closed connection", s);
 	} else {
@@ -1708,7 +1701,7 @@ do_bridge_action(CManager cm, int s)
 	    act->o.out.conn = NULL;
 	}
     }
-    evp->stone_map[s].is_outputting = 0;
+    stone->is_outputting = 0;
     return 0;
 }
 
@@ -1720,11 +1713,9 @@ INT_EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num, int n
     stone_type stone;
     proto_action *p;
 
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return;
-    }
-    stone = &evp->stone_map[stone_num];
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return;
+
     p = &stone->proto_actions[action_num];
     old_limit = p->o.store.max_stored;
     p->o.store.max_stored = new_limit;
@@ -1750,11 +1741,10 @@ INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
     event_path_data evp = cm->evp;
     stone_type stone;
     int resp_num;
-    if (evp->stone_count < stone_id) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_id);
-        return -1;
-    }
-    stone = &evp->stone_map[stone_id];
+
+    stone = stone_struct(evp, stone_id);
+    if (!stone) return -1;
+
     resp_num = stone->response_cache_count;
     stone->response_cache = realloc(stone->response_cache, sizeof(stone->response_cache[0]) * (resp_num + 1));
     response_cache_element *resp = &stone->response_cache[stone->response_cache_count];
@@ -1778,11 +1768,8 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
     stone_type stone;
     int resp_num;
     int queue_count = 0, i;
-    if (evp->stone_count < stone_id) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_id);
-        return -1;
-    }
-    stone = &evp->stone_map[stone_id];
+
+    stone = stone_struct(evp, stone_id);
     resp_num = stone->response_cache_count;
     while (reference_formats[queue_count] != NULL) queue_count++;
     stone->response_cache = realloc(stone->response_cache, sizeof(stone->response_cache[0]) * (resp_num + queue_count));
@@ -1826,7 +1813,7 @@ static int
 is_output_stone(CManager cm, EVstone stone_num)
 {
     event_path_data evp = cm->evp;
-    stone_type stone = &evp->stone_map[stone_num];
+    stone_type stone = stone_struct(evp, stone_num);
     if (stone->default_action == -1) return 0;
     return (stone->proto_actions[stone->default_action].action_type == Action_Output);
 }
@@ -1851,12 +1838,10 @@ INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list
     stone_type stone;
     int action_num;
     CMConnection conn;
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return -1;
-    }
 
-    stone = &evp->stone_map[stone_num];
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return -1;
+
     action_num = stone->proto_action_count;
     conn = INT_CMget_conn(cm, contact_list);
     if (conn == NULL) {
@@ -1906,11 +1891,10 @@ INT_EVassoc_split_action(CManager cm, EVstone stone_num,
     stone_type stone;
     int action_num;
     int target_count = 0, i;
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return -1;
-    }
-    stone = &evp->stone_map[stone_num];
+
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return -1;
+
     action_num = stone->proto_action_count;
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (action_num + 1) * 
@@ -1950,11 +1934,10 @@ INT_EVaction_add_split_target(CManager cm, EVstone stone_num,
     stone_type stone;
     EVstone *target_stone_list;
     int target_count = 0;
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return -1;
-    }
-    stone = &evp->stone_map[stone_num];
+
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return -1;
+
     if (stone->proto_actions[action_num].action_type != Action_Split ) {
 	printf("Not split action\n");
 	return 0;
@@ -1979,11 +1962,10 @@ INT_EVaction_remove_split_target(CManager cm, EVstone stone_num,
     stone_type stone;
     EVstone *target_stone_list;
     int target_count = 0;
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return;
-    }
-    stone = &evp->stone_map[stone_num];
+
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return;
+
     if (stone->proto_actions[action_num].action_type != Action_Split ) {
 	printf("Not split action\n");
     }
@@ -2008,11 +1990,9 @@ INT_EVsend_stored(CManager cm, EVstone stone_num, EVaction action_num)
     event_item *item;
     proto_action *p;
 
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return;
-    }
-    stone = &evp->stone_map[stone_num];
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return;
+
     p = &stone->proto_actions[action_num];
     while ((item = storage_queue_dequeue(cm, &p->o.store.queue)) != NULL) {
         internal_path_submit(cm, p->o.store.target_stone_id, item);
@@ -2039,11 +2019,10 @@ INT_EVstore_start_send(CManager cm, EVstone stone_num, EVaction action_num)
     action_state as = evp->as;
     stone_type stone;
     proto_action *act;
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return;
-    }
-    stone = &evp->stone_map[stone_num];
+
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return;
+
     act = &stone->proto_actions[action_num];
 
     if (act->o.store.num_stored == 0) return;
@@ -2062,7 +2041,7 @@ static int
 process_stone_pending_output(CManager cm, EVstone stone_num) {
     event_path_data evp = cm->evp;
     action_state as = evp->as;
-    stone_type stone = &evp->stone_map[stone_num];
+    stone_type stone = stone_struct(evp, stone_num);
     EVaction action_num;
     int found = 0;
     int more_pending = 0;
@@ -2076,7 +2055,7 @@ process_stone_pending_output(CManager cm, EVstone stone_num) {
             ++found;
             item = storage_queue_dequeue(cm, &act->o.store.queue);
             assert(item->ref_count > 0);
-            assert(!evp->stone_map[act->o.store.target_stone_id].is_stalled);
+            assert(!stone_struct(evp, act->o.store.target_stone_id)->is_stalled);
             internal_path_submit(cm, act->o.store.target_stone_id, item);
             /* printf("submitted one <%d / %d>\n", as->events_in_play, as->last_active_stone); */
             act->o.store.num_stored--;
@@ -2102,11 +2081,9 @@ INT_EVstore_is_sending(CManager cm, EVstone stone_num, EVaction action_num)
     stone_type stone;;
     proto_action *p;
 
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return -1;
-    }
-    stone = &evp->stone_map[stone_num];
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return -1;
+
     p = &stone->proto_actions[action_num];
     return p->o.store.is_sending;
 }
@@ -2118,11 +2095,9 @@ INT_EVstore_count(CManager cm, EVstone stone_num, EVaction action_num)
     stone_type stone;
     proto_action *p;
 
-    if (evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return -1;
-    }
-    stone = &evp->stone_map[stone_num];
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return -1;
+
     p = &stone->proto_actions[action_num];
     return p->o.store.num_stored;
 }
@@ -2150,10 +2125,10 @@ foreach_source_inner(CManager cm, EVstone to_stone, char *seen,
         ForeachSourceCB cb, struct source_info *info) {
     event_path_data evp = cm->evp;
     EVstone cur_stone;
-    for (cur_stone = 0; cur_stone < evp->stone_count; ++cur_stone) {
+    for (cur_stone = evp->stone_base_num; cur_stone < evp->stone_count + evp->stone_base_num; ++cur_stone) {
         EVaction cur_action;
-        stone_type stone = &evp->stone_map[cur_stone];
-        if (seen[cur_stone]) continue;
+        stone_type stone = stone_struct(evp, cur_stone);
+        if (seen[cur_stone - evp->stone_base_num]) continue;
         if (stone->local_id == -1) continue;
         if (cur_stone == to_stone) {
             if (stone->last_remote_source != NULL) {
@@ -2225,9 +2200,9 @@ foreach_source_inner(CManager cm, EVstone to_stone, char *seen,
                  */
                 if (!was_stalled && matches_recursive) {
                     /* avoid infinite recursion */
-                    seen[cur_stone] = 1;
+                    seen[cur_stone - evp->stone_base_num] = 1;
                     foreach_source_inner(cm, cur_stone, seen, cb, info);
-                    seen[cur_stone] = 0; /* XXX */
+                    seen[cur_stone - evp->stone_base_num] = 0; /* XXX */
                 }
             }
         }
@@ -2252,7 +2227,7 @@ enum { CONTROL_SQUELCH, CONTROL_UNSQUELCH };
 static void
 register_backpressure_callback(CManager cm, EVstone s, EVSubmitCallbackFunc cb, void *user_data) {
     stall_callback *new_cb = INT_CMmalloc(sizeof(stall_callback));
-    stone_type stone = &cm->evp->stone_map[s];
+    stone_type stone = stone_struct(cm->evp, s);
     assert(CManager_locked(cm));
     new_cb->cb = cb;
     new_cb->user_data = user_data;
@@ -2262,7 +2237,7 @@ register_backpressure_callback(CManager cm, EVstone s, EVSubmitCallbackFunc cb, 
 
 static void
 do_backpressure_unstall_callbacks(CManager cm, EVstone stone_id) {
-    stone_type stone = &cm->evp->stone_map[stone_id];
+    stone_type stone = stone_struct(cm->evp, stone_id);
     stall_callback *cur = stone->unstall_callbacks;
     assert(CManager_locked(cm));
     if (!cur) return;
@@ -2285,8 +2260,8 @@ backpressure_set_one(CManager cm, struct source_info *info)
     action_state as = evp->as;
     assert(as->events_in_play >= 0);
     int s = info->to_stone;
-    stone_type to_stone = &evp->stone_map[s];
-    stone_type stone = &evp->stone_map[info->stone];
+    stone_type to_stone = stone_struct(evp,s);
+    stone_type stone = stone_struct(evp, info->stone);
     switch (info->type) {
     case SOURCE_ACTION: {
             proto_action *act = &stone->proto_actions[info->u.action.action];
@@ -2355,7 +2330,7 @@ backpressure_set_one(CManager cm, struct source_info *info)
 static void
 backpressure_set(CManager cm, EVstone to_stone, int stalledp) {
     event_path_data evp = cm->evp;
-    stone_type stone = &evp->stone_map[to_stone];
+    stone_type stone = stone_struct(evp, to_stone);
     assert(cm->evp->use_backpressure);
     if (stone->is_stalled == stalledp) {
         return;
@@ -2376,7 +2351,7 @@ backpressure_set(CManager cm, EVstone to_stone, int stalledp) {
 
 static void
 backpressure_transition(CManager cm, EVstone s, stall_source src, int new_value) {
-    stone_type stone = &cm->evp->stone_map[s];
+    stone_type stone = stone_struct(cm->evp, s);
     assert(cm->evp->use_backpressure);
     if (new_value) {
         stone->stall_from |= src;
@@ -2389,7 +2364,7 @@ backpressure_transition(CManager cm, EVstone s, stall_source src, int new_value)
 static void
 backpressure_check(CManager cm, EVstone s) {
     if (cm->evp->use_backpressure) {
-        stone_type stone = &cm->evp->stone_map[s];
+        stone_type stone = stone_struct(cm->evp, s);
         int old_stalled = stone->is_stalled;
         int low_threshold = 50, high_threshold = 200;
         if (stone->stone_attrs) {
@@ -2412,11 +2387,10 @@ INT_EVsubmit_or_wait(EVsource source, void *data, attr_list attrs,
                     EVSubmitCallbackFunc cb, void *user_data) {
     CManager cm = source->cm;
     stone_type stone;
-    if (cm->evp->stone_count < source->local_stone_id) {
-	printf("EVPATH: Invalid stone ID %d\n", source->local_stone_id);
-        return -1;
-    }
-    stone = &cm->evp->stone_map[source->local_stone_id];
+
+    stone = stone_struct(cm->evp, source->local_stone_id);
+    if (!stone) return -1;
+
     if (stone->is_stalled) {
         register_backpressure_callback(source->cm, source->local_stone_id, cb, user_data);
         return 0;
@@ -2430,11 +2404,9 @@ int
 INT_EVsubmit_encoded_or_wait(CManager cm, EVstone s, void *data, int data_len, 
                     attr_list attrs, EVSubmitCallbackFunc cb, void *user_data) {
     stone_type stone;
-    if (cm->evp->stone_count < s) {
-	printf("EVPATH: Invalid stone ID %d\n", s);
-        return -1;
-    }
-    stone = &cm->evp->stone_map[s];
+    stone = stone_struct(cm->evp, s);
+    if (!stone) return -1;
+
     if (stone->is_stalled) {
         register_backpressure_callback(cm, s, cb, user_data);
         return 0;
@@ -2462,8 +2434,8 @@ INT_EVhandle_control_message(CManager cm, CMConnection conn, unsigned char type,
     case CONTROL_UNSQUELCH: {
             int s;
             stone_type stone;
-            for (s = 0; s < evp->stone_count; ++s) {
-                stone = &evp->stone_map[s];
+            for (s = evp->stone_base_num; s < evp->stone_count + evp->stone_base_num; ++s) {
+                stone = stone_struct(evp, s);
                 if (is_output_stone(cm, s) &&  stone->proto_actions[stone->default_action].o.out.conn == conn
                         && stone->proto_actions[stone->default_action].o.out.remote_stone_id == arg) {
                     backpressure_transition(cm, s, Stall_Squelch, type == CONTROL_SQUELCH);
@@ -2521,11 +2493,10 @@ INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec,
 {
     CMTaskHandle handle;
     stone_type stone;
-    if (cm->evp->stone_count < stone_num) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_num);
-        return;
-    }
-    stone = &cm->evp->stone_map[stone_num];
+
+    stone = stone_struct(cm->evp, stone_num);
+    if (!stone) return;
+
     handle = INT_CMadd_periodic_task(cm, period_sec, period_usec,
 				     EVauto_submit_func, 
 				     (void*)(long)stone_num);
@@ -2586,6 +2557,7 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
 {
     event_path_data evp = cm->evp;
     event_item *event = get_free_event(evp);
+    stone_type stone;
     event->contents = Event_CM_Owned;
     event->event_encoded = 1;
     event->event_len = length;
@@ -2619,8 +2591,9 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     }
     INT_CMtake_buffer(cm, buffer);
     event->cm = cm;
-    if (evp->stone_map[stone_id].squelch_depth == 0) {
-        evp->stone_map[stone_id].last_remote_source = conn;
+    stone = stone_struct(evp, stone_id);
+    if (stone->squelch_depth == 0) {
+        stone->last_remote_source = conn;
     }
     internal_path_submit(cm, stone_id, event);
     return_event(evp, event);
@@ -2684,10 +2657,8 @@ INT_EVsubmit_encoded(CManager cm, EVstone stone, void *data, int data_len, attr_
 {
     event_path_data evp = cm->evp;
     event_item *event = get_free_event(evp);
-    if (evp->stone_count < stone) {
-	printf("EVPATH: Invalid stone ID %d\n", stone);
-        return;
-    }
+    if (stone_struct(evp, stone) == NULL) return;
+
     event->contents = Event_App_Owned;
     event->event_encoded = 1;
     event->encoded_event = data;
@@ -2708,7 +2679,7 @@ free_evp(CManager cm, void *not_used)
     int s;
     CMtrace_out(cm, CMFreeVerbose, "Freeing evpath information, evp %lx", (long) evp);
     for (s = 0 ; s < evp->stone_count; s++) {
-	INT_EVfree_stone(cm, s);
+	INT_EVfree_stone(cm, s + evp->stone_base_num);
     }
     cm->evp = NULL;
     if (evp == NULL) return;
@@ -2728,10 +2699,21 @@ free_evp(CManager cm, void *not_used)
 void
 EVPinit(CManager cm)
 {
+    static int first_evpinit = 1;
     cm->evp = INT_CMmalloc(sizeof( struct _event_path_data));
     memset(cm->evp, 0, sizeof( struct _event_path_data));
     cm->evp->ffsc = cm->FFScontext;
     cm->evp->fmc = FMContext_from_FFS(cm->evp->ffsc);
+    cm->evp->stone_base_num = 0;
+    if (!first_evpinit) {
+	/* 
+	 * after the first evpinit, start stones at random base number,
+	 * just so that we're more likely to catch mitmatched stone/CM
+	 * combos in threaded situations.
+	*/
+	cm->evp->stone_base_num = lrand48() & 0xffff;
+    }
+    first_evpinit = 0;
     cm->evp->queue_items_free_list = NULL;
     cm->evp->lock = thr_mutex_alloc();
     internal_add_shutdown_task(cm, free_evp, NULL);
@@ -2835,10 +2817,8 @@ INT_EVfreeze_stone(CManager cm, EVstone stone_id)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
-    if (evp->stone_count < stone_id) {
-        return -1;
-    }
-    stone = &(evp->stone_map[stone_id]);
+    stone = stone_struct(evp, stone_id);
+    if (!stone) return -1;
     stone->is_frozen = 1;
     return 1;	
 }
@@ -2848,10 +2828,9 @@ INT_EVunfreeze_stone(CManager cm, EVstone stone_id)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
-    if (evp->stone_count < stone_id) {
-        return -1;
-    }
-    stone = &(evp->stone_map[stone_id]);
+    stone = stone_struct(evp, stone_id);
+    if (!stone) return -1;
+
     stone->is_frozen = 0;
     /* ensure that we run the process_actions loop soon so the stone's
        pending events (or pending output) won't be ignored */
@@ -2866,10 +2845,10 @@ INT_EVdrain_stone(CManager cm, EVstone stone_id)
     stone_type stone;
 /*    attr_list stone_attrs;
     EVevent_list buf_list = NULL;*/
-    if (evp->stone_count < stone_id) {
-        return -1;
-    }
-    stone = &(evp->stone_map[stone_id]);
+
+    stone = stone_struct(evp, stone_id);
+    if (!stone) return -1;
+
     stone->is_draining = 1;
     while(stone->is_processing || stone->is_outputting);
     stone->is_draining = 2;
@@ -2883,12 +2862,9 @@ INT_EVextract_stone_events(CManager cm, EVstone stone_id)
     stone_type stone;
     EVevent_list list = malloc(sizeof(list[0]));
 
-    if (evp->stone_count < stone_id) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_id);
-        return NULL;
-    }
     list[0].length = -1;
-    stone = &(evp->stone_map[stone_id]);
+    stone = stone_struct(evp, stone_id);
+    if (!stone) return NULL;
     list = extract_events_from_queue(cm, stone->queue, list);
     return list;
 }
@@ -2898,11 +2874,8 @@ INT_EVextract_attr_list(CManager cm, EVstone stone_id)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
-    if (evp->stone_count < stone_id) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_id);
-        return NULL;
-    }
-    stone = &(evp->stone_map[stone_id]);
+    stone = stone_struct(evp, stone_id);
+    if (!stone) return NULL;
     return(stone->stone_attrs);
 }
 
@@ -2911,11 +2884,8 @@ INT_EVset_attr_list(CManager cm, EVstone stone_id, attr_list stone_attrs)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
-    if (evp->stone_count < stone_id) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_id);
-        return;
-    }
-    stone = &(evp->stone_map[stone_id]);
+    stone = stone_struct(evp, stone_id);
+    if (!stone) return;
     stone->stone_attrs = stone_attrs;
     add_ref_attr_list(stone_attrs);
 }
@@ -2954,11 +2924,8 @@ INT_EVdestroy_stone(CManager cm, EVstone stone_id)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
-    if (evp->stone_count < stone_id) {
-	printf("EVPATH: Invalid stone ID %d\n", stone_id);
-        return -1;
-    }
-    stone = &(evp->stone_map[stone_id]);
+    stone = stone_struct(evp, stone_id);
+    if (!stone) return -1;
     while (stone->is_draining != 2);  
     empty_queue(stone->queue);
     free(stone->queue);

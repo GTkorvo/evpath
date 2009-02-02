@@ -205,6 +205,7 @@ typedef struct _stone {
     
 typedef struct _event_path_data {
     int stone_count;
+    int stone_base_num;
     stone_type stone_map;
     void *as;
     FMContext fmc;
