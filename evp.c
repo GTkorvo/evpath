@@ -1314,7 +1314,7 @@ is_congestion_action(response_cache_element *act) {
     return act->action_type == Action_Congestion;
 }
 
-static int do_output_action(CManager cm, int s);
+static int do_bridge_action(CManager cm, int s);
 
 static void backpressure_set(CManager, EVstone, int stalledp);
 static int process_stone_pending_output(CManager, EVstone);
@@ -1347,7 +1347,7 @@ process_events_stone(CManager cm, int s, action_class c)
     item = evp->stone_map[s].queue->queue_head;
     stone = &(evp->stone_map[s]);
     if (is_output_stone(cm, s) && (c == Output)) {
-	do_output_action(cm, s);
+	do_bridge_action(cm, s);
 	return 0;
     }
     while (item != NULL && stone->is_draining == 0 && stone->is_frozen == 0) {
@@ -1632,12 +1632,12 @@ write_callback_handler(CManager cm, CMConnection conn, void *client_data)
     stone->write_callback = -1;
     /* try calling the congestion handler before we write again... */
     process_events_stone(cm, s, Congestion);
-    do_output_action(cm, s);
+    do_bridge_action(cm, s);
 }
 
 static
 int
-do_output_action(CManager cm, int s)
+do_bridge_action(CManager cm, int s)
 {
     event_path_data evp = cm->evp;
     proto_action *act = NULL;
@@ -1802,11 +1802,23 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
 }
 
 extern EVstone
-INT_EVcreate_output_action(CManager cm, attr_list contact_list,
-		      EVstone remote_stone)
+EVcreate_output_action(CManager cm, attr_list contact_list,
+			   EVstone remote_stone)
+{
+    static int first = 1;
+    if (first) {
+	first = 0;
+	printf("EVassoc_output_action is deprecated.  Please use EVassoc_bridge_action()\n");
+    }
+    return EVcreate_bridge_action(cm, contact_list, remote_stone);
+}
+
+extern EVstone
+INT_EVcreate_bridge_action(CManager cm, attr_list contact_list,
+			   EVstone remote_stone)
 {
     EVstone stone = INT_EValloc_stone(cm);
-    INT_EVassoc_output_action(cm, stone, contact_list, remote_stone);
+    INT_EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
     return stone;
 }
 
@@ -1820,7 +1832,19 @@ is_output_stone(CManager cm, EVstone stone_num)
 }
 
 extern EVaction
-INT_EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
+EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list,
+		      EVstone remote_stone)
+{
+    static int first = 1;
+    if (first) {
+	first = 0;
+	printf("EVassoc_output_action is deprecated.  Please use EVassoc_bridge_action()\n");
+    }
+    return EVassoc_bridge_action(cm, stone_num, contact_list, remote_stone);
+}
+
+extern EVaction
+INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list,
 		      EVstone remote_stone)
 {
     event_path_data evp = cm->evp;
@@ -1837,7 +1861,7 @@ INT_EVassoc_output_action(CManager cm, EVstone stone_num, attr_list contact_list
     conn = INT_CMget_conn(cm, contact_list);
     if (conn == NULL) {
 	if (CMtrace_on(cm, EVWarning)) {
-	    printf("EVassoc_output_action - failed to contact host at contact point \n\t");
+	    printf("EVassoc_bridge_action - failed to contact host at contact point \n\t");
 	    if (contact_list != NULL) {
 		dump_attr_list(contact_list);
 	    } else {

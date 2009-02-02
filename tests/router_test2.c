@@ -298,13 +298,13 @@ char **argv;
 	    list_str = strchr(list_str, ':') + 1;
 	    contact_list = attr_list_from_string(list_str);
 	    term0 = EValloc_stone(cm);
-	    EVassoc_output_action(cm, term0, contact_list, remote_stone0);
+	    EVassoc_bridge_action(cm, term0, contact_list, remote_stone0);
 	    term1 = EValloc_stone(cm);
 	    contact_list = attr_list_from_string(list_str);
-	    EVassoc_output_action(cm, term1, contact_list, remote_stone1);
+	    EVassoc_bridge_action(cm, term1, contact_list, remote_stone1);
 	    term2 = EValloc_stone(cm);
 	    contact_list = attr_list_from_string(list_str);
-	    EVassoc_output_action(cm, term2, contact_list, remote_stone2);
+	    EVassoc_bridge_action(cm, term2, contact_list, remote_stone2);
 	}
 	filter = create_router_action_spec(filter_format_list, router_func);
     

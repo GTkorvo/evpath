@@ -304,7 +304,7 @@ char **argv;
 	    list_str = strchr(argv[1], ':') + 1;
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
-	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
+	    EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
 	}
 	data = malloc(sizeof(simple_rec));
 	generate_record(data);

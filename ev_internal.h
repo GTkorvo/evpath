@@ -56,13 +56,13 @@ typedef int (*EVMultiHandlerFunc) ARGS((CManager cm,
 					 int out_count,
 					 int *out_stones));
 
-typedef struct output_action_struct {
+typedef struct bridge_action_struct {
     CMConnection conn;
     int remote_stone_id;
     int remote_path_len;
     char *remote_path;
     int conn_failed;
-} output_action_vals;
+} bridge_action_vals;
 
 typedef struct decode_action_struct {
     FFSTypeHandle decode_format; /* has conversion registered */
@@ -137,7 +137,7 @@ typedef struct _proto_action {
     FMFormat *matching_reference_formats;
     union {
 	struct terminal_proto_vals term;
-	output_action_vals out;
+	bridge_action_vals out;
 	decode_action_vals decode;
 	immediate_action_vals imm;
 	int *split_stone_targets;
@@ -242,7 +242,7 @@ extern int
 INT_EVsubmit_or_wait(EVsource source, void *data, attr_list attrs,
 		     EVSubmitCallbackFunc cb, void *user_data);
 extern int INT_EVsubmit_encoded_or_wait ( CManager cm, EVstone stone, void *data, int data_len, attr_list attrs, EVSubmitCallbackFunc cb, void *user_data );
-extern EVstone INT_EVcreate_output_action(CManager cm, attr_list contact_list, EVstone remote_stone);
+extern EVstone INT_EVcreate_bridge_action(CManager cm, attr_list contact_list, EVstone remote_stone);
 extern EVstone INT_EVcreate_immediate_action(CManager cm, char *action_spec, EVstone *target_list);
 extern EVstone INT_EVcreate_split_action(CManager cm, EVstone *target_list);
 extern EVstone INT_EVcreate_terminal_action(CManager cm, FMStructDescList format_list, 
@@ -285,7 +285,7 @@ extern void
 INT_EVaction_remove_split_target(CManager cm, EVstone stone, EVaction action,
 			  EVstone target_stone);
 extern EVaction
-INT_EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list, 
+INT_EVassoc_bridge_action(CManager cm, EVstone stone, attr_list contact_list, 
 			  EVstone remote_stone);
 extern EVaction
 INT_EVassoc_terminal_action(CManager cm, EVstone stone, FMStructDescList format_list, 

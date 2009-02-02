@@ -87,7 +87,7 @@ int main(int argc, char **argv)
 	/* regardless of filtering or not, we'll need an output stone */
 	output_stone = EValloc_stone(cm);
 	contact_list = attr_list_from_string(string_list);
-	EVassoc_output_action(cm, output_stone, contact_list, remote_stone);
+	EVassoc_bridge_action(cm, output_stone, contact_list, remote_stone);
 
 	if (filter_specs == NULL) {
 	    EVaction_add_split_target(cm, split_stone, split_action, output_stone);

@@ -1001,7 +1001,7 @@ struct _EVSource;
  *
  * EVStone is an integer-typed opaque handle.  Its only external use is 
  * to act as an external stone identifier for remote operations (such as 
- * specifying the remote target stone in an output action)
+ * specifying the remote target stone in a bridge action)
  */
 typedef int EVstone;
 /*!
@@ -1065,7 +1065,7 @@ struct _event_item;
  * Stones are the basic abstraction of EVPath, the entity to which events
  * are submitted and with which actions are associated.  The value returned
  * from EValloc_stone() is actually a simple integer which may be transmitted
- * to remote locations (for example for use in remote output actions).
+ * to remote locations (for example for use in remote bridge actions).
  * \param cm The CManager which will manage the control for this stone.
  * \return The stone identifier, an integer EVstone value, which can be used
  * in subsequent calls to associate actions with the stone.
@@ -1236,7 +1236,7 @@ EVcreate_immediate_action(CManager cm, char *action_spec, EVstone *target_list);
  * Direct the output of a stone action to another local target stone
  *
  * Immediate and queued actions have one or more outputs from which data
- * will emerge.  EVaction_set_output() is used to assigne each of these
+ * will emerge.  EVaction_set_output() is used to assign each of these
  * outputs to a local stone.  (It is NOT used with output stones.)
  * \param cm The CManager from which this stone was allocated.
  * \param stone The stone to which the action is registered.
@@ -1283,10 +1283,10 @@ EVassoc_filter_action(CManager cm, EVstone stone,
 		      void* client_data);
 
 /*!
- * Associate an output action with a stone.
+ * Associate a bridge action with a stone.
  *
- * Output actions perform network data transmission between address spaces.
- * EVassoc_output_action will acquire a CM-level connection to the remote
+ * Bridge actions perform network data transmission between address spaces.
+ * EVassoc_bridge_action will acquire a CM-level connection to the remote
  * process specified by the \b contact_list parameter.  Data delivered to
  * the local stone specified by \b stone will be encoded, sent over the 
  * network link and delivered to \b remote_stone in the target address space.
@@ -1300,21 +1300,21 @@ EVassoc_filter_action(CManager cm, EVstone stone,
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
  *
- * Output actions are associated with the default action of a stone and are
+ * Bridge actions are associated with the default action of a stone and are
  * non-specific as far as input data, encoding and transmitting any event
- * presented to the action.  Output actions may not be modified after
+ * presented to the action.  Bridge actions may not be modified after
  * association. 
  */
 /*REMOTE*/
 extern EVaction
-EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list, 
+EVassoc_bridge_action(CManager cm, EVstone stone, attr_list contact_list, 
 		      EVstone remote_stone);
 
 /*!
- * Associate an output action with a new stone.
+ * Associate a bridge action with a new stone.
  *
- * Output actions perform network data transmission between address spaces.
- * EVassoc_output_action will acquire a CM-level connection to the remote
+ * Bridge actions perform network data transmission between address spaces.
+ * EVcreate_bridge_action will acquire a CM-level connection to the remote
  * process specified by the \b contact_list parameter.  Data delivered to
  * the local stone specified by \b stone will be encoded, sent over the 
  * network link and delivered to \b remote_stone in the target address space.
@@ -1329,15 +1329,15 @@ EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list,
  * \return The stone identifier, an integer EVstone value, which can be used
  * in subsequent calls.
  *
- * Output actions are associated with the default action of a stone and are
+ * Bridge actions are associated with the default action of a stone and are
  * non-specific as far as input data, encoding and transmitting any event
- * presented to the action.  Output actions may not be modified after
+ * presented to the action.  Bridge actions may not be modified after
  * association. 
  */
 /*REMOTE*/
 extern EVstone
-EVcreate_output_action(CManager cm, attr_list contact_list, 
-		      EVstone remote_stone);
+EVcreate_bridge_action(CManager cm, attr_list contact_list, 
+		       EVstone remote_stone);
 
 /*!
  * Associate a split action with a stone.

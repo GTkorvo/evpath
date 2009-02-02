@@ -316,7 +316,7 @@ char **argv;
 	    list_str = strchr(argv[1], ':') + 1;
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
-	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
+	    EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
             congest_act = create_multityped_action_spec(simple_format_lists,
                 simple_format_list, (char *) congest);
             EVassoc_congestion_action(cm, stone, congest_act, NULL); 

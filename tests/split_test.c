@@ -242,7 +242,7 @@ char **argv;
 	    list_str = strchr(argv[1], ':') + 1;
 	    contact_list = attr_list_from_string(list_str);
 	    for (i=0; i < 8; i++) {
-		last_row_stones[i] = EVcreate_output_action(cm, contact_list, remote_stone);
+		last_row_stones[i] = EVcreate_bridge_action(cm, contact_list, remote_stone);
 	    }
 	    for (i=0; i < 4; i++) {
 		list[0] = last_row_stones[i*2];

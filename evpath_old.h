@@ -1598,7 +1598,7 @@ old_EVassoc_filter_action(cm, stone, incoming_format_list, handler, out_stone, c
  * Associate an output action with a stone.
  *
  * Output actions perform network data transmission between address spaces.
- * EVassoc_output_action will acquire a CM-level connection to the remote
+ * EVassoc_bridge_action will acquire a CM-level connection to the remote
  * process specified by the \b contact_list parameter.  Data delivered to
  * the local stone specified by \b stone will be encoded, sent over the 
  * network link and delivered to \b remote_stone in the target address space.
@@ -1619,14 +1619,15 @@ old_EVassoc_filter_action(cm, stone, incoming_format_list, handler, out_stone, c
  */
 /*REMOTE*/
 extern EVaction
-EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list, 
+EVassoc_bridge_action(CManager cm, EVstone stone, attr_list contact_list, 
 		      EVstone remote_stone);
+#define EVassoc_output_action(cm, stone, contact_list, remote_stone) EVassoc_bridge_action(cm, stone, contact_list, remote_stone)
 
 /*!
  * Associate an output action with a new stone.
  *
  * Output actions perform network data transmission between address spaces.
- * EVassoc_output_action will acquire a CM-level connection to the remote
+ * EVassoc_bridge_action will acquire a CM-level connection to the remote
  * process specified by the \b contact_list parameter.  Data delivered to
  * the local stone specified by \b stone will be encoded, sent over the 
  * network link and delivered to \b remote_stone in the target address space.
@@ -1648,8 +1649,9 @@ EVassoc_output_action(CManager cm, EVstone stone, attr_list contact_list,
  */
 /*REMOTE*/
 extern EVstone
-EVcreate_output_action(CManager cm, attr_list contact_list, 
+EVcreate_bridge_action(CManager cm, attr_list contact_list, 
 		      EVstone remote_stone);
+#define EVcreate_output_action(cm, contact_list, remote_stone) EVcreate_bridge_action(cm, contact_list, remote_stone)
 
 /*!
  * Associate a split action with a stone.

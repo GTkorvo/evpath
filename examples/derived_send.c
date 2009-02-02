@@ -73,7 +73,7 @@ int main(int argc, char **argv)
 	contact_list = attr_list_from_string(string_list);
 	printf("This is the contact list   --------");
 	dump_attr_list(contact_list);
-	EVassoc_output_action(cm, output_stone, contact_list, remote_stone);
+	EVassoc_bridge_action(cm, output_stone, contact_list, remote_stone);
 
 	if (filter_spec == NULL) {
 	    EVaction_add_split_target(cm, split_stone, split_action, output_stone);

@@ -433,11 +433,11 @@ subprocess_work(const char *contact_list) {
     CManager cm;
     cm = CManager_create();
     command_output_stone = EValloc_stone(cm);
-    EVassoc_output_action(cm, command_output_stone, 
+    EVassoc_bridge_action(cm, command_output_stone, 
         attr_list_from_string((char *) contact_list), 0);
     command_source = EVcreate_submit_handle(cm, command_output_stone, control_format_list);
     output_stone = EValloc_stone(cm);
-    EVassoc_output_action(cm, output_stone,
+    EVassoc_bridge_action(cm, output_stone,
         attr_list_from_string((char *) contact_list), 1);
     run_test(cm);
     EVfree_source(command_source);

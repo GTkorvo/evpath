@@ -282,7 +282,7 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
     local_stone = EValloc_stone(cm);
     EVassoc_terminal_action(cm, local_stone, simple_format_list, simple_handler, &message_count);
     
-    REVassoc_output_action(conn, output_stone, CMget_contact_list(cm), local_stone);
+    REVassoc_bridge_action(conn, output_stone, CMget_contact_list(cm), local_stone);
     REVenable_auto_stone(conn, stone, 1, 0);
 }
 

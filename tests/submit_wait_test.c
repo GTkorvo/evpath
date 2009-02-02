@@ -121,7 +121,7 @@ interpret_request(CManager cm, void *vevent, void *client_data, attr_list attrs)
 #ifdef DEBUG
         fprintf(stderr, "about to create output action for <%s>\n", request->target_contact);
 #endif
-        EVassoc_output_action(cm, state->target_stone,
+        EVassoc_bridge_action(cm, state->target_stone,
             attr_list_from_string((char *) request->target_contact), request->target_stone);
         state->target = EVcreate_submit_handle(cm, state->target_stone,
             data_event_format_list);
@@ -210,7 +210,7 @@ subprocess_work(const char *contact_list) {
     check_stone = EValloc_stone(cm);
     EVassoc_terminal_action(cm, check_stone, data_event_format_list, check_data, NULL);
     out_stone = EValloc_stone(cm);
-    EVassoc_output_action(cm, out_stone, attr_list_from_string((char *) contact_list), 0);
+    EVassoc_bridge_action(cm, out_stone, attr_list_from_string((char *) contact_list), 0);
     source = EVcreate_submit_handle(cm, out_stone, send_request_format_list);
     req.target_contact = attr_list_to_string(CMget_contact_list(cm));
     req.target_stone = check_stone;

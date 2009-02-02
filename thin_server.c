@@ -104,6 +104,8 @@ thin_data_available(void *cmv, void * conn_datav)
     int i;
 
     switch(FFSnext_record_type(cd->ffsfile)) {
+    case FFSindex:
+	break;
     case FFSend:
     case FFSerror:
 	close_FFSfile(cd->ffsfile);

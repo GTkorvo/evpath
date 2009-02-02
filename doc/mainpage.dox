@@ -143,7 +143,7 @@ receiver, extracted to the variables \c remote_stone and \c contact_list.
 The next step is to create a stone and associate an output action with it.
 The output action requires a CM-style contact list in attribute list form,
 so we must unstringify the \c string_list we extracted from the argument.
-\until EVassoc_output_action
+\until EVassoc_bridge_action
 Finally, we create an event submission handle, initialize a record to send
 and submit it.
 \until }
@@ -336,7 +336,7 @@ decoded filter specification, or NULL if no filter specification was
 included (I.E. if the argument was from a \b net_recv client.)
 
 Both cases require the creation of an appropriately-targetted output stone:
-\until EVassoc_output_action
+\until EVassoc_bridge_action
 If we're dealing with an original non-filtered client, all we have to do is
 to add its output stone as a target of the split stone:
 \until else

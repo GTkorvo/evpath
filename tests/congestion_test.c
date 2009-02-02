@@ -327,7 +327,7 @@ char **argv;
 	    list_str = strchr(argv[1], ':') + 1;
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
-	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
+	    EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
 
             source_handle = EVcreate_submit_handle_free(cm, stone, simple_format_list,
 						    data_free, NULL);

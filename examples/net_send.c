@@ -36,7 +36,7 @@ int main(int argc, char **argv)
 
     stone = EValloc_stone(cm);
     contact_list = attr_list_from_string(string_list);
-    EVassoc_output_action(cm, stone, contact_list, remote_stone);
+    EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
 
     source = EVcreate_submit_handle(cm, stone, simple_format_list);
     data.integer_field = 318;
