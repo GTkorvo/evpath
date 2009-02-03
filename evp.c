@@ -19,7 +19,7 @@ static void dump_action(stone_type stone, response_cache_element *resp,
 static void dump_stone(stone_type stone);
 static int is_output_stone(CManager cm, EVstone stone_num);
 
-static const char *action_str[] = { "Action_NoAction","Action_Output", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Encode_to_Buffer", "Action_Split", "Action_Store", "Action_Congestion"};
+static const char *action_str[] = { "Action_NoAction","Action_Bridge", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Encode_to_Buffer", "Action_Split", "Action_Store", "Action_Congestion"};
 
 void
 EVPSubmit_encoded(CManager cm, int local_path_id, void *data, int len)
@@ -152,9 +152,9 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	case Action_NoAction:
 	case Action_Encode_to_Buffer:
 	    break;
-	case Action_Output:
-	    if (act->o.out.remote_path) 
-		free(act->o.out.remote_path);
+	case Action_Bridge:
+	    if (act->o.bri.remote_path) 
+		free(act->o.bri.remote_path);
 	    break;
 	case Action_Terminal:
 	    break;
@@ -1016,8 +1016,8 @@ cached_stage_for_action(proto_action *act) {
         return Congestion;
     case Action_Multi:
         return Immediate_and_Multi;
-    case Action_Output:
-        return Output;
+    case Action_Bridge:
+        return Bridge;
     case Action_Terminal:
     case Action_Filter:
     case Action_Split:
@@ -1085,12 +1085,12 @@ dump_action(stone_type stone, response_cache_element *resp, int a, const char *i
     }
     printf("\n");
     switch(act->action_type) {
-    case Action_Output:
+    case Action_Bridge:
 	printf("  Target: %s: connection %lx, remote_stone_id %d\n",
-	       (act->o.out.remote_path ? act->o.out.remote_path : "NULL" ),
-	       (long)(void*)act->o.out.conn, act->o.out.remote_stone_id);
-	if (act->o.out.conn != NULL) dump_attr_list(act->o.out.conn->attrs);
-	if (act->o.out.conn_failed) printf("Connection has FAILED!\n");
+	       (act->o.bri.remote_path ? act->o.bri.remote_path : "NULL" ),
+	       (long)(void*)act->o.bri.conn, act->o.bri.remote_stone_id);
+	if (act->o.bri.conn != NULL) dump_attr_list(act->o.bri.conn->attrs);
+	if (act->o.bri.conn_failed) printf("Connection has FAILED!\n");
 	break;
     case Action_Terminal:
 	break;
@@ -1326,12 +1326,12 @@ process_events_stone(CManager cm, int s, action_class c)
     if (c == Immediate_and_Multi && stone->pending_output) {
         more_pending += process_stone_pending_output(cm, s);
     }
-    if (is_output_stone(cm, s) && (c != Output) && (c != Congestion)) return 0;
+    if (is_output_stone(cm, s) && (c != Bridge) && (c != Congestion)) return 0;
     stone->is_processing = 1;
     
     CMtrace_out(cm, EVerbose, "Process events stone %d\n", s);
     item = stone->queue->queue_head;
-    if (is_output_stone(cm, s) && (c == Output)) {
+    if (is_output_stone(cm, s) && (c == Bridge)) {
 	do_bridge_action(cm, s);
 	return 0;
     }
@@ -1490,7 +1490,7 @@ process_events_stone(CManager cm, int s, action_class c)
                 }
                 break;
             }
-	    case Action_Output:
+	    case Action_Bridge:
 	    default:
 		assert(FALSE);
 	    }
@@ -1549,7 +1549,7 @@ CManager cm;
 	CMtrace_out(cm, EVerbose, "Process output actions on stone %d",
 		    as->last_active_stone);
 	CMtrace_out(cm, EVerbose, "2 - in-play %d", as->events_in_play);
-	more_pending += process_events_stone(cm, as->last_active_stone, Output);
+	more_pending += process_events_stone(cm, as->last_active_stone, Bridge);
     }
     if (as->events_in_play > 0) {
 	/* check all stones */
@@ -1558,7 +1558,7 @@ CManager cm;
 	    if (stone->local_id == -1) continue;
 	    if (stone->is_frozen == 1) continue;
 	    CMtrace_out(cm, EVerbose, "3 - in-play %d", as->events_in_play);
-	    more_pending += process_events_stone(cm, s, Output);
+	    more_pending += process_events_stone(cm, s, Bridge);
 	}
     }
 
@@ -1591,10 +1591,10 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
 		conn, s);
     for (a=0 ; a < stone->proto_action_count; a++) {
 	proto_action *act = &stone->proto_actions[a];
-	if ((act->action_type == Action_Output) && 
-	    (act->o.out.conn == conn)) {
-	    act->o.out.conn_failed = 1;
-	    act->o.out.conn = NULL;
+	if ((act->action_type == Action_Bridge) && 
+	    (act->o.bri.conn == conn)) {
+	    act->o.bri.conn_failed = 1;
+	    act->o.bri.conn = NULL;
 	    INT_CMConnection_close(conn);   /* dereference the connection */
 /*	    while (act->queue->queue_head != NULL) {
 		int action_id;
@@ -1639,14 +1639,14 @@ do_bridge_action(CManager cm, int s)
     if (stone->is_frozen || stone->is_draining) return 0;
     stone->is_outputting = 1;
     for (a=0 ; a < stone->proto_action_count && stone->is_frozen == 0 && stone->is_draining == 0; a++) {
-	if (stone->proto_actions[a].action_type == Action_Output) {
+	if (stone->proto_actions[a].action_type == Action_Bridge) {
 	    act = &stone->proto_actions[a];
 	}
     }
     while (stone->queue->queue_head != NULL) {
 	int action_id, ret = 1;
-	if (act->o.out.conn && 
-	    INT_CMConnection_write_would_block(act->o.out.conn)) {
+	if (act->o.bri.conn && 
+	    INT_CMConnection_write_would_block(act->o.bri.conn)) {
             queue_item *q = stone->queue->queue_head;
 	    int i = 0;
 	    CMtrace_out(cm, EVerbose, "Would call congestion_handler, new flag %d\n", stone->new_enqueue_flag);
@@ -1656,7 +1656,7 @@ do_bridge_action(CManager cm, int s)
 		CMtrace_out(cm, EVerbose, "Would call congestion_handler, %d items queued\n", i);
 		if (stone->write_callback == -1) {
 		    stone->write_callback = 
-                        INT_CMregister_write_callback(act->o.out.conn, 
+                        INT_CMregister_write_callback(act->o.bri.conn, 
 						  write_callback_handler, 
 						  (void*)(long)s);
 		}
@@ -1665,14 +1665,14 @@ do_bridge_action(CManager cm, int s)
 /*	    }*/
 	}
 	event_item *event = dequeue_event(cm, stone, &action_id);
-	if (act->o.out.conn == NULL) {
-	    CMtrace_out(cm, EVerbose, "Output stone %d has closed connection", s);
+	if (act->o.bri.conn == NULL) {
+	    CMtrace_out(cm, EVerbose, "Bridge stone %d has closed connection", s);
 	} else {
 	    CMtrace_out(cm, EVerbose, "Writing event to remote stone %d",
-			act->o.out.remote_stone_id);
+			act->o.bri.remote_stone_id);
 	    if (event->format) {
-		ret = internal_write_event(act->o.out.conn, event->format,
-					   &act->o.out.remote_stone_id, 4, 
+		ret = internal_write_event(act->o.bri.conn, event->format,
+					   &act->o.bri.remote_stone_id, 4, 
 					   event, event->attrs);
 	    } else {
 		struct _CMFormat tmp_format;
@@ -1682,8 +1682,8 @@ do_bridge_action(CManager cm, int s)
 		    tmp_format.fmformat = event->reference_format;
 		    tmp_format.format_name = name_of_FMformat(event->reference_format);
 		    tmp_format.registration_pending = 0;
-		    ret = internal_write_event(act->o.out.conn, &tmp_format,
-					       &act->o.out.remote_stone_id, 4, 
+		    ret = internal_write_event(act->o.bri.conn, &tmp_format,
+					       &act->o.bri.remote_stone_id, 4, 
 					       event, event->attrs);
 		}
 	    }
@@ -1693,12 +1693,12 @@ do_bridge_action(CManager cm, int s)
 	if (ret == 0) {
 	    if (CMtrace_on(cm, EVWarning)) {
 		printf("Warning!  Write failed for output action %d on stone %d, event likely not transmitted\n", a, s);
-		printf("   -  Output Stone %d disabled\n", s);
+		printf("   -  Bridge Stone %d disabled\n", s);
 	    }
-	    if (act->o.out.conn != NULL) 
-		INT_CMConnection_close(act->o.out.conn);
-	    act->o.out.conn_failed = 1;
-	    act->o.out.conn = NULL;
+	    if (act->o.bri.conn != NULL) 
+		INT_CMConnection_close(act->o.bri.conn);
+	    act->o.bri.conn_failed = 1;
+	    act->o.bri.conn = NULL;
 	}
     }
     stone->is_outputting = 0;
@@ -1809,13 +1809,22 @@ INT_EVcreate_bridge_action(CManager cm, attr_list contact_list,
     return stone;
 }
 
+extern EVstone
+INT_EVcreate_thread_bridge_action(CManager cm, CManager target_cm,
+				  EVstone target_stone)
+{
+    EVstone stone = INT_EValloc_stone(cm);
+    INT_EVassoc_thread_bridge_action(cm, stone, target_cm, target_stone);
+    return stone;
+}
+
 static int
 is_output_stone(CManager cm, EVstone stone_num)
 {
     event_path_data evp = cm->evp;
     stone_type stone = stone_struct(evp, stone_num);
     if (stone->default_action == -1) return 0;
-    return (stone->proto_actions[stone->default_action].action_type == Action_Output);
+    return (stone->proto_actions[stone->default_action].action_type == Action_Bridge);
 }
 
 extern EVaction
@@ -1852,7 +1861,7 @@ INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list
 	    } else {
 		printf("NULL\n");
 	    }
-	    printf("Output action association failed for stone %d, outputting to remote stone %d\n",
+	    printf("Bridge action association failed for stone %d, outputting to remote stone %d\n",
 		   stone_num, remote_stone);
 	}
 	return -1;
@@ -1866,9 +1875,51 @@ INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list
 				   sizeof(stone->proto_actions[0]));
     memset(&stone->proto_actions[action_num], 0, 
 	   sizeof(stone->proto_actions[0]));
-    stone->proto_actions[action_num].action_type = Action_Output;
-    stone->proto_actions[action_num].o.out.conn = conn;
-    stone->proto_actions[action_num].o.out.remote_stone_id = remote_stone;
+    stone->proto_actions[action_num].action_type = Action_Bridge;
+    stone->proto_actions[action_num].o.bri.conn = conn;
+    stone->proto_actions[action_num].o.bri.remote_stone_id = remote_stone;
+    stone->default_action = action_num;
+    stone->proto_action_count++;
+    clear_response_cache(stone);
+    return action_num;
+}
+
+extern EVaction
+INT_EVassoc_thread_bridge_action(CManager cm, EVstone stone_num, 
+				 CManager target_cm, EVstone target_stone)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone;
+    int action_num;
+    CMConnection conn;
+
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return -1;
+
+    action_num = stone->proto_action_count;
+    conn = INT_CMget_conn(cm, NULL);
+    if (conn == NULL) {
+	if (CMtrace_on(cm, EVWarning)) {
+	    printf("EVassoc_thread_bridge_action - failed to contact host at contact point \n\t");
+		printf("NULL\n");
+
+	    printf("Bridge action association failed for stone %d, outputting to remote stone %d\n",
+		   stone_num, 0);
+	}
+	return -1;
+    }
+    INT_CMconn_register_close_handler(conn, stone_close_handler, 
+				      (void*)(long)stone_num);
+    CMtrace_out(cm, EVerbose, "Adding output action %d to stone %d",
+		action_num, stone_num);
+    stone->proto_actions = realloc(stone->proto_actions, 
+				   (action_num + 1) * 
+				   sizeof(stone->proto_actions[0]));
+    memset(&stone->proto_actions[action_num], 0, 
+	   sizeof(stone->proto_actions[0]));
+    stone->proto_actions[action_num].action_type = Action_Bridge;
+    stone->proto_actions[action_num].o.bri.conn = conn;
+    stone->proto_actions[action_num].o.bri.remote_stone_id = 0;
     stone->default_action = action_num;
     stone->proto_action_count++;
     clear_response_cache(stone);
@@ -2436,8 +2487,8 @@ INT_EVhandle_control_message(CManager cm, CMConnection conn, unsigned char type,
             stone_type stone;
             for (s = evp->stone_base_num; s < evp->stone_count + evp->stone_base_num; ++s) {
                 stone = stone_struct(evp, s);
-                if (is_output_stone(cm, s) &&  stone->proto_actions[stone->default_action].o.out.conn == conn
-                        && stone->proto_actions[stone->default_action].o.out.remote_stone_id == arg) {
+                if (is_output_stone(cm, s) &&  stone->proto_actions[stone->default_action].o.bri.conn == conn
+                        && stone->proto_actions[stone->default_action].o.bri.remote_stone_id == arg) {
                     backpressure_transition(cm, s, Stall_Squelch, type == CONTROL_SQUELCH);
                 }
             }

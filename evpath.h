@@ -1340,6 +1340,53 @@ EVcreate_bridge_action(CManager cm, attr_list contact_list,
 		       EVstone remote_stone);
 
 /*!
+ * Associate a thread bridge action with a stone.
+ *
+ * Thread bridge actions transfer events between CM control domains in the
+ * same address space.
+ *
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The local stone to which to register the action.
+ * \param target_cm Another CManager in the same address space to which data should be transferred.
+ * \param target_stone The stone ID associated with the target CM to which
+ * data is to be delivered.
+ * \return An action identifier, an integer EVaction value, which can be used
+ * in subsequent calls to modify or remove the action.
+ *
+ * Bridge actions are associated with the default action of a stone and are
+ * non-specific as far as input data, generally transferring events without
+ * encoding or copying.  Thread bridge actions may not be modified after
+ * association. 
+ */
+/*REMOTE*/
+extern EVaction
+EVassoc_thread_bridge_action(CManager cm, EVstone stone, CManager target_cm,
+			     EVstone target_stone);
+
+/*!
+ * Associate a thread bridge action with a stone.
+ *
+ * Thread bridge actions transfer events between CM control domains in the
+ * same address space.
+ *
+ * \param cm The CManager from which a stone should be allocated.
+ * \param target_cm Another CManager in the same address space to which data should be transferred.
+ * \param target_stone The stone ID associated with the target CM to which
+ * data is to be delivered.
+ * \return The stone identifier, an integer EVstone value, which can be used
+ * in subsequent calls.
+ *
+ * Bridge actions are associated with the default action of a stone and are
+ * non-specific as far as input data, generally transferring events without
+ * encoding or copying.  Thread bridge actions may not be modified after
+ * association. 
+ */
+/*REMOTE*/
+extern EVstone
+EVcreate_thread_bridge_action(CManager cm, CManager target_cm,
+			      EVstone target_stone);
+
+/*!
  * Associate a split action with a stone.
  *
  * Split actions replicate an incoming event to multiple output target

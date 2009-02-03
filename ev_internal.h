@@ -35,9 +35,9 @@ typedef struct _event_item {
     EVFreeFunction free_func;
 } event_item, *event_queue;
 
-typedef enum { Action_NoAction = 0, Action_Output, Action_Terminal, Action_Filter, Action_Immediate, Action_Multi, Action_Decode, Action_Encode_to_Buffer, Action_Split, Action_Store, Action_Congestion } action_value;
+typedef enum { Action_NoAction = 0, Action_Bridge, Action_Terminal, Action_Filter, Action_Immediate, Action_Multi, Action_Decode, Action_Encode_to_Buffer, Action_Split, Action_Store, Action_Congestion } action_value;
 
-typedef enum {Immediate, Immediate_and_Multi, Output, Congestion} action_class;
+typedef enum {Immediate, Immediate_and_Multi, Bridge, Congestion} action_class;
 
 /*!
  * The prototype of a specific queued handler funcion.
@@ -137,7 +137,7 @@ typedef struct _proto_action {
     FMFormat *matching_reference_formats;
     union {
 	struct terminal_proto_vals term;
-	bridge_action_vals out;
+	bridge_action_vals bri;
 	decode_action_vals decode;
 	immediate_action_vals imm;
 	int *split_stone_targets;
@@ -244,6 +244,8 @@ INT_EVsubmit_or_wait(EVsource source, void *data, attr_list attrs,
 		     EVSubmitCallbackFunc cb, void *user_data);
 extern int INT_EVsubmit_encoded_or_wait ( CManager cm, EVstone stone, void *data, int data_len, attr_list attrs, EVSubmitCallbackFunc cb, void *user_data );
 extern EVstone INT_EVcreate_bridge_action(CManager cm, attr_list contact_list, EVstone remote_stone);
+extern EVaction INT_EVassoc_thread_bridge_action(CManager cm, EVstone stone, CManager target_cm, EVstone target_stone);
+extern EVstone INT_EVcreate_thread_bridge_action(CManager cm, CManager target_cm, EVstone target_stone);
 extern EVstone INT_EVcreate_immediate_action(CManager cm, char *action_spec, EVstone *target_list);
 extern EVstone INT_EVcreate_split_action(CManager cm, EVstone *target_list);
 extern EVstone INT_EVcreate_terminal_action(CManager cm, FMStructDescList format_list, 
