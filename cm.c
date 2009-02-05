@@ -87,6 +87,7 @@ void CMdo_performance_response ARGS((CMConnection conn, int length,
 					    char *buffer));
 
 void CMhttp_handler ARGS((CMConnection conn, char* buffer, int length));
+static void CM_init_select ARGS((CMControlList cl, CManager cm));
 
 static void
 CMpoll_forever(cm)
@@ -96,6 +97,9 @@ CManager cm;
     CMControlList cl = cm->control_list;
     int should_exit = 0;
     CManager_lock(cm);
+    if (!cm->control_list->select_initialized) {
+	CM_init_select(cm->control_list, cm);
+    }
     CManager_unlock(cm);
     if (cl->has_thread > 0 && cl->server_thread == thr_thread_self())
 	should_exit++;
@@ -117,6 +121,9 @@ extern void
 INT_CMrun_network(cm)
 CManager cm;
 {
+    if (!cm->control_list->select_initialized) {
+	CM_init_select(cm->control_list, cm);
+    }
     if ((cm->control_list->server_thread != 0) &&
 	(cm->control_list->server_thread != thr_thread_self())) {
 	/* What?  We're polling, but we're not the server thread? */
@@ -142,6 +149,9 @@ CManager cm;
 {
     /* if we're on a kernel-level-threads package, for the thread and 
        return 1, else return 0; */
+    if (!cm->control_list->select_initialized) {
+	CM_init_select(cm->control_list, cm);
+    }
     if (gen_thr_is_kernel()) {
 	if (cm->control_list->has_thread == 0) {
 	    if (cm->control_list->network_blocking_function.func) {
@@ -3206,8 +3216,6 @@ attr_list attrs;
 
 }
 
-
-static void CM_init_select ARGS((CMControlList cl, CManager cm));
 
 extern void
 INT_CM_fd_add_select(cm, fd, handler_func, param1, param2)
