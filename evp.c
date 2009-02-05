@@ -642,7 +642,9 @@ EVdiscard_queue_item(CManager cm, int s, queue_item *item) {
 static void encode_event(CManager, event_item*);
 
 /* {{{ storage_queue_default_* */
-static void ensure_ev_owned(CManager cm, event_item *event) {
+extern void 
+ensure_ev_owned(CManager cm, event_item *event)
+{
     if (event->contents == Event_App_Owned && !event->free_func) {
         encode_event(cm, event);
         event->decoded_event = NULL;
@@ -1536,6 +1538,7 @@ CManager cm;
     if (as == NULL) {
 	as = evp->as = malloc(sizeof(*as));
 	memset(as, 0, sizeof(*as));
+	as->last_active_stone = -1;
     }
  restart:
     if (as->last_active_stone != -1) {
@@ -2779,6 +2782,7 @@ EVPinit(CManager cm)
             cm->evp->use_backpressure = 0;
         }
     }
+    CMadd_poll(cm, deferred_process_actions, NULL);
     REVPinit(cm);
 }
 
