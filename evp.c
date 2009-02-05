@@ -151,6 +151,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	switch(act->action_type) {
 	case Action_NoAction:
 	case Action_Encode_to_Buffer:
+	case Action_Thread_Bridge:
 	    break;
 	case Action_Bridge:
 	    if (act->o.bri.remote_path) 
@@ -1023,6 +1024,7 @@ cached_stage_for_action(proto_action *act) {
     case Action_Split:
     case Action_Immediate:
     case Action_Store:
+    case Action_Thread_Bridge:
         return Immediate;
     default:
         assert(0);    
@@ -1091,6 +1093,11 @@ dump_action(stone_type stone, response_cache_element *resp, int a, const char *i
 	       (long)(void*)act->o.bri.conn, act->o.bri.remote_stone_id);
 	if (act->o.bri.conn != NULL) dump_attr_list(act->o.bri.conn->attrs);
 	if (act->o.bri.conn_failed) printf("Connection has FAILED!\n");
+	break;
+    case Action_Thread_Bridge:
+	printf("  Target: CManager %p, stone_id %d\n",
+	       act->o.thr_bri.target_cm, act->o.thr_bri.target_stone_id);
+	if (act->o.thr_bri.target_cm_shutdown) printf("TARGET CM HAS SHUTDOWN!\n");
 	break;
     case Action_Terminal:
 	break;
@@ -1276,6 +1283,7 @@ is_immediate_action(response_cache_element *act)
     case Action_Split:
     case Action_Immediate:
     case Action_Store:
+    case Action_Thread_Bridge:
 	return 1;
     default:
 	return 0;
@@ -1490,6 +1498,13 @@ process_events_stone(CManager cm, int s, action_class c)
                 }
                 break;
             }
+	    case Action_Thread_Bridge: {
+		proto_action *p = &stone->proto_actions[act->proto_action_id];
+		if (p->o.thr_bri.target_cm_shutdown) continue;
+                thread_bridge_transfer(cm, event, p->o.thr_bri.target_cm,
+				       p->o.thr_bri.target_stone_id);
+		break;
+	    }
 	    case Action_Bridge:
 	    default:
 		assert(FALSE);
@@ -1868,7 +1883,7 @@ INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list
     }
     INT_CMconn_register_close_handler(conn, stone_close_handler, 
 				      (void*)(long)stone_num);
-    CMtrace_out(cm, EVerbose, "Adding output action %d to stone %d",
+    CMtrace_out(cm, EVerbose, "Adding bridge action %d to stone %d",
 		action_num, stone_num);
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (action_num + 1) * 
@@ -1891,35 +1906,22 @@ INT_EVassoc_thread_bridge_action(CManager cm, EVstone stone_num,
     event_path_data evp = cm->evp;
     stone_type stone;
     int action_num;
-    CMConnection conn;
 
     stone = stone_struct(evp, stone_num);
     if (!stone) return -1;
 
     action_num = stone->proto_action_count;
-    conn = INT_CMget_conn(cm, NULL);
-    if (conn == NULL) {
-	if (CMtrace_on(cm, EVWarning)) {
-	    printf("EVassoc_thread_bridge_action - failed to contact host at contact point \n\t");
-		printf("NULL\n");
-
-	    printf("Bridge action association failed for stone %d, outputting to remote stone %d\n",
-		   stone_num, 0);
-	}
-	return -1;
-    }
-    INT_CMconn_register_close_handler(conn, stone_close_handler, 
-				      (void*)(long)stone_num);
-    CMtrace_out(cm, EVerbose, "Adding output action %d to stone %d",
+    CMtrace_out(cm, EVerbose, "Adding thread bridge action %d to stone %d\n",
 		action_num, stone_num);
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
     memset(&stone->proto_actions[action_num], 0, 
 	   sizeof(stone->proto_actions[0]));
-    stone->proto_actions[action_num].action_type = Action_Bridge;
-    stone->proto_actions[action_num].o.bri.conn = conn;
-    stone->proto_actions[action_num].o.bri.remote_stone_id = 0;
+    stone->proto_actions[action_num].action_type = Action_Thread_Bridge;
+    stone->proto_actions[action_num].o.thr_bri.target_cm = target_cm;
+    stone->proto_actions[action_num].o.thr_bri.target_stone_id = target_stone;
+    stone->proto_actions[action_num].o.thr_bri.target_cm_shutdown = 0;
     stone->default_action = action_num;
     stone->proto_action_count++;
     clear_response_cache(stone);

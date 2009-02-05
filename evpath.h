@@ -1358,7 +1358,6 @@ EVcreate_bridge_action(CManager cm, attr_list contact_list,
  * encoding or copying.  Thread bridge actions may not be modified after
  * association. 
  */
-/*REMOTE*/
 extern EVaction
 EVassoc_thread_bridge_action(CManager cm, EVstone stone, CManager target_cm,
 			     EVstone target_stone);
@@ -1381,7 +1380,6 @@ EVassoc_thread_bridge_action(CManager cm, EVstone stone, CManager target_cm,
  * encoding or copying.  Thread bridge actions may not be modified after
  * association. 
  */
-/*REMOTE*/
 extern EVstone
 EVcreate_thread_bridge_action(CManager cm, CManager target_cm,
 			      EVstone target_stone);

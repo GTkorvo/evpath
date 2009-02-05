@@ -1088,6 +1088,13 @@ CMControlList cl;
 }
 
 
+void
+CMwake_server_thread(CManager cm)
+{
+    CMControlList cl = cm->control_list;
+    (cl->wake_select)((void*)&CMstatic_trans_svcs, &cl->select_data);
+}
+
 extern void
 CMControlList_free(cl)
 CMControlList cl;

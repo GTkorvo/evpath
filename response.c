@@ -895,8 +895,8 @@ proto_action_in_stage(proto_action *act, action_class stage) {
         default:
             return 0;
         }
-    case Output:
-        return act->action_type == Action_Output;
+    case Bridge:
+        return act->action_type == Action_Bridge;
     case Congestion:
         return act->action_type == Action_Congestion;     
     default:

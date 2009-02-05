@@ -4,7 +4,7 @@ AUTOMAKE_OPTIONS = foreign
 ACLOCAL_AMFLAGS="-Iconfig"
 ACLOCAL_AMFLAGS+="-I libltdl/m4"
 
-SUBDIRS = libltdl . mtests tests rtests otests
+SUBDIRS = libltdl . tests mtests rtests old_tests
 
 INCLUDES = $(INCLTDL)
 
@@ -25,12 +25,12 @@ libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c \
 	               cmsockets.c cmselect.c\
 		       cm_lock.c cm_pbio.c cm_interface.c version.c \
 		       cm_threadio.c cm_evol.c evp.c response.c revp.c \
-		       evp_compat.c thin_server.c 
+		       evp_compat.c thin_server.c evp_threads.c
 else
 libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c \
 		       cm_lock.c cm_pbio.c cm_interface.c version.c \
 		       cm_threadio.c cm_evol.c evp.c response.c revp.c \
-		       evp_compat.c thin_server.c 
+		       evp_compat.c thin_server.c evp_threads.c
 
 
 endif

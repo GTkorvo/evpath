@@ -42,7 +42,7 @@ noinst_PROGRAMS = $(am__EXEEXT_1) congestion_test$(EXEEXT) \
 	store_send_test$(EXEEXT) store_limit_test$(EXEEXT) \
 	store_pressure_test$(EXEEXT) block_test$(EXEEXT) \
 	submit_wait_test$(EXEEXT)
-subdir = otests
+subdir = old_tests
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/config/argz.m4 \
@@ -323,9 +323,9 @@ $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__confi
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  otests/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign  old_tests/Makefile'; \
 	cd $(top_srcdir) && \
-	  $(AUTOMAKE) --foreign  otests/Makefile
+	  $(AUTOMAKE) --foreign  old_tests/Makefile
 .PRECIOUS: Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \

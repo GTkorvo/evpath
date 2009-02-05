@@ -109,17 +109,18 @@ libcmudp_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 am__libevpath_la_SOURCES_DIST = cm.c cm_control.c cm_formats.c \
 	cm_util.c cm_transport.c cm_lock.c cm_pbio.c cm_interface.c \
 	version.c cm_threadio.c cm_evol.c evp.c response.c revp.c \
-	evp_compat.c thin_server.c cmsockets.c cmselect.c
+	evp_compat.c thin_server.c evp_threads.c cmsockets.c \
+	cmselect.c
 @CNL_FALSE@am_libevpath_la_OBJECTS = cm.lo cm_control.lo cm_formats.lo \
 @CNL_FALSE@	cm_util.lo cm_transport.lo cm_lock.lo cm_pbio.lo \
 @CNL_FALSE@	cm_interface.lo version.lo cm_threadio.lo \
 @CNL_FALSE@	cm_evol.lo evp.lo response.lo revp.lo evp_compat.lo \
-@CNL_FALSE@	thin_server.lo
+@CNL_FALSE@	thin_server.lo evp_threads.lo
 @CNL_TRUE@am_libevpath_la_OBJECTS = cm.lo cm_control.lo cm_formats.lo \
 @CNL_TRUE@	cm_util.lo cm_transport.lo cmsockets.lo cmselect.lo \
 @CNL_TRUE@	cm_lock.lo cm_pbio.lo cm_interface.lo version.lo \
 @CNL_TRUE@	cm_threadio.lo cm_evol.lo evp.lo response.lo revp.lo \
-@CNL_TRUE@	evp_compat.lo thin_server.lo
+@CNL_TRUE@	evp_compat.lo thin_server.lo evp_threads.lo
 libevpath_la_OBJECTS = $(am_libevpath_la_OBJECTS)
 libevpath_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -313,7 +314,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign
 ACLOCAL_AMFLAGS = "-Iconfig" "-I libltdl/m4"
-SUBDIRS = libltdl . mtests tests rtests otests
+SUBDIRS = libltdl . tests mtests rtests old_tests
 INCLUDES = $(INCLTDL)
 EXTRA_DIST = 
 @CNL_FALSE@lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la libcmsockets.la libcmselect.la
@@ -322,13 +323,13 @@ EXTRA_LTLIBRARIES =
 @CNL_FALSE@libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c \
 @CNL_FALSE@		       cm_lock.c cm_pbio.c cm_interface.c version.c \
 @CNL_FALSE@		       cm_threadio.c cm_evol.c evp.c response.c revp.c \
-@CNL_FALSE@		       evp_compat.c thin_server.c 
+@CNL_FALSE@		       evp_compat.c thin_server.c evp_threads.c
 
 @CNL_TRUE@libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c \
 @CNL_TRUE@	               cmsockets.c cmselect.c\
 @CNL_TRUE@		       cm_lock.c cm_pbio.c cm_interface.c version.c \
 @CNL_TRUE@		       cm_threadio.c cm_evol.c evp.c response.c revp.c \
-@CNL_TRUE@		       evp_compat.c thin_server.c 
+@CNL_TRUE@		       evp_compat.c thin_server.c evp_threads.c
 
 libevpath_la_LDFLAGS = $(MATH_LIB) -version-info 1:0:0
 libevpath_la_LIBADD = $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lffs -lcod @SOCKET_LIBS@ 
@@ -499,6 +500,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmudp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp_compat.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp_threads.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/response.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/revp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/thin_server.Plo@am__quote@
@@ -540,7 +542,7 @@ install-includeHEADERS: $(include_HEADERS)
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  f=$(am__strip_dir) \
 	  echo " cmp -s '$$d$$p' '$(DESTDIR)$(includedir)/$$f' || $(includeHEADERS_INSTALL) '$$d$$p' '$(DESTDIR)$(includedir)/$$f'"; \
-	   cmp -s "$$d$$p" "$(DESTDIR)$(includedir)/$$f" || $(includeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(includedir)/$$f"; \
+	  cmp -s "$$d$$p" "$(DESTDIR)$(includedir)/$$f" || $(includeHEADERS_INSTALL) "$$d$$p" "$(DESTDIR)$(includedir)/$$f"; \
 	done
 
 uninstall-includeHEADERS:

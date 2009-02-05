@@ -35,7 +35,7 @@ typedef struct _event_item {
     EVFreeFunction free_func;
 } event_item, *event_queue;
 
-typedef enum { Action_NoAction = 0, Action_Bridge, Action_Terminal, Action_Filter, Action_Immediate, Action_Multi, Action_Decode, Action_Encode_to_Buffer, Action_Split, Action_Store, Action_Congestion } action_value;
+typedef enum { Action_NoAction = 0, Action_Bridge, Action_Thread_Bridge, Action_Terminal, Action_Filter, Action_Immediate, Action_Multi, Action_Decode, Action_Encode_to_Buffer, Action_Split, Action_Store, Action_Congestion } action_value;
 
 typedef enum {Immediate, Immediate_and_Multi, Bridge, Congestion} action_class;
 
@@ -63,6 +63,12 @@ typedef struct bridge_action_struct {
     char *remote_path;
     int conn_failed;
 } bridge_action_vals;
+
+typedef struct thread_bridge_action_struct {
+    int target_stone_id;
+    CManager target_cm;
+    int target_cm_shutdown;
+} thread_bridge_action_vals;
 
 typedef struct decode_action_struct {
     FFSTypeHandle decode_format; /* has conversion registered */
@@ -138,6 +144,7 @@ typedef struct _proto_action {
     union {
 	struct terminal_proto_vals term;
 	bridge_action_vals bri;
+	thread_bridge_action_vals thr_bri;
 	decode_action_vals decode;
 	immediate_action_vals imm;
 	int *split_stone_targets;
@@ -345,3 +352,4 @@ extern int INT_EVstore_is_sending(CManager cm, EVstone stone_num, EVaction actio
 extern int INT_EVstore_count(CManager cm, EVstone stone_num, EVaction action_num);
 extern int INT_EVdestroy_stone(CManager cm, EVstone stone_id);
 extern void INT_EVfree_source(EVsource source);
+extern void thread_bridge_transfer(CManager source_cm, event_item *event, CManager target_cm, EVstone target_stone);
