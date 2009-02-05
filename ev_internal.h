@@ -3,17 +3,6 @@
 #endif
 #define EV_INTERNAL_H
 
-typedef struct ev_free_block_rec {
-    int ref_count;
-    CManager cm;
-    void *free_arg;
-    void *block;
-    FMFormat ioformat;
-/*    EControlContext locking_context;*/
-    attr_list attrs;
-    struct free_block_rec *next;
-} *ev_free_block_rec_p;
-
 typedef enum { Event_App_Owned,  Event_Freeable, Event_CM_Owned } event_pkg_contents;
 
 typedef struct _event_item {
