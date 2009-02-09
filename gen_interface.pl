@@ -102,7 +102,7 @@ sub gen_stub {
     }
     print REVP "    int cond = CMCondition_get(conn->cm, conn);\n";
     print REVP "    CMFormat f = CMlookup_format(conn->cm, ${subr}_req_formats);\n";
-    print REVP "    EV_${retsubtype}_response *response;\n" unless ($return_type{$subr} eq "void");
+    print REVP "    EV_${retsubtype}_response response;\n" unless ($return_type{$subr} eq "void");
     print REVP "    ${subr}_request request;\n";
     foreach $arg (split (", ", $args[1])) {
 	$_ = $arg;
@@ -132,12 +132,12 @@ sub gen_stub {
     print REVP "    CMwrite(conn, f, &request);\n";
     print REVP "    CMCondition_wait(conn->cm, cond);\n";
   switch:for ($return_type{$subr}) {
-      /attr_list/ && do {print REVP "    return attr_list_from_string(response->ret);\n"; last;};
+      /attr_list/ && do {print REVP "    return attr_list_from_string(response.ret);\n"; last;};
       /void/ && do {last;};
-      /EVstone/ && do {print REVP "    return (EVstone) response->ret;\n"; last;};
-      /EVaction/ && do {print REVP "    return (EVaction) response->ret;\n"; last;};
-      /int/ && do {print REVP "    return response->ret;\n"; last;};
-      /EVevent_list/ && do {print REVP "    return response->ret;\n"; last;};
+      /EVstone/ && do {print REVP "    return (EVstone) response.ret;\n"; last;};
+      /EVaction/ && do {print REVP "    return (EVaction) response.ret;\n"; last;};
+      /int/ && do {print REVP "    return response.ret;\n"; last;};
+      /EVevent_list/ && do {print REVP "    return response.ret;\n"; last;};
   }
     print REVP "}\n";
 }
@@ -217,7 +217,7 @@ sub gen_handler {
       /EVstone/ && do {print REVP "    response.ret = (int)ret;\n"; last;};
       /EVaction/ && do {print REVP "    response.ret = (int) ret;\n"; last;};
       /int/ && do {print REVP "    response.ret = ret;;\n"; last;};
-      /EVevent_list/ && do {print REVP "    response.ret = ret;\n"; last;};
+      /EVevent_list/ && do {print REVP "     response.ret_len = count_EVevent_list(ret);\n    response.ret = ret;\n"; last;};
   }
     print REVP "    response.condition_var = request->condition_var;\n";
     print REVP "    CMwrite(conn, f, &response);\n";
@@ -523,14 +523,48 @@ typedef struct _EV_EVevent_list_response {
 FMField  EV_EVevent_list_response_flds[] = {
     {"condition_var", "integer", sizeof(int), FMOffset(EV_EVevent_list_response*, condition_var)},
     {"ret_len", "integer", sizeof(int), FMOffset(EV_EVevent_list_response*,ret_len)},
-    {"ret", "string", sizeof(char*), FMOffset(EV_EVevent_list_response*,ret)},
+    {"ret", "EVevent_list[ret_len]", sizeof(struct buf_entry), FMOffset(EV_EVevent_list_response*,ret)},
+    {NULL, NULL, 0, 0}
+};
+
+FMField  EVevent_list_flds[] = {
+    {"length", "integer", sizeof(int), FMOffset(EVevent_list,length)},
+    {"event_buffer", "char[length]", sizeof(char), FMOffset(EVevent_list, buffer)},
     {NULL, NULL, 0, 0}
 };
 
 FMStructDescRec  EV_EVevent_list_response_formats[] = {
     {"EV_EVevent_response", EV_EVevent_list_response_flds, sizeof(EV_EVevent_list_response), NULL},
+    {"EVevent_list", EVevent_list_flds, sizeof(struct buf_entry), NULL},
     {NULL, NULL, 0, NULL}
 };
+
+int
+count_EVevent_list(EVevent_list list)
+{
+    int count = 0;
+    while (list && list[count].buffer != NULL) {
+	count++;
+    }
+    count++;
+    return count;
+}
+
+EVevent_list
+copy_EVevent_list(EVevent_list list)
+{
+    EVevent_list ret;
+    int i, size = count_EVevent_list(list);
+    ret = malloc(sizeof(ret[0]) * size);
+    for (i=0; i < size-1; i++) {
+	ret[i].length = list[i].length;
+	ret[i].buffer = malloc(list[i].length);
+	memcpy(ret[i].buffer, list[i].buffer, list[i].length);
+    }
+    ret[i].length = 0;
+    ret[i].buffer = NULL;
+    return ret;
+}
 
 EVSimpleHandlerFunc
 REVPlookup_handler(char *name)
@@ -626,6 +660,42 @@ REV_response_handler(CManager cm, CMConnection conn, void *data,void *client_dat
     CMCondition_signal(cm, response->condition_var);
 }
 
+static void
+REV_int_response_handler(CManager cm, CMConnection conn, void *data,void *client_data,attr_list attrs)
+{
+    EV_void_response *response = (EV_void_response*) data;
+    CMtake_buffer(cm, data);
+    void **response_ptr = CMCondition_get_client_data(cm, response->condition_var);
+    if (NULL != response_ptr) {
+	memcpy(response_ptr, data, sizeof(EV_int_response));
+    }
+    CMCondition_signal(cm, response->condition_var);
+}
+
+static void
+REV_string_response_handler(CManager cm, CMConnection conn, void *data,void *client_data,attr_list attrs)
+{
+    EV_string_response *response = (EV_string_response*) data;
+    CMtake_buffer(cm, data);
+    EV_string_response *stub_ptr = CMCondition_get_client_data(cm, response->condition_var);
+    if (NULL != stub_ptr) {
+	memcpy(stub_ptr, data, sizeof(EV_string_response));
+	stub_ptr->ret = strdup(response->ret);
+    }
+    CMCondition_signal(cm, response->condition_var);
+}
+
+static void
+REV_EVevent_list_response_handler(CManager cm, CMConnection conn, void *data,void *client_data,attr_list attrs)
+{
+    EV_EVevent_list_response *response = (EV_EVevent_list_response*) data;
+    EV_EVevent_list_response *stub_ptr = CMCondition_get_client_data(cm, response->condition_var);
+    if (NULL != stub_ptr) {
+	memcpy(stub_ptr, data, sizeof(EV_EVevent_list_response));
+	stub_ptr->ret = copy_EVevent_list(response->ret);
+    }
+    CMCondition_signal(cm, response->condition_var);
+}
 
 extern void
 REVPinit(CManager cm)
@@ -633,16 +703,16 @@ REVPinit(CManager cm)
     CMFormat tmp_format;
 $handler_register_string
     tmp_format = CMregister_format(cm, EV_int_response_formats);
-    CMregister_handler(tmp_format, REV_response_handler, cm->evp);
+    CMregister_handler(tmp_format, REV_int_response_handler, cm->evp);
 
     tmp_format = CMregister_format(cm, EV_void_response_formats);
     CMregister_handler(tmp_format, REV_response_handler, cm->evp);
 
     tmp_format = CMregister_format(cm, EV_string_response_formats);
-    CMregister_handler(tmp_format, REV_response_handler, cm->evp);
+    CMregister_handler(tmp_format, REV_string_response_handler, cm->evp);
 
     tmp_format = CMregister_format(cm, EV_EVevent_list_response_formats);
-    CMregister_handler(tmp_format, REV_response_handler, cm->evp);
+    CMregister_handler(tmp_format, REV_EVevent_list_response_handler, cm->evp);
 }
 EOF
 print REVPH<<EOF;
