@@ -2064,7 +2064,7 @@ INT_EVsend_stored(CManager cm, EVstone stone_num, EVaction action_num)
 static void
 deferred_process_actions(CManager cm, void *client_data) {
     CManager_lock(cm);
-    while (process_local_actions(cm));
+    while (cm->evp && process_local_actions(cm));
     CManager_unlock(cm);
 }
 
