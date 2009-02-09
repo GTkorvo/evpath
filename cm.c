@@ -236,9 +236,7 @@ CManager cm;
     CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Network");
     cl->network_polling_function.func((void*)&CMstatic_trans_svcs,
 				      cl->network_polling_function.client_data);
-    CManager_lock(cm);
     CMcontrol_list_poll(cl);
-    CManager_unlock(cm);
 }
 
 static void
