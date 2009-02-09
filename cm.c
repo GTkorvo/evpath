@@ -471,7 +471,7 @@ void *client_data;
     func_entry *poll_list;
     int count = 0;
     poll_list = cl->polling_function_list;
-    while ((poll_list != NULL) && (poll_list->func != NULL)) {
+    while ((poll_list != NULL) && (poll_list[count].func != NULL)) {
 	count++;
     }
     if (poll_list != NULL) {
