@@ -39,7 +39,7 @@ EVPSubmit_general(CManager cm, int local_path_id, event_item *event)
 stone_type
 stone_struct(event_path_data evp, int stone_num)
 {
-    if (evp->stone_count < stone_num - evp->stone_base_num) {
+    if (evp->stone_count <= stone_num - evp->stone_base_num) {
 	printf("EVPATH: Invalid stone ID %d\n", stone_num);
         return NULL;
     }
