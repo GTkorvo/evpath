@@ -734,7 +734,6 @@ CMusleep ARGS((CManager cm, int usecs));
  * \note Not all pending messages will be handled, but generally one message
  * will be handled for each connection upon which input is pending.
  */
-/*NOLOCK*/
 extern 
 void CMpoll_network ARGS((CManager cm));
 
@@ -752,7 +751,6 @@ void CMrun_network ARGS((CManager cm));
 
 typedef void (*select_func) ARGS((void *, void*));
 
-/*NOLOCK*/
 extern void
 CM_fd_add_select ARGS((CManager cm, int fd, select_func handler_func,
 		       void *param1, void *param2));
