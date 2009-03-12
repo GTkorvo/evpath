@@ -88,5 +88,8 @@ clone_event(CManager cm, event_item *event, CManager target_cm)
 	  */
 	ensure_ev_owned(cm, event);
 	return event;
+    default:
+	assert(FALSE);
     }
+    return NULL;
 }

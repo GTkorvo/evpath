@@ -137,6 +137,7 @@ typedef struct _CMControlList {
     func_entry network_blocking_function;
     func_entry network_polling_function;
     func_entry *polling_function_list;
+    int pflist_size;
     int cl_consistency_number;
 
     int select_initialized;

@@ -474,10 +474,21 @@ void *client_data;
     while ((poll_list != NULL) && (poll_list[count].func != NULL)) {
 	count++;
     }
+    /*
+     *  We're going to navigate the poll list without locks.  This is
+     *  somewhat dangerous, but safe enough if we only have a couple of
+     *  functions so we never realloc.  If we ever hit the realloc() below,
+     *  there's a chance of some bad data references.  At this point, using
+     *  that many poll functions seems unlikely, but later, maybe not...
+     */
     if (poll_list != NULL) {
-	poll_list = INT_CMrealloc(poll_list, sizeof(func_entry) * (count+2));
+	if (cl->pflist_size < count - 2) {
+	    cl->pflist_size *= 2;
+	    poll_list = INT_CMrealloc(poll_list, sizeof(func_entry) * (cl->pflist_size));
+	}
     } else {
-	poll_list = INT_CMmalloc(sizeof(func_entry)*2);
+	poll_list = INT_CMmalloc(sizeof(func_entry)*10);
+	cl->pflist_size = 10;
     }
     poll_list[count].cm = cm;
     poll_list[count].func = func;
