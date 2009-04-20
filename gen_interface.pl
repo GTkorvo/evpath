@@ -62,6 +62,7 @@ sub gen_field_list
 	  switch:for ($argtype) {
 	      /attr_list/ && do {$iotype = "string"; $argtype="char*"; last;};
 	      /char*/ && do {$iotype = "string"; $argtype="char*"; last;};
+	      /void*/ && do {$iotype = "char[${argname}_len"; $argtype="void*"; last;};
 	      /int/ && do {$iotype = "integer"; $argtype="int"; last;};
 	      /EVstone/ && do {$iotype = "integer"; $argtype="EVstone"; last;};
 	      /EVaction/ && do {$iotype = "integer"; $argtype="EVaction"; last;};
