@@ -1717,6 +1717,7 @@ EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
  * \param attrs The attribute list to be submitted with the data.
  *
  */
+/*REMOTE*/
 extern void
 EVsubmit_encoded(CManager cm, EVstone stone, void *data, int data_len,
 		 attr_list attrs);

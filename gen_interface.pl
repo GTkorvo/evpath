@@ -147,7 +147,7 @@ sub gen_handler {
     my(@args);
     @args = split( ", ",  $arg_str,2);
     print REVP "\nstatic void\n";
-    print REVP "R${subr}_handler(CManager cm, CMConnection conn, void *data,void *client_data,attr_list attrs)\n";
+    print REVP "R${subr}_handler(CManager cm, CMConnection conn, void *data,void *client_data,attr_list message_attrs)\n";
     $handler_register_string = "$handler_register_string\
     tmp_format = CMregister_format(cm, ${subr}_req_formats);\
     CMregister_handler(tmp_format, R${subr}_handler, cm->evp);\n";

@@ -1337,12 +1337,13 @@ process_events_stone(CManager cm, int s, action_class c)
         more_pending += process_stone_pending_output(cm, s);
     }
     if (is_output_stone(cm, s) && (c != Bridge) && (c != Congestion)) return 0;
-    stone->is_processing = 1;
     
     CMtrace_out(cm, EVerbose, "Process events stone %d\n", s);
     item = stone->queue->queue_head;
     if (is_output_stone(cm, s) && (c == Bridge)) {
+	stone->is_processing = 1;
 	do_bridge_action(cm, s);
+	stone->is_processing = 0;
 	return 0;
     }
     while (item != NULL && stone->is_draining == 0 && stone->is_frozen == 0) {
@@ -1420,6 +1421,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		CMtrace_out(cm, EVerbose, "Executing terminal/filter event");
 		update_event_length_sum(cm, p, event);
 		cm->evp->current_event_item = event;
+		stone->is_processing = 1;
 		CManager_unlock(cm);
 		if ((p->data_state == Requires_Contig_Encoded) && 
 		    (event->event_encoded == 0)) {
@@ -1434,6 +1436,7 @@ process_events_stone(CManager cm, int s, action_class c)
 				    client_data, event->attrs);
 		}
 		CManager_lock(cm);
+		stone->is_processing = 0;
 		cm->evp->current_event_item = NULL;
 		if (act->action_type == Action_Filter) {
 		    if (out) {
@@ -1477,7 +1480,9 @@ process_events_stone(CManager cm, int s, action_class c)
 		client_data = act->o.imm.client_data;
 		out_stones = p->o.imm.output_stone_ids;
 		out_count = p->o.imm.output_count;
+		stone->is_processing = 1;
 		func(cm, event, client_data, event->attrs, out_count, out_stones);
+		stone->is_processing = 0;
 		return_event(evp, event);
 		if (as->events_in_play > in_play)
 		    more_pending++;   /* maybe??? */
@@ -1514,10 +1519,12 @@ process_events_stone(CManager cm, int s, action_class c)
 	} else if (is_multi_action(act) || is_congestion_action(act)) {
             proto_action *p = &stone->proto_actions[act->proto_action_id];
 	    /* event_item *event = dequeue_item(cm, stone->queue, item); XXX */
+	    stone->is_processing = 1;
             if ((act->o.multi.handler)(cm, stone->queue, item,
 					act->o.multi.client_data, p->o.imm.output_count,
 					p->o.imm.output_stone_ids))
                 more_pending++;
+	    stone->is_processing = 0;
             break;    
 	} 
 	item = next;
