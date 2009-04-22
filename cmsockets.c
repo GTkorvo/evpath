@@ -1145,6 +1145,7 @@ attr_list listen_info;
     }
     if (sock_addr.sin_port != 0) {
 	/* specific port requested */
+	svc->trace_out(cm, "CMSocket trying to bind selected port %d", port_num);
 	if (bind(conn_sock, (struct sockaddr *) &sock_addr,
 		 sizeof sock_addr) == SOCKET_ERROR) {
 	    fprintf(stderr, "Cannot bind INET socket\n");
@@ -1161,6 +1162,7 @@ attr_list listen_info;
 	while (tries > 0) {
 	    int target = low_bound + size * drand48();
 	    sock_addr.sin_port = htons(target);
+	    svc->trace_out(cm, "CMSocket trying to bind port %d", target);
 	    result = bind(conn_sock, (struct sockaddr *) &sock_addr,
 			  sizeof sock_addr);
 	    tries--;

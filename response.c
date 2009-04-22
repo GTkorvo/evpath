@@ -6,6 +6,7 @@
 #include <strings.h>
 #include <string.h>
 #include <ctype.h>
+#include <time.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -94,7 +95,6 @@ typedef struct response_instance {
 } *response_instance;
 
 
-
 static char *
 add_FMfieldlist_to_string(char *str, FMStructDescRec *f)
 {
@@ -105,13 +105,13 @@ add_FMfieldlist_to_string(char *str, FMStructDescRec *f)
     len += strlen(f->format_name) + 5 + 35 + 20;
     str = realloc(str, len);
     while(list[field_count].field_name != NULL) field_count++;
-    tmp_str = str + strlen(str); 
-    sprintf(tmp_str, "FMFormat \"%s\" StructSize %d FieldCount %d\n", 
+    tmp_str = str + strlen(str);
+    sprintf(tmp_str, "FMFormat \"%s\" StructSize %d FieldCount %d\n",
 	    f->format_name, f->struct_size, field_count);
     for (index = 0; index < field_count; index++) {
 	len += strlen(list[index].field_name) +strlen(list[index].field_type) + 50;
 	str = realloc(str, len);
-	tmp_str = str + strlen(str); 
+	tmp_str = str + strlen(str);
 	sprintf(tmp_str, "    FMField \"%s\" \"%s\" %d %d\n",
 		list[index].field_name, list[index].field_type,
 		list[index].field_size, list[index].field_offset);
@@ -140,7 +140,7 @@ get_str(char *str, const char **name_p)
     *name_p = name;
     return str;
 }
-    
+
 static char *
 parse_FMformat_from_string(char *str, FMStructDescRec *f)
 {
@@ -193,7 +193,7 @@ parse_FMformat_from_string(char *str, FMStructDescRec *f)
 }
 
 void *
-install_response_handler(CManager cm, int stone_id, char *response_spec, 
+install_response_handler(CManager cm, int stone_id, char *response_spec,
 			 void *local_data, FMFormat **ref_ptr)
 {
     char *str = response_spec;
@@ -229,7 +229,7 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	response->u.filter.format_list = list;
 	response->u.filter.function = function;
 	response->u.filter.client_data = local_data;
-	response->u.filter.reference_format = 
+	response->u.filter.reference_format =
 	    EVregister_format_set(cm, list);
 	if (ref_ptr) {
 	    FMFormat *formats = malloc(2*sizeof(FMFormat));
@@ -259,7 +259,7 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	response->u.filter.format_list = list;
 	response->u.filter.function = function;
 	response->u.filter.client_data = local_data;
-	response->u.filter.reference_format = 
+	response->u.filter.reference_format =
 	    EVregister_format_set(cm, list);
 	if (ref_ptr) {
 	    FMFormat *formats = malloc(2*sizeof(FMFormat));
@@ -303,8 +303,8 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	response->u.transform.function = function;
 	response->u.transform.client_data = local_data;
 	response->u.transform.reference_input_format = NULL;
-	if (in_list[0].format_name != NULL) 
-	    response->u.transform.reference_input_format = 
+	if (in_list[0].format_name != NULL)
+	    response->u.transform.reference_input_format =
 		EVregister_format_set(cm, in_list);
 	if (ref_ptr) {
 	    FMFormat *formats = malloc(2*sizeof(FMFormat));
@@ -313,7 +313,7 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	    *ref_ptr = formats;
 	}
 	if (out_list[0].format_name != NULL)
-	    response->u.transform.reference_output_format = 
+	    response->u.transform.reference_output_format =
 		EVregister_format_set(cm, out_list);
 	response->u.transform.output_base_struct_size = out_list[0].struct_size;
 	return (void*)response;
@@ -323,7 +323,7 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	int list_count, j, format_count, i;
 	char *function;
 	FMStructDescList *struct_list, out_list = NULL;
-        
+
 	str += strlen("Multityped Action") + 1;
 	sscanf(str, "  List Count %d\n", &list_count);
 	str = strchr(str, '\n') + 1;
@@ -360,11 +360,11 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	response->u.multityped.out_format_list = out_list;
 	response->u.multityped.function = function;
 	response->u.multityped.client_data = local_data;
-	response->u.multityped.reference_input_format_list = 
+	response->u.multityped.reference_input_format_list =
 	    malloc((list_count +1) * sizeof(FMFormat));
 	for (j = 0; j < list_count; j++) {
-	    if ((struct_list[j])[0].format_name != NULL) 
-		response->u.multityped.reference_input_format_list[j] = 
+	    if ((struct_list[j])[0].format_name != NULL)
+		response->u.multityped.reference_input_format_list[j] =
 		    EVregister_format_set(cm, struct_list[j]);
 	}
 	if (ref_ptr) {
@@ -441,7 +441,7 @@ INT_create_transform_action_spec(FMStructDescList format_list, FMStructDescList 
     int format_count = 0;
     int i;
     char *str;
-    while(format_list && format_list[format_count].format_name != NULL) 
+    while(format_list && format_list[format_count].format_name != NULL)
 	format_count++;
     str = malloc(50);
     sprintf(str, "Transform Action   Input Format Count %d\n", format_count);
@@ -470,7 +470,7 @@ INT_create_multityped_action_spec(FMStructDescList *input_format_lists, FMStruct
     int out_format_count = 0;
     int l, i;
     char *str;
-    while(input_format_lists && input_format_lists[list_count] != NULL) 
+    while(input_format_lists && input_format_lists[list_count] != NULL)
 	list_count++;
 
     str = malloc(50);
@@ -479,7 +479,7 @@ INT_create_multityped_action_spec(FMStructDescList *input_format_lists, FMStruct
     for (l = 0; l < list_count; l++) {
 	int format_count = 0, i;
 	FMStructDescList format_list = input_format_lists[l];
-	while(format_list && format_list[format_count].format_name != NULL) 
+	while(format_list && format_list[format_count].format_name != NULL)
 	    format_count++;
 	str = realloc(str, strlen(str) + 50);
 	sprintf(str + strlen(str), "Next format   Subformat Count %d\n",
@@ -489,7 +489,7 @@ INT_create_multityped_action_spec(FMStructDescList *input_format_lists, FMStruct
 	}
     }
 
-    while(output_format_list && output_format_list[out_format_count].format_name != NULL) 
+    while(output_format_list && output_format_list[out_format_count].format_name != NULL)
 	out_format_count++;
     str = realloc(str, strlen(str) + 50);
     sprintf(str + strlen(str), "  Output Format Count %d\n",
@@ -553,7 +553,7 @@ router_wrapper(CManager cm, struct _event_item *event, void *client_data,
     if (instance->u.filter.func_ptr) {
 	ret = ((int(*)(void *, attr_list))instance->u.filter.func_ptr)(event->decoded_event, attrs);
     } else {
-	int (*func)(cod_exec_context, void *, attr_list) = 
+	int (*func)(cod_exec_context, void *, attr_list) =
 	    (int(*)(cod_exec_context, void *, attr_list))instance->u.filter.code->func;
 	cod_exec_context ec = instance->u.filter.ec;
 	struct ev_state_data ev_state;
@@ -664,7 +664,7 @@ static queue_item *queue_find_index(queue_item *item, int i, FMFormat format) {
 static queue_item *cod_find_index_rel(struct ev_state_data *ev_state, int queue, int index)
 {
     return queue_find_index(
-        ev_state->queue->queue_head, index, 
+        ev_state->queue->queue_head, index,
         queue < 0 ?  NULL : ev_state->instance->u.queued.formats[queue]);
 }
 
@@ -673,7 +673,7 @@ static queue_item *cod_find_index_abs(struct ev_state_data *ev_state, int queue,
     ret = queue_find_index(ev_state->queue->queue_head, index, NULL);
     if (!ret)
         return NULL;
-    if (queue < 0 || ret->item->reference_format == 
+    if (queue < 0 || ret->item->reference_format ==
             ev_state->instance->u.queued.formats[queue])
         return ret;
     else
@@ -727,9 +727,33 @@ static void cod_ev_discard_and_submit(cod_exec_context ec,
     internal_path_submit(cm, stone, item->item);
 
     ev_state->did_output++;
-    
+
     EVdiscard_queue_item(cm, ev_state->stone, item);
 }
+
+static int cod_ev_get_port(cod_exec_context ec, int queue) {
+
+	struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
+
+	int port = (ev_state->out_stones[queue]);
+
+	return  port;
+
+}
+
+static int cod_ev_target_size(cod_exec_context ec, int stone) {
+
+	struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
+
+	CManager cm = ev_state->cm;
+
+	int queue_len = cm->evp->stone_map[stone].queue_size;
+
+	return queue_len;
+
+}
+
+
 
 static void cod_ev_discard_and_submit_rel(cod_exec_context ec, EVstone stone, int queue,
         int index) {
@@ -751,7 +775,7 @@ static void *cod_ev_get_data(cod_exec_context ec, int absp, int queue, int index
     assert(item->item);
 
     if (!item->item->decoded_event) {
-        item->item = cod_decode_event(ev_state->cm, ev_state->stone,    
+        item->item = cod_decode_event(ev_state->cm, ev_state->stone,
 				      ev_state->proto_action_id, item->item);
     }
     assert(item->item->decoded_event);
@@ -779,7 +803,7 @@ static int cod_ev_present(cod_exec_context ec, int queue, int index) {
 
 static int cod_ev_count(cod_exec_context ec, int queue) {
     struct ev_state_data *ev_state = (void*) cod_get_client_data(ec, 0x34567890);
-    FMFormat type = queue < 0 ? NULL : 
+    FMFormat type = queue < 0 ? NULL :
         ev_state->instance->u.queued.formats[queue];
     queue_item *item = ev_state->item;
     int count = 1;
@@ -838,10 +862,10 @@ queued_wrapper(CManager cm, struct _queue *queue, queue_item *item,
 }
 
 static response_instance
-generate_filter_code(struct response_spec *mrd, stone_type stone, 
+generate_filter_code(struct response_spec *mrd, stone_type stone,
 		     FMFormat format);
 static response_instance
-generate_multityped_code(struct response_spec *mrd, stone_type stone, 
+generate_multityped_code(struct response_spec *mrd, stone_type stone,
 			  FMFormat *formats);
 
 static FMFormat
@@ -898,7 +922,7 @@ proto_action_in_stage(proto_action *act, action_class stage) {
     case Bridge:
         return act->action_type == Action_Bridge;
     case Congestion:
-        return act->action_type == Action_Congestion;     
+        return act->action_type == Action_Congestion;
     default:
         assert(0);
     }
@@ -927,8 +951,8 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	int j = 0;
         if (!proto_action_in_stage(&stone->proto_actions[i], stage)) {
             continue;
-        } 
-	while (stone->proto_actions[i].matching_reference_formats && 
+        }
+	while (stone->proto_actions[i].matching_reference_formats &&
 	       (stone->proto_actions[i].matching_reference_formats[j] != NULL)) {
 	    formatList = (FMFormat *) realloc(formatList, (format_count + 2) * sizeof(FMFormat));
 	    format_map = realloc(format_map, (format_count + 2) * sizeof(int));
@@ -943,14 +967,14 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	/* special case for unformatted input */
 	int i;
 	for (i=0 ; i < stone->proto_action_count ; i++) {
-            if (!proto_action_in_stage(&stone->proto_actions[i], stage)) 
+            if (!proto_action_in_stage(&stone->proto_actions[i], stage))
 		continue;
 	    if ((stone->proto_actions[i].matching_reference_formats == NULL) ||
 		(stone->proto_actions[i].matching_reference_formats[0] == NULL))
 		nearest_proto_action = i;
 	}
     } else {
-	int map_entry = FMformat_compat_cmp2(event->reference_format, 
+	int map_entry = FMformat_compat_cmp2(event->reference_format,
 						    formatList,
 						    format_count,
 						    &older_format);
@@ -964,7 +988,7 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
         int i;
         for (i=0; i < stone->proto_action_count; i++) {
             if (!proto_action_in_stage(&stone->proto_actions[i], stage)) continue;
-            if (stone->proto_actions[i].matching_reference_formats 
+            if (stone->proto_actions[i].matching_reference_formats
                 && stone->proto_actions[i].matching_reference_formats[0] == NULL
                 && stone->proto_actions[i].data_state != Requires_Decoded) {
                 nearest_proto_action = i;
@@ -980,13 +1004,13 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    /* must be immediate action */
 	    response_instance instance;
 	    struct response_spec *mrd;
-	    mrd = 
+	    mrd =
 		proto->o.imm.mutable_response_data;
 	    switch(mrd->response_type) {
 	    case Response_Filter:
 	    case Response_Router:
 		if (event->event_encoded) {
-		    conversion_target_format = 
+		    conversion_target_format =
 			localize_format(cm, event->reference_format);
 		} else {
 		    conversion_target_format = event->reference_format;
@@ -1007,18 +1031,18 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    action_generated++;
 	    switch(mrd->response_type) {
 	    case Response_Filter:
-		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action, 
-					       filter_wrapper, instance, 
+		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action,
+					       filter_wrapper, instance,
 					       conversion_target_format);
 		break;
 	    case Response_Router:
-		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action, 
-					       router_wrapper, instance, 
+		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action,
+					       router_wrapper, instance,
 					       conversion_target_format);
 		break;
 	    case Response_Transform:
-		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action, 
-					       transform_wrapper, instance, 
+		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action,
+					       transform_wrapper, instance,
 					       conversion_target_format);
 		break;
             default:
@@ -1030,9 +1054,9 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    response_instance instance;
 	    struct response_spec *mrd;
 
-	    mrd = 
+	    mrd =
 		proto->o.imm.mutable_response_data;
-	    instance = generate_multityped_code(mrd, stone, 
+	    instance = generate_multityped_code(mrd, stone,
 						 proto->matching_reference_formats);
 	    if (instance == 0) {
                 return 0;
@@ -1040,8 +1064,8 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    instance->stone = stone->local_id;
 	    instance->proto_action_id = nearest_proto_action;
 	    action_generated++;
-	    INT_EVassoc_mutated_multi_action(cm, stone->local_id, nearest_proto_action, 
-					      queued_wrapper, instance, 
+	    INT_EVassoc_mutated_multi_action(cm, stone->local_id, nearest_proto_action,
+					      queued_wrapper, instance,
 					      proto->matching_reference_formats);
 
             if (event->event_encoded) {
@@ -1057,7 +1081,7 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 		if (stone->response_cache != NULL) free(stone->response_cache);
 		stone->response_cache = malloc(sizeof(stone->response_cache[0]));
 	    } else {
-		stone->response_cache = 
+		stone->response_cache =
 		    realloc(stone->response_cache,
 			    (stone->response_cache_count + 1) * sizeof(stone->response_cache[0]));
 	    }
@@ -1073,7 +1097,7 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    if (event->event_encoded) {
 		/* create a decode action */
 		INT_EVassoc_conversion_action(cm, stone->local_id, stage,
-					      conversion_target_format, 
+					      conversion_target_format,
 					      event->reference_format);
 /*	    printf(" Returning ");
 	    dump_action(stone, a, "   ");*/
@@ -1115,13 +1139,13 @@ internal_cod_submit(cod_exec_context ec, int port, void *data, void *type_info)
     assert(CManager_locked(cm));
     ev_state->did_output++;
     if (ev_state->cur_event && data == ev_state->cur_event->decoded_event) {
-	CMtrace_out(cm, EVerbose, 
+	CMtrace_out(cm, EVerbose,
 		    "Internal COD submit, resubmission of current input event to stone %d\n",
 		    ev_state->out_stones[port]);
 	internal_path_submit(ev_state->cm, ev_state->out_stones[port], ev_state->cur_event);
     } else {
 	FMFormat event_format = NULL;
-	CMtrace_out(cm, EVerbose, 
+	CMtrace_out(cm, EVerbose,
 		    "Internal COD submit, submission of new data to stone %d\n",
 		    ev_state->out_stones[port]);
 	if (event_format == NULL) {
@@ -1163,7 +1187,8 @@ cod_parse_context context;
 		long lrand48();\n\
 		double drand48();\n\
 		void EVsubmit(cod_exec_context ec, int port, void* d, cod_type_spec dt);\n\
-		attr_list stone_attrs;";
+		attr_list stone_attrs;\n";
+		//time_t time(time_t *timer);\n";
 
     static cod_extern_entry externs[] = {
 	{"printf", (void *) 0},
@@ -1177,7 +1202,10 @@ cod_parse_context context;
 	{"sleep", (void*) 0},
 	{(void *) 0, (void *) 0}
     };
-    /* 
+
+    //{"time", (void*) 0},
+
+    /*
      * some compilers think it isn't a static initialization to put this
      * in the structure above, so do it explicitly.
      */
@@ -1190,6 +1218,7 @@ cod_parse_context context;
     externs[6].extern_value = (void *) (long) &stone->stone_attrs;
     externs[7].extern_value = (void *) (long) &internal_cod_submit;
     externs[8].extern_value = (void *) (long) &sleep;
+    //externs[9].extern_value = (void *) (long) time;
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
@@ -1200,7 +1229,7 @@ add_typed_queued_routines(cod_parse_context context, int index, FMFormat format)
 {
     const char *fmt_name;
     char *extern_string;
-    static char *extern_string_fmt = 
+    static char *extern_string_fmt =
         "%s *EVdata_%s(cod_exec_context ec, cod_closure_context type, int index);\n"
         "%s *EVdata_full_%s(cod_exec_context ec, cod_closure_context type, int index);\n"
         "void EVdiscard_%s(cod_exec_context ec, cod_closure_context type, int index);\n"
@@ -1274,7 +1303,10 @@ add_queued_routines(cod_parse_context context, FMFormat *formats)
         void *EVdata(cod_exec_context ec, int queue, int index);\n\
         void *EVdata_full(cod_exec_context ec, int queue, int index);\n\
         int EVcount(cod_exec_context ec, int queue);\n\
-        int EVpresent(cod_exec_context ec, int queue, int index);\n";
+        int EVpresent(cod_exec_context ec, int queue, int index);\n\
+		int EVget_port(cod_exec_context ec, int queue);\n\
+    	int EVtarget_size(cod_exec_context ec, int outstone);\n";
+
     static cod_extern_entry externs[] = {
         {"EVconforms", (void *)0},
         {"EVdiscard", (void *)0},
@@ -1285,11 +1317,13 @@ add_queued_routines(cod_parse_context context, FMFormat *formats)
         {"EVdata_full", (void *)0},
         {"EVcount", (void *)0},
         {"EVpresent", (void *)0},
+        {"EVget_port", (void *)0},
+        {"EVtarget_size", (void *)0},
         {(void *)0, (void *)0}
     };
     int i;
     FMFormat *cur;
-    
+
     externs[0].extern_value = (void*)cod_ev_conforms;
     externs[1].extern_value = (void*)cod_ev_discard_rel;
     externs[2].extern_value = (void*)cod_ev_discard_abs;
@@ -1299,6 +1333,8 @@ add_queued_routines(cod_parse_context context, FMFormat *formats)
     externs[6].extern_value = (void*)cod_ev_get_data_abs;
     externs[7].extern_value = (void*)cod_ev_count;
     externs[8].extern_value = (void*)cod_ev_present;
+    externs[9].extern_value = (void*)cod_ev_get_port;
+    externs[10].extern_value = (void*)cod_ev_target_size;
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
@@ -1330,7 +1366,7 @@ cod_build_param_node(const char *id, sm_ref typ, int param_num);
 extern void
 cod_add_decl_to_parse_context(const char *name, sm_ref item, cod_parse_context context);
 extern void
-cod_add_param(const char *id, const char *typ, int param_num, 
+cod_add_param(const char *id, const char *typ, int param_num,
 	      cod_parse_context context);
 
 static void
@@ -1494,7 +1530,7 @@ FMFormat format;
 	    cod_add_param("input", "int", 1, parse_context);
 	}
 	if (mrd->response_type == Response_Transform) {
-	    add_param(parse_context, "output", 2, 
+	    add_param(parse_context, "output", 2,
 		      mrd->u.transform.reference_output_format);
 	    cod_add_param("event_attrs", "attr_list", 3, parse_context);
 	} else {
@@ -1506,10 +1542,10 @@ FMFormat format;
         assert(FALSE);
 	break;
     }
-	    
+
 /*    conn_info_data_type = cod_build_type_node("output_conn_info_type",
 					      output_conn_field_list);
-    cod_add_decl_to_parse_context("output_conn_info_type", 
+    cod_add_decl_to_parse_context("output_conn_info_type",
 				  conn_info_data_type, parse_context);
     conn_info_param = cod_build_param_node("output_conn_info",
 					   conn_info_data_type, 3);
@@ -1523,7 +1559,7 @@ FMFormat format;
 	    /* it is a dll */
 	    char *path = NULL;
 	    char *symbol_name = NULL;
-	    
+
 	    path = extract_dll_path(mrd->u.filter.function);
 	    symbol_name = extract_symbol_name(mrd->u.filter.function);
 	    if (!path || !symbol_name) {
@@ -1545,7 +1581,7 @@ FMFormat format;
 	    instance->u.filter.code = code;
 	    if (code)
 		instance->u.filter.ec = cod_create_exec_context(code);
-	    
+
 	    instance->u.filter.func_ptr = NULL;
 	}
 	break;
@@ -1554,7 +1590,7 @@ FMFormat format;
 	    /* it is a dll */
 	    char *path = NULL;
 	    char *symbol_name = NULL;
-	    
+
 	    path = extract_dll_path(mrd->u.transform.function);
 	    symbol_name = extract_symbol_name(mrd->u.transform.function);
 	    if (!path || !symbol_name) {
@@ -1562,7 +1598,7 @@ FMFormat format;
 		free(instance);
 		return NULL;
 	    }
-	    instance->u.transform.func_ptr = 
+	    instance->u.transform.func_ptr =
 		(int(*)(void*,void*,attr_list)) load_dll_symbol(path, symbol_name);
 	    if (instance->u.transform.func_ptr == NULL) {
 		fprintf(stderr, "Failed to load symbol \"%s\" from file \"%s\"\n",
@@ -1578,9 +1614,9 @@ FMFormat format;
 	    if (code)
 		instance->u.transform.ec = cod_create_exec_context(code);
 	}
-	instance->u.transform.out_size = 
+	instance->u.transform.out_size =
 	    mrd->u.transform.output_base_struct_size;
-	instance->u.transform.out_format = 
+	instance->u.transform.out_format =
 	    mrd->u.transform.reference_output_format;
 	break;
     case Response_Multityped:
@@ -1628,7 +1664,7 @@ FMFormat *formats;
     instance->u.queued.code = code;
     if (code)
 	instance->u.queued.ec = cod_create_exec_context(code);
-    
+
     cod_free_parse_context(parse_context);
 
     if (!instance->u.queued.ec) {
