@@ -37,7 +37,7 @@ TESTS = evtest$(EXEEXT) bulktest$(EXEEXT) http_test$(EXEEXT) \
 	router_test2$(EXEEXT) filter2_test$(EXEEXT) \
 	transform_test$(EXEEXT) auto_test$(EXEEXT) \
 	extract_test$(EXEEXT) submit_test$(EXEEXT) thin_test$(EXEEXT) \
-	rawtest$(EXEEXT) multi_thread$(EXEEXT)
+	rawtest$(EXEEXT) multi_thread$(EXEEXT) multiq_test$(EXEEXT)
 noinst_PROGRAMS = $(am__EXEEXT_1) thin_client$(EXEEXT) \
 	congestion_test$(EXEEXT) congest_bulktest$(EXEEXT) \
 	multiq_test$(EXEEXT) store_send_test$(EXEEXT) \
@@ -66,7 +66,7 @@ am__EXEEXT_1 = evtest$(EXEEXT) bulktest$(EXEEXT) http_test$(EXEEXT) \
 	router_test2$(EXEEXT) filter2_test$(EXEEXT) \
 	transform_test$(EXEEXT) auto_test$(EXEEXT) \
 	extract_test$(EXEEXT) submit_test$(EXEEXT) thin_test$(EXEEXT) \
-	rawtest$(EXEEXT) multi_thread$(EXEEXT)
+	rawtest$(EXEEXT) multi_thread$(EXEEXT) multiq_test$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
 auto_test_SOURCES = auto_test.c
 auto_test_OBJECTS = auto_test.$(OBJEXT)
@@ -336,7 +336,7 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = no-dependencies foreign
 SUBDIRS = testdll .
-OLD_TESTS = cmtest cmping take_test store_limit_test store_send_test multiq_test congest_bulktest
+OLD_TESTS = cmtest cmping take_test store_limit_test store_send_test congest_bulktest
 LDADD = ../libevpath.la 
 thin_client_LDADD = -L@FFSDIR@ -lffs
 thin_test_DEPENDENCIES = ../libevpath.la thin_client

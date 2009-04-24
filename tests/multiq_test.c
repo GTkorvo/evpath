@@ -146,7 +146,6 @@ static char *trans = "{\
     a_rec *a;\
     b_rec *b;\
     c_rec c;\
-    printf(\"Getport is %d\\n\", EVget_port(0));\n\
     if (EVpresent(a_rec_ID, 0)) {\
         a = EVdata_a_rec(0); ++found;\
     }\
