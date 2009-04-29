@@ -709,22 +709,43 @@ static void cod_ev_discard_abs(cod_exec_context ec, int queue, int index) {
     cod_ev_discard(ec, 1, queue, index);
 }
 
+static EVstone
+port_to_stone(struct ev_state_data *evstate, int port)
+{
+    if (port >= evstate->out_count) {
+	fprintf(stderr, "Stone has %d outbound ports, port %d invalid\n",
+		evstate->out_count, port);
+	return -1;
+    }
+    if (evstate->out_stones[port] == -1) {
+	fprintf(stderr, "Stone port %d target has not been set\n",
+		port);
+    }
+    return evstate->out_stones[port];
+}
+
 static void cod_ev_discard_and_submit(cod_exec_context ec,
-        int absp, EVstone stone, int queue, int index) {
+        int absp, int port, int queue, int index) {
     struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
     CManager cm = ev_state->cm;
     queue_item *item;
+    EVstone target_stone = port_to_stone(ev_state, port);
+
+    if (target_stone == -1) {
+        printf("Port %d on stone %d invalid\n", port, ev_state->stone);
+	return;
+    }
 
     item = cod_find_index(absp, ev_state, queue, index);
 
     if (item == NULL) {
-        printf("Item %x not found on queue %d, stone %d\n", index, queue, stone);
+        printf("Item %x not found on queue %d, stone %d\n", index, queue, ev_state->stone);
 	return;
     }
 
     item->action_id = -1;
 
-    internal_path_submit(cm, stone, item->item);
+    internal_path_submit(cm, target_stone, item->item);
 
     ev_state->did_output++;
 
@@ -755,14 +776,28 @@ static int cod_ev_target_size(cod_exec_context ec, int stone) {
 
 
 
-static void cod_ev_discard_and_submit_rel(cod_exec_context ec, EVstone stone, int queue,
+static void cod_ev_discard_and_submit_rel(cod_exec_context ec, int port, int queue,
         int index) {
-    cod_ev_discard_and_submit(ec, 0, stone, queue, index);
+    struct ev_state_data *ev_state = (void*) cod_get_client_data(ec, 0x34567890);
+    EVstone target_stone = port_to_stone(ev_state, port);
+    if (target_stone == -1) {
+        printf("Port %d on stone %d invalid\n", port, ev_state->stone);
+	return;
+    }
+
+    cod_ev_discard_and_submit(ec, 0, target_stone, queue, index);
 }
 
-static void cod_ev_discard_and_submit_abs(cod_exec_context ec, EVstone stone, int queue,
+static void cod_ev_discard_and_submit_abs(cod_exec_context ec, int port, int queue,
         int index) {
-    cod_ev_discard_and_submit(ec, 1, stone, queue, index);
+    struct ev_state_data *ev_state = (void*) cod_get_client_data(ec, 0x34567890);
+    EVstone target_stone = port_to_stone(ev_state, port);
+    if (target_stone == -1) {
+        printf("Port %d on stone %d invalid\n", port, ev_state->stone);
+	return;
+    }
+
+    cod_ev_discard_and_submit(ec, 1, target_stone, queue, index);
 }
 
 static void *cod_ev_get_data(cod_exec_context ec, int absp, int queue, int index)
@@ -1136,18 +1171,24 @@ internal_cod_submit(cod_exec_context ec, int port, void *data, void *type_info)
     CManager cm = ev_state->cm;
     event_path_data evp = ev_state->cm->evp;
     event_item *event;
+    EVstone target_stone = port_to_stone(ev_state, port);
+    if (target_stone == -1) {
+        printf("Port %d on stone %d invalid\n", port, ev_state->stone);
+	return;
+    }
+
     assert(CManager_locked(cm));
     ev_state->did_output++;
     if (ev_state->cur_event && data == ev_state->cur_event->decoded_event) {
 	CMtrace_out(cm, EVerbose,
 		    "Internal COD submit, resubmission of current input event to stone %d\n",
-		    ev_state->out_stones[port]);
-	internal_path_submit(ev_state->cm, ev_state->out_stones[port], ev_state->cur_event);
+		    target_stone);
+	internal_path_submit(ev_state->cm, target_stone, ev_state->cur_event);
     } else {
 	FMFormat event_format = NULL;
 	CMtrace_out(cm, EVerbose,
 		    "Internal COD submit, submission of new data to stone %d\n",
-		    ev_state->out_stones[port]);
+		    target_stone);
 	if (event_format == NULL) {
 	    event_format = EVregister_format_set(cm, (FMStructDescList) type_info);
 	    if (event_format == NULL) {
@@ -1167,7 +1208,7 @@ internal_cod_submit(cod_exec_context ec, int port, void *data, void *type_info)
 	cod_encode_event(cm, event);  /* map to memory we trust */
 	event->event_encoded = 1;
 	event->decoded_event = NULL;  /* lose old data */
-	internal_path_submit(cm, ev_state->out_stones[port], event);
+	internal_path_submit(cm, target_stone, event);
 	return_event(cm->evp, event);
     }
 }
