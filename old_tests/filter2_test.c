@@ -373,6 +373,7 @@ char **argv;
 	int remote_stone, stone = 0;
 	int count;
 	EVsource source_handle, bigger_handle;
+	atom_t CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");
 	if (argc == 2) {
 	    attr_list contact_list;
 	    char *list_str;
@@ -383,8 +384,6 @@ char **argv;
 	    EVassoc_output_action(cm, stone, contact_list, remote_stone);
 	}
 	attrs = create_attr_list();
-#define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
-	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
 	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
 	source_handle = EVcreate_submit_handle(cm, stone, simple_format_list);
 	bigger_handle = EVcreate_submit_handle(cm, stone, bigger_format_list);

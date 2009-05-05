@@ -230,6 +230,7 @@ char **argv;
 	char *action_spec = create_transform_action_spec(NULL,simple_format_list,ECL_generate);
 	EVstone auto_stone;
 	EVaction auto_action;
+	atom_t CMDEMO_TEST_ATOM;
 	if (argc == 2) {
 	    attr_list contact_list;
 	    char *list_str;
@@ -244,8 +245,7 @@ char **argv;
 	EVaction_set_output(cm, auto_stone, auto_action, 0, stone);
 	EVenable_auto_stone(cm, auto_stone, 1, 0);
 	attrs = create_attr_list();
-#define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
-	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
+	CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");
 	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
 	CMsleep(cm, 3);
 	free_attr_list(attrs);

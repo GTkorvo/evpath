@@ -118,6 +118,7 @@ submit_thread(void *vrec)
     simple_rec data;
     attr_list attrs;
     int i;
+    atom_t CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");
     EVsource source_handle = EVcreate_submit_handle(rec->cm, rec->target, 
 						    simple_format_list);
     for (i=0; i < rec->count; i++) {
@@ -125,8 +126,6 @@ submit_thread(void *vrec)
 	generate_record(&data);
 	tmp = data.short_field;
 	attrs = create_attr_list();
-#define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
-	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
 	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
 
 	data.short_field = rec->thread;
