@@ -237,6 +237,7 @@ char **argv;
 	    int first_row_stones[2];
 	    int list[3] = {0, 0, -1};
 	    int i;
+	    atom_t CMDEMO_TEST_ATOM;
 	    char *list_str;
 	    sscanf(argv[1], "%d:", &remote_stone);
 	    list_str = strchr(argv[1], ':') + 1;
@@ -262,8 +263,7 @@ char **argv;
 	}
 	generate_record(&data);
 	attrs = create_attr_list();
-#define CMDEMO_TEST_ATOM ATL_CHAR_CONS('C','\115','\104','t')
-	set_attr_atom_and_string("CMdemo_test_atom", CMDEMO_TEST_ATOM);
+	CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");
 	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
 	source_handle = EVcreate_submit_handle(cm, stone, simple_format_list);
 	if (quiet <= 0) printf("submitting %d\n", data.integer_field);
