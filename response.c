@@ -1559,6 +1559,7 @@ FMFormat format;
 
     memset(instance, 0, sizeof(*instance));
     add_standard_routines(stone, parse_context);
+    add_metrics_routines(stone, parse_context);
 
     switch (mrd->response_type) {
     case Response_Filter:
