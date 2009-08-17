@@ -43,7 +43,7 @@ include_HEADERS = evpath.h evpath_old.h revpath.h cm_transport.h
 
 AM_CPPFLAGS =
 
-noinst_HEADERS = assert.h cm_internal.h  ev_internal.h
+noinst_HEADERS = cm_internal.h  ev_internal.h
 
 cm_interface.c revp.c revpath.h: evpath.h gen_interface.pl
 	@PERL@ ./gen_interface.pl
