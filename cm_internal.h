@@ -12,6 +12,14 @@
 #define thr_thread_t void *
 #endif
 
+#if defined (__INTEL_COMPILER)
+//  Allow extern declarations with no prior decl
+#  pragma warning (disable: 1418)
+//  Allow extern declarations in primary source files.
+#  pragma warning (disable: 1419)
+//  Don't tell me about unspecified order of evaluation
+#  pragma warning (disable: 981)
+#endif
 struct _ecl_code_struct;
 
 
