@@ -197,6 +197,7 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 			 void *local_data, FMFormat **ref_ptr)
 {
     char *str = response_spec;
+    (void)stone_id;
     if (strncmp("Terminal Action", str, strlen("Terminal Action")) == 0) {
 	int format_count, i;
 	FMStructDescList list;
@@ -329,17 +330,17 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	str = strchr(str, '\n') + 1;
 	struct_list = malloc(sizeof(struct_list[0]) * (list_count + 1));
 	for (j = 0; j < list_count; j++) {
-	    int format_count, i;
+	    int format_count2, i;
 	    FMStructDescList in_list;
-	    sscanf(str, "Next format   Subformat Count %d\n", &format_count);
+	    sscanf(str, "Next format   Subformat Count %d\n", &format_count2);
 	    str = strchr(str, '\n') + 1;
 
-	    in_list = malloc(sizeof(in_list[0]) * (format_count + 1));
-	    for (i=0; i < format_count; i++) {
+	    in_list = malloc(sizeof(in_list[0]) * (format_count2 + 1));
+	    for (i=0; i < format_count2; i++) {
 		str = parse_FMformat_from_string(str, &in_list[i]);
 	    }
-	    in_list[format_count].format_name = NULL;
-	    in_list[format_count].field_list = NULL;
+	    in_list[format_count2].format_name = NULL;
+	    in_list[format_count2].field_list = NULL;
 	    struct_list[j] = in_list;
 	}
 	if (sscanf(str, "  Output Format Count %d\n", &format_count) != 1) {
@@ -369,9 +370,9 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	}
 	if (ref_ptr) {
 	    FMFormat *formats = malloc((list_count + 1)*sizeof(FMFormat));
-	    int i = 0;
-	    for (i=0; i < list_count; i++) {
-		formats[i] = response->u.multityped.reference_input_format_list[i];
+	    int j = 0;
+	    for (j=0; j < list_count; j++) {
+		formats[j] = response->u.multityped.reference_input_format_list[j];
 	    }
 	    formats[list_count] = NULL;
 	    *ref_ptr = formats;
@@ -477,7 +478,7 @@ INT_create_multityped_action_spec(FMStructDescList *input_format_lists, FMStruct
     sprintf(str, "Multityped Action   List Count %d\n", list_count);
 
     for (l = 0; l < list_count; l++) {
-	int format_count = 0, i;
+	int format_count = 0;
 	FMStructDescList format_list = input_format_lists[l];
 	while(format_list && format_list[format_count].format_name != NULL)
 	    format_count++;
@@ -961,6 +962,7 @@ proto_action_in_stage(proto_action *act, action_class stage) {
     default:
         assert(0);
     }
+    return 0;
 }
 
 extern int
@@ -1000,7 +1002,6 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
     formatList[format_count] = NULL;
     if (event->reference_format == NULL) {
 	/* special case for unformatted input */
-	int i;
 	for (i=0 ; i < stone->proto_action_count ; i++) {
             if (!proto_action_in_stage(&stone->proto_actions[i], stage))
 		continue;
@@ -1020,7 +1021,6 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
     }
     if (nearest_proto_action == -1) {
         /* special case for accepting anything */
-        int i;
         for (i=0; i < stone->proto_action_count; i++) {
             if (!proto_action_in_stage(&stone->proto_actions[i], stage)) continue;
             if (stone->proto_actions[i].matching_reference_formats
@@ -1121,11 +1121,11 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 			    (stone->response_cache_count + 1) * sizeof(stone->response_cache[0]));
 	    }
 	    resp = &stone->response_cache[stone->response_cache_count++];
-	    proto_action *proto = &stone->proto_actions[nearest_proto_action];
+	    proto_action *proto2 = &stone->proto_actions[nearest_proto_action];
 	    resp->reference_format = conversion_target_format;
 	    resp->proto_action_id = nearest_proto_action;
-	    resp->action_type = proto->action_type;
-	    resp->requires_decoded = (proto->data_state == Requires_Decoded);
+	    resp->action_type = proto2->action_type;
+	    resp->requires_decoded = (proto2->data_state == Requires_Decoded);
             resp->stage = stage;
 	}
 	if (conversion_target_format != NULL) {
@@ -1215,9 +1215,7 @@ internal_cod_submit(cod_exec_context ec, int port, void *data, void *type_info)
 
 
 static void
-add_standard_routines(stone, context)
-stone_type stone;
-cod_parse_context context;
+add_standard_routines(stone_type stone, cod_parse_context context)
 {
     static char extern_string[] = "\
 		int printf(string format, ...);\n\
@@ -1468,8 +1466,7 @@ add_param_list(cod_parse_context parse_context, char *name, int param_num,
 #endif
 
 static int
-dll_prefix_present(filter)
-char *filter;
+dll_prefix_present(char *filter)
 {
 
     if (filter[0] == 'd' && filter[1] == 'l' && filter[2] == 'l' && filter[3] == ':') {
@@ -1479,8 +1476,7 @@ char *filter;
 }
 
 static char *
-extract_dll_path(filter)
-char *filter;
+extract_dll_path(char *filter)
 {
     char *copy = strdup(filter);
     char *temp;
@@ -1502,8 +1498,7 @@ char *filter;
 }
 
 static char *
-extract_symbol_name(filter)
-char *filter;
+extract_symbol_name(char *filter)
 {
 
     char *copy = strdup(filter);
@@ -1526,9 +1521,7 @@ char *filter;
 }
 
 static void*
-load_dll_symbol(path, symbol_name)
-char *path;
-char *symbol_name;
+load_dll_symbol(char *path, char *symbol_name)
 {
     lt_dlhandle handle;
 
@@ -1546,10 +1539,8 @@ char *symbol_name;
 
 
 static response_instance
-generate_filter_code(mrd, stone, format)
-struct response_spec *mrd;
-stone_type stone;
-FMFormat format;
+generate_filter_code(struct response_spec *mrd, stone_type stone,
+		     FMFormat format)
 {
     response_instance instance = malloc(sizeof(*instance));
 
@@ -1670,10 +1661,8 @@ FMFormat format;
 }
 
 static response_instance
-generate_multityped_code(mrd, stone, formats)
-struct response_spec *mrd;
-stone_type stone;
-FMFormat *formats;
+generate_multityped_code(struct response_spec *mrd, stone_type stone,
+			 FMFormat *formats)
 {
     response_instance instance = malloc(sizeof(*instance));
     FMFormat *cur_format;

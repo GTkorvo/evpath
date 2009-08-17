@@ -64,6 +64,7 @@ thread_bridge_transfer(CManager source_cm, event_item *event,
 static event_item *
 clone_event(CManager cm, event_item *event, CManager target_cm)
 {
+    (void)target_cm;
     switch(event->contents) {
     case Event_CM_Owned:
 	/* 

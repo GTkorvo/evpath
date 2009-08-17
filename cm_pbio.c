@@ -130,10 +130,7 @@ static void CM_pbio_query ARGS((CMConnection conn, CMTransport trans,
 				char *buffer, int length));
 
 static int
-request_in_pending(cm, format_ID, format_id_length)
-CManager cm;
-void *format_ID; 
-int format_id_length;
+request_in_pending(CManager cm, void *format_ID, int format_id_length)
 {
     int i;
     for (i=0; i<cm->pending_request_max; i++) {
@@ -147,11 +144,8 @@ int format_id_length;
 }
 
 static void
-add_request_to_pending(cm, format_ID, format_id_length, cond)
-CManager cm;
-void *format_ID;
-int format_id_length;
-int cond;
+add_request_to_pending(CManager cm, void *format_ID, int format_id_length,
+		       int cond)
 {
     int i;
     /* tag any duplicates as no longer the most recent request */
@@ -194,10 +188,7 @@ int cond;
  */
 
 static void
-signal_requests(cm, server_rep, condition)
-CManager cm;
-char *server_rep;
-int condition;
+signal_requests(CManager cm, char *server_rep, int condition)
 {
     /* 
      *  signal the most recent (top) request and give it the server rep.
@@ -243,14 +234,9 @@ int condition;
 }
 
 extern void *
-CMpbio_get_format_rep_callback(format_ID, format_ID_length, host_IP,
-			       host_port, app_context, client_data)
-void *format_ID; 
-int format_ID_length;
-int host_IP;
-int host_port;
-void *app_context;
-void *client_data;
+CMpbio_get_format_rep_callback(void *format_ID, int format_ID_length, 
+			       int host_IP, int host_port, void *app_context,
+			       void *client_data)
 {
     CManager cm = (CManager) client_data;
     CMConnection conn = (CMConnection) app_context;
@@ -328,8 +314,7 @@ void *client_data;
     return server_rep;
 }
 
-extern int CMpbio_get_port_callback(client_data)
-void *client_data;
+extern int CMpbio_get_port_callback(void *client_data)
 {
     CManager cm = (CManager) client_data;
     attr_list contact_attrs = INT_CMget_contact_list(cm);
@@ -370,11 +355,8 @@ struct pbio_exchange_msg {
 extern struct CMtrans_services_s CMstatic_trans_svcs;
 
 static int
-CMpbio_send_format_request(format_ID, format_ID_length, conn, cond)
-char *format_ID;
-int format_ID_length;
-CMConnection conn;
-int cond;
+CMpbio_send_format_request(char *format_ID, int format_ID_length,
+			   CMConnection conn, int cond)
 {
     struct pbio_exchange_msg msg;
     struct FFSEncodeVec vec[2];
@@ -402,10 +384,8 @@ int cond;
 }
 
 static int
-CMpbio_send_format_response(ioformat, conn, cond)
-FMFormat ioformat;
-CMConnection conn;
-int cond;
+CMpbio_send_format_response(FMFormat ioformat, CMConnection conn, 
+			    int cond)
 {
     struct pbio_exchange_msg msg;
     struct FFSEncodeVec vec[2];
@@ -440,9 +420,7 @@ int cond;
 }
 
 extern int
-CMpbio_send_format_preload(ioformat, conn)
-FMFormat ioformat;
-CMConnection conn;
+CMpbio_send_format_preload(FMFormat ioformat, CMConnection conn)
 {
     struct pbio_exchange_msg msg;
     struct FFSEncodeVec vec[3];
@@ -484,8 +462,7 @@ CMConnection conn;
 int CMself_hosted_formats = -1;
 
 extern void
-CMinit_local_formats(cm)
-CManager cm;
+CMinit_local_formats(CManager cm)
 {
     if (CMself_hosted_formats == -1) {
 	CMself_hosted_formats = 0;
@@ -512,10 +489,7 @@ CManager cm;
 }
 
 static int
-conn_read_to_buffer(conn, buffer, length)
-CMConnection conn;
-void *buffer;
-int length;
+conn_read_to_buffer(CMConnection conn, void *buffer, int length)
 {
     transport_entry trans = conn->trans;
     if (trans->read_to_buffer_func) {
@@ -542,9 +516,7 @@ int length;
 }
 
 static void
-byte_swap(data, size)
-char *data;
-int size;
+byte_swap(char *data, int size)
 {
     int i;
     assert((size % 2) == 0);
@@ -759,18 +731,18 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, int length)
     }
     default: 
         {
-	    char *buffer;
-	    int length = msg->payload1_length + msg->payload2_length;
+	    char *buffer2;
+	    int len = msg->payload1_length + msg->payload2_length;
 	    CMtrace_out(conn->cm, CMFormatVerbose, 
 			"CMpbio - Unknown incoming message type %d",
 			msg->msg_type);
-	    buffer = malloc(length);
-	    if (conn_read_to_buffer(conn, buffer, length) != 1) {
+	    buffer2 = malloc(len);
+	    if (conn_read_to_buffer(conn, buffer2, len) != 1) {
 		CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio Read Failed");
 		INT_CMConnection_close(conn);
 	    }
 	    /* ignore message */
-	    free(buffer);
+	    free(buffer2);
 	    break;
 	}
     }

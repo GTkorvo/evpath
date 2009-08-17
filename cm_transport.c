@@ -25,9 +25,7 @@ extern struct CMtrans_services_s CMstatic_trans_svcs;
 static transport_entry *global_transports = NULL;
 
 transport_entry
-add_transport_to_cm(cm, transport)
-CManager cm;
-transport_entry transport;
+add_transport_to_cm(CManager cm, transport_entry transport)
 {
     int num_trans;
     if (cm->transports == NULL) {
@@ -48,9 +46,7 @@ transport_entry transport;
 }
 
 int
-load_transport(cm, trans_name)
-CManager cm;
-const char *trans_name;
+load_transport(CManager cm, const char *trans_name)
 {
     transport_entry *trans_list = global_transports;
     transport_entry transport;

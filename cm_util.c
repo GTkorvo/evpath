@@ -45,9 +45,9 @@ extern int CMtrace_init(CMTraceType trace_type)
 	sscanf(str, "%d", &CMtrace_val[EVWarning]);
     }
     if (cercs_getenv("CMVerbose") != NULL) {
-	int i;
-	for (i=0; i<CMLastTraceType; i++)
-	    CMtrace_val[i] = 1;
+	int j;
+	for (j=0; j<CMLastTraceType; j++)
+	    CMtrace_val[j] = 1;
     }
     /* for low level verbose, value overrides general CMVerbose */
     CMtrace_val[CMLowLevelVerbose] = (cercs_getenv("CMLowLevelVerbose") != NULL);
@@ -105,6 +105,7 @@ CMtransport_trace(CManager cm, char *format, ...)
 #endif
 	vfprintf(stdout, format, ap);
 	va_end(ap);
+	(void)cm;
 	printf("\n");
     }
 #endif
@@ -114,6 +115,7 @@ extern attr_list
 CMint_create_attr_list(CManager cm, char *file, int line)
 {
     attr_list list = create_attr_list();
+    (void)cm;
     CMtrace_out(cm, CMAttrVerbose, "Creating attr list %lx at %s:%d", 
 		(long)list, file, line);
     return list;
@@ -123,6 +125,7 @@ extern void
 CMint_free_attr_list(CManager cm, attr_list l, char *file, int line)
 {
     int count = attr_list_ref_count(l);
+    (void)cm;
     CMtrace_out(cm, CMAttrVerbose, "Freeing attr list %lx at %s:%d, ref count was %d", 
 		(long)l, file, line, count);
     free_attr_list(l);
@@ -133,6 +136,7 @@ extern attr_list
 CMint_add_ref_attr_list(CManager cm, attr_list l, char *file, int line)
 {
     int count;
+    (void)cm;
     if (l == NULL) return NULL;
     count = attr_list_ref_count(l);
     CMtrace_out(cm, CMAttrVerbose, "Adding ref attr list %lx at %s:%d, ref count now %d", 
@@ -144,6 +148,7 @@ extern attr_list
 CMint_attr_copy_list(CManager cm, attr_list l, char *file, int line)
 {
     attr_list ret = attr_copy_list(l);
+    (void)cm;
     CMtrace_out(cm, CMAttrVerbose, "Copy attr list %lx at %s:%d, new list %p", 
 		(long)l, file, line, ret);
     return ret;
@@ -153,6 +158,9 @@ extern void
 CMint_attr_merge_lists(CManager cm, attr_list l1, attr_list l2, 
 		       char *file, int line)
 {
+    (void)cm;
+    (void)file;
+    (void)line;
     attr_merge_lists(l1, l2);
 }
 
@@ -160,15 +168,14 @@ extern attr_list
 CMint_decode_attr_from_xmit(CManager cm, void * buf, char *file, int line)
 {
     attr_list l = decode_attr_from_xmit(buf);
+    (void)cm;
     CMtrace_out(cm, CMAttrVerbose, "decode attr list from xmit at %s:%d, new list %lx", 
 		file, line, (long)l);
     return l;
 }
 
 extern void*
-INT_CMrealloc(ptr, size)
-void *ptr;
-int size;
+INT_CMrealloc(void *ptr, int size)
 {
     void *tmp = realloc(ptr, size);
     if ((tmp == 0) && (size != 0)) {
@@ -179,15 +186,13 @@ int size;
 }
 
 extern void*
-INT_CMmalloc(size)
-int size;
+INT_CMmalloc(int size)
 {
     return malloc(size);
 }
 
 extern void
-INT_CMfree(ptr)
-void *ptr;
+INT_CMfree(void *ptr)
 {
     free(ptr);
 }

@@ -169,6 +169,8 @@ sub gen_handler {
     print REVP "    ${subr}_request *request = (${subr}_request *) data;\n";
     print REVP "    $return_type{$subr} ret;\n" unless ($return_type{$subr} eq "void");
     print REVP "    CMFormat f = CMlookup_format(conn->cm, EV_${retsubtype}_response_formats);\n";
+    print REVP "    (void) message_attrs;\n";
+    print REVP "    (void) client_data;\n";
     print REVP "    if (f == NULL) {\n";
     print REVP "        f = CMregister_format(conn->cm, EV_${retsubtype}_response_formats);\n";
     print REVP "    }\n";
@@ -583,7 +585,7 @@ REVPlookup_handler(char *name)
 	lt_dlinit();
 	h = lt_dlopen(NULL);
     }
-    f = lt_dlsym(h, name);
+    f = (EVSimpleHandlerFunc) lt_dlsym(h, name);
     if (f == NULL) {
 	printf("Dynamic symbol lookup for \\"%s\\" failed.\\n\\tEither the symbol is invalid, or symbol lookup is not enabled.\\n", name);
 	printf("Try linking the program with either \\"-rdynamic\\" (GCC) or \\"-dlopen self\\" (libtool)\\n");

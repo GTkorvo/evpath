@@ -29,9 +29,9 @@ typedef struct _CMCondition {
 
 static int cm_control_debug_flag = -1;
 
-static void set_debug_flag(cm)
-CManager cm;
+static void set_debug_flag(CManager cm)
 {
+    (void)cm;
     if (cm_control_debug_flag == -1) {
 	if (CMtrace_on(cm, CMLowLevelVerbose)) {
 	    cm_control_debug_flag = 1;
@@ -42,9 +42,7 @@ CManager cm;
 }
 
 static CMCondition
-CMCondition_find(cl, condition)
-CMControlList cl;
-int condition;
+CMCondition_find(CMControlList cl, int condition)
 {
     CMCondition next = cl->condition_list;
     while (next != NULL) {
@@ -59,9 +57,7 @@ int condition;
 
 
 extern int
-INT_CMCondition_get(cm, conn)
-CManager cm;
-CMConnection conn;
+INT_CMCondition_get(CManager cm, CMConnection conn)
 {
     CMControlList cl = cm->control_list;
     CMCondition cond = INT_CMmalloc(sizeof(CMCondition_s));
@@ -85,10 +81,9 @@ CMConnection conn;
 }
 
 static void
-CMCondition_trigger(cond, cl) 
-CMCondition cond;
-CMControlList cl;
+CMCondition_trigger(CMCondition cond, CMControlList cl)
 {
+    (void)cl;
     if (cm_control_debug_flag) {
 	printf("CMLowLevel Triggering CMcondition %d\n", cond->condition_num);
     }
@@ -108,8 +103,7 @@ CMControlList cl;
 }
 
 extern void
-CMconn_fail_conditions(conn)
-CMConnection conn;
+CMconn_fail_conditions(CMConnection conn)
 {
     CMControlList cl = conn->cm->control_list;
     CMCondition cond_list;
@@ -125,9 +119,7 @@ CMConnection conn;
 }
 
 void
-CMCondition_destroy(cl, condition)
-CMControlList cl;
-int condition;
+CMCondition_destroy(CMControlList cl, int condition)
 {
     CMCondition cond = NULL, prev = NULL;
     CMCondition next = NULL;
@@ -160,9 +152,7 @@ int condition;
 }
 
 extern int
-INT_CMCondition_has_signaled(cm, condition)
-CManager cm;
-int condition;
+INT_CMCondition_has_signaled(CManager cm, int condition)
 {
     int retval;
     CMCondition cond;
@@ -176,9 +166,7 @@ int condition;
 }
 
 extern int
-INT_CMCondition_has_failed(cm, condition)
-CManager cm;
-int condition;
+INT_CMCondition_has_failed(CManager cm, int condition)
 {
     int retval;
     CMCondition cond;
@@ -192,9 +180,7 @@ int condition;
 }
 
 extern int
-INT_CMCondition_wait(cm, condition)
-CManager cm;
-int condition;
+INT_CMCondition_wait(CManager cm, int condition)
 {
     CMCondition cond;
     CMControlList cl = cm->control_list;
@@ -303,9 +289,7 @@ int condition;
 }
 
 extern void
-INT_CMCondition_signal(cm, condition)
-CManager cm;
-int condition;
+INT_CMCondition_signal(CManager cm, int condition)
 {
     CMCondition cond;
     CMControlList cl = cm->control_list;
@@ -320,10 +304,7 @@ int condition;
 }
 
 extern void
-INT_CMCondition_set_client_data(cm, condition, client_data)
-CManager cm;
-int condition;
-void *client_data;
+INT_CMCondition_set_client_data(CManager cm, int condition, void *client_data)
 {
     CMCondition cond;
     CMControlList cl = cm->control_list;
@@ -333,9 +314,7 @@ void *client_data;
 }
 
 extern void *
-INT_CMCondition_get_client_data(cm, condition)
-CManager cm;
-int condition;
+INT_CMCondition_get_client_data(CManager cm, int condition)
 {
     CMCondition cond;
     void *client_data;

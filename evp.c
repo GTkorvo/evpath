@@ -216,6 +216,7 @@ EVaction
 add_proto_action(CManager cm, stone_type stone, proto_action **act)
 {
     int proto_action_num = stone->proto_action_count;
+    (void)cm;
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (proto_action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
@@ -656,6 +657,7 @@ ensure_ev_owned(CManager cm, event_item *event)
 
 static void
 storage_queue_default_empty(CManager cm, storage_queue_ptr queue) {
+    (void)cm;
     empty_queue(&queue->u.queue); 
 }
 
@@ -682,12 +684,8 @@ static storage_queue_ops storage_queue_default_ops = {
 
 
 extern void
-INT_EVassoc_conversion_action(cm, stone_id, stage, target_format, incoming_format)
-CManager cm;
-int stone_id;
-int stage;
-FMFormat target_format;
-FMFormat incoming_format;
+INT_EVassoc_conversion_action(CManager cm, int stone_id, int stage, 
+			      FMFormat target_format, FMFormat incoming_format)
 {
     response_cache_element *act;
     stone_type stone;
@@ -880,6 +878,7 @@ event_item *
 get_free_event(event_path_data evp)
 {
     event_item *event = malloc(sizeof(*event));
+    (void)evp;
     memset(event, 0, sizeof(event_item));
     event->ref_count = 1;
     event->event_len = -1;
@@ -890,6 +889,7 @@ get_free_event(event_path_data evp)
 extern void
 return_event(event_path_data evp, event_item *event)
 {
+    (void)evp;
     event->ref_count--;
     if (event->ref_count == 0) {
 	/* return event memory */
@@ -984,7 +984,6 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
 	    new_event->attrs = NULL;
 	}
 	return new_event;
-	break;
     }
     }
     return NULL;   /* shouldn't ever happen */
@@ -993,6 +992,7 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
 static void
 encode_event(CManager cm, event_item *event)
 {
+    (void)cm;
     if (event->event_encoded) {
 	assert(0);
     }
@@ -1031,6 +1031,8 @@ cached_stage_for_action(proto_action *act) {
     default:
         assert(0);    
     }
+    /*NOTREACHED*/
+    return Immediate;
 }
 
 extern event_item * 
@@ -1053,6 +1055,7 @@ static void
 dump_proto_action(stone_type stone, int a, const char *indent)
 {
     proto_action *proto = &stone->proto_actions[a];
+    (void)indent;
     printf(" Proto-Action %d - %s\n", a, action_str[proto->action_type]);
 }
 
@@ -1060,6 +1063,7 @@ static void
 dump_action(stone_type stone, response_cache_element *resp, int a, const char *indent)
 {
     proto_action *act;
+    (void)indent;
     if ((resp != NULL) && (resp->action_type == Action_NoAction)) {
 	printf("NO ACTION REGISTERED\n");
 	return;
@@ -1239,10 +1243,7 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 }
 
 static void
-update_event_length_sum(cm, act, event)
-CManager cm;
-proto_action *act; 
-event_item *event;
+update_event_length_sum(CManager cm, proto_action *act, event_item *event)
 {
     int eventlength;
     int totallength; 
@@ -1431,8 +1432,8 @@ process_events_stone(CManager cm, int s, action_class c)
 		    out = (handler)(cm, event->decoded_event, client_data,
 				    event->attrs);
 		} else {
-		    EVRawHandlerFunc handler = (EVRawHandlerFunc)term->handler;
-		    out = (handler)(cm, event->encoded_event, event->event_len,
+		    EVRawHandlerFunc han = (EVRawHandlerFunc)term->handler;
+		    out = (han)(cm, event->encoded_event, event->event_len,
 				    client_data, event->attrs);
 		}
 		CManager_lock(cm);
@@ -1535,8 +1536,7 @@ process_events_stone(CManager cm, int s, action_class c)
 
 static
 int
-process_local_actions(cm)
-CManager cm;
+process_local_actions(CManager cm)
 {
     event_path_data evp = cm->evp;
     action_state as = evp->as;
@@ -1733,7 +1733,6 @@ do_bridge_action(CManager cm, int s)
 void
 INT_EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num, int new_limit)
 {
-    int old_limit;
     event_path_data evp = cm->evp;
     stone_type stone;
     proto_action *p;
@@ -1742,7 +1741,6 @@ INT_EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num, int n
     if (!stone) return;
 
     p = &stone->proto_actions[action_num];
-    old_limit = p->o.store.max_stored;
     p->o.store.max_stored = new_limit;
     if (p->o.store.max_stored != -1) {
         while (p->o.store.num_stored > p->o.store.max_stored) {
@@ -2069,7 +2067,9 @@ INT_EVsend_stored(CManager cm, EVstone stone_num, EVaction action_num)
  * runs the standard loop later.
  */
 static void
-deferred_process_actions(CManager cm, void *client_data) {
+deferred_process_actions(CManager cm, void *client_data)
+{
+    (void)client_data;
     CManager_lock(cm);
     while (cm->evp && process_local_actions(cm));
     CManager_unlock(cm);
@@ -2621,6 +2621,7 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     event_path_data evp = cm->evp;
     event_item *event = get_free_event(evp);
     stone_type stone;
+    (void)cm_data_buf;
     event->contents = Event_CM_Owned;
     event->event_encoded = 1;
     event->event_len = length;
@@ -2668,6 +2669,7 @@ INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
 		 attr_list attrs)
 {
     event_item *event = get_free_event(source->cm->evp);
+    (void)attrs;
     event->contents = Event_App_Owned;
     event->event_encoded = 0;
     event->decoded_event = data;
@@ -2740,6 +2742,7 @@ free_evp(CManager cm, void *not_used)
 {
     event_path_data evp = cm->evp;
     int s;
+    (void)not_used;
     CMtrace_out(cm, CMFreeVerbose, "Freeing evpath information, evp %lx", (long) evp);
     for (s = 0 ; s < evp->stone_count; s++) {
 	INT_EVfree_stone(cm, s + evp->stone_base_num);
@@ -2846,6 +2849,8 @@ void *event;
     event_path_data evp = cm->evp;
     queue_item *tmp, *last = NULL;
     /* search through list for event and then dereference it */
+    (void)cm;
+    (void)event;
 
     tmp = evp->taken_events_list;
     while (tmp != NULL) {

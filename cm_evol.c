@@ -31,9 +31,7 @@
  * caches it and returns a pointer to the cached context
  * */
 extern CMincoming_format_list
-CMidentify_rollbackCMformat(cm, data_buffer)
-CManager cm;
-char *data_buffer;
+CMidentify_rollbackCMformat(CManager cm, char *data_buffer)
 {
     int i;
     int nearest_format = -1;

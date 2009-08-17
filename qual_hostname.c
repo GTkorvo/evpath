@@ -37,8 +37,7 @@ extern int getdomainname ARGS((char *name, int namelen));
  */
 
 static int
-get_self_ip_addr(svc)
-CMtrans_services svc;
+get_self_ip_addr(CMtrans_services svc)
 {
     struct hostent *host;
     char buf[256];

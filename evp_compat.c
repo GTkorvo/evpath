@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "evpath.h"
+#include "cm_internal.h"
 
 struct _CMformat_list {
     /*! the name to be associated with this structure */

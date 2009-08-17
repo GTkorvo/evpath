@@ -26,9 +26,7 @@
 static void add_format_to_cm ARGS((CManager cm, CMFormat format));
 
 CMFormat
-INT_CMlookup_format(cm, format_list)
-CManager cm;
-FMStructDescList format_list;
+INT_CMlookup_format(CManager cm, FMStructDescList format_list)
 {
     int i;
     for (i=0; i< cm->reg_format_count; i++) {
@@ -100,9 +98,7 @@ IOContext context;
 #endif 
 
 CMFormat
-INT_CMregister_format(cm, format_list)
-CManager cm;
-FMStructDescList format_list;
+INT_CMregister_format(CManager cm, FMStructDescList format_list)
 {
     CMFormat format;
 
@@ -139,9 +135,7 @@ int *len_p;
 #endif
 
 extern void 
-CMcomplete_format_registration(format, lock)
-CMFormat format;
-int lock;
+CMcomplete_format_registration(CMFormat format, int lock)
 {
     
     CManager cm = format->cm;
@@ -216,9 +210,7 @@ CMFormatList subformat_list;
 #endif
 
 static void
-add_format_to_cm(cm, format)
-CManager cm;
-CMFormat format;
+add_format_to_cm(CManager cm, CMFormat format)
 {
     char *format_name = format->format_name;
     int insert_before = 0, i;
@@ -263,16 +255,13 @@ CMFormat format;
 }
 
 extern void
-free_CMFormat(format)
-CMFormat format;
+free_CMFormat(CMFormat format)
 {
     INT_CMfree(format);
 }
 
 extern CMincoming_format_list
-CMidentify_CMformat(cm, format)
-CManager cm;
-FFSTypeHandle format;
+CMidentify_CMformat(CManager cm, FFSTypeHandle format)
 {
     int i;
     char *format_name = name_of_FMformat(FMFormat_of_original(format));
@@ -331,44 +320,38 @@ FFSTypeHandle format;
 }
 
 extern FFSTypeHandle
-INT_CMget_format_IOcontext(cm, context, buffer)
-CManager cm;
-FFSContext context;
-void *buffer;
+INT_CMget_format_IOcontext(CManager cm, FFSContext context, void *buffer)
 {
     FFSTypeHandle ret;
+    (void)cm;
     ret = FFSTypeHandle_from_encode(context, buffer);
     return ret;
 }
 
 extern FFSTypeHandle
-INT_CMget_format_app_IOcontext(cm, context, buffer, app_context)
-CManager cm;
-FFSContext context;
-void *buffer;
-void *app_context;
+INT_CMget_format_app_IOcontext(CManager cm, FFSContext context, void *buffer,
+			       void *app_context)
 {
     FFSTypeHandle ret;
+    (void) cm;
+    (void) app_context;
     ret = FFSTypeHandle_from_encode(context, buffer);
     return ret;
 }
 
 extern void
-INT_CMset_conversion_IOcontext(cm, context, format, format_list)
-CManager cm;
-FFSContext context;
-FFSTypeHandle format;
-FMStructDescList format_list;
+INT_CMset_conversion_IOcontext(CManager cm, FFSContext context,
+			       FFSTypeHandle format,
+			       FMStructDescList format_list)
 {
+    (void)cm;
     establish_conversion(context, format, format_list);
 }
 
 extern int CMself_hosted_formats;
 
 static void
-preload_pbio_format(conn, ioformat)
-CMConnection conn;
-FMFormat ioformat;
+preload_pbio_format(CMConnection conn, FMFormat ioformat)
 {
     CMtrace_out(conn->cm, CMFormatVerbose, 
 		"CMpbio preloading format %s on connection %p", 
@@ -388,9 +371,7 @@ FMFormat ioformat;
 }
 
 extern void
-CMformat_preload(conn, format)
-CMConnection conn;
-CMFormat format;
+CMformat_preload(CMConnection conn, CMFormat format)
 {
     int load_count = 0;
     CMFormat *loaded_list = conn->downloaded_formats;
