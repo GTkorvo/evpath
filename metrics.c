@@ -145,7 +145,7 @@ unsigned long total_jiffies_func ( void )
 }   
 
  
-float cpu_idle_func ( void )
+double cpu_idle_func ( void )
 {
     char *p;
     static float val; 
@@ -178,7 +178,7 @@ stone_type stone;
 cod_parse_context context;
 {
     static char extern_string[] = "\
-		float cpu_idle_func();\n\
+		double cpu_idle_func();\n\
 		int num_cpustates_func();\n";
 
     static cod_extern_entry externs[] = {
