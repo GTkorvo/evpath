@@ -1537,6 +1537,8 @@ load_dll_symbol(char *path, char *symbol_name)
     return lt_dlsym(handle, symbol_name);
 }
 
+extern void
+add_metrics_routines(stone_type stone, cod_parse_context context);
 
 static response_instance
 generate_filter_code(struct response_spec *mrd, stone_type stone,
