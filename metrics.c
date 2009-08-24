@@ -522,25 +522,26 @@ cod_parse_context context;
 		int num_cpustates_func();\n";
 
     static cod_extern_entry externs[] = {
-	{"cpu_scaling_available_governors_func", (void *) 0},
-	{"cpu_scaling_governor_func", (void *) 0},
-	{"cpu_available_freq_func", (void *) 0},
-	{"cpu_cur_freq_func", (void *) 0},
-	{"cpu_min_freq_func", (void *) 0},
-	{"cpu_max_freq_func", (void *) 0},
-	{"gettimeofday_func", (void *) 0},
-	{"swap_free_func", (void *) 0},
-	{"mem_cached_func", (void *) 0},
-	{"mem_free_func", (void *) 0},
-	{"mem_buffers_func", (void *) 0},
-	{"load_fifteen_func", (void *) 0},
-	{"load_five_func", (void *) 0},
-	{"load_one_func", (void *) 0},
-	{"cpu_system_func", (void *) 0},
-	{"cpu_nice_func", (void *) 0},
-	{"cpu_user_func", (void *) 0},
-	{"total_jiffies_func", (void *) 0},
-	{"num_cpustates_func", (void*) 0},
+	{"cpu_scaling_available_governors_func", (void *) 0},	// 0
+	{"cpu_scaling_governor_func", (void *) 0},		// 1
+	{"cpu_available_freq_func", (void *) 0},		// 2
+	{"cpu_cur_freq_func", (void *) 0},			// 3
+	{"cpu_min_freq_func", (void *) 0},			// 4
+	{"cpu_max_freq_func", (void *) 0},			// 5
+	{"gettimeofday_func", (void *) 0},			// 6
+	{"swap_free_func", (void *) 0},				// 7
+	{"mem_cached_func", (void *) 0},			// 8
+	{"mem_free_func", (void *) 0},				// 9
+	{"mem_buffers_func", (void *) 0},			// 10
+	{"load_fifteen_func", (void *) 0},			// 11
+	{"load_five_func", (void *) 0},				// 12
+	{"load_one_func", (void *) 0},				// 13
+	{"cpu_idle_func", (void *) 0},				// 14
+	{"cpu_system_func", (void *) 0},			// 15
+	{"cpu_nice_func", (void *) 0},				// 16
+	{"cpu_user_func", (void *) 0},				// 17
+	{"total_jiffies_func", (void *) 0},			// 18
+	{"num_cpustates_func", (void*) 0},			// 19
 	{(void *) 0, (void *) 0}
     };
 
@@ -562,11 +563,12 @@ cod_parse_context context;
     externs[11].extern_value = (void *) (long) load_fifteen_func;
     externs[12].extern_value = (void *) (long) load_five_func;
     externs[13].extern_value = (void *) (long) load_one_func;
-    externs[14].extern_value = (void *) (long) cpu_system_func;
-    externs[15].extern_value = (void *) (long) cpu_nice_func;
-    externs[16].extern_value = (void *) (long) cpu_user_func;
-    externs[17].extern_value = (void *) (long) total_jiffies_func;
-    externs[18].extern_value = (void *) (long) num_cpustates_func;
+    externs[14].extern_value = (void *) (long) cpu_idle_func;
+    externs[15].extern_value = (void *) (long) cpu_system_func;
+    externs[16].extern_value = (void *) (long) cpu_nice_func;
+    externs[17].extern_value = (void *) (long) cpu_user_func;
+    externs[18].extern_value = (void *) (long) total_jiffies_func;
+    externs[19].extern_value = (void *) (long) num_cpustates_func;
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
