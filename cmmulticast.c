@@ -77,6 +77,30 @@ typedef struct multicast_transport_data {
     CMtrans_services svc;
 } *multicast_transport_data_ptr;
 
+#if defined(FUNCPROTO) || defined(__STDC__) || defined(__cplusplus) || defined(c_plusplus)
+#ifndef ARGS
+#define ARGS(args) args
+#endif
+#else
+#ifndef ARGS
+#define ARGS(args) (/*args*/)
+#endif
+#endif
+
+#include <stdio.h>
+#include "config.h"
+
+static char *EVPath_version = "EVPath Version 3.0.57 rev. 7506  -- 2009-08-24 01:23:21 -0400 (Mon, 24 Aug 2009)))))))\n";
+
+#if defined (__INTEL_COMPILER)
+#  pragma warning (disable: 869)
+#  pragma warning (disable: 310)
+#  pragma warning (disable: 1418)
+#  pragma warning (disable: 180)
+#  pragma warning (disable: 177)
+#  pragma warning (disable: 2259)
+#endif
+
 #define MSGBUFSIZE 25600
 
 typedef struct mcast_connection_data {
@@ -107,8 +131,7 @@ static atom_t CM_MCAST_ADDR = -1;
 static atom_t CM_FD = -1;
 
 static mcast_conn_data_ptr
-create_mcast_conn_data(svc)
-CMtrans_services svc;
+create_mcast_conn_data(CMtrans_services svc)
 {
     mcast_conn_data_ptr mcast_conn_data =
     svc->malloc_func(sizeof(struct mcast_connection_data));
@@ -160,9 +183,7 @@ int fd;
 #endif
 
 extern void
-libcmmulticast_LTX_shutdown_conn(svc, mcd)
-CMtrans_services svc;
-mcast_conn_data_ptr mcd;
+libcmmulticast_LTX_shutdown_conn(CMtrans_services svc, mcast_conn_data_ptr mcd)
 {
     svc->fd_remove_select(mcd->mtd->cm, mcd->input_fd);
     close(mcd->input_fd);
@@ -174,14 +195,7 @@ mcast_conn_data_ptr mcd;
 #include "qual_hostname.c"
 
 static int
-initiate_conn(cm, svc, trans, attrs, mcast_conn_data, conn_attr_list, no_more_redirect)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
-mcast_conn_data_ptr mcast_conn_data;
-attr_list conn_attr_list;
-int no_more_redirect;
+initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_list attrs, mcast_conn_data_ptr mcast_conn_data, attr_list conn_attr_list, int no_more_redirect)
 {
     int one = 1;
     int input_fd, output_fd;
@@ -193,6 +207,7 @@ int no_more_redirect;
     struct sockaddr_in output_addr;
     struct ip_mreq mreq;
 
+    (void) no_more_redirect;
     if (!query_attr(attrs, CM_MCAST_ADDR, /* type pointer */ NULL,
     /* value pointer */ (attr_value *) (long) &mcast_ip)) {
 	svc->trace_out(cm, "CMMulticast transport found no MCAST_ADDR attribute");
@@ -218,10 +233,10 @@ int no_more_redirect;
     port_num = int_port_num;
 
     memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
+    addr.sin_family = (unsigned short) AF_INET;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);	/* N.B.: differs from *
 						 * sender */
-    addr.sin_port = htons(port_num);
+    addr.sin_port = (unsigned short) htons(port_num);
 #ifdef SO_REUSEPORT
     if (setsockopt(input_fd, SOL_SOCKET, SO_REUSEPORT, (char *) &one, sizeof(one)) == -1) {
 	perror("setsockopt reuseport");
@@ -253,7 +268,7 @@ int no_more_redirect;
     memset(&output_addr, 0, sizeof(output_addr));
     output_addr.sin_family = AF_INET;
     output_addr.sin_addr.s_addr = htonl(mcast_ip);
-    output_addr.sin_port = htons(port_num);
+    output_addr.sin_port = (unsigned short) htons(port_num);
 
     svc->trace_out(cm, "--> Connection established");
 
@@ -308,11 +323,7 @@ libcmmulticast_data_available(void *vtrans, void *vmcd)
  * Initiate a connection to a multicast group.
  */
 extern CMConnection
-libcmmulticast_LTX_initiate_conn(cm, svc, trans, attrs)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
+libcmmulticast_LTX_initiate_conn(CManager cm,CMtrans_services svc, transport_entry trans, attr_list attrs)
 {
     mcast_conn_data_ptr mcast_conn_data = create_mcast_conn_data(svc);
     attr_list conn_attr_list = create_attr_list();
@@ -338,22 +349,13 @@ attr_list attrs;
  * This only makes sense for connection-based transports, not multicast.
  */
 extern int
-libcmmulticast_LTX_self_check(cm, svc, trans, attrs)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
+libcmmulticast_LTX_self_check(CManager cm, CMtrans_services svc, transport_entry trans, attr_list attrs)
 {
     return 0;
 }
 
 extern int
-libcmmulticast_LTX_connection_eq(cm, svc, trans, attrs, mcd)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
-mcast_conn_data_ptr mcd;
+libcmmulticast_LTX_connection_eq(CManager cm, CMtrans_services svc, transport_entry trans, attr_list attrs, mcast_conn_data_ptr mcd)
 {
 
     int int_port_num;

@@ -57,6 +57,13 @@
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
 #endif
+#if defined (__INTEL_COMPILER)
+#  pragma warning (disable: 869)
+#  pragma warning (disable: 310)
+#  pragma warning (disable: 1418)
+#  pragma warning (disable: 180)
+#  pragma warning (disable: 177)
+#endif
 
 typedef struct func_list_item {
     select_list_func func;

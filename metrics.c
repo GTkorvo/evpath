@@ -177,7 +177,7 @@ double cpu_user_func ( void )
 
     p = skip_token(p);
     user_jiffies  = strtod( p , (char **)NULL );
-    total_jiffies = total_jiffies_func();
+    total_jiffies = (double) total_jiffies_func();
 
     if (first) {
 	last_user_jiffies = user_jiffies;
@@ -211,7 +211,7 @@ double cpu_nice_func ( void )
     p = skip_token(p);
     p = skip_token(p);
     nice_jiffies  = strtod( p , (char **)NULL );
-    total_jiffies = total_jiffies_func();
+    total_jiffies = (double) total_jiffies_func();
 
     if (first) {
 	last_nice_jiffies = nice_jiffies;
@@ -252,7 +252,7 @@ double cpu_system_func ( void )
 	p = skip_token(p);
 	system_jiffies += strtod( p , (char **)NULL ); /* "sintr" counted in system */
     }
-    total_jiffies  = total_jiffies_func();
+    total_jiffies  = (double) total_jiffies_func();
 
     diff = system_jiffies  - last_system_jiffies;
 
@@ -281,7 +281,7 @@ double cpu_idle_func ( void )
     p = skip_token(p);
     p = skip_token(p);
     idle_jiffies  = strtod( p , (char **)NULL );
-    total_jiffies = total_jiffies_func();
+    total_jiffies = (double) total_jiffies_func();
 		 
     diff = idle_jiffies - last_idle_jiffies;
 
@@ -496,9 +496,7 @@ char **cpu_scaling_available_governors_func( void )
 
 
 void
-add_metrics_routines(stone, context)
-stone_type stone;
-cod_parse_context context;
+add_metrics_routines(stone_type stone, cod_parse_context context)
 {
     static char extern_string[] = "\
 		char **cpu_scaling_available_governors_func();\n\
@@ -545,6 +543,7 @@ cod_parse_context context;
 	{(void *) 0, (void *) 0}
     };
 
+    (void) stone;
     /*
      * some compilers think it isn't a static initialization to put this
      * in the structure above, so do it explicitly.

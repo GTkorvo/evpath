@@ -13,6 +13,10 @@
 
 static char *EVPath_version = "EVPath Version 3.0.58 rev. 7508  -- 2009-08-24 10:55:55 -0400 (Mon, 24 Aug 2009))))))))\n";
 
+#if defined (__INTEL_COMPILER)
+//  Allow extern declarations with no prior decl
+#  pragma warning (disable: 1418)
+#endif
 void EVprint_version(){
     printf("%s",EVPath_version);
 }

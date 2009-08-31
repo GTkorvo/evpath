@@ -22,6 +22,12 @@
 extern int getdomainname ARGS((char *name, int namelen));
 #endif
 
+#if defined (__INTEL_COMPILER)
+//  Allow unordered operations
+#  pragma warning (disable: 981)
+//  allow int conversions
+#  pragma warning (disable: 2259)
+#endif
 
 /*
  *  qual_hostname.c

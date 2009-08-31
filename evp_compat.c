@@ -16,6 +16,10 @@ struct _CMformat_list {
 typedef struct _CMformat_list CMFormatRec;
 typedef CMFormatRec *CMFormatList;
 
+extern int
+IOget_array_size_dimen(const char *str, FMFieldList fields, int dimen,
+		       int *control_field);
+
 static int
 is_var_array_field(FMFieldList field_list, int field)
 {
@@ -46,11 +50,11 @@ is_var_array_field(FMFieldList field_list, int field)
 
 #define Max(i,j) ((i<j) ? j : i)
 
+extern FMdata_type array_str_to_data_type(const char *str, 
+						long *element_count_ptr);
 static
 int
-struct_size_field_list(list, pointer_size)
-FMFieldList list;
-int pointer_size;
+struct_size_field_list(FMFieldList list, int pointer_size)
 {
     int i = 0;
     int struct_size = 0;
@@ -83,12 +87,12 @@ old_CMregister_format ARGS((CManager cm, char *format_name,
     structs = malloc(sizeof(structs[0]) * (sub_count + 2));
     structs[0].format_name = format_name;
     structs[0].field_list = field_list;
-    structs[0].struct_size = struct_size_field_list(field_list, sizeof(char*));
+    structs[0].struct_size = struct_size_field_list(field_list, (int)sizeof(char*));
     structs[0].opt_info = NULL;
     for (i = 0; i < sub_count; i++) {
 	structs[i+1].format_name = subformat_list[i].format_name;
 	structs[i+1].field_list = subformat_list[i].field_list;
-	structs[i+1].struct_size = struct_size_field_list(structs[i+1].field_list, sizeof(char*));
+	structs[i+1].struct_size = struct_size_field_list(structs[i+1].field_list, (int)sizeof(char*));
 	structs[i+1].opt_info = NULL;
     }
     structs[sub_count+1].format_name = NULL;
@@ -107,7 +111,7 @@ old_EVassoc_terminal_action(CManager cm, EVstone stone, CMFormatList format_list
     for (i = 0; i < count; i++) {
 	structs[i].format_name = format_list[i].format_name;
 	structs[i].field_list = format_list[i].field_list;
-	structs[i].struct_size = struct_size_field_list(structs[i].field_list, sizeof(char*));
+	structs[i].struct_size = struct_size_field_list(structs[i].field_list, (int)sizeof(char*));
 	structs[i].opt_info = NULL;
     }
     structs[count].format_name = NULL;
@@ -126,7 +130,7 @@ old_EVassoc_filter_action(CManager cm, EVstone stone, CMFormatList format_list,
     for (i = 0; i < count; i++) {
 	structs[i].format_name = format_list[i].format_name;
 	structs[i].field_list = format_list[i].field_list;
-	structs[i].struct_size = struct_size_field_list(structs[i].field_list, sizeof(char*));
+	structs[i].struct_size = struct_size_field_list(structs[i].field_list, (int)sizeof(char*));
 	structs[i].opt_info = NULL;
     }
     structs[count].format_name = NULL;
@@ -144,7 +148,7 @@ old_EVcreate_submit_handle(CManager cm, EVstone stone, CMFormatList format_list)
     for (i = 0; i < count; i++) {
 	structs[i].format_name = format_list[i].format_name;
 	structs[i].field_list = format_list[i].field_list;
-	structs[i].struct_size = struct_size_field_list(structs[i].field_list, sizeof(char*));
+	structs[i].struct_size = struct_size_field_list(structs[i].field_list, (int)sizeof(char*));
 	structs[i].opt_info = NULL;
     }
     structs[count].format_name = NULL;
@@ -163,7 +167,7 @@ old_EVcreate_submit_handle_free(CManager cm, EVstone stone, CMFormatList format_
     for (i = 0; i < count; i++) {
 	structs[i].format_name = format_list[i].format_name;
 	structs[i].field_list = format_list[i].field_list;
-	structs[i].struct_size = struct_size_field_list(structs[i].field_list, sizeof(char*));
+	structs[i].struct_size = struct_size_field_list(structs[i].field_list, (int)sizeof(char*));
 	structs[i].opt_info = NULL;
     }
     structs[count].format_name = NULL;
@@ -181,7 +185,7 @@ old_create_filter_action_spec(CMFormatList format_list, char *function)
     for (i = 0; i < count; i++) {
 	structs[i].format_name = format_list[i].format_name;
 	structs[i].field_list = format_list[i].field_list;
-	structs[i].struct_size = struct_size_field_list(structs[i].field_list, sizeof(char*));
+	structs[i].struct_size = struct_size_field_list(structs[i].field_list, (int)sizeof(char*));
 	structs[i].opt_info = NULL;
     }
     structs[count].format_name = NULL;
@@ -199,7 +203,7 @@ old_create_router_action_spec(CMFormatList format_list, char *function)
     for (i = 0; i < count; i++) {
 	structs[i].format_name = format_list[i].format_name;
 	structs[i].field_list = format_list[i].field_list;
-	structs[i].struct_size = struct_size_field_list(structs[i].field_list, sizeof(char*));
+	structs[i].struct_size = struct_size_field_list(structs[i].field_list, (int)sizeof(char*));
 	structs[i].opt_info = NULL;
     }
     structs[count].format_name = NULL;
@@ -217,7 +221,7 @@ old_create_transform_action_spec(CMFormatList format_list, CMFormatList out_form
     for (i = 0; i < count; i++) {
 	structs[i].format_name = format_list[i].format_name;
 	structs[i].field_list = format_list[i].field_list;
-	structs[i].struct_size = struct_size_field_list(structs[i].field_list, sizeof(char*));
+	structs[i].struct_size = struct_size_field_list(structs[i].field_list, (int)sizeof(char*));
 	structs[i].opt_info = NULL;
     }
     structs[count].format_name = NULL;
@@ -229,7 +233,7 @@ old_create_transform_action_spec(CMFormatList format_list, CMFormatList out_form
     for (i = 0; i < count; i++) {
 	out_structs[i].format_name = out_format_list[i].format_name;
 	out_structs[i].field_list = out_format_list[i].field_list;
-	out_structs[i].struct_size = struct_size_field_list(out_structs[i].field_list, sizeof(char*));
+	out_structs[i].struct_size = struct_size_field_list(out_structs[i].field_list, (int)sizeof(char*));
 	out_structs[i].opt_info = NULL;
     }
     out_structs[count].format_name = NULL;
@@ -253,7 +257,7 @@ old_create_multityped_action_spec(CMFormatList *input_format_lists, CMFormatList
 	for (i = 0; i < count; i++) {
 	    structs[i].format_name = format_list[i].format_name;
 	    structs[i].field_list = format_list[i].field_list;
-	    structs[i].struct_size = struct_size_field_list(structs[i].field_list, sizeof(char*));
+	    structs[i].struct_size = struct_size_field_list(structs[i].field_list, (int)sizeof(char*));
 	    structs[i].opt_info = NULL;
 	}
 	structs[count].format_name = NULL;
@@ -267,7 +271,7 @@ old_create_multityped_action_spec(CMFormatList *input_format_lists, CMFormatList
     for (i = 0; i < count; i++) {
 	out_structs[i].format_name = out_format_list[i].format_name;
 	out_structs[i].field_list = out_format_list[i].field_list;
-	out_structs[i].struct_size = struct_size_field_list(out_structs[i].field_list, sizeof(char*));
+	out_structs[i].struct_size = struct_size_field_list(out_structs[i].field_list, (int)sizeof(char*));
 	out_structs[i].opt_info = NULL;
     }
     out_structs[count].format_name = NULL;

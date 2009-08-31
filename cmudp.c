@@ -66,6 +66,16 @@
 #define SOCKET_ERROR -1
 #endif
 
+#if defined (__INTEL_COMPILER)
+#  pragma warning (disable: 869)
+#  pragma warning (disable: 310)
+#  pragma warning (disable: 1418)
+#  pragma warning (disable: 180)
+#  pragma warning (disable: 177)
+#  pragma warning (disable: 2259)
+#  pragma warning (disable: 981)
+#endif
+
 struct udp_connection_data;
 
 static atom_t CM_UDP_PORT = -1;

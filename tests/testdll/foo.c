@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#if defined (__INTEL_COMPILER)
+#  pragma warning (disable: 1418)
+#endif
+
 typedef struct _complex_rec {
     double r;
     double i;
@@ -24,8 +28,8 @@ typedef struct _simple_rec {
 int 
 filter(void* input, void* output, void *data)
 {
-
-	return ((simple_rec_ptr)input)->long_field %2;
+    (void) output; (void) data;
+    return ((simple_rec_ptr)input)->long_field %2;
 }
 
 typedef struct _output_rec {
@@ -39,7 +43,7 @@ typedef struct _output_rec {
     int sum3_field;
 } output_rec, *output_rec_ptr;
 
-int
+extern int
 transform(simple_rec_ptr input, output_rec_ptr output)
 {
     output->random_field = (lrand48() % 10);

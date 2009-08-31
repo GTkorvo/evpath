@@ -330,14 +330,14 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	str = strchr(str, '\n') + 1;
 	struct_list = malloc(sizeof(struct_list[0]) * (list_count + 1));
 	for (j = 0; j < list_count; j++) {
-	    int format_count2, i;
+	    int format_count2, k;
 	    FMStructDescList in_list;
 	    sscanf(str, "Next format   Subformat Count %d\n", &format_count2);
 	    str = strchr(str, '\n') + 1;
 
 	    in_list = malloc(sizeof(in_list[0]) * (format_count2 + 1));
-	    for (i=0; i < format_count2; i++) {
-		str = parse_FMformat_from_string(str, &in_list[i]);
+	    for (k=0; k < format_count2; k++) {
+		str = parse_FMformat_from_string(str, &in_list[k]);
 	    }
 	    in_list[format_count2].format_name = NULL;
 	    in_list[format_count2].field_list = NULL;
@@ -370,9 +370,9 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	}
 	if (ref_ptr) {
 	    FMFormat *formats = malloc((list_count + 1)*sizeof(FMFormat));
-	    int j = 0;
-	    for (j=0; j < list_count; j++) {
-		formats[j] = response->u.multityped.reference_input_format_list[j];
+	    int k = 0;
+	    for (k=0; k < list_count; k++) {
+		formats[k] = response->u.multityped.reference_input_format_list[k];
 	    }
 	    formats[list_count] = NULL;
 	    *ref_ptr = formats;

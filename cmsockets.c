@@ -7,6 +7,7 @@
 #include <winsock.h>
 #define getpid()	_getpid()
 #else
+#include <time.h>
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
@@ -65,6 +66,15 @@
 
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
+#endif
+
+#if defined (__INTEL_COMPILER)
+#  pragma warning (disable: 869)
+#  pragma warning (disable: 310)
+#  pragma warning (disable: 1418)
+#  pragma warning (disable: 180)
+#  pragma warning (disable: 2259)
+#  pragma warning (disable: 177)
 #endif
 
 typedef struct func_list_item {
@@ -1006,8 +1016,6 @@ void *void_conn_sock;
 		    break;
 
 		{
-		    int left, iget;
-
 		    iget = read(sock, (char *) &socket_conn_data->remote_contact_port, 4);
 		    if (iget == 0) {
 			break;
@@ -1109,7 +1117,7 @@ attr_list listen_info;
     struct sockaddr_in sock_addr;
     int sock_opt_val = 1;
     int conn_sock;
-    int int_port_num = 0;
+    int attr_port_num = 0;
     u_short port_num = 0;
     static int register_with_redirect_server = -1;
     char *network_string;
@@ -1124,17 +1132,17 @@ attr_list listen_info;
      */
     if (listen_info != NULL
 	&& !query_attr(listen_info, CM_IP_PORT,
-		       NULL, (attr_value *)(long) & int_port_num)) {
+		       NULL, (attr_value *)(long) & attr_port_num)) {
 	port_num = 0;
     } else {
-	if (int_port_num > USHRT_MAX || int_port_num < 0) {
-	    fprintf(stderr, "Requested port number %d is invalid\n", int_port_num);
+	if (attr_port_num > USHRT_MAX || attr_port_num < 0) {
+	    fprintf(stderr, "Requested port number %d is invalid\n", attr_port_num);
 	    return NULL;
 	}
-	port_num = int_port_num;
+	port_num = attr_port_num;
     }
 
-    svc->trace_out(cm, "CMSocket begin listen, requested port %d", int_port_num);
+    svc->trace_out(cm, "CMSocket begin listen, requested port %d", attr_port_num);
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_addr.s_addr = INADDR_ANY;
     sock_addr.sin_port = htons(port_num);
@@ -1233,7 +1241,6 @@ attr_list listen_info;
 	    add_attr(ret_list, CM_IP_HOSTNAME, Attr_String,
 		     (attr_value) strdup(host_name));
 	    if (network_added) {
-		char *network_string = NULL;
 		if (query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
 			       (attr_value *) (long)& network_string)) {
 		    add_attr(ret_list, CM_NETWORK_POSTFIX, Attr_String,

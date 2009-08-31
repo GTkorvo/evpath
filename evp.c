@@ -21,21 +21,6 @@ static int is_output_stone(CManager cm, EVstone stone_num);
 
 static const char *action_str[] = { "Action_NoAction","Action_Bridge", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Encode_to_Buffer", "Action_Split", "Action_Store", "Action_Congestion"};
 
-void
-EVPSubmit_encoded(CManager cm, int local_path_id, void *data, int len)
-{
-    /* build data record for event and enter it into queue for path */
-    /* apply actions to data until none remain (no writes) */
-    /* do writes, dereferencing data as necessary */
-    /* check data record to see if it is still referenced and act accordingly*/
-}
-
-void
-EVPSubmit_general(CManager cm, int local_path_id, event_item *event)
-{
-    
-}
-
 stone_type
 stone_struct(event_path_data evp, int stone_num)
 {
@@ -1273,7 +1258,7 @@ update_event_length_sum(CManager cm, proto_action *act, event_item *event)
     if(act->attrs == NULL){
 	act->attrs = CMcreate_attr_list(cm);
     }
-    totallength = act->event_length_sum;/*1024*/ 
+    totallength = (int) act->event_length_sum;/*1024*/ 
     set_int_attr(act->attrs, EV_EVENT_LSUM, totallength);
 }
 
@@ -2412,6 +2397,10 @@ backpressure_set(CManager cm, EVstone to_stone, int stalledp) {
     foreach_source(cm, to_stone, backpressure_set_one, NULL);
 }
 
+#if defined (__INTEL_COMPILER)
+//  Allow extern declarations with no prior decl
+#  pragma warning (disable: 188)
+#endif
 static void
 backpressure_transition(CManager cm, EVstone s, stall_source src, int new_value) {
     stone_type stone = stone_struct(cm->evp, s);
@@ -2842,9 +2831,7 @@ INT_EVtake_event_buffer(CManager cm, void *event)
 }
 
 void
-INT_EVreturn_event_buffer(cm, event)
-CManager cm;
-void *event;
+INT_EVreturn_event_buffer(CManager cm, void *event)
 {
     event_path_data evp = cm->evp;
     queue_item *tmp, *last = NULL;

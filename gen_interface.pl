@@ -470,6 +470,10 @@ print REVP<<EOF;
 #ifdef	__cplusplus
 extern "C" \{
 #endif
+#if defined (__INTEL_COMPILER)
+//  Allow unused
+#  pragma warning (disable: 869)
+#endif
 
 typedef struct _EV_void_response {
     int condition_var;
@@ -578,7 +582,7 @@ REVPlookup_handler(char *name)
 	/* hex constant */
 	void *p;
 	sscanf(name, "0x%p", &p);
-	f = p;
+	f = (EVSimpleHandlerFunc)p;
 	return f;
     } 
     if (h == NULL) {
@@ -619,7 +623,7 @@ REVPlookup_format_structs(CManager cm, char *format_name)
 	tmp[0] = format_name[2*i];
 	tmp[1] = format_name[2*i + 1];
 	sscanf(tmp, "%x", &x);
-	id[i] = x;
+	id[i] = (unsigned char) x;
     }
     format = FMformat_from_ID(cm->evp->fmc, (char*)id);
     free(id);

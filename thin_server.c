@@ -12,6 +12,10 @@
 #include "evpath.h"
 #include "cm_internal.h"
 
+#if defined (__INTEL_COMPILER)
+//  Allow int conversions
+#  pragma warning (disable: 2259)
+#endif
 static void socket_accept_thin_client(void *cmv, void * sockv);
 extern void CMget_qual_hostname(char *buf, int len);
 
@@ -38,7 +42,7 @@ EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
     }
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_addr.s_addr = INADDR_ANY;
-    sock_addr.sin_port = htons(port_num);
+    sock_addr.sin_port = (unsigned short) (htons(port_num));
     if (setsockopt(conn_sock, SOL_SOCKET, SO_REUSEADDR, (char *) &sock_opt_val,
 		   sizeof(sock_opt_val)) != 0) {
 	fprintf(stderr, "Failed to set 1REUSEADDR on INET socket\n");
@@ -71,7 +75,7 @@ EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
 		    (void *) cm, (void *) (long)conn_sock);
     
 
-    int_port_num = ntohs(sock_addr.sin_port);
+    int_port_num = (unsigned short)(ntohs(sock_addr.sin_port));
 
     CMget_qual_hostname(host_name, sizeof(host_name));
 	
@@ -93,6 +97,7 @@ typedef struct thin_conn {
 
 static void thin_free_func(void *event_data, void *client_data)
 {
+    (void) client_data;
     free(event_data);
 }
 
@@ -232,15 +237,16 @@ socket_accept_thin_client(void *cmv, void * sockv)
     sock_len = sizeof(sock_addr);
     memset(&sock_addr, 0, sock_len);
     getsockname(sock, (struct sockaddr *) &sock_addr, &sock_len);
-    int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
+    int_port_num = (unsigned short) ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
 
     memset(&sock_addr, 0, sizeof(sock_addr));
     sock_len = sizeof(sock_addr);
     if (getpeername(sock, &sock_addr,
 		    &sock_len) == 0) {
-	int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
+	int_port_num = (unsigned short) ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
     }
 
+    (void) int_port_num;
     cd = malloc(sizeof(*cd));
     memset(cd, 0, sizeof(*cd));
     cd->ffsfile = open_FFSfd((void*)(long)sock, "r");

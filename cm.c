@@ -1683,7 +1683,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	    arg = ((int *) base)[0];
 	}
 #ifdef EV_INTERNAL_H
-        INT_EVhandle_control_message(conn->cm, conn, performance_func, arg);
+        INT_EVhandle_control_message(conn->cm, conn, (unsigned char) performance_func, arg);
 #endif
         return 0;
     }
@@ -2855,7 +2855,7 @@ dp_inv(double **A, int n)
 
     ks = 0;
     for (k = 0; k < n; k++) {
-	if (A[k][k] != 0) {
+	if (A[k][k] != 0.0) {
 	    ks = ks + 1;
 	    for (j = 0; j < n; j++) {
 		if (j != k)
@@ -3116,8 +3116,8 @@ INT_CMregressive_probe_bandwidth(CMConnection conn, int size, attr_list attrs)
 
     {
 	int ibandwidth, icof;
-	ibandwidth = bandwidth * 1000;
-	icof = cofXY * 1000;
+	ibandwidth = (int) (bandwidth * 1000.0);
+	icof = (int) (cofXY * 1000.0);
 
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Regressive Setting measures to BW %d kbps, COF %d", ibandwidth, icof);
 	set_int_attr(conn->attrs, CM_BW_MEASURED_VALUE, ibandwidth);

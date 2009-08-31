@@ -19,6 +19,8 @@
 #  pragma warning (disable: 1419)
 //  Don't tell me about unspecified order of evaluation
 #  pragma warning (disable: 981)
+//  Don't tell me about floating point equality tests
+#  pragma warning (disable: 1572)
 #endif
 struct _ecl_code_struct;
 

@@ -126,9 +126,13 @@ struct _transport_item {
 }
 #endif
 
-#if NO_DYNAMIC_LINKING 
+#if defined(NO_DYNAMIC_LINKING)
 struct socket_connection_data;
 
+#if defined (__INTEL_COMPILER)
+//  declaration not visible
+#  pragma warning (disable: 274)
+#endif
 extern void libcmsockets_LTX_shutdown_conn(CMtrans_services svc, struct socket_connection_data * scd);
 extern CMConnection libcmsockets_LTX_initiate_conn(CManager cm, CMtrans_services svc,
 						   transport_entry trans, attr_list attrs);

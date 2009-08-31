@@ -342,3 +342,4 @@ extern int INT_EVstore_count(CManager cm, EVstone stone_num, EVaction action_num
 extern int INT_EVdestroy_stone(CManager cm, EVstone stone_id);
 extern void INT_EVfree_source(EVsource source);
 extern void thread_bridge_transfer(CManager source_cm, event_item *event, CManager target_cm, EVstone target_stone);
+extern void ensure_ev_owned(CManager cm, event_item *event);

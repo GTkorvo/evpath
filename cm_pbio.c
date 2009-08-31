@@ -372,7 +372,7 @@ CMpbio_send_format_request(char *format_ID, int format_ID_length,
     vec[0].iov_len = sizeof(msg);
     vec[1].iov_base = format_ID;
     vec[1].iov_len = format_ID_length;
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format request - total %ld bytes in writev", (long)format_ID_length + sizeof(msg));
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format request - total %d bytes in writev", (int)(format_ID_length + sizeof(msg)));
     actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
 				      conn->transport_data, 
 				      &vec[0], 2);
@@ -408,7 +408,7 @@ CMpbio_send_format_response(FMFormat ioformat, CMConnection conn,
     vec[0].iov_len = sizeof(msg);
     vec[1].iov_base = format_body_rep;
     vec[1].iov_len = body_len;
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format response - total %ld bytes in writev", (long)body_len + sizeof(msg));
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format response - total %ld bytes in writev", (long)(body_len + sizeof(msg)));
     actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
 				      conn->transport_data, 
 				      &vec[0], 2);
@@ -448,7 +448,7 @@ CMpbio_send_format_preload(FMFormat ioformat, CMConnection conn)
     vec[1].iov_len = id_len;
     vec[2].iov_base = format_body_rep;
     vec[2].iov_len = body_len;
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format preload - total %ld bytes in writev", (long)body_len + id_len + sizeof(msg));
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format preload - total %ld bytes in writev", (long)(body_len + id_len + sizeof(msg)));
     actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
 				      conn->transport_data, 
 				      &vec[0], 3);
