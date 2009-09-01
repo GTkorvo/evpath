@@ -27,11 +27,12 @@
 #define SAMPLEBUFFERSIZE 8192
 #endif
 
-#define NUM_CPUSTATES_24X 4
-#define NUM_CPUSTATES_26X 7
-static unsigned int num_cpustates;
+/*#define NUM_CPUSTATES_26X 7*/
+/*#define NUM_CPUSTATES_26X 7*/
+/*static unsigned int num_cpustates;*/
 
-struct stat struct_stat;
+/*struct stat struct_stat;*/
+
 #define CPU_FREQ_SCALING_MAX_FREQ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"
 #define CPU_FREQ_SCALING_MIN_FREQ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
 #define CPU_FREQ_SCALING_CUR_FREQ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
@@ -49,8 +50,8 @@ struct stat struct_stat;
 #define CPU_FREQ_ONDEMAND_IGNORE_NICE_LOAD "/sys/devices/system/cpu/cpu0/cpufreq/ondemand/ignore_nice_load"
 #define CPU_FREQ_ONDEMAND_POWERSAVE_BIAD "/sys/devices/system/cpu/cpu0/cpufreq/ondemand/powersave_bias"
 
-char sys_devices_system_cpu[32];
-char sys_devices_system_cpu_available[128];
+/*char sys_devices_system_cpu[32];*/
+/*char sys_devices_system_cpu_available[128];*/
 
 typedef struct sensor_slurp {
 	char *name;
@@ -105,7 +106,7 @@ int slurpfile(char *filename, char *buffer, int buflen)
 }
 
 char *update_file(sensor_slurp *sf) {
-    (void) slurpfile(sf->name, sf->buffer, SAMPLEBUFFERSIZE);
+    (void) slurpfile(sf->name, &sf->buffer[0], SAMPLEBUFFERSIZE);
     return sf->buffer;
 }
 
@@ -151,7 +152,8 @@ unsigned long total_jiffies_func ( void ) {
    p = skip_whitespace(p);
    idle_jiffies = (unsigned int)strtod( p , &p );
 
-   if(num_cpustates == NUM_CPUSTATES_24X)
+   int num_cpustates = num_cpu_states_func();
+   if(num_cpustates == 4) /*NUM_CPUSTATES_24X*/
        return user_jiffies + nice_jiffies + system_jiffies + idle_jiffies;
 
    p = skip_whitespace(p);
@@ -244,7 +246,8 @@ double cpu_system_func ( void )
     p = skip_token(p);
     p = skip_token(p);
     system_jiffies = strtod( p , (char **)NULL );
-    if (num_cpustates > NUM_CPUSTATES_24X) {
+	int num_cpustates = num_cpu_states_func();
+    if (num_cpustates > 4 ) /*NUM_CPUSTATES_24X)*/ {
 	p = skip_token(p);
 	p = skip_token(p);
 	p = skip_token(p);
@@ -405,11 +408,13 @@ int cpu_max_freq_func( void )
     char *p;
     int val = -1;
 
+	struct stat struct_stat;
+	char sys_devices_system_cpu[32];
     if ( stat(CPU_FREQ_SCALING_MAX_FREQ, &struct_stat) == 0 ) {
-	if(slurpfile(CPU_FREQ_SCALING_MAX_FREQ, sys_devices_system_cpu, 32)) {
-	    p = sys_devices_system_cpu;
-	    val = (strtol( p, (char **)NULL , 10 ) / 1000 );
-	}
+		if(slurpfile(CPU_FREQ_SCALING_MAX_FREQ, sys_devices_system_cpu, 32)) {
+			p = sys_devices_system_cpu;
+			val = (strtol( p, (char **)NULL , 10 ) / 1000 );
+		}
     }
     return val;
 }
@@ -419,11 +424,13 @@ int cpu_min_freq_func( void )
     char *p;
     int val = -1;
 
+	struct stat struct_stat;
+	char sys_devices_system_cpu[32];
     if ( stat(CPU_FREQ_SCALING_MIN_FREQ, &struct_stat) == 0 ) {
-	if(slurpfile(CPU_FREQ_SCALING_MIN_FREQ, sys_devices_system_cpu, 32)) {
-	    p = sys_devices_system_cpu;
-	    val = (strtol( p, (char **)NULL , 10 ) / 1000 );
-	}
+		if(slurpfile(CPU_FREQ_SCALING_MIN_FREQ, sys_devices_system_cpu, 32)) {
+			p = sys_devices_system_cpu;
+			val = (strtol( p, (char **)NULL , 10 ) / 1000 );
+		}
     }
     return val;
 }
@@ -433,11 +440,13 @@ int cpu_cur_freq_func( void )
     char *p;
     int val = -1;
     
+	struct stat struct_stat;
+	char sys_devices_system_cpu[32];
     if ( stat(CPU_FREQ_SCALING_CUR_FREQ, &struct_stat) == 0 ) {
-	if(slurpfile(CPU_FREQ_SCALING_CUR_FREQ, sys_devices_system_cpu, 32)) {
-	    p = sys_devices_system_cpu;
-	    val = (strtol( p, (char **)NULL , 10 ) / 1000 );
-	}
+		if(slurpfile(CPU_FREQ_SCALING_CUR_FREQ, sys_devices_system_cpu, 32)) {
+			p = sys_devices_system_cpu;
+			val = (strtol( p, (char **)NULL , 10 ) / 1000 );
+		}
     }
     return val;
 }
@@ -447,18 +456,17 @@ int *cpu_available_freq_func( void )
     char *p;
     static int val[3];
 
+	struct stat struct_stat;
+	char sys_devices_system_cpu_available[128];
     if ( stat(CPU_FREQ_SCALING_AVAILABLE_FREQ, &struct_stat) == 0 ) {
-	if(slurpfile(CPU_FREQ_SCALING_AVAILABLE_FREQ, sys_devices_system_cpu_available, 128)) {
-	    p = sys_devices_system_cpu_available;
-	    val[0] = (strtol( p, (char **)NULL , 10 ) / 1000 );
-	    printf (" CPU_MAX_FREQ %%  :  %d \n", val[0]);
-	    p = skip_token(p);
-	    val[1] = (strtol( p, (char **)NULL , 10 ) / 1000 );
-	    printf (" CPU_MID_FREQ %%  :  %d \n", val[1]);
-	    p = skip_token(p);
-	    val[2] = (strtol( p, (char **)NULL , 10 ) / 1000 );
-	    printf (" CPU_MIN_FREQ %%  :  %d \n", val[2]);
-	}
+		if(slurpfile(CPU_FREQ_SCALING_AVAILABLE_FREQ, sys_devices_system_cpu_available, 128)) {
+			p = sys_devices_system_cpu_available;
+			val[0] = (strtol( p, (char **)NULL , 10 ) / 1000 );
+			p = skip_token(p);
+			val[1] = (strtol( p, (char **)NULL , 10 ) / 1000 );
+			p = skip_token(p);
+			val[2] = (strtol( p, (char **)NULL , 10 ) / 1000 );
+		}
     }
     return val;
 }
@@ -466,10 +474,12 @@ int *cpu_available_freq_func( void )
 char *cpu_scaling_governor_func( void )
 {
     char *p = NULL;
+	struct stat struct_stat;
+	char sys_devices_system_cpu[32];
     if ( stat(CPU_FREQ_SCALING_GOVERNOR, &struct_stat) == 0 ) {
-	if(slurpfile(CPU_FREQ_SCALING_GOVERNOR, sys_devices_system_cpu, 32)) {
-	    p = sys_devices_system_cpu;
-	}
+		if(slurpfile(CPU_FREQ_SCALING_GOVERNOR, sys_devices_system_cpu, 32)) {
+			p = sys_devices_system_cpu;
+		}
     }
     return p;
 }
@@ -479,17 +489,15 @@ char **cpu_scaling_available_governors_func( void )
     static char *val[3];
     char *p;
 
+	struct stat struct_stat;
+	char sys_devices_system_cpu_available[128];
     if ( stat(CPU_FREQ_SCALING_AVAILABLE_GOVERNORS, &struct_stat) == 0 ) {
-	if(slurpfile(CPU_FREQ_SCALING_AVAILABLE_GOVERNORS, sys_devices_system_cpu_available, 128)) {
-	    p = sys_devices_system_cpu_available;
-	    printf (" CPU_AVAILABLE 1 2 3 %%  :  %s \n", p);
-	    val[0] = strtok(p, " ");
-	    printf (" CPU_AVAILABLE 1 %%  :  %s \n", val[0]);
-	    val[1] = strtok(NULL, " ");
-	    printf (" CPU_AVAILABLE 2 %%  :  %s \n", val[1]);
-	    val[2] = strtok(NULL, " ");
-	    printf (" CPU_AVAILABLE 3 %%  :  %s \n", val[2]);
-	}
+		if(slurpfile(CPU_FREQ_SCALING_AVAILABLE_GOVERNORS, sys_devices_system_cpu_available, 128)) {
+			p = sys_devices_system_cpu_available;
+			val[0] = strtok(p, " ");
+			val[1] = strtok(NULL, " ");
+			val[2] = strtok(NULL, " ");
+		}
     }
     return val;
 }
