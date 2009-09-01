@@ -24,7 +24,7 @@
 /* #include <ctype.h> */
 
 #ifndef SAMPLEBUFFERSIZE
-#define SAMPLEBUFFERSIZE 4096 
+#define SAMPLEBUFFERSIZE 8192
 #endif
 
 #define NUM_CPUSTATES_24X 4
