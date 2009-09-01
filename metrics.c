@@ -16,22 +16,7 @@
 #include "evpath.h"
 #include "cm_internal.h"
 #include "cod.h"
-/* #include <sys/time.h> */
-/* #include <sys/types.h> */
-/* #include <sys/stat.h> */
-/* #include <sys/time.h> */
 #include <fcntl.h>
-/* #include <ctype.h> */
-
-/*#ifndef SAMPLEBUFFERSIZE*/
-/*#define SAMPLEBUFFERSIZE 8192*/
-/*#endif*/
-
-/*#define NUM_CPUSTATES_26X 7*/
-/*#define NUM_CPUSTATES_26X 7*/
-/*static unsigned int num_cpustates;*/
-
-/*struct stat struct_stat;*/
 
 /*#define CPU_FREQ_SCALING_MAX_FREQ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"*/
 /*#define CPU_FREQ_SCALING_MIN_FREQ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"*/
@@ -50,13 +35,10 @@
 /*#define CPU_FREQ_ONDEMAND_IGNORE_NICE_LOAD "/sys/devices/system/cpu/cpu0/cpufreq/ondemand/ignore_nice_load"*/
 /*#define CPU_FREQ_ONDEMAND_POWERSAVE_BIAD "/sys/devices/system/cpu/cpu0/cpufreq/ondemand/powersave_bias"*/
 
-/*char sys_devices_system_cpu[32];*/
-/*char sys_devices_system_cpu_available[128];*/
-
-/*typedef struct sensor_slurp {
-	char *name;
+typedef struct sensor_slurp {
+	const char *name;
 	char buffer[8192];
-} sensor_slurp, *sensor_slurp_ptr;*/
+} sensor_slurp, *sensor_slurp_ptr;
 
 /*sensor_slurp proc_stat    = { "/proc/stat" };*/
 /*sensor_slurp proc_loadavg = { "/proc/loadavg" };*/
@@ -76,7 +58,7 @@ char * skip_token (const char *p)
     return (char *)p;
 }         
 
-int slurpfile(char *filename, char *buffer, int buflen)
+int slurpfile(const char *filename, char *buffer, int buflen)
 {
     int fd, read_len;
 
@@ -99,7 +81,7 @@ int slurpfile(char *filename, char *buffer, int buflen)
     return read_len;
 }
 
-char *update_file(sensor_slurp *sf) {
+char *update_file(struct sensor_slurp *sf) {
     (void) slurpfile(sf->name, &sf->buffer[0], 8192);
     return sf->buffer;
 }
@@ -107,11 +89,6 @@ char *update_file(sensor_slurp *sf) {
 unsigned int num_cpustates_func ( void ) {
    char *p;
    unsigned int i=0;
-
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 
 	sensor_slurp proc_stat    = { "/proc/stat" };
    p = update_file(&proc_stat);
@@ -141,10 +118,6 @@ unsigned long total_jiffies_func ( void ) {
    unsigned long user_jiffies, nice_jiffies, system_jiffies, idle_jiffies,
                  wio_jiffies, irq_jiffies, sirq_jiffies;
 	
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 	sensor_slurp proc_stat    = { "/proc/stat" };
    p = update_file(&proc_stat);
    p = skip_token(p);
@@ -180,10 +153,6 @@ double cpu_user_func ( void )
     static double last_user_jiffies, last_total_jiffies;
     double user_jiffies, total_jiffies, diff;
    
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 	sensor_slurp proc_stat    = { "/proc/stat" };
     p = update_file(&proc_stat);
 
@@ -218,10 +187,6 @@ double cpu_nice_func ( void )
     static double last_nice_jiffies, last_total_jiffies;
     double nice_jiffies, total_jiffies, diff;
     
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 	sensor_slurp proc_stat    = { "/proc/stat" };
     p = update_file(&proc_stat);
  
@@ -256,10 +221,6 @@ double cpu_system_func ( void )
     static double last_system_jiffies,  system_jiffies,
 	last_total_jiffies, total_jiffies, diff;
  
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 	sensor_slurp proc_stat    = { "/proc/stat" };
     p = update_file(&proc_stat);
     p = skip_token(p);
@@ -297,10 +258,6 @@ double cpu_idle_func ( void )
     static double last_idle_jiffies,  idle_jiffies,
 	last_total_jiffies, total_jiffies, diff;
 									  
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 	sensor_slurp proc_stat    = { "/proc/stat" };
     p = update_file(&proc_stat);
 		      
@@ -325,10 +282,6 @@ double cpu_idle_func ( void )
 double load_one_func ( void )
 {
     double val;
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 	sensor_slurp proc_loadavg = { "/proc/loadavg" };
     val = strtod( update_file(&proc_loadavg), (char **)NULL);
     return val;
@@ -339,10 +292,6 @@ double load_five_func ( void )
     char *p;
     double val;
 
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 	sensor_slurp proc_loadavg = { "/proc/loadavg" };
     p = update_file(&proc_loadavg);
     p = skip_token(p);
@@ -356,10 +305,6 @@ double load_fifteen_func ( void )
     char *p;
     double val;
 
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 	sensor_slurp proc_loadavg = { "/proc/loadavg" };
     p = update_file(&proc_loadavg);
 
@@ -375,10 +320,6 @@ double mem_buffers_func ( void )
     char *p;
     double val;
 
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 	sensor_slurp proc_meminfo = { "/proc/meminfo" };
     p = strstr( update_file(&proc_meminfo), "Buffers:" );
     if(p) {
@@ -396,10 +337,6 @@ double mem_free_func ( void )
     char *p;
     double val;
 
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 	sensor_slurp proc_meminfo = { "/proc/meminfo" };
     p = strstr( update_file(&proc_meminfo), "MemFree:" );
     if(p) {
@@ -417,10 +354,6 @@ double mem_cached_func ( void )
     char *p;
     double val;
 
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 	sensor_slurp proc_meminfo = { "/proc/meminfo" };
     p = strstr( update_file(&proc_meminfo), "Cached:");
     if(p) {
@@ -429,7 +362,6 @@ double mem_cached_func ( void )
     } else {
 	val = 0;
     }
-
    return val;
 }
 
@@ -438,10 +370,6 @@ double swap_free_func ( void )
     char *p;
     double val;
    
-	typedef struct sensor_slurp {
-		char *name;
-		char buffer[8192];
-	} sensor_slurp, *sensor_slurp_ptr;
 	sensor_slurp proc_meminfo = { "/proc/meminfo" };
     p = strstr( update_file(&proc_meminfo), "SwapFree:" );
     if(p) {
@@ -470,7 +398,7 @@ int cpu_max_freq_func( void )
 
 	struct stat struct_stat;
 	char sys_devices_system_cpu[32];
-	#define CPU_FREQ_SCALING_MAX_FREQ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"
+	const char *CPU_FREQ_SCALING_MAX_FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq";
     if ( stat(CPU_FREQ_SCALING_MAX_FREQ, &struct_stat) == 0 ) {
 		if(slurpfile(CPU_FREQ_SCALING_MAX_FREQ, sys_devices_system_cpu, 32)) {
 			p = sys_devices_system_cpu;
@@ -487,7 +415,7 @@ int cpu_min_freq_func( void )
 
 	struct stat struct_stat;
 	char sys_devices_system_cpu[32];
-	#define CPU_FREQ_SCALING_MIN_FREQ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq"
+	const char *CPU_FREQ_SCALING_MIN_FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq";
     if ( stat(CPU_FREQ_SCALING_MIN_FREQ, &struct_stat) == 0 ) {
 		if(slurpfile(CPU_FREQ_SCALING_MIN_FREQ, sys_devices_system_cpu, 32)) {
 			p = sys_devices_system_cpu;
@@ -504,7 +432,7 @@ int cpu_cur_freq_func( void )
     
 	struct stat struct_stat;
 	char sys_devices_system_cpu[32];
-#define CPU_FREQ_SCALING_CUR_FREQ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq"
+	const char *CPU_FREQ_SCALING_CUR_FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq";
     if ( stat(CPU_FREQ_SCALING_CUR_FREQ, &struct_stat) == 0 ) {
 		if(slurpfile(CPU_FREQ_SCALING_CUR_FREQ, sys_devices_system_cpu, 32)) {
 			p = sys_devices_system_cpu;
@@ -521,7 +449,7 @@ int *cpu_available_freq_func( void )
 
 	struct stat struct_stat;
 	char sys_devices_system_cpu_available[128];
-#define CPU_FREQ_SCALING_AVAILABLE_FREQ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies"
+	const char *CPU_FREQ_SCALING_AVAILABLE_FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies";
     if ( stat(CPU_FREQ_SCALING_AVAILABLE_FREQ, &struct_stat) == 0 ) {
 		if(slurpfile(CPU_FREQ_SCALING_AVAILABLE_FREQ, sys_devices_system_cpu_available, 128)) {
 			p = sys_devices_system_cpu_available;
@@ -540,7 +468,7 @@ char *cpu_scaling_governor_func( void )
     char *p = NULL;
 	struct stat struct_stat;
 	char sys_devices_system_cpu[32];
-#define CPU_FREQ_SCALING_GOVERNOR "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+	const char *CPU_FREQ_SCALING_GOVERNOR = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor";
     if ( stat(CPU_FREQ_SCALING_GOVERNOR, &struct_stat) == 0 ) {
 		if(slurpfile(CPU_FREQ_SCALING_GOVERNOR, sys_devices_system_cpu, 32)) {
 			p = sys_devices_system_cpu;
@@ -556,7 +484,7 @@ char **cpu_scaling_available_governors_func( void )
 
 	struct stat struct_stat;
 	char sys_devices_system_cpu_available[128];
-#define CPU_FREQ_SCALING_AVAILABLE_GOVERNORS "/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors"
+	const char *CPU_FREQ_SCALING_AVAILABLE_GOVERNORS  = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors";
     if ( stat(CPU_FREQ_SCALING_AVAILABLE_GOVERNORS, &struct_stat) == 0 ) {
 		if(slurpfile(CPU_FREQ_SCALING_AVAILABLE_GOVERNORS, sys_devices_system_cpu_available, 128)) {
 			p = sys_devices_system_cpu_available;
