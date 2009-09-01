@@ -130,7 +130,7 @@ unsigned long total_jiffies_func ( void ) {
    p = skip_whitespace(p);
    idle_jiffies = (unsigned int)strtod( p , &p );
 
-   int num_cpustates = num_cpu_states_func();
+   int num_cpustates = num_cpustates_func();
    if(num_cpustates == 4) /*NUM_CPUSTATES_24X*/
        return user_jiffies + nice_jiffies + system_jiffies + idle_jiffies;
 
@@ -227,7 +227,7 @@ double cpu_system_func ( void )
     p = skip_token(p);
     p = skip_token(p);
     system_jiffies = strtod( p , (char **)NULL );
-	int num_cpustates = num_cpu_states_func();
+	int num_cpustates = num_cpustates_func();
     if (num_cpustates > 4 ) /*NUM_CPUSTATES_24X)*/ {
 	p = skip_token(p);
 	p = skip_token(p);
