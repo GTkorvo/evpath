@@ -90,8 +90,6 @@ typedef struct multicast_transport_data {
 #include <stdio.h>
 #include "config.h"
 
-static char *EVPath_version = "EVPath Version 3.0.57 rev. 7506  -- 2009-08-24 01:23:21 -0400 (Mon, 24 Aug 2009)))))))\n";
-
 #if defined (__INTEL_COMPILER)
 #  pragma warning (disable: 869)
 #  pragma warning (disable: 310)

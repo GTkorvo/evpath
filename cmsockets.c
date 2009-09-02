@@ -1490,10 +1490,10 @@ int iovcnt;
 #endif
 
 extern int
-libcmsockets_LTX_writev_attr_func(svc, scd, iov, iovcnt, attrs)
+libcmsockets_LTX_writev_attr_func(svc, scd, iovs, iovcnt, attrs)
 CMtrans_services svc;
 socket_conn_data_ptr scd;
-struct iovec *iov;
+void *iovs;
 int iovcnt;
 attr_list attrs;
 {
@@ -1502,7 +1502,7 @@ attr_list attrs;
     int iget = 0;
     int iovleft, i;
     iovleft = iovcnt;
-
+    struct iovec * iov = (struct iovec*) iov;
     /* sum lengths */
     for (i = 0; i < iovcnt; i++)
 	left += iov[i].iov_len;
@@ -1559,10 +1559,10 @@ attr_list attrs;
 
 /* non blocking version */
 extern int
-libcmsockets_LTX_NBwritev_attr_func(svc, scd, iov, iovcnt, attrs)
+libcmsockets_LTX_NBwritev_attr_func(svc, scd, iovs, iovcnt, attrs)
 CMtrans_services svc;
 socket_conn_data_ptr scd;
-struct iovec *iov;
+void *iovs;
 int iovcnt;
 attr_list attrs;
 {
@@ -1570,6 +1570,7 @@ attr_list attrs;
     int init_bytes, left = 0;
     int iget = 0;
     int iovleft, i;
+    struct iovec * iov = (struct iovec*) iov;
     iovleft = iovcnt;
 
     /* sum lengths */
@@ -1618,7 +1619,7 @@ extern int
 libcmsockets_LTX_writev_func(svc, scd, iov, iovcnt)
 CMtrans_services svc;
 socket_conn_data_ptr scd;
-struct iovec *iov;
+void *iov;
 int iovcnt;
 {
     return libcmsockets_LTX_writev_attr_func(svc, scd, iov, iovcnt, NULL);

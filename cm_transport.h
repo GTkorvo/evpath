@@ -155,12 +155,12 @@ libcmsockets_LTX_write_func(CMtrans_services svc, struct socket_connection_data 
 
 
 extern int libcmsockets_LTX_writev_attr_func(CMtrans_services svc, struct socket_connection_data * scd, 
-					     struct iovec *iov, int iovcnt, attr_list attrs);
+					     void *iov, int iovcnt, attr_list attrs);
 
 extern int libcmsockets_LTX_NBwritev_attr_func(CMtrans_services svc, struct socket_connection_data * scd, 
-					       struct iovec *iov, int iovcnt, attr_list attrs);
+					       void *iov, int iovcnt, attr_list attrs);
 extern int libcmsockets_LTX_writev_func(CMtrans_services svc, struct socket_connection_data * scd, 
-					struct iovec *iov, int iovcnt);
+					void *iov, int iovcnt);
 
 
 extern void *

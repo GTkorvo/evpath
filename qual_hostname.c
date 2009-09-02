@@ -172,6 +172,7 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 	strncpy(buf, hostname_string, len);
 	return;
     }
+    (void)get_qual_hostname;
     gethostname(buf, len);
     buf[len - 1] = '\0';
     if (memchr(buf, '.', strlen(buf)) == NULL) {
