@@ -1502,7 +1502,7 @@ attr_list attrs;
     int iget = 0;
     int iovleft, i;
     iovleft = iovcnt;
-    struct iovec * iov = (struct iovec*) iov;
+    struct iovec * iov = (struct iovec*) iovs;
     /* sum lengths */
     for (i = 0; i < iovcnt; i++)
 	left += iov[i].iov_len;
