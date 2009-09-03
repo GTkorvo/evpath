@@ -1570,7 +1570,7 @@ attr_list attrs;
     int init_bytes, left = 0;
     int iget = 0;
     int iovleft, i;
-    struct iovec * iov = (struct iovec*) iov;
+    struct iovec * iov = (struct iovec*) iovs;
     iovleft = iovcnt;
 
     /* sum lengths */
