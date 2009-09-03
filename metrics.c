@@ -504,6 +504,7 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
 		char **cpu_scaling_available_governors_func();\n\
 		char *cpu_scaling_governor_func();\n\
 		int *cpu_available_freq_func();\n\
+		int cpu_cur_freq_func();\n\
 		int cpu_min_freq_func();\n\
 		int cpu_max_freq_func();\n\
 		double gettimeofday_func();\n\
