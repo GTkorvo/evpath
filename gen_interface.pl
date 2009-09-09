@@ -336,6 +336,7 @@ print INT<<EOF;
  *
  */
 #include "ffs.h"
+#include "cod.h"
 #include "atl.h"
 #include "evpath.h"
 #include "cm_internal.h"

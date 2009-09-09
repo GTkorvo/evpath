@@ -2022,6 +2022,22 @@ extern char *
 create_multityped_action_spec(FMStructDescList *input_format_lists, FMStructDescList out_format_list, char *function);
 
 /*!
+ * Add a set of routines that will be visible in COD.
+ *
+ * \param cm The CManager in which the routines should be visible
+ * \param extern_string A string that declares the routines, C-style 
+ * \param externs A NULL-terminated structure of type cod_extern_entry.
+ * This structure consists of name/address pairs that give transfer
+ * adddresses for each routine declared by the extern string.
+ * You must include cod.h for this routine to be visible.
+ */
+#ifdef __COD__H__
+extern void
+EVadd_standard_routines(CManager cm, char *extern_string, 
+			cod_extern_entry *externs);
+#endif
+
+/*!
  * Print a description of stone status to standard output.
  *
  * A simple dump function that can be used for debugging.

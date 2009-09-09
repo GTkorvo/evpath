@@ -199,6 +199,15 @@ typedef struct _stone {
     stall_callback *unstall_callbacks;
 } *stone_type;
     
+#ifdef __COD__H__
+typedef struct _extern_routine_struct {
+    char *extern_decl;
+    cod_extern_entry *externs;
+} *extern_routines;
+#else
+typedef void *extern_routines;
+#endif
+
 typedef struct _event_path_data {
     int stone_count;
     int stone_base_num;
@@ -211,6 +220,7 @@ typedef struct _event_path_data {
     queue_item *taken_events_list;
     thr_mutex_t lock;
     int use_backpressure;
+    extern_routines externs;
 } *event_path_data;
 
 struct _EVSource {

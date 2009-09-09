@@ -12,8 +12,8 @@
 #endif
 
 #include "evpath.h"
-#include "cm_internal.h"
 #include "cod.h"
+#include "cm_internal.h"
 #include "libltdl/ltdl.h"
 
 typedef enum {Response_Filter, Response_Transform, Response_Router, Response_Multityped} response_types;
@@ -898,10 +898,10 @@ queued_wrapper(CManager cm, struct _queue *queue, queue_item *item,
 }
 
 static response_instance
-generate_filter_code(struct response_spec *mrd, stone_type stone,
+generate_filter_code(CManager cm, struct response_spec *mrd, stone_type stone,
 		     FMFormat format);
 static response_instance
-generate_multityped_code(struct response_spec *mrd, stone_type stone,
+generate_multityped_code(CManager cm, struct response_spec *mrd, stone_type stone,
 			  FMFormat *formats);
 
 static FMFormat
@@ -1059,7 +1059,7 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
                 break;
 	    }
 
-	    instance = generate_filter_code(mrd, stone, conversion_target_format);
+	    instance = generate_filter_code(cm, mrd, stone, conversion_target_format);
 	    if (instance == NULL) return 0;
 	    instance->stone = stone->local_id;
 	    instance->proto_action_id = nearest_proto_action;
@@ -1091,7 +1091,7 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 
 	    mrd =
 		proto->o.imm.mutable_response_data;
-	    instance = generate_multityped_code(mrd, stone,
+	    instance = generate_multityped_code(cm, mrd, stone,
 						 proto->matching_reference_formats);
 	    if (instance == 0) {
                 return 0;
@@ -1163,6 +1163,25 @@ cod_free_wrapper(void *data, void *free_data)
 			    data);
 }
 #endif
+
+extern void 
+INT_EVadd_standard_routines(CManager cm, char *extern_string,
+			    cod_extern_entry *externs)
+{
+    event_path_data evp = cm->evp;
+    int count = 0;
+    if (evp->externs == NULL) {
+	evp->externs = malloc(sizeof(evp->externs[0]) * 2);
+    } else {
+	while(evp->externs[count].extern_decl != NULL) count++;
+	evp->externs = realloc(evp->externs, 
+			       sizeof(evp->externs[0]) * (count + 2));
+    }
+    evp->externs[count].extern_decl = extern_string;
+    evp->externs[count].externs = externs;
+    evp->externs[count + 1].extern_decl = NULL;
+    evp->externs[count + 1].externs = NULL;
+}
 
 static void
 internal_cod_submit(cod_exec_context ec, int port, void *data, void *type_info)
@@ -1541,7 +1560,7 @@ extern void
 add_metrics_routines(stone_type stone, cod_parse_context context);
 
 static response_instance
-generate_filter_code(struct response_spec *mrd, stone_type stone,
+generate_filter_code(CManager cm, struct response_spec *mrd, stone_type stone,
 		     FMFormat format)
 {
     response_instance instance = malloc(sizeof(*instance));
@@ -1553,6 +1572,14 @@ generate_filter_code(struct response_spec *mrd, stone_type stone,
     memset(instance, 0, sizeof(*instance));
     add_standard_routines(stone, parse_context);
     add_metrics_routines(stone, parse_context);
+    if (cm->evp->externs) {
+	int count = -1;
+	while (cm->evp->externs[++count].extern_decl != NULL) {
+	    cod_assoc_externs(parse_context, cm->evp->externs[count].externs);
+	    cod_parse_for_context(cm->evp->externs[count].extern_decl, 
+				  parse_context);
+	}
+    }
 
     switch (mrd->response_type) {
     case Response_Filter:
@@ -1663,7 +1690,7 @@ generate_filter_code(struct response_spec *mrd, stone_type stone,
 }
 
 static response_instance
-generate_multityped_code(struct response_spec *mrd, stone_type stone,
+generate_multityped_code(CManager cm, struct response_spec *mrd, stone_type stone,
 			 FMFormat *formats)
 {
     response_instance instance = malloc(sizeof(*instance));
@@ -1682,6 +1709,15 @@ generate_multityped_code(struct response_spec *mrd, stone_type stone,
     add_standard_routines(stone, parse_context);
     add_queued_routines(parse_context, formats);
     add_queued_constants(parse_context, formats);
+    if (cm->evp->externs) {
+	int count = -1;
+	while (cm->evp->externs[++count].extern_decl != NULL) {
+	    cod_assoc_externs(parse_context, cm->evp->externs[count].externs);
+	    cod_parse_for_context(cm->evp->externs[count].extern_decl, 
+				  parse_context);
+	}
+    }
+
 
 
     assert(mrd->response_type == Response_Multityped);

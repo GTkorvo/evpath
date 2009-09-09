@@ -473,6 +473,11 @@ extern void INT_CMusleep ARGS((CManager cm, int usecs));
 extern void INT_CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
 extern void INT_CM_fd_add_select ARGS((CManager cm, int fd, select_func handler_func, void *param1, void *param2));
 extern void INT_CMstart_read_thread(CMConnection conn);
+#ifdef __COD__H__
+extern void INT_EVadd_standard_routines(CManager cm, char *extern_string, cod_extern_entry *externs);
+#else
+extern void INT_EVadd_standard_routines(CManager cm, char *extern_string, void *externs);
+#endif
 extern void CMwake_server_thread(CManager cm);
 extern int CMtrace_val[];
 extern int CMtrace_init(CMTraceType t);
