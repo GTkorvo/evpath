@@ -90,7 +90,7 @@ unsigned int num_cpustates_func ( void ) {
    char *p;
    unsigned int i=0;
 
-	sensor_slurp proc_stat    = { "/proc/stat" };
+   sensor_slurp proc_stat    = { "/proc/stat" };
    p = update_file(&proc_stat);
 
 /**
@@ -118,7 +118,7 @@ unsigned long total_jiffies_func ( void ) {
    unsigned long user_jiffies, nice_jiffies, system_jiffies, idle_jiffies,
                  wio_jiffies, irq_jiffies, sirq_jiffies;
 	
-	sensor_slurp proc_stat    = { "/proc/stat" };
+   sensor_slurp proc_stat = { "/proc/stat" };
    p = update_file(&proc_stat);
    p = skip_token(p);
    p = skip_whitespace(p);
@@ -149,7 +149,6 @@ double cpu_user_func ( void )
 {
     char *p;
     double val;
-    static int first = 1;
     static double last_user_jiffies, last_total_jiffies;
     double user_jiffies, total_jiffies, diff;
    
@@ -160,12 +159,6 @@ double cpu_user_func ( void )
     user_jiffies  = strtod( p , (char **)NULL );
     total_jiffies = (double) total_jiffies_func();
 
-    if (first) {
-	last_user_jiffies = user_jiffies;
-	last_total_jiffies = total_jiffies;
-	first = 0;
-	return 0.0;
-    }
     diff = user_jiffies - last_user_jiffies; 
     
     if ( diff )
@@ -183,7 +176,6 @@ double cpu_nice_func ( void )
 {
     char *p;
     double val;
-    static int first = 1;
     static double last_nice_jiffies, last_total_jiffies;
     double nice_jiffies, total_jiffies, diff;
     
@@ -195,12 +187,6 @@ double cpu_nice_func ( void )
     nice_jiffies  = strtod( p , (char **)NULL );
     total_jiffies = (double) total_jiffies_func();
 
-    if (first) {
-	last_nice_jiffies = nice_jiffies;
-	last_total_jiffies = total_jiffies;
-	first = 0;
-	return 0.0;
-    }
     diff = (nice_jiffies  - last_nice_jiffies);
 
     if ( diff )
@@ -471,7 +457,7 @@ char *cpu_scaling_governor_func( void )
 	const char *CPU_FREQ_SCALING_GOVERNOR = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor";
     if ( stat(CPU_FREQ_SCALING_GOVERNOR, &struct_stat) == 0 ) {
 		if(slurpfile(CPU_FREQ_SCALING_GOVERNOR, sys_devices_system_cpu, 32)) {
-			p = sys_devices_system_cpu;
+			p = strdup(sys_devices_system_cpu);
 		}
     }
     return p;
@@ -487,7 +473,7 @@ char **cpu_scaling_available_governors_func( void )
 	const char *CPU_FREQ_SCALING_AVAILABLE_GOVERNORS  = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors";
     if ( stat(CPU_FREQ_SCALING_AVAILABLE_GOVERNORS, &struct_stat) == 0 ) {
 		if(slurpfile(CPU_FREQ_SCALING_AVAILABLE_GOVERNORS, sys_devices_system_cpu_available, 128)) {
-			p = sys_devices_system_cpu_available;
+			p = strdup(sys_devices_system_cpu_available);
 			val[0] = strtok(p, " ");
 			val[1] = strtok(NULL, " ");
 			val[2] = strtok(NULL, " ");
@@ -575,3 +561,34 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
 }
+
+/*int main(int argc, char **argv) {
+	//num_cpustates_func();
+	printf (" CPU USER %  :  %lf \n", cpu_user_func());
+	printf (" CPU NICE %  :  %lf \n", cpu_nice_func());
+	printf (" CPU SYSTEM %  :  %lf \n", cpu_system_func());
+	printf (" CPU IDLE %  :  %lf \n", cpu_idle_func());
+	
+	printf (" LOAD 1 %  :  %lf \n", load_one_func());
+	printf (" LOAD 5 %  :  %lf \n", load_five_func());
+	printf (" LOAD 15 %  :  %lf \n", load_fifteen_func());
+
+	printf (" MEM FREE %  :  %lf \n", mem_free_func());
+	printf (" MEM BUFF %  :  %lf \n", mem_buffers_func());
+	printf (" MEM CACHE %  :  %lf \n", mem_cached_func());
+
+	printf (" SWAP FREE %  :  %lf \n", swap_free_func());
+	printf (" GET TIMESTAMP %  :  %lf \n", gettimeofday_func());
+
+	printf (" CPU_MAX_FREQ %  :  %d \n", cpu_max_freq_func());
+	printf (" CPU_MIN_FREQ %  :  %d \n", cpu_min_freq_func());
+	printf (" CPU_CUR_FREQ %  :  %d \n", cpu_cur_freq_func());
+	int *val;
+	val = cpu_available_freq_func();
+	printf (" CPU_AVAILABLE_FREQ %  :  %d , %d , %d \n", val[0], val[1], val[2]);
+
+	printf (" CPU_FREQ_GOVERNOR %  :  %s \n", cpu_scaling_governor_func());
+	char **avail;
+	avail = cpu_scaling_available_governors_func();
+	printf (" CPU_FREQ_AVAILABLE_GOVERNORS %  :  %s , %s , %s \n", avail[0], avail[1], avail[2]);
+}*/
