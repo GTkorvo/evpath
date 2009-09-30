@@ -1507,6 +1507,7 @@ attr_list attrs;
     for (i = 0; i < iovcnt; i++)
 	left += iov[i].iov_len;
 
+    printf("@@@@@@@@CMSocket writev of %d bytes on fd %d @@@@@@@@@@@ \n", left, fd);
     svc->trace_out(scd->sd->cm, "CMSocket writev of %d bytes on fd %d",
 		   left, fd);
     while (left > 0) {
