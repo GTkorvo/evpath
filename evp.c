@@ -979,7 +979,7 @@ encode_event(CManager cm, event_item *event)
 {
     (void)cm;
     if (event->event_encoded) {
-	assert(0);
+	return;
     }
 	
     if (event->ioBuffer != NULL) return;  /* already encoded */
