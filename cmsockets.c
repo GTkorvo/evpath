@@ -1161,7 +1161,7 @@ attr_list listen_info;
 	}
     } else {
 	/* port num is free.  Constrain to range 26000 : 26100 */
-	srand(time(NULL));
+	srand48(time(NULL));
 	int low_bound = 26000;
 	int high_bound = 26100;
 	int size = high_bound - low_bound;
