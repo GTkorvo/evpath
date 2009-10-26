@@ -6,6 +6,7 @@
 #include <memory.h>
 #include <strings.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "evpath.h"
 #include "cm_internal.h"
@@ -2766,7 +2767,10 @@ EVPinit(CManager cm)
 	 * just so that we're more likely to catch mitmatched stone/CM
 	 * combos in threaded situations.
 	*/
-	cm->evp->stone_base_num = lrand48() & 0xffff;
+	srand48(time(NULL));
+	while (cm->evp->stone_base_num == 0) {
+	    cm->evp->stone_base_num = lrand48() & 0xffff;
+	}
 	
     }
     CMtrace_out(cm, EVerbose, "INITATED EVPATH, base stone num is %d", 
