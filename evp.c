@@ -2767,7 +2767,10 @@ EVPinit(CManager cm)
 	 * combos in threaded situations.
 	*/
 	cm->evp->stone_base_num = lrand48() & 0xffff;
+	
     }
+    CMtrace_out(cm, EVerbose, "INITATED EVPATH, base stone num is %d", 
+		cm->evp->stone_base_num);
     first_evpinit = 0;
     cm->evp->queue_items_free_list = NULL;
     cm->evp->lock = thr_mutex_alloc();
