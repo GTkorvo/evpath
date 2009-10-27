@@ -786,7 +786,7 @@ static void cod_ev_discard_and_submit_rel(cod_exec_context ec, int port, int que
 	return;
     }
 
-    cod_ev_discard_and_submit(ec, 0, target_stone, queue, index);
+    cod_ev_discard_and_submit(ec, 0, port, queue, index);
 }
 
 static void cod_ev_discard_and_submit_abs(cod_exec_context ec, int port, int queue,
@@ -798,7 +798,7 @@ static void cod_ev_discard_and_submit_abs(cod_exec_context ec, int port, int que
 	return;
     }
 
-    cod_ev_discard_and_submit(ec, 1, target_stone, queue, index);
+    cod_ev_discard_and_submit(ec, 1, port, queue, index);
 }
 
 static void *cod_ev_get_data(cod_exec_context ec, int absp, int queue, int index)
