@@ -1795,7 +1795,7 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
     }
     stone->response_cache_count += queue_count;
     CMtrace_out(cm, EVerbose, "Installing %d mutated action responses for multi action %d on stone %d\n",
-		queue_count, action_num, stone_id);
+		queue_count, act_num, stone_id);
     return resp_num;
 }
 
