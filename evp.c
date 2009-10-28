@@ -20,7 +20,7 @@ static void dump_action(stone_type stone, response_cache_element *resp,
 static void dump_stone(stone_type stone);
 static int is_output_stone(CManager cm, EVstone stone_num);
 
-static const char *action_str[] = { "Action_NoAction","Action_Bridge", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Encode_to_Buffer", "Action_Split", "Action_Store", "Action_Congestion"};
+static const char *action_str[] = { "Action_NoAction","Action_Bridge", "Action_Thread_Bridge", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Encode_to_Buffer", "Action_Split", "Action_Store", "Action_Congestion"};
 
 stone_type
 stone_struct(event_path_data evp, int stone_num)
@@ -327,7 +327,7 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
     if (!stone) return -1;
 
     action_num = add_proto_action(cm, stone, &act);
-    CMtrace_out(cm, EVerbose, "Adding Immediate action %d to stone %d",
+    CMtrace_out(cm, EVerbose, "Adding Immediate action %d to stone %d\n",
 		action_num, stone_num);
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
@@ -355,7 +355,7 @@ INT_EVassoc_multi_action(CManager cm, EVstone stone_num,
     stone = stone_struct(evp, stone_num);
     if (!stone) return -1;
     action_num = stone->proto_action_count;
-    CMtrace_out(cm, EVerbose, "Adding Multi action %d to stone %d",
+    CMtrace_out(cm, EVerbose, "Adding Multi action %d to stone %d\n",
 		action_num, stone_num);
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
@@ -385,7 +385,7 @@ INT_EVassoc_congestion_action(CManager cm, EVstone stone_num,
     if (!stone) return -1;
 
     action_num = stone->proto_action_count;
-    CMtrace_out(cm, EVerbose, "Adding Congestion action %d to stone %d",
+    CMtrace_out(cm, EVerbose, "Adding Congestion action %d to stone %d\n",
 		action_num, stone_num);
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
@@ -437,7 +437,7 @@ INT_EVassoc_filter_action(CManager cm, EVstone stone_num,
     }	
     stone->proto_action_count++;
     clear_response_cache(stone);
-    CMtrace_out(cm, EVerbose, "Adding filter action %d to stone %d",
+    CMtrace_out(cm, EVerbose, "Adding filter action %d to stone %d\n",
 		proto_action_num, stone_num);
     return proto_action_num;
 }
@@ -685,7 +685,7 @@ INT_EVassoc_conversion_action(CManager cm, int stone_id, int stage,
 
     a = stone->response_cache_count;
     server_id = get_server_ID_FMformat(incoming_format, &id_len);
-    CMtrace_out(cm, EVerbose, "Adding Conversion action %d to stone %d",
+    CMtrace_out(cm, EVerbose, "Adding Conversion action %d to stone %d\n",
 		a, stone_id);
     if (CMtrace_on(cm, EVerbose)) {
 	char *target_tmp = global_name_of_FMFormat(target_format);
@@ -728,7 +728,7 @@ INT_EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num,
     } else {
         assert((stone->proto_actions[act_num].action_type == Action_Immediate) ||
                (stone->proto_actions[act_num].action_type == Action_Multi));
-        CMtrace_out(cm, EVerbose, "Setting output %d on stone %d to local stone %d",
+        CMtrace_out(cm, EVerbose, "Setting output %d on stone %d to local stone %d\n",
                     output_index, stone_num, output_stone);
         output_count = stone->proto_actions[act_num].o.imm.output_count;
         if (output_index >= output_count) {
@@ -758,9 +758,9 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
     int i;
     int return_response;
     if (event->reference_format == NULL) {
-	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is NULL");
+	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is NULL\n");
     } else {
-	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %p (%s)",
+	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %p (%s)\n",
 	   event->reference_format, name_of_FMformat(event->reference_format));
     }
     for (i=0; i < stone->response_cache_count; i++) {
@@ -1371,7 +1371,7 @@ process_events_stone(CManager cm, int s, action_class c)
 	    resp = &stone->response_cache[resp_id];
 	    if (resp->action_type == Action_Decode) {
 		event_item *event_to_submit;
-		CMtrace_out(cm, EVerbose, "Decoding event, action id %d", resp_id);
+		CMtrace_out(cm, EVerbose, "Decoding event, action id %d\n", resp_id);
 		event_to_submit = decode_action(cm, event, resp);
 		if (event_to_submit == NULL) return more_pending;
 		item->item = event_to_submit;
@@ -1405,7 +1405,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		struct terminal_proto_vals *term = &(p->o.term);
 		EVSimpleHandlerFunc handler = term->handler;
 		void *client_data = term->client_data;
-		CMtrace_out(cm, EVerbose, "Executing terminal/filter event");
+		CMtrace_out(cm, EVerbose, "Executing terminal/filter event\n");
 		update_event_length_sum(cm, p, event);
 		cm->evp->current_event_item = event;
 		stone->is_processing = 1;
@@ -1427,16 +1427,16 @@ process_events_stone(CManager cm, int s, action_class c)
 		cm->evp->current_event_item = NULL;
 		if (act->action_type == Action_Filter) {
 		    if (out) {
-			CMtrace_out(cm, EVerbose, "Filter passed event to stone %d, submitting", term->target_stone_id);
+			CMtrace_out(cm, EVerbose, "Filter passed event to stone %d, submitting\n", term->target_stone_id);
 			internal_path_submit(cm, 
 					     term->target_stone_id,
 					     event);
 			more_pending++;
 		    } else {
-			CMtrace_out(cm, EVerbose, "Filter discarded event");
+			CMtrace_out(cm, EVerbose, "Filter discarded event\n");
 		    }			    
 		} else {
-		    CMtrace_out(cm, EVerbose, "Finish terminal event");
+		    CMtrace_out(cm, EVerbose, "Finish terminal event\n");
 		}
 		return_event(evp, event);
 		break;
@@ -1478,10 +1478,10 @@ process_events_stone(CManager cm, int s, action_class c)
             case Action_Store: {
 		proto_action *p = &stone->proto_actions[act->proto_action_id];
                 storage_queue_enqueue(cm, &p->o.store.queue, event);
-                CMtrace_out(cm, EVerbose, "Enqueued item to store");
+                CMtrace_out(cm, EVerbose, "Enqueued item to store\n");
                 if (++p->o.store.num_stored > p->o.store.max_stored
                         && p->o.store.max_stored != -1) {
-                    CMtrace_out(cm, EVerbose, "Dequeuing item because of limit");
+                    CMtrace_out(cm, EVerbose, "Dequeuing item because of limit\n");
                     event_item *last_event;
                     last_event = storage_queue_dequeue(cm, &p->o.store.queue);
                     assert(last_event->ref_count > 0);
@@ -1527,7 +1527,7 @@ process_local_actions(CManager cm)
     event_path_data evp = cm->evp;
     action_state as = evp->as;
     int s, more_pending = 0;
-    CMtrace_out(cm, EVerbose, "Process local actions");
+    CMtrace_out(cm, EVerbose, "Process local actions\n");
     if (as == NULL) {
 	as = evp->as = malloc(sizeof(*as));
 	memset(as, 0, sizeof(*as));
@@ -1537,10 +1537,10 @@ process_local_actions(CManager cm)
     if (as->last_active_stone != -1) {
 	more_pending = 1;
 	while (more_pending) {
-	    CMtrace_out(cm, EVerbose, "Process local actions on stone %d",
+	    CMtrace_out(cm, EVerbose, "Process local actions on stone %d\n",
 			as->last_active_stone);
 	    
-	    CMtrace_out(cm, EVerbose, "0 - in-play %d", as->events_in_play);
+	    CMtrace_out(cm, EVerbose, "0 - in-play %d\n", as->events_in_play);
 	    more_pending = process_events_stone(cm, as->last_active_stone, Immediate);
 	}
     }
@@ -1551,15 +1551,15 @@ process_local_actions(CManager cm)
 	    if (stone->local_id == -1) continue;
 	    if (stone->is_draining == 1) continue;
 	    if (stone->is_frozen == 1) continue;
-	    CMtrace_out(cm, EVerbose, "1 - in-play %d", as->events_in_play);
+	    CMtrace_out(cm, EVerbose, "1 - in-play %d\n", as->events_in_play);
 	    more_pending += process_events_stone(cm, s, Immediate_and_Multi);
 	    if (more_pending && (as->last_active_stone != -1)) goto restart;
 	}
     }
     if (as->last_active_stone != -1) {
-	CMtrace_out(cm, EVerbose, "Process output actions on stone %d",
+	CMtrace_out(cm, EVerbose, "Process output actions on stone %d\n",
 		    as->last_active_stone);
-	CMtrace_out(cm, EVerbose, "2 - in-play %d", as->events_in_play);
+	CMtrace_out(cm, EVerbose, "2 - in-play %d\n", as->events_in_play);
 	more_pending += process_events_stone(cm, as->last_active_stone, Bridge);
     }
     if (as->events_in_play > 0) {
@@ -1568,7 +1568,7 @@ process_local_actions(CManager cm)
 	    stone_type stone = stone_struct(evp, s);
 	    if (stone->local_id == -1) continue;
 	    if (stone->is_frozen == 1) continue;
-	    CMtrace_out(cm, EVerbose, "3 - in-play %d", as->events_in_play);
+	    CMtrace_out(cm, EVerbose, "3 - in-play %d\n", as->events_in_play);
 	    more_pending += process_events_stone(cm, s, Bridge);
 	}
     }
@@ -1598,7 +1598,7 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
     int s = (long)client_data;  /* stone ID */
     int a = 0;
     stone_type stone = stone_struct(evp, s);
-    CMtrace_out(cm, EVerbose, "Got a close for connection %p on stone %d, shutting down",
+    CMtrace_out(cm, EVerbose, "Got a close for connection %p on stone %d, shutting down\n",
 		conn, s);
     for (a=0 ; a < stone->proto_action_count; a++) {
 	proto_action *act = &stone->proto_actions[a];
@@ -1644,7 +1644,7 @@ do_bridge_action(CManager cm, int s)
     proto_action *act = NULL;
     stone_type stone;
     int a;
-    CMtrace_out(cm, EVerbose, "Process output action on stone %d", s);
+    CMtrace_out(cm, EVerbose, "Process output action on stone %d\n", s);
     stone = stone_struct(evp, s);
 
     if (stone->is_frozen || stone->is_draining) return 0;
@@ -1677,9 +1677,9 @@ do_bridge_action(CManager cm, int s)
 	}
 	event_item *event = dequeue_event(cm, stone, &action_id);
 	if (act->o.bri.conn == NULL) {
-	    CMtrace_out(cm, EVerbose, "Bridge stone %d has closed connection", s);
+	    CMtrace_out(cm, EVerbose, "Bridge stone %d has closed connection\n", s);
 	} else {
-	    CMtrace_out(cm, EVerbose, "Writing event to remote stone %d",
+	    CMtrace_out(cm, EVerbose, "Writing event to remote stone %d\n",
 			act->o.bri.remote_stone_id);
 	    if (event->format) {
 		ret = internal_write_event(act->o.bri.conn, event->format,
@@ -1794,6 +1794,8 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
 	resp->reference_format = reference_formats[i];
     }
     stone->response_cache_count += queue_count;
+    CMtrace_out(cm, EVerbose, "Installing %d mutated action responses for multi action %d on stone %d\n",
+		queue_count, action_num, stone_id);
     return resp_num;
 }
 
@@ -1877,7 +1879,7 @@ INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list
     }
     INT_CMconn_register_close_handler(conn, stone_close_handler, 
 				      (void*)(long)stone_num);
-    CMtrace_out(cm, EVerbose, "Adding bridge action %d to stone %d",
+    CMtrace_out(cm, EVerbose, "Adding bridge action %d to stone %d\n",
 		action_num, stone_num);
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (action_num + 1) * 
@@ -2554,7 +2556,7 @@ INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec,
 				     EVauto_submit_func, 
 				     (void*)(long)stone_num);
     stone->periodic_handle = handle;
-    CMtrace_out(cm, EVerbose, "Enabling auto events on stone %d", stone_num);
+    CMtrace_out(cm, EVerbose, "Enabling auto events on stone %d\n", stone_num);
 }
 
 
@@ -2620,7 +2622,7 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
 							buffer));
     event->attrs = CMadd_ref_attr_list(cm, attrs);
     event->format = NULL;
-    CMtrace_out(cm, EVerbose, "Event coming in from network to stone %d", 
+    CMtrace_out(cm, EVerbose, "Event coming in from network to stone %d\n", 
 		stone_id);
     if (CMtrace_on(conn->cm, EVerbose)) {
 	static int dump_char_limit = 256;
@@ -2733,7 +2735,7 @@ free_evp(CManager cm, void *not_used)
     event_path_data evp = cm->evp;
     int s;
     (void)not_used;
-    CMtrace_out(cm, CMFreeVerbose, "Freeing evpath information, evp %lx", (long) evp);
+    CMtrace_out(cm, CMFreeVerbose, "Freeing evpath information, evp %lx\n", (long) evp);
     for (s = 0 ; s < evp->stone_count; s++) {
 	INT_EVfree_stone(cm, s + evp->stone_base_num);
     }
@@ -2773,7 +2775,7 @@ EVPinit(CManager cm)
 	}
 	
     }
-    CMtrace_out(cm, EVerbose, "INITATED EVPATH, base stone num is %d", 
+    CMtrace_out(cm, EVerbose, "INITATED EVPATH, base stone num is %d\n", 
 		cm->evp->stone_base_num);
     first_evpinit = 0;
     cm->evp->queue_items_free_list = NULL;
