@@ -823,13 +823,13 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
         resp->stage = stage;
 	return return_response;
     }
-    /* This should be detected elsewhere now
     if (CMtrace_on(cm, EVWarning)) {
-	printf("Warning!  No action found for incoming event on stone %d\n",
+	char *tmp;
+	printf("Warning!  No action found for incoming an event on stone %d\n",
 	       stone->local_id);
+	printf("A NO_ACTION response has been installed into the response cache for event type \"%s\", ref %p\n", tmp = global_name_of_FMFormat(event->reference_format), event->reference_format);
 	dump_stone(stone);
     }
-    */
     stone->response_cache[return_response].action_type = Action_NoAction;
     stone->response_cache[return_response].stage = stage;
     stone->response_cache[return_response].requires_decoded = 0;
@@ -1070,7 +1070,7 @@ dump_action(stone_type stone, response_cache_element *resp, int a, const char *i
 	int i = 0;
 	while (act->matching_reference_formats[i] != NULL) {
 	    char *tmp;
-	    printf("\"%s\" ", tmp = global_name_of_FMFormat(act->matching_reference_formats[i]));
+	    printf("\"%s\" (%p), ", tmp = global_name_of_FMFormat(act->matching_reference_formats[i]), act->matching_reference_formats[i]);
 	    i++;
 	    free(tmp);
 	}
@@ -1783,6 +1783,8 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
     while (reference_formats[queue_count] != NULL) queue_count++;
     stone->response_cache = realloc(stone->response_cache, sizeof(stone->response_cache[0]) * (resp_num + queue_count));
     response_cache_element *resp;
+    CMtrace_out(cm, EVerbose, "Installing %d mutated action responses for multi action %d on stone %d\n",
+		queue_count, act_num, stone_id);
     for (i=0; i < queue_count; i++) {
 	resp = &stone->response_cache[stone->response_cache_count + i];
 	resp->action_type = stone->proto_actions[act_num].action_type;
@@ -1792,10 +1794,14 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
 	resp->o.multi.client_data = client_data;
         resp->stage = cached_stage_for_action(&stone->proto_actions[act_num]);
 	resp->reference_format = reference_formats[i];
+	if (CMtrace_on(cm, EVerbose)) {
+	    char *tmp;
+	    printf("\tResponse %d for format \"%s\" ref value %p", i, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
+	    i++;
+	    free(tmp);
+	}
     }
     stone->response_cache_count += queue_count;
-    CMtrace_out(cm, EVerbose, "Installing %d mutated action responses for multi action %d on stone %d\n",
-		queue_count, act_num, stone_id);
     return resp_num;
 }
 
