@@ -63,10 +63,30 @@ thread_bridge_transfer(CManager source_cm, event_item *event,
     CMwake_server_thread(target_cm);
 }
 
+static void
+free_master_event(void *event_data, void *event_struct)
+{
+    return_event(/*EVP*/NULL, (event_item*) event_struct);
+}
+
 static event_item *
 clone_event(CManager cm, event_item *event, CManager target_cm)
 {
-    (void)target_cm;
+    event_item *new_event = get_free_event(target_cm->evp);
+    int id_len;
+    char *old_ID;
+
+    *new_event = *event;
+    CMadd_ref_attr_list(cm, new_event->attrs);
+    new_event->format = NULL;
+    new_event->ref_count = 1;
+    new_event->free_arg = event;
+    new_event->free_func = free_master_event;
+    new_event->contents = Event_Freeable;
+
+    old_ID = get_server_ID_FMformat(event->reference_format, &id_len);
+    new_event->reference_format = FMformat_from_ID(target_cm->evp->fmc, old_ID);
+
     switch(event->contents) {
     case Event_CM_Owned:
 	/* 
@@ -76,21 +96,21 @@ clone_event(CManager cm, event_item *event, CManager target_cm)
 	 * between CMs.  Possibly very bad if one is always the network
 	 * manager and the other the consumer.)
 	 */
-	return event;
+	return new_event;
     case Event_Freeable:
 	/* 
 	 *  Ditto.  Except that it doesn't matter much who calls the 
 	 *  free function.
 	 */
-	return event;
+	return new_event;
     case Event_App_Owned:
          /*
 	  * Ugly.  This is a local EVsubmit of user-owned data.  They 
 	  * expect us not to return until they can overwrite their data.
 	  * Cheat and force the event to be CM-owned instead.
 	  */
-	ensure_ev_owned(cm, event);
-	return event;
+	ensure_ev_owned(cm, new_event);
+	return new_event;
     default:
 	assert(FALSE);
     }
