@@ -827,7 +827,7 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
 	char *tmp;
 	printf("Warning!  No action found for incoming an event on stone %d\n",
 	       stone->local_id);
-	printf("A NO_ACTION response has been installed into the response cache for event type \"%s\", ref %p\n", tmp = global_name_of_FMFormat(event->reference_format), event->reference_format);
+	printf("A NO_ACTION response has been installed into the response cache for event type \"%s\" (%p)\n", tmp = global_name_of_FMFormat(event->reference_format), event->reference_format);
 	dump_stone(stone);
     }
     stone->response_cache[return_response].action_type = Action_NoAction;
@@ -1796,7 +1796,7 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
 	resp->reference_format = reference_formats[i];
 	if (CMtrace_on(cm, EVerbose)) {
 	    char *tmp;
-	    printf("\tResponse %d for format \"%s\" ref value %p", i, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
+	    printf("\tResponse %d for format \"%s\"(%p)", i, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
 	    i++;
 	    free(tmp);
 	}
