@@ -57,6 +57,8 @@ thread_bridge_transfer(CManager source_cm, event_item *event,
     /* Both CMs are locked now */
     new_event = clone_event(source_cm, event, target_cm);
     internal_path_submit(target_cm, target_stone, new_event);
+    CMtrace_out(cm, EVerbose, "Transferring event %p from cm %p to cm %p, new_event %p\n\n",
+		source_cm, target_cm, event, new_event);
     CManager_unlock(target_cm);
     CMwake_server_thread(target_cm);
 }
