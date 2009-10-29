@@ -823,13 +823,13 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
         resp->stage = stage;
 	return return_response;
     }
-    if (CMtrace_on(cm, EVWarning)) {
+/*    if (CMtrace_on(cm, EVWarning)) {
 	char *tmp;
 	printf("Warning!  No action found for incoming an event on stone %d\n",
 	       stone->local_id);
 	printf("A NO_ACTION response has been installed into the response cache for event type \"%s\" (%p)\n", tmp = global_name_of_FMFormat(event->reference_format), event->reference_format);
 	dump_stone(stone);
-    }
+	}*/
     stone->response_cache[return_response].action_type = Action_NoAction;
     stone->response_cache[return_response].stage = stage;
     stone->response_cache[return_response].requires_decoded = 0;
