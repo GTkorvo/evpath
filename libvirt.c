@@ -117,17 +117,17 @@ int libvirt_init(void) {
 
 int libvirt_conn_test(void) {
 	if(libvirt_init() != 0)
-		return 0;
-	virConnectPtr conn = virConnectOpenReadOnly("xen:///");
+		return 1;
+	virConnectPtr conn = virConnectOpen("xen:///");
 	if(conn == NULL) {
 	  printf("libvirt connection open error on uri \n"); 
-	  return 0;
+	  return 1;
 	}
 	if(conn != NULL) 
 		virConnectClose(conn);
 
 	conn = NULL;
-	return 1;
+	return 0;
 }
 
 void free_domains(void) {
@@ -237,7 +237,7 @@ int add_interface_device(virDomainPtr dom, const char *path) {
 }
 
 int libvirt_open() {
-	conn = virConnectOpenReadOnly("xen:///");
+	conn = virConnectOpen("xen:///");
 	if(conn == NULL) {
 	  printf("libvirt connection open error on uri \n"); 
 	  return 0;
@@ -445,7 +445,7 @@ struct domain_info_list *libvirt_domain_info_list() {
 	domain_info_list->num_domains = nr_domains;
 	domain_info_list->domain_info = (struct domain_info *) calloc(nr_domains, sizeof(struct domain_info));
 
-	for(i = 0; i < nr_domains; ++i) {
+	for(i = 0; i < nr_domains; i++) {
 		if(virDomainGetInfo(domains[i], &vir_domain_info) != 0) 
 			continue;
 
@@ -462,47 +462,96 @@ struct domain_info_list *libvirt_domain_info_list() {
 
 struct domain_disk_info_list *libvirt_domain_disk_info_list() {
 	int i;
+	int j = 0;
+	unsigned long long vblock_rreq = 0L;
+	unsigned long long vblock_wreq = 0L;
+	unsigned long long vblock_rbytes = 0L;
+	unsigned long long vblock_wbytes = 0L;
 
 	struct domain_disk_info_list *domain_disk_info_list = (struct domain_disk_info_list *) calloc(1, sizeof(struct domain_disk_info_list));
 	domain_disk_info_list->num_domains = nr_domains;
 	domain_disk_info_list->domain_disk_info = (struct domain_disk_info *) calloc(nr_domains, sizeof(struct domain_disk_info));
 
-	for(i = 0; i < nr_block_devices; ++i) {
+	for(i = 0; i < nr_block_devices; i++) {
 		struct _virDomainBlockStats stats;
 		if(virDomainBlockStats(block_devices[i].dom, block_devices[i].path, &stats, sizeof stats) != 0)
 			continue;
-		domain_disk_info_list->domain_disk_info[i].domain_name = strdup(virDomainGetName(domains[i]));
-		domain_disk_info_list->domain_disk_info[i].domain_id = virDomainGetID(domains[i]);
-		domain_disk_info_list->domain_disk_info[i].domain_vblock_rreq = (unsigned long long) stats.rd_req;
-		domain_disk_info_list->domain_disk_info[i].domain_vblock_wreq = (unsigned long long) stats.wr_req;
-		domain_disk_info_list->domain_disk_info[i].domain_vblock_rbytes = (unsigned long long) stats.rd_bytes;
-		domain_disk_info_list->domain_disk_info[i].domain_vblock_wbytes = (unsigned long long) stats.wr_bytes;
+		vblock_rreq += (unsigned long long) stats.rd_req;
+		vblock_wreq += (unsigned long long) stats.wr_req;
+		vblock_rbytes += (unsigned long long) stats.rd_bytes;
+		vblock_wbytes += (unsigned long long) stats.wr_bytes;
+
+		if(((i+1)%2) == 0) {
+			if(j < nr_domains) {
+				domain_disk_info_list->domain_disk_info[j].domain_name = strdup(virDomainGetName(domains[j+1]));
+				domain_disk_info_list->domain_disk_info[j].domain_id = virDomainGetID(domains[j+1]);
+				domain_disk_info_list->domain_disk_info[j].domain_vblock_rreq = vblock_rreq;
+				domain_disk_info_list->domain_disk_info[j].domain_vblock_wreq = vblock_wreq;
+				domain_disk_info_list->domain_disk_info[j].domain_vblock_rbytes = vblock_rbytes;
+				domain_disk_info_list->domain_disk_info[j].domain_vblock_wbytes = vblock_wbytes;
+				j += 1;
+			}
+			vblock_rreq = 0L;
+			vblock_wreq = 0L;
+			vblock_rbytes = 0L;
+			vblock_wbytes = 0L;
+		} 
 	}
 	return domain_disk_info_list;
 }
 
 struct domain_interface_info_list *libvirt_domain_interface_info_list() {
 	int i;
+	int j = 0;
+	unsigned long long if_rxbytes = 0L;
+	unsigned long long if_txbytes = 0L;
+	unsigned long long if_rxpackets = 0L;
+	unsigned long long if_txpackets = 0L;
+	unsigned long long if_rxerrors = 0L;
+	unsigned long long if_txerrors = 0L;
+	unsigned long long if_rxdrops = 0L;
+	unsigned long long if_txdrops = 0L;
 
 	struct domain_interface_info_list *domain_interface_info_list = (struct domain_interface_info_list *) calloc(1, 
 	sizeof(struct domain_interface_info_list));
 	domain_interface_info_list->num_domains = nr_domains;
 	domain_interface_info_list->domain_interface_info = (struct domain_interface_info *) calloc(nr_domains, sizeof(struct domain_interface_info));
 
-	for(i = 0; i < nr_interface_devices; ++i) {
+	for(i = 0; i < nr_interface_devices; i++) {
 		struct _virDomainInterfaceStats stats;
 		if(virDomainInterfaceStats(interface_devices[i].dom, interface_devices[i].path, &stats, sizeof stats) != 0)
 			continue;
-		domain_interface_info_list->domain_interface_info[i].domain_name = strdup(virDomainGetName(domains[i]));
-		domain_interface_info_list->domain_interface_info[i].domain_id = virDomainGetID(domains[i]);
-		domain_interface_info_list->domain_interface_info[i].domain_if_rxbytes = (unsigned long long) stats.rx_bytes;
-		domain_interface_info_list->domain_interface_info[i].domain_if_txbytes = (unsigned long long) stats.tx_bytes;
-		domain_interface_info_list->domain_interface_info[i].domain_if_rxpackets = (unsigned long long) stats.rx_packets;
-		domain_interface_info_list->domain_interface_info[i].domain_if_txpackets = (unsigned long long) stats.tx_packets;
-		domain_interface_info_list->domain_interface_info[i].domain_if_rxerrors = (unsigned long long) stats.rx_errs;
-		domain_interface_info_list->domain_interface_info[i].domain_if_txerrors = (unsigned long long) stats.tx_errs;
-		domain_interface_info_list->domain_interface_info[i].domain_if_rxdrops = (unsigned long long) stats.rx_drop;
-		domain_interface_info_list->domain_interface_info[i].domain_if_txdrops = (unsigned long long) stats.tx_drop;
+
+		if_rxbytes += (unsigned long long) stats.rx_bytes;
+		if_txbytes += (unsigned long long) stats.tx_bytes;
+		if_rxpackets += (unsigned long long) stats.rx_packets;
+		if_txpackets += (unsigned long long) stats.tx_packets;
+		if_rxerrors += (unsigned long long) stats.rx_errs;
+		if_txerrors += (unsigned long long) stats.tx_errs;
+		if_rxdrops += (unsigned long long) stats.rx_drop;
+		if_txdrops += (unsigned long long) stats.tx_drop;
+
+		if(j < nr_domains) {
+			domain_interface_info_list->domain_interface_info[j].domain_name = strdup(virDomainGetName(domains[j+1]));
+			domain_interface_info_list->domain_interface_info[j].domain_id = virDomainGetID(domains[j+1]);
+			domain_interface_info_list->domain_interface_info[j].domain_if_rxbytes = if_rxbytes;
+			domain_interface_info_list->domain_interface_info[j].domain_if_txbytes = if_txbytes;
+			domain_interface_info_list->domain_interface_info[j].domain_if_rxpackets = if_rxpackets;
+			domain_interface_info_list->domain_interface_info[j].domain_if_txpackets = if_txpackets;
+			domain_interface_info_list->domain_interface_info[j].domain_if_rxerrors = if_rxerrors;
+			domain_interface_info_list->domain_interface_info[j].domain_if_txerrors = if_txerrors;
+			domain_interface_info_list->domain_interface_info[j].domain_if_rxdrops = if_rxdrops;
+			domain_interface_info_list->domain_interface_info[j].domain_if_txdrops = if_txdrops;
+			j += 1;
+		}
+		if_rxbytes = 0L;
+		if_txbytes = 0L;
+		if_rxpackets = 0L;
+		if_txpackets = 0L;
+		if_rxerrors = 0L;
+		if_txerrors = 0L;
+		if_rxdrops = 0L;
+		if_txdrops = 0L;
 	}
 	return domain_interface_info_list;
 }
@@ -816,38 +865,58 @@ unsigned long long libvirt_get_domain_if_txdrops(char *domain_name) {
 	return domain_if_txdrops;
 }
 
+int libvirt_set_vcpus(char *domain_name, int num_vcpus) {
+	int i;
+	for(i = 0; i < nr_domains; i++) {
+		if(strstr(domain_name, virDomainGetName(domains[i]))) {
+			return virDomainSetVcpus(domains[i], num_vcpus);
+		}
+	}
+}
+
+int libvirt_set_memory(char *domain_name, unsigned long mem_kbs) {
+	int i;
+	for(i = 0; i < nr_domains; i++) {
+		if(strstr(domain_name, virDomainGetName(domains[i]))) {
+			return virDomainSetMemory(domains[i], mem_kbs);
+		}
+	}
+}
+
 void
 add_metrics_routines(stone_type stone, cod_parse_context context)
 {
     static char extern_string[] = "\
-		void libvirt_init();\n\											// 1
-		void libvirt_open();\n\											// 2
-		void libvirt_close();\n\										// 3
-		int libvirt_num_domains();\n\									// 4
-		int libvirt_num_active_domains();\n\							// 5
-		int libvirt_num_inactive_domains();\n\							// 6
-		domain_info *libvirt_get_domain_info();\n\ 						// 7
-		domain_disk_info *libvirt_get_domain_disk_info();\n\			// 8	
-		domain_interface_info *libvirt_get_domain_interface_info();\n\	// 9
-		int libvirt_domain_exists();\n\ 								// 10
-		int libvirt_get_domain_id();\n\ 								// 11
-		unsigned char libvirt_get_domain_state();\n\ 					// 12
-		unsigned long libvirt_get_domain_mem_max();\n\ 					// 13
-		unsigned long libvirt_get_domain_mem_used();\n\ 				// 14
-		unsigned short libvirt_get_domain_num_vcpus();\n\ 				// 15
-		unsigned long long libvirt_get_domain_cpu_total_time();\n\		// 16
-		unsigned long long libvirt_get_domain_vblock_rreq();\n\			// 17
-		unsigned long long libvirt_get_domain_vblock_wreq();\n\			// 18
-		unsigned long long libvirt_get_domain_vblock_rbytes();\n\		// 19
-		unsigned long long libvirt_get_domain_vblock_wbytes();\n\		// 20
-		unsigned long long libvirt_get_domain_if_rxbytes();\n\			// 21
-		unsigned long long libvirt_get_domain_if_txbytes();\n\			// 22
-		unsigned long long libvirt_get_domain_if_rxpackets();\n\		// 23
-		unsigned long long libvirt_get_domain_if_txpackets();\n\		// 24
-		unsigned long long libvirt_get_domain_if_rxerrors();\n\			// 25
-		unsigned long long libvirt_get_domain_if_txerrors();\n\			// 26
-		unsigned long long libvirt_get_domain_if_rxdrops();\n\			// 27
-		unsigned long long libvirt_get_domain_if_txdrops();\n\			// 28
+		void libvirt_init();\n\												// 1
+		void libvirt_open();\n\												// 2
+		void libvirt_close();\n\											// 3
+		int libvirt_num_domains();\n\										// 4
+		int libvirt_num_active_domains();\n\								// 5
+		int libvirt_num_inactive_domains();\n\								// 6
+		domain_info *libvirt_get_domain_info();\n\ 							// 7
+		domain_disk_info *libvirt_get_domain_disk_info();\n\				// 8	
+		domain_interface_info *libvirt_get_domain_interface_info();\n\		// 9
+		int libvirt_domain_exists();\n\ 									// 10
+		int libvirt_get_domain_id();\n\ 									// 11
+		unsigned char libvirt_get_domain_state();\n\ 						// 12
+		unsigned long libvirt_get_domain_mem_max();\n\ 						// 13
+		unsigned long libvirt_get_domain_mem_used();\n\ 					// 14
+		unsigned short libvirt_get_domain_num_vcpus();\n\ 					// 15
+		unsigned long long libvirt_get_domain_cpu_total_time();\n\			// 16
+		unsigned long long libvirt_get_domain_vblock_rreq();\n\				// 17
+		unsigned long long libvirt_get_domain_vblock_wreq();\n\				// 18
+		unsigned long long libvirt_get_domain_vblock_rbytes();\n\			// 19
+		unsigned long long libvirt_get_domain_vblock_wbytes();\n\			// 20
+		unsigned long long libvirt_get_domain_if_rxbytes();\n\				// 21
+		unsigned long long libvirt_get_domain_if_txbytes();\n\				// 22
+		unsigned long long libvirt_get_domain_if_rxpackets();\n\			// 23
+		unsigned long long libvirt_get_domain_if_txpackets();\n\			// 24
+		unsigned long long libvirt_get_domain_if_rxerrors();\n\				// 25
+		unsigned long long libvirt_get_domain_if_txerrors();\n\				// 26
+		unsigned long long libvirt_get_domain_if_rxdrops();\n\				// 27
+		unsigned long long libvirt_get_domain_if_txdrops();\n\				// 28
+		int libvirt_set_vcpus(char *domain_name, int num_vcpus);\n\     	// 29 
+		int libvirt_set_memory(char *domain_name, unsigned long mem_kbs);\n\	//30
 
     static cod_extern_entry externs[] = {
 	{"libvirt_init", (void *) 0},						// 0
@@ -878,6 +947,8 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
 	{"libvirt_get_domain_if_txerrors", (void *) 0},		// 25
 	{"libvirt_get_domain_if_rxdrops", (void *) 0}, 		// 26
 	{"libvirt_get_domain_if_txdrops", (void *) 0},		// 27
+	{"libvirt_set_vcpus", (void *) 0},					// 28
+	{"libvirt_set_memory", (void *) 0},					// 29
 	{(void *) 0, (void *) 0}
     };
 
@@ -914,6 +985,8 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
     externs[25].extern_value = (void *) (long) libvirt_get_domain_if_txerrors;
     externs[26].extern_value = (void *) (long) libvirt_get_domain_if_rxdrops;
     externs[27].extern_value = (void *) (long) libvirt_get_domain_if_txdrops;
+    externs[28].extern_value = (void *) (long) libvirt_set_vcpus;
+    externs[29].extern_value = (void *) (long) libvirt_set_memory;
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
@@ -923,17 +996,37 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
 	printf (" Test %  ..\n");
 	libvirt_init();
 	libvirt_open();
-
-	printf("Domain info - name  : %s \n", libvirt_get_domain_disk_info("apache")->domain_name); 
+	//libvirt_read_stats();	
+		
+	printf("Domain info - name  : %s \n", libvirt_get_domain_info("apache")->domain_name); 
 	printf("Domain info - vblock_rreq   : %llu \n", libvirt_get_domain_vblock_rreq("apache")); 
-	printf("Domain info - vblock_wreq 	: %llu \n", libvirt_get_domain_vblock_wreq("apache")); 
+	printf("Domain info - vblock_wreq   : %llu \n", libvirt_get_domain_vblock_wreq("apache")); 
 	printf("Domain info - vblock_rbytes : %llu \n", libvirt_get_domain_vblock_rbytes("apache")); 
 	printf("Domain info - vblock_wbytes : %llu \n", libvirt_get_domain_vblock_wbytes("apache")); 
 
-	printf("Domain info - if_txpackets : %llu \n", libvirt_get_domain_if_txpackets("Domain-0")); 
-	printf("Domain info - if_rxpackets : %llu \n", libvirt_get_domain_if_rxpackets("Domain-0")); 
-	printf("Domain info - if_txbytes : %llu \n", libvirt_get_domain_if_txbytes("Domain-0")); 
-	printf("Domain info - if_rxbytes : %llu \n", libvirt_get_domain_if_rxbytes("Domain-0")); 
+	printf("Domain info - name  : %s \n", libvirt_get_domain_info("tomcat")->domain_name); 
+	printf("Domain info - vblock_rreq   : %llu \n", libvirt_get_domain_vblock_rreq("tomcat")); 
+	printf("Domain info - vblock_wreq   : %llu \n", libvirt_get_domain_vblock_wreq("tomcat")); 
+	printf("Domain info - vblock_rbytes : %llu \n", libvirt_get_domain_vblock_rbytes("tomcat")); 
+	printf("Domain info - vblock_wbytes : %llu \n", libvirt_get_domain_vblock_wbytes("tomcat")); 
+	
+	printf("Domain info - name  : %s \n", libvirt_get_domain_info("apache")->domain_name); 
+	printf("Domain info - if_txpackets : %llu \n", libvirt_get_domain_if_txpackets("apache")); 
+	printf("Domain info - if_rxpackets : %llu \n", libvirt_get_domain_if_rxpackets("apache")); 
+	printf("Domain info - if_txbytes : %llu \n", libvirt_get_domain_if_txbytes("apache")); 
+	printf("Domain info - if_rxbytes : %llu \n", libvirt_get_domain_if_rxbytes("apache")); 
+	printf("Domain info - if_txerrors : %llu \n", libvirt_get_domain_if_txerrors("apache")); 
+	printf("Domain info - if_rxerrors : %llu \n", libvirt_get_domain_if_rxerrors("apache")); 
+	printf("Domain info - if_txdrops : %llu \n", libvirt_get_domain_if_txdrops("apache")); 
+	printf("Domain info - if_rxdrops : %llu \n", libvirt_get_domain_if_rxdrops("apache")); 
 
+	printf("Domain info - num vpcus %us \n", libvirt_get_domain_num_vcpus("Domain-0")); 
+	printf("Domain info - mem max %llu \n", libvirt_get_domain_mem_max("Domain-0")); 
+	printf("Domain info - mem used %llu \n", libvirt_get_domain_mem_used("Domain-0")); 
+	//libvirt_set_vpcus("Domain-0", 7);
+	//uint32_t mem = 1024*1024; //Can add up to 16GB 16777216 Kbs = 16*1024*1024
+	//libvirt_set_memory("Domain-0", mem);
+	
 	libvirt_close();
+
 }*/
