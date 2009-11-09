@@ -887,36 +887,36 @@ void
 add_metrics_routines(stone_type stone, cod_parse_context context)
 {
     static char extern_string[] = "\
-		void libvirt_init();\n\												// 1
-		void libvirt_open();\n\												// 2
-		void libvirt_close();\n\											// 3
-		int libvirt_num_domains();\n\										// 4
-		int libvirt_num_active_domains();\n\								// 5
-		int libvirt_num_inactive_domains();\n\								// 6
-		domain_info *libvirt_get_domain_info();\n\ 							// 7
-		domain_disk_info *libvirt_get_domain_disk_info();\n\				// 8	
-		domain_interface_info *libvirt_get_domain_interface_info();\n\		// 9
-		int libvirt_domain_exists();\n\ 									// 10
-		int libvirt_get_domain_id();\n\ 									// 11
-		unsigned char libvirt_get_domain_state();\n\ 						// 12
-		unsigned long libvirt_get_domain_mem_max();\n\ 						// 13
-		unsigned long libvirt_get_domain_mem_used();\n\ 					// 14
-		unsigned short libvirt_get_domain_num_vcpus();\n\ 					// 15
-		unsigned long long libvirt_get_domain_cpu_total_time();\n\			// 16
-		unsigned long long libvirt_get_domain_vblock_rreq();\n\				// 17
-		unsigned long long libvirt_get_domain_vblock_wreq();\n\				// 18
-		unsigned long long libvirt_get_domain_vblock_rbytes();\n\			// 19
-		unsigned long long libvirt_get_domain_vblock_wbytes();\n\			// 20
-		unsigned long long libvirt_get_domain_if_rxbytes();\n\				// 21
-		unsigned long long libvirt_get_domain_if_txbytes();\n\				// 22
-		unsigned long long libvirt_get_domain_if_rxpackets();\n\			// 23
-		unsigned long long libvirt_get_domain_if_txpackets();\n\			// 24
-		unsigned long long libvirt_get_domain_if_rxerrors();\n\				// 25
-		unsigned long long libvirt_get_domain_if_txerrors();\n\				// 26
-		unsigned long long libvirt_get_domain_if_rxdrops();\n\				// 27
-		unsigned long long libvirt_get_domain_if_txdrops();\n\				// 28
-		int libvirt_set_vcpus(char *domain_name, int num_vcpus);\n\     	// 29 
-		int libvirt_set_memory(char *domain_name, unsigned long mem_kbs);\n\	//30
+		void libvirt_init();\n\																// 1
+		void libvirt_open();\n\																// 2
+		void libvirt_close();\n\															// 3
+		int libvirt_num_domains();\n\														// 4
+		int libvirt_num_active_domains();\n\												// 5
+		int libvirt_num_inactive_domains();\n\												// 6
+		//domain_info *libvirt_get_domain_info(char *domain_name);\n\ 						// 7
+		//domain_disk_info *libvirt_get_domain_disk_info(char *domain_name);\n\				// 8	
+		//domain_interface_info *libvirt_get_domain_interface_info(char *domain_name);\n\	// 9
+		int libvirt_domain_exists(char *domain_name);\n\ 									// 10
+		int libvirt_get_domain_id(char *domain_name);\n\ 									// 11
+		unsigned char libvirt_get_domain_state(char *domain_name);\n\ 						// 12
+		unsigned long libvirt_get_domain_mem_max(char *domain_name);\n\ 					// 13
+		unsigned long libvirt_get_domain_mem_used(char *domain_name);\n\ 					// 14
+		unsigned short libvirt_get_domain_num_vcpus(char *domain_name);\n\ 					// 15
+		unsigned long long libvirt_get_domain_cpu_total_time(char *domain_name);\n\			// 16
+		unsigned long long libvirt_get_domain_vblock_rreq(char *domain_name);\n\			// 17
+		unsigned long long libvirt_get_domain_vblock_wreq(char *domain_name);\n\			// 18
+		unsigned long long libvirt_get_domain_vblock_rbytes(char *domain_name);\n\			// 19
+		unsigned long long libvirt_get_domain_vblock_wbytes(char *domain_name);\n\			// 20
+		unsigned long long libvirt_get_domain_if_rxbytes(char *domain_name);\n\				// 21
+		unsigned long long libvirt_get_domain_if_txbytes(char *domain_name);\n\				// 22
+		unsigned long long libvirt_get_domain_if_rxpackets(char *domain_name);\n\			// 23
+		unsigned long long libvirt_get_domain_if_txpackets(char *domain_name);\n\			// 24
+		unsigned long long libvirt_get_domain_if_rxerrors(char *domain_name);\n\			// 25
+		unsigned long long libvirt_get_domain_if_txerrors(char *domain_name);\n\			// 26
+		unsigned long long libvirt_get_domain_if_rxdrops(char *domain_name);\n\				// 27
+		unsigned long long libvirt_get_domain_if_txdrops(char *domain_name);\n\				// 28
+		int libvirt_set_vcpus(char *domain_name, int num_vcpus);\n\     					// 29 
+		int libvirt_set_memory(char *domain_name, unsigned long mem_kbs);\n";				//30
 
     static cod_extern_entry externs[] = {
 	{"libvirt_init", (void *) 0},						// 0
@@ -925,9 +925,9 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
 	{"libvirt_num_domains", (void *) 0},				// 3
 	{"libvirt_num_active_domains", (void *) 0},			// 4
 	{"libvirt_num_inactive_domains", (void *) 0},		// 5
-	{"libvirt_get_domain_info", (void *) 0},			// 6
-	{"libvirt_get_domain_disk_info", (void *) 0},		// 7	
-	{"libvirt_get_domain_interface_info", (void *) 0},	// 8
+	//{"libvirt_get_domain_info", (void *) 0},			// 6
+	//{"libvirt_get_domain_disk_info", (void *) 0},		// 7	
+	//{"libvirt_get_domain_interface_info", (void *) 0},// 8
 	{"libvirt_domain_exists", (void *) 0}, 				// 9
 	{"libvirt_get_domain_id", (void *) 0},				// 10
 	{"libvirt_get_domain_state", (void *) 0}, 			// 11
@@ -963,30 +963,30 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
     externs[2].extern_value = (void *) (long) libvirt_num_domains;
     externs[3].extern_value = (void *) (long) libvirt_num_active_domains;
     externs[5].extern_value = (void *) (long) libvirt_num_inactive_domains;
-    externs[6].extern_value = (void *) (long) libvirt_get_domain_info;
-    externs[7].extern_value = (void *) (long) libvirt_get_domain_disk_info;
-    externs[8].extern_value = (void *) (long) libvirt_get_domain_interface_info;
-    externs[9].extern_value = (void *) (long) libvirt_domain_exists;
-    externs[10].extern_value = (void *) (long) libvirt_get_domain_id;
-    externs[11].extern_value = (void *) (long) libvirt_get_domain_state;
-    externs[12].extern_value = (void *) (long) libvirt_get_domain_mem_max;
-    externs[13].extern_value = (void *) (long) libvirt_get_domain_mem_used;
-    externs[14].extern_value = (void *) (long) libvirt_get_domain_num_vcpus;
-    externs[15].extern_value = (void *) (long) libvirt_get_domain_cpu_total_time;
-    externs[16].extern_value = (void *) (long) libvirt_get_domain_vblock_rreq;
-    externs[17].extern_value = (void *) (long) libvirt_get_domain_vblock_wreq;
-    externs[18].extern_value = (void *) (long) libvirt_get_domain_vblock_rbytes;
-    externs[19].extern_value = (void *) (long) libvirt_get_domain_vblock_wbytes;
-    externs[20].extern_value = (void *) (long) libvirt_get_domain_if_rxbytes;
-    externs[21].extern_value = (void *) (long) libvirt_get_domain_if_txbytes;
-    externs[22].extern_value = (void *) (long) libvirt_get_domain_if_rxpackets;
-    externs[23].extern_value = (void *) (long) libvirt_get_domain_if_txpackets;
-    externs[24].extern_value = (void *) (long) libvirt_get_domain_if_rxerrors;
-    externs[25].extern_value = (void *) (long) libvirt_get_domain_if_txerrors;
-    externs[26].extern_value = (void *) (long) libvirt_get_domain_if_rxdrops;
-    externs[27].extern_value = (void *) (long) libvirt_get_domain_if_txdrops;
-    externs[28].extern_value = (void *) (long) libvirt_set_vcpus;
-    externs[29].extern_value = (void *) (long) libvirt_set_memory;
+    //externs[6].extern_value = (void *) (long) libvirt_get_domain_info;
+    //externs[7].extern_value = (void *) (long) libvirt_get_domain_disk_info;
+    //externs[8].extern_value = (void *) (long) libvirt_get_domain_interface_info;
+    externs[6].extern_value = (void *) (long) libvirt_domain_exists;
+    externs[7].extern_value = (void *) (long) libvirt_get_domain_id;
+    externs[8].extern_value = (void *) (long) libvirt_get_domain_state;
+    externs[9].extern_value = (void *) (long) libvirt_get_domain_mem_max;
+    externs[10].extern_value = (void *) (long) libvirt_get_domain_mem_used;
+    externs[11].extern_value = (void *) (long) libvirt_get_domain_num_vcpus;
+    externs[12].extern_value = (void *) (long) libvirt_get_domain_cpu_total_time;
+    externs[13].extern_value = (void *) (long) libvirt_get_domain_vblock_rreq;
+    externs[14].extern_value = (void *) (long) libvirt_get_domain_vblock_wreq;
+    externs[15].extern_value = (void *) (long) libvirt_get_domain_vblock_rbytes;
+    externs[16].extern_value = (void *) (long) libvirt_get_domain_vblock_wbytes;
+    externs[17].extern_value = (void *) (long) libvirt_get_domain_if_rxbytes;
+    externs[18].extern_value = (void *) (long) libvirt_get_domain_if_txbytes;
+    externs[19].extern_value = (void *) (long) libvirt_get_domain_if_rxpackets;
+    externs[20].extern_value = (void *) (long) libvirt_get_domain_if_txpackets;
+    externs[21].extern_value = (void *) (long) libvirt_get_domain_if_rxerrors;
+    externs[22].extern_value = (void *) (long) libvirt_get_domain_if_txerrors;
+    externs[23].extern_value = (void *) (long) libvirt_get_domain_if_rxdrops;
+    externs[24].extern_value = (void *) (long) libvirt_get_domain_if_txdrops;
+    externs[25].extern_value = (void *) (long) libvirt_set_vcpus;
+    externs[26].extern_value = (void *) (long) libvirt_set_memory;
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
@@ -1028,5 +1028,4 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
 	//libvirt_set_memory("Domain-0", mem);
 	
 	libvirt_close();
-
 }*/
