@@ -1059,7 +1059,7 @@ dump_action(stone_type stone, response_cache_element *resp, int a, const char *i
     if (act->data_state == Accepts_All) {
 	printf("accepts any encode state\n");
     } else if (act->data_state == Requires_Decoded) {
-	printf("requires encoded\n");
+	printf("requires decoded\n");
     } else if (act->data_state == Requires_Contig_Encoded) {
 	printf("requires contiguous encoded\n");
     } else if (act->data_state == Requires_Vector_Encoded) {
