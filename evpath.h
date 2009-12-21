@@ -2012,14 +2012,11 @@ create_transform_action_spec(FMStructDescList format_list, FMStructDescList out_
  * \param input_format_lists A null-terminated list of null-terminated lists
  *  of descriptions of  the incoming event data types that the transformation
  *  expects. 
- * \param out_format_list A description of the outgoing event data that the
- * transformation will produce. 
- * \param function The processing that will perform the transformation.  A
- * zero return value means that the output data should be ignored/discarded.
+ * \param function The processing that will perform the transformation.  Not outputs are explicit, but must be performed by some EVsubmit* action.
  */
 /*NOLOCK*/
 extern char *
-create_multityped_action_spec(FMStructDescList *input_format_lists, FMStructDescList out_format_list, char *function);
+create_multityped_action_spec(FMStructDescList *input_format_lists, char *function);
 
 /*!
  * Add a set of routines that will be visible in COD.

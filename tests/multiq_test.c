@@ -253,6 +253,7 @@ char **argv;
 	}
 	term = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, term, c_format_list, output_handler, NULL);
+	EVassoc_terminal_action(cm, term, a_format_list, output_handler, NULL);
 	filter = create_multityped_action_spec(queue_list,
 						c_format_list, trans);
 

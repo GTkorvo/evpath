@@ -276,6 +276,6 @@ old_create_multityped_action_spec(CMFormatList *input_format_lists, CMFormatList
     }
     out_structs[count].format_name = NULL;
     out_structs[count].field_list = NULL;
-    return create_multityped_action_spec(struct_list, out_structs, function);
+    return create_multityped_action_spec(struct_list, function);
 }
 

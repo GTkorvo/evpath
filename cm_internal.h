@@ -431,7 +431,7 @@ extern CMFormat INT_CMlookup_format ARGS((CManager cm, FMStructDescList format_l
 extern char *
 INT_create_transform_action_spec(FMStructDescList format_list, FMStructDescList out_format_list, char *function);
 extern char *
-INT_create_multityped_action_spec(FMStructDescList *input_format_lists, FMStructDescList output_format_list, char *function);
+INT_create_multityped_action_spec(FMStructDescList *input_format_lists, char *function);
 
 extern int INT_CMCondition_has_signaled ARGS((CManager cm, int condition));
 

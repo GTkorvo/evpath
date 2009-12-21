@@ -44,7 +44,6 @@ struct transform_spec {
 
 struct multityped_spec {
     FMStructDescList *struct_list;
-    FMStructDescList out_format_list;
     char *function;
     void *client_data;
     FMFormat *reference_input_format_list;
@@ -321,9 +320,9 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
     }
     if (strncmp("Multityped Action", str, strlen("Multityped Action")) == 0) {
 	struct response_spec *response = malloc(sizeof(struct response_spec));
-	int list_count, j, format_count, i;
+	int list_count, j;
 	char *function;
-	FMStructDescList *struct_list, out_list = NULL;
+	FMStructDescList *struct_list;
 
 	str += strlen("Multityped Action") + 1;
 	sscanf(str, "  List Count %d\n", &list_count);
@@ -343,22 +342,10 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	    in_list[format_count2].field_list = NULL;
 	    struct_list[j] = in_list;
 	}
-	if (sscanf(str, "  Output Format Count %d\n", &format_count) != 1) {
-	    printf("output format parse failed\n");
-	    return 0;
-	}
-	str = strchr(str, '\n') + 1;
-	out_list = malloc(sizeof(out_list[0]) * (format_count + 1));
-	for (i=0; i < format_count; i++) {
-	    str = parse_FMformat_from_string(str, &out_list[i]);
-	}
-	out_list[format_count].format_name = NULL;
-	out_list[format_count].field_list = NULL;
 	function = malloc(strlen(str) + 1);
 	strcpy(function, str);
 	response->response_type = Response_Multityped;
 	response->u.multityped.struct_list = struct_list;
-	response->u.multityped.out_format_list = out_list;
 	response->u.multityped.function = function;
 	response->u.multityped.client_data = local_data;
 	response->u.multityped.reference_input_format_list =
@@ -465,10 +452,9 @@ INT_create_transform_action_spec(FMStructDescList format_list, FMStructDescList 
 }
 
 extern char *
-INT_create_multityped_action_spec(FMStructDescList *input_format_lists, FMStructDescList output_format_list, char *function)
+INT_create_multityped_action_spec(FMStructDescList *input_format_lists, char *function)
 {
     int list_count = 0;
-    int out_format_count = 0;
     int l, i;
     char *str;
     while(input_format_lists && input_format_lists[list_count] != NULL)
@@ -490,16 +476,6 @@ INT_create_multityped_action_spec(FMStructDescList *input_format_lists, FMStruct
 	}
     }
 
-    while(output_format_list && output_format_list[out_format_count].format_name != NULL)
-	out_format_count++;
-    str = realloc(str, strlen(str) + 50);
-    sprintf(str + strlen(str), "  Output Format Count %d\n",
-	    out_format_count);
-    for (i = 0 ; i < out_format_count; i++) {
-	str = add_FMfieldlist_to_string(str, &output_format_list[i]);
-    }
-    str = realloc(str, strlen(str) + strlen(function) + 1);
-    strcpy(&str[strlen(str)], function);
     return str;
 }
 
@@ -625,6 +601,10 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	ret = ((int(*)(void *, void *, attr_list))instance->u.transform.func_ptr)(event->decoded_event, out_event, attrs);
     }
 
+    if (out_stones[0] == -1) {
+	printf("Transform output stone ID not set, event discarded\n");
+	ret = 0;
+    }
     if (ret) {
 	struct _EVSource s;
 	if (CMtrace_on(cm, EVerbose)) {
