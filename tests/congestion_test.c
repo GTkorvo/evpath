@@ -332,8 +332,7 @@ char **argv;
 
             source_handle = EVcreate_submit_handle_free(cm, stone, simple_format_list,
 						    data_free, NULL);
-	    filter = create_multityped_action_spec(simple_format_lists, simple_format_list,
-						    congest);
+	    filter = create_multityped_action_spec(simple_format_lists, congest);
 	    EVassoc_congestion_action(cm, stone, filter, NULL);
 	}
 	data = malloc(sizeof(simple_rec));

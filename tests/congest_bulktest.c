@@ -319,7 +319,7 @@ char **argv;
 	    stone = EValloc_stone(cm);
 	    EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
             congest_act = create_multityped_action_spec(simple_format_lists,
-                simple_format_list, (char *) congest);
+							(char *) congest);
             EVassoc_congestion_action(cm, stone, congest_act, NULL); 
         } else {
             assert(FALSE);

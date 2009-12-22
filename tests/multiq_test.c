@@ -254,8 +254,7 @@ char **argv;
 	term = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, term, c_format_list, output_handler, NULL);
 	EVassoc_terminal_action(cm, term, a_format_list, output_handler, NULL);
-	filter = create_multityped_action_spec(queue_list,
-						c_format_list, trans);
+	filter = create_multityped_action_spec(queue_list, trans);
 
 	fstone = EValloc_stone(cm);
 	faction = EVassoc_multi_action(cm, fstone, filter, NULL);
@@ -429,8 +428,7 @@ do_regression_master_test()
     term = EValloc_stone(cm);
     EVassoc_terminal_action(cm, term, c_format_list, output_handler, &message_count);
 
-    filter = create_multityped_action_spec(queue_list,
-					    c_format_list, trans);
+    filter = create_multityped_action_spec(queue_list, trans);
 
     fstone = EValloc_stone(cm);
     faction = EVassoc_multi_action(cm, fstone, filter, NULL);
