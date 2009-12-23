@@ -476,6 +476,8 @@ INT_create_multityped_action_spec(FMStructDescList *input_format_lists, char *fu
 	}
     }
 
+    str = realloc(str, strlen(str) + strlen(function) + 1);
+    strcpy(&str[strlen(str)], function);
     return str;
 }
 
