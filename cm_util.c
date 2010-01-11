@@ -116,7 +116,7 @@ CMint_create_attr_list(CManager cm, char *file, int line)
 {
     attr_list list = create_attr_list();
     (void)cm;
-    CMtrace_out(cm, CMAttrVerbose, "Creating attr list %lx at %s:%d", 
+    CMtrace_out(cm, CMAttrVerbose, "Creating attr list %lx at %s:%d\n", 
 		(long)list, file, line);
     return list;
 }
@@ -126,7 +126,7 @@ CMint_free_attr_list(CManager cm, attr_list l, char *file, int line)
 {
     int count = attr_list_ref_count(l);
     (void)cm;
-    CMtrace_out(cm, CMAttrVerbose, "Freeing attr list %lx at %s:%d, ref count was %d", 
+    CMtrace_out(cm, CMAttrVerbose, "Freeing attr list %lx at %s:%d, ref count was %d\n", 
 		(long)l, file, line, count);
     free_attr_list(l);
 }
@@ -139,7 +139,7 @@ CMint_add_ref_attr_list(CManager cm, attr_list l, char *file, int line)
     (void)cm;
     if (l == NULL) return NULL;
     count = attr_list_ref_count(l);
-    CMtrace_out(cm, CMAttrVerbose, "Adding ref attr list %lx at %s:%d, ref count now %d", 
+    CMtrace_out(cm, CMAttrVerbose, "Adding ref attr list %lx at %s:%d, ref count now %d\n", 
 		(long)l, file, line, count+1);
     return add_ref_attr_list(l);
 }
@@ -149,7 +149,7 @@ CMint_attr_copy_list(CManager cm, attr_list l, char *file, int line)
 {
     attr_list ret = attr_copy_list(l);
     (void)cm;
-    CMtrace_out(cm, CMAttrVerbose, "Copy attr list %lx at %s:%d, new list %p", 
+    CMtrace_out(cm, CMAttrVerbose, "Copy attr list %lx at %s:%d, new list %p\n", 
 		(long)l, file, line, ret);
     return ret;
 }
@@ -169,7 +169,7 @@ CMint_decode_attr_from_xmit(CManager cm, void * buf, char *file, int line)
 {
     attr_list l = decode_attr_from_xmit(buf);
     (void)cm;
-    CMtrace_out(cm, CMAttrVerbose, "decode attr list from xmit at %s:%d, new list %lx", 
+    CMtrace_out(cm, CMAttrVerbose, "decode attr list from xmit at %s:%d, new list %lx\n", 
 		file, line, (long)l);
     return l;
 }

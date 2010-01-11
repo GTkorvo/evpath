@@ -354,10 +354,10 @@ static void
 preload_pbio_format(CMConnection conn, FMFormat ioformat)
 {
     CMtrace_out(conn->cm, CMFormatVerbose, 
-		"CMpbio preloading format %s on connection %p", 
+		"CMpbio preloading format %s on connection %p\n", 
 		name_of_FMformat(ioformat), conn);
     if (CMpbio_send_format_preload(ioformat, conn) != 1) {
-	CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio preload failed");
+	CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio preload failed\n");
 	return;
     }
 #ifndef MODULE

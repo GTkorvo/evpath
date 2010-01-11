@@ -19,7 +19,7 @@
 extern void
 IntCManager_lock(CManager cm, char *file, int line)
 {
-    CMtrace_out(cm, CMLowLevelVerbose, "CManager Lock at \"%s\" line %d",
+    CMtrace_out(cm, CMLowLevelVerbose, "CManager Lock at \"%s\" line %d\n",
 		file, line);
     if (gen_thr_initialized()) {
 	if (cm->exchange_lock == NULL) {
@@ -36,7 +36,7 @@ IntCManager_lock(CManager cm, char *file, int line)
 extern void
 IntCManager_unlock(CManager cm, char *file, int line)
 {
-    CMtrace_out(cm, CMLowLevelVerbose, "CManager Unlock at \"%s\" line %d",
+    CMtrace_out(cm, CMLowLevelVerbose, "CManager Unlock at \"%s\" line %d\n",
 		file, line);
     cm->locked--;
     if (cm->locked != 0) {

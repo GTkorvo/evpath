@@ -100,14 +100,14 @@ load_transport(CManager cm, const char *trans_name)
 		EVPATH_LIBRARY_INSTALL_DIR);
 
     } else {
-	CMtrace_out(cm, CMTransportVerbose, "Loading local or staticly linked version of \"%s\" transport",
+	CMtrace_out(cm, CMTransportVerbose, "Loading local or staticly linked version of \"%s\" transport\n",
 		    trans_name);
     }
     if (!handle) {
 	return 0;
     }
     INT_CMfree(libname);
-    CMtrace_out(cm, CMTransportVerbose, "Loaded transport.");
+    CMtrace_out(cm, CMTransportVerbose, "Loaded transport.\n");
     transport->trans_name = strdup(trans_name);
     transport->cm = cm;
     transport->data_available = CMDataAvailable;  /* callback pointer */
@@ -136,7 +136,7 @@ load_transport(CManager cm, const char *trans_name)
 	lt_dlsym(handle, "NBwritev_attr_func");  
     transport->set_write_notify = (CMTransport_set_write_notify_func)
 	lt_dlsym(handle, "set_write_notify");
-    CMtrace_out(cm, CMTransportVerbose, "Listen is %p", transport->listen);
+    CMtrace_out(cm, CMTransportVerbose, "Listen is %p\n", transport->listen);
     if (transport->transport_init) {
 	transport->trans_data = 
 	    transport->transport_init(cm, &CMstatic_trans_svcs);
@@ -163,7 +163,7 @@ load_transport(CManager cm, const char *trans_name)
     transport->NBwritev_attr_func = (CMTransport_writev_attr_func)libcmsockets_LTX_NBwritev_attr_func;
     
     transport->set_write_notify = (CMTransport_set_write_notify_func)    libcmsockets_LTX_set_write_notify;
-    CMtrace_out(cm, CMTransportVerbose, "Listen is %lx", transport->listen);
+    CMtrace_out(cm, CMTransportVerbose, "Listen is %lx\n", transport->listen);
     if (transport->transport_init) {
 	transport->trans_data = 
 	    transport->transport_init(cm, &CMstatic_trans_svcs);
