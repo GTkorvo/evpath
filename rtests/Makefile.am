@@ -1,7 +1,7 @@
 
 AUTOMAKE_OPTIONS = no-dependencies foreign
 
-TESTS = evtest
+TESTS = evtest remote_terminal_test
 
 not-really-check-local:
 	@if CMTransport=udp ./evtest$(EXEEXT) ; then\
