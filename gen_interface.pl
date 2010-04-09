@@ -468,6 +468,7 @@ print REVP<<EOF;
 #include "libltdl/ltdl.h"
 #include "stdio.h"
 #include "string.h"
+#include <dlfcn.h>
 #ifdef	__cplusplus
 extern "C" \{
 #endif
@@ -578,6 +579,7 @@ EVSimpleHandlerFunc
 REVPlookup_handler(char *name)
 {
     static lt_dlhandle h = NULL;
+    static void *dh = NULL;
     EVSimpleHandlerFunc f = NULL;
     if (strncmp("0x", name, 2) == 0) {
 	/* hex constant */
@@ -592,7 +594,21 @@ REVPlookup_handler(char *name)
     }
     f = (EVSimpleHandlerFunc) lt_dlsym(h, name);
     if (f == NULL) {
+	if (dh == NULL) {
+	    dh = dlopen(NULL, 0);
+	}
+	printf("Querying dlopen()\\n");
+	f = dlsym(dh, name);
+    }
+    if (f == NULL) {
+	if (dh == NULL) {
+	    dh = dlopen(NULL, RTLD_GLOBAL|RTLD_LAZY);
+	}
+	f = dlsym(dh, name);
+    }
+    if (f == NULL) {
 	printf("Dynamic symbol lookup for \\"%s\\" failed.\\n\\tEither the symbol is invalid, or symbol lookup is not enabled.\\n", name);
+	printf("Make sure that the symbol is declared \\"extern\\" (not \\"static\\")\\n");
 	printf("Try linking the program with either \\"-rdynamic\\" (GCC) or \\"-dlopen self\\" (libtool)\\n");
     }
     return f;
