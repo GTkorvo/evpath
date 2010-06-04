@@ -179,11 +179,20 @@ fi
 
 search_list="$search_list /usr/$5/$2 /usr/local/$5/$2 /opt/$1/$5/$2 /opt/misc/$5/$2 /opt/misc/$5/$cercs_cv_archive/$2"
 CERCS_SEARCH($search_list)
+if test -n "$with_rpm_build_specified"; then
+if test "$5" == "lib"; then
+   tmp_search_results=$libdir;
+fi
+if test "$5" == "include"; then
+   tmp_search_results=$incdir;
+fi
+fi
 if test -n "$tmp_search_results"; then
 $3=$tmp_search_results
 fi
 ])dnl
 AC_DEFUN([CERCS_SET_INSTALLED],[AC_ARG_WITH(installed, [  --with-installed        Don't use local copies of CERCS packages],with_installed_specified=1)])
+AC_DEFUN([CERCS_SET_RPM_BUILD],[AC_ARG_WITH(rpm-build, [  --with-rpm-build        Assume necessary files in CERCS packages will be installed],with_rpm_build_specified=1)])
 AC_DEFUN([CERCS_SET_LOCAL],[AC_ARG_WITH(local, [  --with-local            Use only local copies of CERCS packages],with_local_specified=1)])
 dnl
 dnl CERCS_SET_ARCHIVE()
@@ -191,6 +200,7 @@ dnl   set the $cercs_cv_machine_target variable to a standard archive name
 dnl
 AC_DEFUN([CERCS_SET_ARCHIVE],[
 AC_REQUIRE([CERCS_SET_INSTALLED])
+AC_REQUIRE([CERCS_SET_RPM_BUILD])
 AC_REQUIRE([CERCS_SET_LOCAL])
 AC_REQUIRE([CERCS_HAS_CSH])
 CHAOS_HOMEDIR=""
