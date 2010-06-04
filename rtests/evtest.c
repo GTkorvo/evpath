@@ -84,14 +84,11 @@ int quiet = 1;
 
 static
 int
-simple_handler(cm, vevent, client_data, attrs)
-CManager cm;
-void *vevent;
-void *client_data;
-attr_list attrs;
+simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     simple_rec_ptr event = vevent;
     long sum = 0, scan_sum = 0;
+    (void)cm;
     sum += event->integer_field % 100;
     sum += event->short_field % 100;
     sum += event->long_field % 100;
@@ -174,9 +171,7 @@ handshake_with_parent(CManager cm, attr_list parent_contact_list)
 }
 
 int
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 {
     int be_the_child = 0;
 
@@ -219,9 +214,9 @@ char **argv;
 static pid_t subproc_proc = 0;
 
 static void
-fail_and_die(signal)
-int signal;
+fail_and_die(int signal)
 {
+    (void)signal;
     fprintf(stderr, "EVtest failed to complete in reasonable time\n");
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
@@ -231,8 +226,7 @@ int signal;
 
 static
 pid_t
-run_subprocess(args)
-char **args;
+run_subprocess(char **args)
 {
     if (dont_fork) {
 	int i = 0;
@@ -275,6 +269,7 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
     EVstone local_stone;
     
     char *action_spec = create_transform_action_spec(NULL, simple_format_list, ECL_generate);
+    (void)alive_v; (void)client_data; (void) attrs;
     stone = REValloc_stone (conn);
     action = REVassoc_immediate_action (conn, stone, action_spec);
     output_stone = REValloc_stone (conn);
