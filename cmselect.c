@@ -301,25 +301,25 @@ int timeout_usec;
 	    return;
 	}
 	if (errno == EBADF) {
-	    int i;
+	    int j;
 	    int found_one = 0;
-	    for (i = 0; i < FD_SETSIZE; i++) {
-		if (FD_ISSET(i, &rd_set)) {
+	    for (j = 0; j < FD_SETSIZE; j++) {
+		if (FD_ISSET(j, &rd_set)) {
 		    fd_set test_set;
 		    timeout.tv_usec = 0;
 		    timeout.tv_sec = 0;
 		    FD_ZERO(&test_set);
-		    FD_SET(i, &test_set);
+		    FD_SET(j, &test_set);
 		    errno = 0;
 		    select(sd->sel_item_max+1, &test_set, (fd_set *) NULL,
 			   (fd_set *) NULL, &timeout);
 		    if (errno == EBADF) {
 			fprintf(stderr, "Select failed, fd %d is bad.  Removing from select list.\n",
-				i);
-			FD_CLR(i, (fd_set *) sd->fdset);
-			FD_CLR(i, (fd_set *) sd->write_set);
+				j);
+			FD_CLR(j, (fd_set *) sd->fdset);
+			FD_CLR(j, (fd_set *) sd->write_set);
 			found_one++;
-			FD_CLR(i, &rd_set);
+			FD_CLR(j, &rd_set);
 		    }
 		}
 	    }

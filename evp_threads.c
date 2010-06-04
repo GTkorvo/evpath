@@ -66,6 +66,7 @@ thread_bridge_transfer(CManager source_cm, event_item *event,
 static void
 free_master_event(void *event_data, void *event_struct)
 {
+    (void) event_data;
     return_event(/*EVP*/NULL, (event_item*) event_struct);
 }
 
