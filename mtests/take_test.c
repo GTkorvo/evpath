@@ -101,8 +101,7 @@ static int vecs = 1;
 
 static
 void 
-free_record(event)
-simple_rec_ptr event;
+free_record(simple_rec_ptr event)
 {
     int i;
     for (i=0; i < event->vec_count; i++) {
@@ -113,8 +112,7 @@ simple_rec_ptr event;
 
 static
 void 
-generate_record(event)
-simple_rec_ptr event;
+generate_record(simple_rec_ptr event)
 {
     int i;
     long sum = 0;
@@ -151,8 +149,7 @@ simple_rec_ptr queue[QUEUE_SIZE];
 int check_value[QUEUE_SIZE];
 
 static void
-check_queue(cm)
-CManager cm;
+check_queue(CManager cm)
 {
     int i;
     int bad = 0;
@@ -171,15 +168,12 @@ CManager cm;
 
 static
 void
-simple_handler(cm, conn, vevent, client_data, attrs)
-CManager cm;
-CMConnection conn;
-void *vevent;
-void *client_data;
-attr_list attrs;
+simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
+	       attr_list attrs)
 {
     simple_rec_ptr event = vevent;
     long sum = 0, scan_sum = 0;
+    (void)cm;(void)conn;
     sum += event->integer_field % 100;
     sum += event->short_field % 100;
     sum += event->long_field % 100;
@@ -226,12 +220,9 @@ attr_list attrs;
 static int do_regression_master_test();
 static int regression = 1;
 static atom_t CM_TRANSPORT;
-static atom_t CM_NETWORK_POSTFIX;
 
 int
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 {
     CManager cm;
     CMConnection conn = NULL;
@@ -272,7 +263,6 @@ char **argv;
     gen_pthread_init();
 #endif
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
-    CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
 
     if (regression && regression_master) {
 	return do_regression_master_test();
@@ -343,9 +333,9 @@ char **argv;
 static pid_t subproc_proc = 0;
 
 static void
-fail_and_die(signal)
-int signal;
+fail_and_die(int signal)
 {
+    (void)signal;
     fprintf(stderr, "CMtest failed to complete in reasonable time\n");
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
@@ -355,8 +345,7 @@ int signal;
 
 static
 pid_t
-run_subprocess(args)
-char **args;
+run_subprocess(char **args)
 {
 #ifdef HAVE_WINDOWS_H
     int child;

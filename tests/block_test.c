@@ -129,7 +129,7 @@ submit_thread(void *vrec)
 	attrs = create_attr_list();
 	add_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)45678);
 
-	data.short_field = rec->thread;
+	data.short_field = (short)rec->thread;
 	data.integer_field += (tmp - data.short_field);
 	data.integer_field++;
 	data.long_field--;
@@ -142,8 +142,7 @@ submit_thread(void *vrec)
 
 static
 void 
-generate_record(event)
-simple_rec_ptr event;
+generate_record(simple_rec_ptr event)
 {
     int i;
     long sum = 0;
@@ -178,15 +177,12 @@ static int msg_count = 0;
 
 static
 int
-simple_handler(cm, vevent, client_data, attrs)
-CManager cm;
-void *vevent;
-void *client_data;
-attr_list attrs;
+simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     simple_rec_ptr event = vevent;
     long sum = 0, scan_sum = 0;
 /*    printf("Received event from thread %d\n", event->short_field);*/
+    (void)cm;
     sum += event->integer_field % 100;
     sum += event->short_field % 100;
     sum += event->long_field % 100;
@@ -229,9 +225,7 @@ static atom_t CM_MCAST_PORT;
 static atom_t CM_CONN_BLOCKING;
 
 int
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 {
     CManager cm;
     int regression_master = 1;
@@ -378,9 +372,9 @@ char **argv;
 static pid_t subproc_proc = 0;
 
 static void
-fail_and_die(signal)
-int signal;
+fail_and_die(int signal)
 {
+    (void)signal;
     fprintf(stderr, "block_test failed to complete in reasonable time\n");
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
@@ -390,8 +384,7 @@ int signal;
 
 static
 pid_t
-run_subprocess(args)
-char **args;
+run_subprocess(char **args)
 {
 #ifdef HAVE_WINDOWS_H
     int child;
@@ -520,12 +513,12 @@ do_regression_master_test()
 		   exit_state);
 	}
 #else
-	int result, i;
+	int result, j;
 	if (quiet <= 0) {
 	    printf(",");
 	    fflush(stdout);
 	}
-	for (i = 0 ; i < 50 ; i++) {
+	for (j = 0 ; j < 50 ; i++) {
 	    sleep(1);
 	    CMpoll_network(cm);
 	} done++;
@@ -554,8 +547,8 @@ do_regression_master_test()
     }
 #endif
     if (msg_count != msg_limit) {
-	int i = 10;
-	while ((i >= 0) && (msg_count != msg_limit)) {
+	int j = 10;
+	while ((j >= 0) && (msg_count != msg_limit)) {
 	    sleep(1);
 	    CMpoll_network(cm);
 /*	    CMsleep(cm, 1);*/

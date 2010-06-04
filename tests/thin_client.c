@@ -69,7 +69,7 @@ main(int argc, char **argv)
 	printf("Connection to %s:%d failed\n", remote_host, remote_port);
 	exit(1);
     }
-    out_connection = open_FFSfd(conn, "w");
+    out_connection = open_FFSfd((void*)conn, "w");
 
     sprintf(comment, "Stone %d", stone);
     write_comment_FFSfile(out_connection, comment);
@@ -119,8 +119,7 @@ do_connection(char * remote_host, int port)
 
 static
 void 
-generate_record(event)
-simple_rec_ptr event;
+generate_record(simple_rec_ptr event)
 {
     long sum = 0;
     event->integer_field = (int) lrand48() % 100;

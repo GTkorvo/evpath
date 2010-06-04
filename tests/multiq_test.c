@@ -1,3 +1,4 @@
+#pragma warning (disable:981)
 #include "config.h"
 
 #include <stdio.h>
@@ -76,8 +77,7 @@ static FMStructDescList queue_list[] = {a_format_list, b_format_list, c_format_l
 
 static
 void
-generate_a_record(event)
-rec_a_ptr event;
+generate_a_record(rec_a_ptr event)
 {
     /* always even */
     event->a_field = ((int) lrand48() % 50) * 2;
@@ -85,8 +85,7 @@ rec_a_ptr event;
 
 static
 void
-generate_b_record(event)
-rec_b_ptr event;
+generate_b_record(rec_b_ptr event)
 {
     /* always odd */
     event->b_field = ((int) lrand48() % 50) * 2 + 1;
@@ -96,13 +95,10 @@ int quiet = 1;
 
 static
 int
-output_handler(cm, vevent, client_data, attrs)
-CManager cm;
-void *vevent;
-void *client_data;
-attr_list attrs;
+output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     rec_c_ptr event = vevent;
+    (void)cm;
     if (event->c_field % 2 != 1) {
 	printf("Received record should be odd, got %d\n", event->c_field);
     }
@@ -168,13 +164,12 @@ static char *trans = "{\
 static void
 data_free(void *event_data, void *client_data)
 {
+    (void) client_data;
     free(event_data);
 }
 
 int
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 {
     CManager cm;
     int regression_master = 1;
@@ -322,9 +317,9 @@ char **argv;
 static pid_t subproc_proc = 0;
 
 static void
-fail_and_die(signal)
-int signal;
+fail_and_die(int signal)
 {
+    (void)signal;
     fprintf(stderr, "EVtest failed to complete in reasonable time\n");
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
@@ -334,8 +329,7 @@ int signal;
 
 static
 pid_t
-run_subprocess(args)
-char **args;
+run_subprocess(char **args)
 {
 #ifdef HAVE_WINDOWS_H
     int child;

@@ -90,8 +90,7 @@ static FMStructDescRec simple_format_list[] =
 
 static
 void 
-generate_record(event)
-simple_rec_ptr event;
+generate_record(simple_rec_ptr event)
 {
     long sum = 0;
     event->sequence_number = gen_seq_num++; 
@@ -118,7 +117,7 @@ simple_rec_ptr event;
 enum {
     CMD_FREEZE,
     CMD_UNFREEZE,
-    CMD_EXPECT_EXACTLY,
+    CMD_EXPECT_EXACTLY
 };
 
 typedef struct _control_rec {
@@ -161,6 +160,8 @@ static
 int interpret_command(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     control_rec_ptr control = vevent;
+    (void) client_data;
+    (void) attrs;
     switch (control->command) {
     case CMD_FREEZE:
         EVfreeze_stone(cm, sink_stone);
@@ -184,19 +185,20 @@ int quiet = 1;
 
 static
 int dummy_handler(CManager cm, void *vevent, void *client_data, attr_list attrs) {
+    (void) cm;
+    (void) vevent;
+    (void) client_data;
+    (void) attrs;
     return 0;
 }
 
 static
 int
-simple_handler(cm, vevent, client_data, attrs)
-CManager cm;
-void *vevent;
-void *client_data;
-attr_list attrs;
+simple_handler(CManager cm,void *vevent, void *client_data, attr_list attrs)
 {
     simple_rec_ptr event = vevent;
     long sum = 0, scan_sum = 0;
+    (void)cm;
     if (event->sequence_number != seq_num++) {
         printf("Sequence number %d but expected %d\n", event->sequence_number,
             seq_num - 1);
@@ -249,6 +251,7 @@ static
 void send_command(CManager cm, int type, int argument)
 {
     control_rec cmd;
+    (void)cm;
     cmd.command = type;
     cmd.argument = argument;
     EVsubmit(command_source, &cmd, NULL);
@@ -271,10 +274,21 @@ static EVstone setup_storage(CManager cm, EVstone sink) {
 enum { ACCEPT_FILTER, REJECT_FILTER };
 
 static const char *filter_code[] = { "{return 1;}", "{return 0;}" };
+static
 int filter_accept(CManager cm, void *msg, void *client_data, attr_list attrs) {
+    (void)cm;
+    (void)msg;
+    (void)client_data;
+    (void)attrs;
+
     return 1;
 }
+static
 int filter_reject(CManager cm, void *msg, void *client_data, attr_list attrs) {
+    (void)cm;
+    (void)msg;
+    (void)client_data;
+    (void)attrs;
     return 0;
 }
 static EVSimpleHandlerFunc filter_funcs[] = { filter_accept, filter_reject };
@@ -468,9 +482,7 @@ static void do_remote_test(void) {
 
 
 int
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 { 
     int remote_child = 0;
 
@@ -511,8 +523,7 @@ char **argv;
 }
 
 /* utility functions */
-static pid_t run_subprocess(args)
-char **args;
+static pid_t run_subprocess(char **args)
 {
 #ifdef HAVE_WINDOWS_H
     int child;

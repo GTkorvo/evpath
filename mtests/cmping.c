@@ -81,8 +81,7 @@ static FMStructDescRec simple_format_list[] =
 
 static
 void 
-generate_record(event)
-simple_rec_ptr event;
+generate_record(simple_rec_ptr event)
 {
     long sum = 0;
     event->integer_field = (int) lrand48() % 100;
@@ -111,12 +110,8 @@ static CMFormat format = NULL;
 
 static
 void
-simple_handler(cm, conn, vevent, client_data, attrs)
-CManager cm;
-CMConnection conn;
-void *vevent;
-void *client_data;
-attr_list attrs;
+simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
+	       attr_list attrs)
 {
     simple_rec_ptr event = vevent;
     long sum = 0, scan_sum = 0;
@@ -157,14 +152,11 @@ static int do_regression_master_test();
 static int regression = 1;
 
 static atom_t CM_TRANSPORT;
-static atom_t CM_NETWORK_POSTFIX;
 static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
 
 int
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 {
     CManager cm;
     CMConnection conn = NULL;
@@ -191,7 +183,6 @@ char **argv;
     gen_pthread_init();
 #endif
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
-    CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
     CM_MCAST_PORT = attr_atom_from_string("MCAST_PORT");
     CM_MCAST_ADDR = attr_atom_from_string("MCAST_ADDR");
 
@@ -269,9 +260,9 @@ char **argv;
 static pid_t subproc_proc = 0;
 
 static void
-fail_and_die(signal)
-int signal;
+fail_and_die(int signal)
 {
+    (void)signal;
     fprintf(stderr, "CMtest failed to complete in reasonable time\n");
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
@@ -281,8 +272,7 @@ int signal;
 
 static
 pid_t
-run_subprocess(args)
-char **args;
+run_subprocess(char **args)
 {
 #ifdef HAVE_WINDOWS_H
     int child;

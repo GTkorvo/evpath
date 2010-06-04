@@ -108,8 +108,7 @@ int quiet = 1;
 
 static
 void 
-generate_record(event)
-simple_rec_ptr event;
+generate_record(simple_rec_ptr event)
 {
     int i;
     long sum = 0;
@@ -144,14 +143,11 @@ static int msg_count = 0;
 
 static
 int
-simple_handler(cm, vevent, client_data, attrs)
-CManager cm;
-void *vevent;
-void *client_data;
-attr_list attrs;
+simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     simple_rec_ptr event = vevent;
     long sum = 0, scan_sum = 0;
+    (void)cm;
     sum += event->integer_field % 100;
     sum += event->short_field % 100;
     sum += event->long_field % 100;
@@ -202,13 +198,12 @@ return 0;\n\
 static void
 data_free(void *event_data, void *client_data)
 {
+    (void) client_data;
     free(event_data);
 }
 
 int
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 {
     CManager cm;
     int regression_master = 1;
@@ -362,9 +357,9 @@ char **argv;
 static pid_t subproc_proc = 0;
 
 static void
-fail_and_die(signal)
-int signal;
+fail_and_die(int signal)
 {
+    (void)signal;
     fprintf(stderr, "congestion_test failed to complete in reasonable time\n");
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
@@ -374,8 +369,7 @@ int signal;
 
 static
 pid_t
-run_subprocess(args)
-char **args;
+run_subprocess(char **args)
 {
 #ifdef HAVE_WINDOWS_H
     int child;

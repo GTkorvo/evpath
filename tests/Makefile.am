@@ -15,7 +15,7 @@ check-local: block_test evtest
 	 echo "PASS: block_test";\
 	else echo "FAIL: block_test"; fi
 
-noinst_PROGRAMS = $(TESTS) thin_client congestion_test congest_bulktest multiq_test store_send_test store_limit_test store_pressure_test block_test submit_wait_test multi_thread
+noinst_PROGRAMS = $(TESTS) thin_client congestion_test congest_bulktest multiq_test store_send_test store_limit_test store_pressure_test block_test submit_wait_test multi_thread autostone
 
 LDADD = ../libevpath.la 
 

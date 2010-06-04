@@ -100,7 +100,7 @@ static int
 interpret_request(CManager cm, void *vevent, void *client_data, attr_list attrs) {
     send_request_ptr request = vevent;
     ds_state_ptr state = client_data;
-
+    (void)cm; (void)vevent; (void)client_data; (void) attrs;
 #ifdef DEBUG
     dump_request(request);
 #endif
@@ -135,7 +135,7 @@ interpret_request(CManager cm, void *vevent, void *client_data, attr_list attrs)
 static void
 send_one_cb(CManager cm, EVstone ignored, void *state_raw) {
     ds_state_ptr state = state_raw; 
-
+    (void)ignored;
     ++deferred;
 
     send_some(cm, state);
@@ -186,9 +186,11 @@ setup_contact(CManager cm) {
 static int message_count = 0;
 static int last_seqno = 0;
 static int
-check_data(CManager cm, void *vevent, void *client_data, attr_list attrs) {
+check_data(CManager cm, void *vevent, void *client_data, attr_list attrs)
+{
     data_event_ptr data = vevent;
 
+    (void)cm;(void)client_data; (void)attrs;
     if (data->seqno <= last_seqno || data->seqno % 1000 == 0) {
         fail("Bad sequence number");
     }
@@ -253,9 +255,7 @@ static void do_remote_test(void) {
 
 
 int
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 { 
     int remote_child = 0;
 
@@ -280,14 +280,13 @@ char **argv;
         use_remote = 1;
         return subprocess_work(argv[1]);
     }
-    
+    (void)use_remote;
     do_remote_test();
     return failures;
 }
 
 /* utility functions */
-static pid_t run_subprocess(args)
-char **args;
+static pid_t run_subprocess(char **args)
 {
 #ifdef HAVE_WINDOWS_H
     int child;
