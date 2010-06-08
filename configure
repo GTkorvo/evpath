@@ -15041,41 +15041,41 @@ cercs_tmp=""
 search_list="./ffs.h"
 CHAOS_HOMEDIR=""
 if test -n "$CSH"; then
-CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
 fi
 if test -n "$with_ffs"; then
-if test `echo $with_ffs | cut -c1` = "~"; then
-EXPANDED=`echo "echo $with_ffs" | csh -sf 2>/dev/null` || EXPANDED=""
-else
-EXPANDED=$with_ffs
-fi
+    if test `echo $with_ffs | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_ffs" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_ffs
+    fi
 
-search_list="$search_list $EXPANDED/ffs.h $EXPANDED/include/ffs.h $EXPANDED/share/ffs.h $EXPANDED/$cercs_cv_archive/ffs.h $EXPANDED/$cercs_cv_archive/include/ffs.h $EXPANDED/ffs/ffs.h $EXPANDED/ffs/$cercs_cv_archive/ffs.h $EXPANDED/ffs/include/ffs.h $EXPANDED/ffs/include/$cercs_cv_archive/ffs.h"
+    search_list="$search_list $EXPANDED/ffs.h $EXPANDED/include/ffs.h $EXPANDED/share/ffs.h $EXPANDED/$cercs_cv_archive/ffs.h $EXPANDED/$cercs_cv_archive/include/ffs.h $EXPANDED/ffs/ffs.h $EXPANDED/ffs/$cercs_cv_archive/ffs.h $EXPANDED/ffs/include/ffs.h $EXPANDED/ffs/include/$cercs_cv_archive/ffs.h"
 fi
 if test -z "$with_installed_specified"; then
-search_list="$search_list `pwd`/../ffs/ffs.h `pwd`/../include/ffs.h `pwd`/../share/ffs.h"
-if test "$CHAOS_HOMEDIR" != "$HOME"; then
-search_list="$search_list $HOME/ffs/ffs.h $HOME/$cercs_cv_archive/include/ffs.h $HOME/include/ffs.h"
-fi
+  search_list="$search_list `pwd`/../ffs/ffs.h `pwd`/../include/ffs.h `pwd`/../share/ffs.h"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/ffs/ffs.h $HOME/$cercs_cv_archive/include/ffs.h $HOME/include/ffs.h"
+  fi
 fi
 if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
-search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/ffs/include/ffs.h $CHAOS_HOMEDIR/$cercs_cv_archive/include/ffs.h $CHAOS_HOMEDIR/ffs/$cercs_cv_archive/include/ffs.h $CHAOS_HOMEDIR/ffs/include/ffs.h $CHAOS_HOMEDIR/include/ffs.h"
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/ffs/include/ffs.h $CHAOS_HOMEDIR/$cercs_cv_archive/include/ffs.h $CHAOS_HOMEDIR/ffs/$cercs_cv_archive/include/ffs.h $CHAOS_HOMEDIR/ffs/include/ffs.h $CHAOS_HOMEDIR/include/ffs.h"
 fi
 if test "$libdir" != '${exec_prefix}/lib'; then
-tmpdir=`echo ${libdir} |  sed 's%/$%%'`
-search_list="$tmpdir/ffs.h $search_list"
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/ffs.h $search_list"
 fi
 if test "$exec_prefix" != "NONE"; then
-tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/lib/ffs.h $search_list"
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/ffs.h $search_list"
 fi
 if test "$includedir" != '${prefix}/include'; then
-tmpdir=`echo ${includedir} |  sed 's%/$%%'`
-search_list="$tmpdir/ffs.h $search_list"
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/ffs.h $search_list"
 fi
 if test "$prefix" != "NONE"; then
-tmpdir=`echo ${prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/include/ffs.h $search_list"
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/include/ffs.h $search_list"
 fi
 if test "include" == "lib"; then
   for tmp_lib_value in $sys_lib_search_path_spec; do
@@ -15095,18 +15095,31 @@ for tmp_search_value in $search_list; do
 done
 
 if test -n "$with_rpm_build_specified"; then
-if test "include" == "lib"; then
-   tmp_search_results=$libdir;
-fi
-if test "include" == "include"; then
-   tmp_search_results=$incdir;
-fi
+  if test "include" == "lib"; then
+     tmp_search_results=$libdir;
+  fi
+  if test "include" == "include"; then
+     tmp_search_results=$incdir;
+  fi
 fi
 if test -n "$with_deb_build_specified"; then
-   tmp_search_results=../ffs;
+# test build directories
+   if test -d "../ffs"; then
+      tmp_search_results=`pwd`/../ffs;
+   fi
+   if test -d "../../ffs"; then
+      tmp_search_results=`pwd`/../../ffs;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../ffs/ffs.h"; then
+      tmp_search_results='${abs_top_srcdir}/../ffs';
+   fi
+   if test -f "$srcdir/../../ffs/ffs.h"; then
+      tmp_search_results='${abs_top_srcdir}/../../ffs';
+   fi
 fi
 if test -n "$tmp_search_results"; then
-cercs_tmp=$tmp_search_results
+  cercs_tmp=$tmp_search_results
 fi
 
 if test -n "$cercs_tmp" -a "$cercs_tmp" != "/usr/include/ffs.h"; then
@@ -15142,41 +15155,41 @@ cercs_tmp=""
 search_list="./libffs.la"
 CHAOS_HOMEDIR=""
 if test -n "$CSH"; then
-CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
 fi
 if test -n "$with_ffs"; then
-if test `echo $with_ffs | cut -c1` = "~"; then
-EXPANDED=`echo "echo $with_ffs" | csh -sf 2>/dev/null` || EXPANDED=""
-else
-EXPANDED=$with_ffs
-fi
+    if test `echo $with_ffs | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_ffs" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_ffs
+    fi
 
-search_list="$search_list $EXPANDED/libffs.la $EXPANDED/lib/libffs.la $EXPANDED/share/libffs.la $EXPANDED/$cercs_cv_archive/libffs.la $EXPANDED/$cercs_cv_archive/lib/libffs.la $EXPANDED/ffs/libffs.la $EXPANDED/ffs/$cercs_cv_archive/libffs.la $EXPANDED/ffs/lib/libffs.la $EXPANDED/ffs/lib/$cercs_cv_archive/libffs.la"
+    search_list="$search_list $EXPANDED/libffs.la $EXPANDED/lib/libffs.la $EXPANDED/share/libffs.la $EXPANDED/$cercs_cv_archive/libffs.la $EXPANDED/$cercs_cv_archive/lib/libffs.la $EXPANDED/ffs/libffs.la $EXPANDED/ffs/$cercs_cv_archive/libffs.la $EXPANDED/ffs/lib/libffs.la $EXPANDED/ffs/lib/$cercs_cv_archive/libffs.la"
 fi
 if test -z "$with_installed_specified"; then
-search_list="$search_list `pwd`/../ffs/libffs.la `pwd`/../lib/libffs.la `pwd`/../share/libffs.la"
-if test "$CHAOS_HOMEDIR" != "$HOME"; then
-search_list="$search_list $HOME/ffs/libffs.la $HOME/$cercs_cv_archive/lib/libffs.la $HOME/lib/libffs.la"
-fi
+  search_list="$search_list `pwd`/../ffs/libffs.la `pwd`/../lib/libffs.la `pwd`/../share/libffs.la"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/ffs/libffs.la $HOME/$cercs_cv_archive/lib/libffs.la $HOME/lib/libffs.la"
+  fi
 fi
 if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
-search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/ffs/lib/libffs.la $CHAOS_HOMEDIR/$cercs_cv_archive/lib/libffs.la $CHAOS_HOMEDIR/ffs/$cercs_cv_archive/lib/libffs.la $CHAOS_HOMEDIR/ffs/lib/libffs.la $CHAOS_HOMEDIR/lib/libffs.la"
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/ffs/lib/libffs.la $CHAOS_HOMEDIR/$cercs_cv_archive/lib/libffs.la $CHAOS_HOMEDIR/ffs/$cercs_cv_archive/lib/libffs.la $CHAOS_HOMEDIR/ffs/lib/libffs.la $CHAOS_HOMEDIR/lib/libffs.la"
 fi
 if test "$libdir" != '${exec_prefix}/lib'; then
-tmpdir=`echo ${libdir} |  sed 's%/$%%'`
-search_list="$tmpdir/libffs.la $search_list"
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/libffs.la $search_list"
 fi
 if test "$exec_prefix" != "NONE"; then
-tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/lib/libffs.la $search_list"
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/libffs.la $search_list"
 fi
 if test "$includedir" != '${prefix}/include'; then
-tmpdir=`echo ${includedir} |  sed 's%/$%%'`
-search_list="$tmpdir/libffs.la $search_list"
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/libffs.la $search_list"
 fi
 if test "$prefix" != "NONE"; then
-tmpdir=`echo ${prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/lib/libffs.la $search_list"
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/libffs.la $search_list"
 fi
 if test "lib" == "lib"; then
   for tmp_lib_value in $sys_lib_search_path_spec; do
@@ -15186,28 +15199,41 @@ fi
 
 search_list="$search_list /usr/lib/libffs.la /usr/local/lib/libffs.la /opt/ffs/lib/libffs.la /opt/misc/lib/libffs.la /opt/misc/lib/$cercs_cv_archive/libffs.la"
 tmp_search_results=""
-echo "configure:15189: searching for $search_list " >&5
+echo "configure:15202: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15193: first found $tmp_search_results " >&5
+	echo "configure:15206: first found $tmp_search_results " >&5
 	break
    fi
 done
 
 if test -n "$with_rpm_build_specified"; then
-if test "lib" == "lib"; then
-   tmp_search_results=$libdir;
-fi
-if test "lib" == "include"; then
-   tmp_search_results=$incdir;
-fi
+  if test "lib" == "lib"; then
+     tmp_search_results=$libdir;
+  fi
+  if test "lib" == "include"; then
+     tmp_search_results=$incdir;
+  fi
 fi
 if test -n "$with_deb_build_specified"; then
-   tmp_search_results=../ffs;
+# test build directories
+   if test -d "../ffs"; then
+      tmp_search_results=`pwd`/../ffs;
+   fi
+   if test -d "../../ffs"; then
+      tmp_search_results=`pwd`/../../ffs;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../ffs/libffs.la"; then
+      tmp_search_results='${abs_top_srcdir}/../ffs';
+   fi
+   if test -f "$srcdir/../../ffs/libffs.la"; then
+      tmp_search_results='${abs_top_srcdir}/../../ffs';
+   fi
 fi
 if test -n "$tmp_search_results"; then
-cercs_tmp=$tmp_search_results
+  cercs_tmp=$tmp_search_results
 fi
 
 if test -n "$cercs_tmp" -a "$cercs_tmp" != "libffs.la"; then
@@ -15234,6 +15260,7 @@ arg="$cercs_cv_ffs_link_arg "`echo $cercs_cv_ffs_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "ffs"` -eq 0; then
+# if arg does not includes a project spec add it at the end
 new_flags="$new_flags $arg"
 else
 new_flags="$arg $new_flags"
@@ -15270,11 +15297,11 @@ else
 
 search_list="$PWD/../ffs $PWD/../../ffs $PWD/../../../ffs"
 tmp_search_results=""
-echo "configure:15273: searching for $search_list " >&5
+echo "configure:15300: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15277: first found $tmp_search_results " >&5
+	echo "configure:15304: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15312,11 +15339,11 @@ else
 
 search_list="$PWD/../ffs $PWD/../../ffs $PWD/../../../ffs"
 tmp_search_results=""
-echo "configure:15315: searching for $search_list " >&5
+echo "configure:15342: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15319: first found $tmp_search_results " >&5
+	echo "configure:15346: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15349,6 +15376,7 @@ arg="$cercs_cv_ffs_link_arg "`echo $cercs_cv_ffs_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "ffs"` -eq 0; then
+# if arg does not includes a project spec add it at the end
 new_flags="$new_flags $arg"
 else
 new_flags="$arg $new_flags"
@@ -15394,41 +15422,41 @@ cercs_tmp=""
 search_list="./gen_thread.h"
 CHAOS_HOMEDIR=""
 if test -n "$CSH"; then
-CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
 fi
 if test -n "$with_gen_thread"; then
-if test `echo $with_gen_thread | cut -c1` = "~"; then
-EXPANDED=`echo "echo $with_gen_thread" | csh -sf 2>/dev/null` || EXPANDED=""
-else
-EXPANDED=$with_gen_thread
-fi
+    if test `echo $with_gen_thread | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_gen_thread" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_gen_thread
+    fi
 
-search_list="$search_list $EXPANDED/gen_thread.h $EXPANDED/include/gen_thread.h $EXPANDED/share/gen_thread.h $EXPANDED/$cercs_cv_archive/gen_thread.h $EXPANDED/$cercs_cv_archive/include/gen_thread.h $EXPANDED/gen_thread/gen_thread.h $EXPANDED/gen_thread/$cercs_cv_archive/gen_thread.h $EXPANDED/gen_thread/include/gen_thread.h $EXPANDED/gen_thread/include/$cercs_cv_archive/gen_thread.h"
+    search_list="$search_list $EXPANDED/gen_thread.h $EXPANDED/include/gen_thread.h $EXPANDED/share/gen_thread.h $EXPANDED/$cercs_cv_archive/gen_thread.h $EXPANDED/$cercs_cv_archive/include/gen_thread.h $EXPANDED/gen_thread/gen_thread.h $EXPANDED/gen_thread/$cercs_cv_archive/gen_thread.h $EXPANDED/gen_thread/include/gen_thread.h $EXPANDED/gen_thread/include/$cercs_cv_archive/gen_thread.h"
 fi
 if test -z "$with_installed_specified"; then
-search_list="$search_list `pwd`/../gen_thread/gen_thread.h `pwd`/../include/gen_thread.h `pwd`/../share/gen_thread.h"
-if test "$CHAOS_HOMEDIR" != "$HOME"; then
-search_list="$search_list $HOME/gen_thread/gen_thread.h $HOME/$cercs_cv_archive/include/gen_thread.h $HOME/include/gen_thread.h"
-fi
+  search_list="$search_list `pwd`/../gen_thread/gen_thread.h `pwd`/../include/gen_thread.h `pwd`/../share/gen_thread.h"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/gen_thread/gen_thread.h $HOME/$cercs_cv_archive/include/gen_thread.h $HOME/include/gen_thread.h"
+  fi
 fi
 if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
-search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/gen_thread/include/gen_thread.h $CHAOS_HOMEDIR/$cercs_cv_archive/include/gen_thread.h $CHAOS_HOMEDIR/gen_thread/$cercs_cv_archive/include/gen_thread.h $CHAOS_HOMEDIR/gen_thread/include/gen_thread.h $CHAOS_HOMEDIR/include/gen_thread.h"
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/gen_thread/include/gen_thread.h $CHAOS_HOMEDIR/$cercs_cv_archive/include/gen_thread.h $CHAOS_HOMEDIR/gen_thread/$cercs_cv_archive/include/gen_thread.h $CHAOS_HOMEDIR/gen_thread/include/gen_thread.h $CHAOS_HOMEDIR/include/gen_thread.h"
 fi
 if test "$libdir" != '${exec_prefix}/lib'; then
-tmpdir=`echo ${libdir} |  sed 's%/$%%'`
-search_list="$tmpdir/gen_thread.h $search_list"
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/gen_thread.h $search_list"
 fi
 if test "$exec_prefix" != "NONE"; then
-tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/lib/gen_thread.h $search_list"
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/gen_thread.h $search_list"
 fi
 if test "$includedir" != '${prefix}/include'; then
-tmpdir=`echo ${includedir} |  sed 's%/$%%'`
-search_list="$tmpdir/gen_thread.h $search_list"
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/gen_thread.h $search_list"
 fi
 if test "$prefix" != "NONE"; then
-tmpdir=`echo ${prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/include/gen_thread.h $search_list"
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/include/gen_thread.h $search_list"
 fi
 if test "include" == "lib"; then
   for tmp_lib_value in $sys_lib_search_path_spec; do
@@ -15438,28 +15466,41 @@ fi
 
 search_list="$search_list /usr/include/gen_thread.h /usr/local/include/gen_thread.h /opt/gen_thread/include/gen_thread.h /opt/misc/include/gen_thread.h /opt/misc/include/$cercs_cv_archive/gen_thread.h"
 tmp_search_results=""
-echo "configure:15441: searching for $search_list " >&5
+echo "configure:15469: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15445: first found $tmp_search_results " >&5
+	echo "configure:15473: first found $tmp_search_results " >&5
 	break
    fi
 done
 
 if test -n "$with_rpm_build_specified"; then
-if test "include" == "lib"; then
-   tmp_search_results=$libdir;
-fi
-if test "include" == "include"; then
-   tmp_search_results=$incdir;
-fi
+  if test "include" == "lib"; then
+     tmp_search_results=$libdir;
+  fi
+  if test "include" == "include"; then
+     tmp_search_results=$incdir;
+  fi
 fi
 if test -n "$with_deb_build_specified"; then
-   tmp_search_results=../gen_thread;
+# test build directories
+   if test -d "../gen_thread"; then
+      tmp_search_results=`pwd`/../gen_thread;
+   fi
+   if test -d "../../gen_thread"; then
+      tmp_search_results=`pwd`/../../gen_thread;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../gen_thread/gen_thread.h"; then
+      tmp_search_results='${abs_top_srcdir}/../gen_thread';
+   fi
+   if test -f "$srcdir/../../gen_thread/gen_thread.h"; then
+      tmp_search_results='${abs_top_srcdir}/../../gen_thread';
+   fi
 fi
 if test -n "$tmp_search_results"; then
-cercs_tmp=$tmp_search_results
+  cercs_tmp=$tmp_search_results
 fi
 
 if test -n "$cercs_tmp" -a "$cercs_tmp" != "/usr/include/gen_thread.h"; then
@@ -15495,41 +15536,41 @@ cercs_tmp=""
 search_list="./libgen_thread.la"
 CHAOS_HOMEDIR=""
 if test -n "$CSH"; then
-CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
 fi
 if test -n "$with_gen_thread"; then
-if test `echo $with_gen_thread | cut -c1` = "~"; then
-EXPANDED=`echo "echo $with_gen_thread" | csh -sf 2>/dev/null` || EXPANDED=""
-else
-EXPANDED=$with_gen_thread
-fi
+    if test `echo $with_gen_thread | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_gen_thread" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_gen_thread
+    fi
 
-search_list="$search_list $EXPANDED/libgen_thread.la $EXPANDED/lib/libgen_thread.la $EXPANDED/share/libgen_thread.la $EXPANDED/$cercs_cv_archive/libgen_thread.la $EXPANDED/$cercs_cv_archive/lib/libgen_thread.la $EXPANDED/gen_thread/libgen_thread.la $EXPANDED/gen_thread/$cercs_cv_archive/libgen_thread.la $EXPANDED/gen_thread/lib/libgen_thread.la $EXPANDED/gen_thread/lib/$cercs_cv_archive/libgen_thread.la"
+    search_list="$search_list $EXPANDED/libgen_thread.la $EXPANDED/lib/libgen_thread.la $EXPANDED/share/libgen_thread.la $EXPANDED/$cercs_cv_archive/libgen_thread.la $EXPANDED/$cercs_cv_archive/lib/libgen_thread.la $EXPANDED/gen_thread/libgen_thread.la $EXPANDED/gen_thread/$cercs_cv_archive/libgen_thread.la $EXPANDED/gen_thread/lib/libgen_thread.la $EXPANDED/gen_thread/lib/$cercs_cv_archive/libgen_thread.la"
 fi
 if test -z "$with_installed_specified"; then
-search_list="$search_list `pwd`/../gen_thread/libgen_thread.la `pwd`/../lib/libgen_thread.la `pwd`/../share/libgen_thread.la"
-if test "$CHAOS_HOMEDIR" != "$HOME"; then
-search_list="$search_list $HOME/gen_thread/libgen_thread.la $HOME/$cercs_cv_archive/lib/libgen_thread.la $HOME/lib/libgen_thread.la"
-fi
+  search_list="$search_list `pwd`/../gen_thread/libgen_thread.la `pwd`/../lib/libgen_thread.la `pwd`/../share/libgen_thread.la"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/gen_thread/libgen_thread.la $HOME/$cercs_cv_archive/lib/libgen_thread.la $HOME/lib/libgen_thread.la"
+  fi
 fi
 if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
-search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/gen_thread/lib/libgen_thread.la $CHAOS_HOMEDIR/$cercs_cv_archive/lib/libgen_thread.la $CHAOS_HOMEDIR/gen_thread/$cercs_cv_archive/lib/libgen_thread.la $CHAOS_HOMEDIR/gen_thread/lib/libgen_thread.la $CHAOS_HOMEDIR/lib/libgen_thread.la"
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/gen_thread/lib/libgen_thread.la $CHAOS_HOMEDIR/$cercs_cv_archive/lib/libgen_thread.la $CHAOS_HOMEDIR/gen_thread/$cercs_cv_archive/lib/libgen_thread.la $CHAOS_HOMEDIR/gen_thread/lib/libgen_thread.la $CHAOS_HOMEDIR/lib/libgen_thread.la"
 fi
 if test "$libdir" != '${exec_prefix}/lib'; then
-tmpdir=`echo ${libdir} |  sed 's%/$%%'`
-search_list="$tmpdir/libgen_thread.la $search_list"
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/libgen_thread.la $search_list"
 fi
 if test "$exec_prefix" != "NONE"; then
-tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/lib/libgen_thread.la $search_list"
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/libgen_thread.la $search_list"
 fi
 if test "$includedir" != '${prefix}/include'; then
-tmpdir=`echo ${includedir} |  sed 's%/$%%'`
-search_list="$tmpdir/libgen_thread.la $search_list"
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/libgen_thread.la $search_list"
 fi
 if test "$prefix" != "NONE"; then
-tmpdir=`echo ${prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/lib/libgen_thread.la $search_list"
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/libgen_thread.la $search_list"
 fi
 if test "lib" == "lib"; then
   for tmp_lib_value in $sys_lib_search_path_spec; do
@@ -15539,28 +15580,41 @@ fi
 
 search_list="$search_list /usr/lib/libgen_thread.la /usr/local/lib/libgen_thread.la /opt/gen_thread/lib/libgen_thread.la /opt/misc/lib/libgen_thread.la /opt/misc/lib/$cercs_cv_archive/libgen_thread.la"
 tmp_search_results=""
-echo "configure:15542: searching for $search_list " >&5
+echo "configure:15583: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15546: first found $tmp_search_results " >&5
+	echo "configure:15587: first found $tmp_search_results " >&5
 	break
    fi
 done
 
 if test -n "$with_rpm_build_specified"; then
-if test "lib" == "lib"; then
-   tmp_search_results=$libdir;
-fi
-if test "lib" == "include"; then
-   tmp_search_results=$incdir;
-fi
+  if test "lib" == "lib"; then
+     tmp_search_results=$libdir;
+  fi
+  if test "lib" == "include"; then
+     tmp_search_results=$incdir;
+  fi
 fi
 if test -n "$with_deb_build_specified"; then
-   tmp_search_results=../gen_thread;
+# test build directories
+   if test -d "../gen_thread"; then
+      tmp_search_results=`pwd`/../gen_thread;
+   fi
+   if test -d "../../gen_thread"; then
+      tmp_search_results=`pwd`/../../gen_thread;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../gen_thread/libgen_thread.la"; then
+      tmp_search_results='${abs_top_srcdir}/../gen_thread';
+   fi
+   if test -f "$srcdir/../../gen_thread/libgen_thread.la"; then
+      tmp_search_results='${abs_top_srcdir}/../../gen_thread';
+   fi
 fi
 if test -n "$tmp_search_results"; then
-cercs_tmp=$tmp_search_results
+  cercs_tmp=$tmp_search_results
 fi
 
 if test -n "$cercs_tmp" -a "$cercs_tmp" != "libgen_thread.la"; then
@@ -15587,6 +15641,7 @@ arg="$cercs_cv_gen_thread_link_arg "`echo $cercs_cv_gen_thread_link_dir | sed "/
 fi
 fi
 if test `echo $arg | grep -c "gen_thread"` -eq 0; then
+# if arg does not includes a project spec add it at the end
 new_flags="$new_flags $arg"
 else
 new_flags="$arg $new_flags"
@@ -15623,11 +15678,11 @@ else
 
 search_list="$PWD/../gen_thread $PWD/../../gen_thread $PWD/../../../gen_thread"
 tmp_search_results=""
-echo "configure:15626: searching for $search_list " >&5
+echo "configure:15681: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15630: first found $tmp_search_results " >&5
+	echo "configure:15685: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15665,11 +15720,11 @@ else
 
 search_list="$PWD/../gen_thread $PWD/../../gen_thread $PWD/../../../gen_thread"
 tmp_search_results=""
-echo "configure:15668: searching for $search_list " >&5
+echo "configure:15723: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15672: first found $tmp_search_results " >&5
+	echo "configure:15727: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15702,6 +15757,7 @@ arg="$cercs_cv_gen_thread_link_arg "`echo $cercs_cv_gen_thread_link_dir | sed "/
 fi
 fi
 if test `echo $arg | grep -c "gen_thread"` -eq 0; then
+# if arg does not includes a project spec add it at the end
 new_flags="$new_flags $arg"
 else
 new_flags="$arg $new_flags"
@@ -15747,41 +15803,41 @@ cercs_tmp=""
 search_list="./cercs_env.h"
 CHAOS_HOMEDIR=""
 if test -n "$CSH"; then
-CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
 fi
 if test -n "$with_cercs_env"; then
-if test `echo $with_cercs_env | cut -c1` = "~"; then
-EXPANDED=`echo "echo $with_cercs_env" | csh -sf 2>/dev/null` || EXPANDED=""
-else
-EXPANDED=$with_cercs_env
-fi
+    if test `echo $with_cercs_env | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_cercs_env" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_cercs_env
+    fi
 
-search_list="$search_list $EXPANDED/cercs_env.h $EXPANDED/include/cercs_env.h $EXPANDED/share/cercs_env.h $EXPANDED/$cercs_cv_archive/cercs_env.h $EXPANDED/$cercs_cv_archive/include/cercs_env.h $EXPANDED/cercs_env/cercs_env.h $EXPANDED/cercs_env/$cercs_cv_archive/cercs_env.h $EXPANDED/cercs_env/include/cercs_env.h $EXPANDED/cercs_env/include/$cercs_cv_archive/cercs_env.h"
+    search_list="$search_list $EXPANDED/cercs_env.h $EXPANDED/include/cercs_env.h $EXPANDED/share/cercs_env.h $EXPANDED/$cercs_cv_archive/cercs_env.h $EXPANDED/$cercs_cv_archive/include/cercs_env.h $EXPANDED/cercs_env/cercs_env.h $EXPANDED/cercs_env/$cercs_cv_archive/cercs_env.h $EXPANDED/cercs_env/include/cercs_env.h $EXPANDED/cercs_env/include/$cercs_cv_archive/cercs_env.h"
 fi
 if test -z "$with_installed_specified"; then
-search_list="$search_list `pwd`/../cercs_env/cercs_env.h `pwd`/../include/cercs_env.h `pwd`/../share/cercs_env.h"
-if test "$CHAOS_HOMEDIR" != "$HOME"; then
-search_list="$search_list $HOME/cercs_env/cercs_env.h $HOME/$cercs_cv_archive/include/cercs_env.h $HOME/include/cercs_env.h"
-fi
+  search_list="$search_list `pwd`/../cercs_env/cercs_env.h `pwd`/../include/cercs_env.h `pwd`/../share/cercs_env.h"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/cercs_env/cercs_env.h $HOME/$cercs_cv_archive/include/cercs_env.h $HOME/include/cercs_env.h"
+  fi
 fi
 if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
-search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/cercs_env/include/cercs_env.h $CHAOS_HOMEDIR/$cercs_cv_archive/include/cercs_env.h $CHAOS_HOMEDIR/cercs_env/$cercs_cv_archive/include/cercs_env.h $CHAOS_HOMEDIR/cercs_env/include/cercs_env.h $CHAOS_HOMEDIR/include/cercs_env.h"
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/cercs_env/include/cercs_env.h $CHAOS_HOMEDIR/$cercs_cv_archive/include/cercs_env.h $CHAOS_HOMEDIR/cercs_env/$cercs_cv_archive/include/cercs_env.h $CHAOS_HOMEDIR/cercs_env/include/cercs_env.h $CHAOS_HOMEDIR/include/cercs_env.h"
 fi
 if test "$libdir" != '${exec_prefix}/lib'; then
-tmpdir=`echo ${libdir} |  sed 's%/$%%'`
-search_list="$tmpdir/cercs_env.h $search_list"
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/cercs_env.h $search_list"
 fi
 if test "$exec_prefix" != "NONE"; then
-tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/lib/cercs_env.h $search_list"
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/cercs_env.h $search_list"
 fi
 if test "$includedir" != '${prefix}/include'; then
-tmpdir=`echo ${includedir} |  sed 's%/$%%'`
-search_list="$tmpdir/cercs_env.h $search_list"
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/cercs_env.h $search_list"
 fi
 if test "$prefix" != "NONE"; then
-tmpdir=`echo ${prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/include/cercs_env.h $search_list"
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/include/cercs_env.h $search_list"
 fi
 if test "include" == "lib"; then
   for tmp_lib_value in $sys_lib_search_path_spec; do
@@ -15791,28 +15847,41 @@ fi
 
 search_list="$search_list /usr/include/cercs_env.h /usr/local/include/cercs_env.h /opt/cercs_env/include/cercs_env.h /opt/misc/include/cercs_env.h /opt/misc/include/$cercs_cv_archive/cercs_env.h"
 tmp_search_results=""
-echo "configure:15794: searching for $search_list " >&5
+echo "configure:15850: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15798: first found $tmp_search_results " >&5
+	echo "configure:15854: first found $tmp_search_results " >&5
 	break
    fi
 done
 
 if test -n "$with_rpm_build_specified"; then
-if test "include" == "lib"; then
-   tmp_search_results=$libdir;
-fi
-if test "include" == "include"; then
-   tmp_search_results=$incdir;
-fi
+  if test "include" == "lib"; then
+     tmp_search_results=$libdir;
+  fi
+  if test "include" == "include"; then
+     tmp_search_results=$incdir;
+  fi
 fi
 if test -n "$with_deb_build_specified"; then
-   tmp_search_results=../cercs_env;
+# test build directories
+   if test -d "../cercs_env"; then
+      tmp_search_results=`pwd`/../cercs_env;
+   fi
+   if test -d "../../cercs_env"; then
+      tmp_search_results=`pwd`/../../cercs_env;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../cercs_env/cercs_env.h"; then
+      tmp_search_results='${abs_top_srcdir}/../cercs_env';
+   fi
+   if test -f "$srcdir/../../cercs_env/cercs_env.h"; then
+      tmp_search_results='${abs_top_srcdir}/../../cercs_env';
+   fi
 fi
 if test -n "$tmp_search_results"; then
-cercs_tmp=$tmp_search_results
+  cercs_tmp=$tmp_search_results
 fi
 
 if test -n "$cercs_tmp" -a "$cercs_tmp" != "/usr/include/cercs_env.h"; then
@@ -15848,41 +15917,41 @@ cercs_tmp=""
 search_list="./libcercs_env.la"
 CHAOS_HOMEDIR=""
 if test -n "$CSH"; then
-CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
 fi
 if test -n "$with_cercs_env"; then
-if test `echo $with_cercs_env | cut -c1` = "~"; then
-EXPANDED=`echo "echo $with_cercs_env" | csh -sf 2>/dev/null` || EXPANDED=""
-else
-EXPANDED=$with_cercs_env
-fi
+    if test `echo $with_cercs_env | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_cercs_env" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_cercs_env
+    fi
 
-search_list="$search_list $EXPANDED/libcercs_env.la $EXPANDED/lib/libcercs_env.la $EXPANDED/share/libcercs_env.la $EXPANDED/$cercs_cv_archive/libcercs_env.la $EXPANDED/$cercs_cv_archive/lib/libcercs_env.la $EXPANDED/cercs_env/libcercs_env.la $EXPANDED/cercs_env/$cercs_cv_archive/libcercs_env.la $EXPANDED/cercs_env/lib/libcercs_env.la $EXPANDED/cercs_env/lib/$cercs_cv_archive/libcercs_env.la"
+    search_list="$search_list $EXPANDED/libcercs_env.la $EXPANDED/lib/libcercs_env.la $EXPANDED/share/libcercs_env.la $EXPANDED/$cercs_cv_archive/libcercs_env.la $EXPANDED/$cercs_cv_archive/lib/libcercs_env.la $EXPANDED/cercs_env/libcercs_env.la $EXPANDED/cercs_env/$cercs_cv_archive/libcercs_env.la $EXPANDED/cercs_env/lib/libcercs_env.la $EXPANDED/cercs_env/lib/$cercs_cv_archive/libcercs_env.la"
 fi
 if test -z "$with_installed_specified"; then
-search_list="$search_list `pwd`/../cercs_env/libcercs_env.la `pwd`/../lib/libcercs_env.la `pwd`/../share/libcercs_env.la"
-if test "$CHAOS_HOMEDIR" != "$HOME"; then
-search_list="$search_list $HOME/cercs_env/libcercs_env.la $HOME/$cercs_cv_archive/lib/libcercs_env.la $HOME/lib/libcercs_env.la"
-fi
+  search_list="$search_list `pwd`/../cercs_env/libcercs_env.la `pwd`/../lib/libcercs_env.la `pwd`/../share/libcercs_env.la"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/cercs_env/libcercs_env.la $HOME/$cercs_cv_archive/lib/libcercs_env.la $HOME/lib/libcercs_env.la"
+  fi
 fi
 if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
-search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/cercs_env/lib/libcercs_env.la $CHAOS_HOMEDIR/$cercs_cv_archive/lib/libcercs_env.la $CHAOS_HOMEDIR/cercs_env/$cercs_cv_archive/lib/libcercs_env.la $CHAOS_HOMEDIR/cercs_env/lib/libcercs_env.la $CHAOS_HOMEDIR/lib/libcercs_env.la"
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/cercs_env/lib/libcercs_env.la $CHAOS_HOMEDIR/$cercs_cv_archive/lib/libcercs_env.la $CHAOS_HOMEDIR/cercs_env/$cercs_cv_archive/lib/libcercs_env.la $CHAOS_HOMEDIR/cercs_env/lib/libcercs_env.la $CHAOS_HOMEDIR/lib/libcercs_env.la"
 fi
 if test "$libdir" != '${exec_prefix}/lib'; then
-tmpdir=`echo ${libdir} |  sed 's%/$%%'`
-search_list="$tmpdir/libcercs_env.la $search_list"
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/libcercs_env.la $search_list"
 fi
 if test "$exec_prefix" != "NONE"; then
-tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/lib/libcercs_env.la $search_list"
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/libcercs_env.la $search_list"
 fi
 if test "$includedir" != '${prefix}/include'; then
-tmpdir=`echo ${includedir} |  sed 's%/$%%'`
-search_list="$tmpdir/libcercs_env.la $search_list"
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/libcercs_env.la $search_list"
 fi
 if test "$prefix" != "NONE"; then
-tmpdir=`echo ${prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/lib/libcercs_env.la $search_list"
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/libcercs_env.la $search_list"
 fi
 if test "lib" == "lib"; then
   for tmp_lib_value in $sys_lib_search_path_spec; do
@@ -15892,28 +15961,41 @@ fi
 
 search_list="$search_list /usr/lib/libcercs_env.la /usr/local/lib/libcercs_env.la /opt/cercs_env/lib/libcercs_env.la /opt/misc/lib/libcercs_env.la /opt/misc/lib/$cercs_cv_archive/libcercs_env.la"
 tmp_search_results=""
-echo "configure:15895: searching for $search_list " >&5
+echo "configure:15964: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15899: first found $tmp_search_results " >&5
+	echo "configure:15968: first found $tmp_search_results " >&5
 	break
    fi
 done
 
 if test -n "$with_rpm_build_specified"; then
-if test "lib" == "lib"; then
-   tmp_search_results=$libdir;
-fi
-if test "lib" == "include"; then
-   tmp_search_results=$incdir;
-fi
+  if test "lib" == "lib"; then
+     tmp_search_results=$libdir;
+  fi
+  if test "lib" == "include"; then
+     tmp_search_results=$incdir;
+  fi
 fi
 if test -n "$with_deb_build_specified"; then
-   tmp_search_results=../cercs_env;
+# test build directories
+   if test -d "../cercs_env"; then
+      tmp_search_results=`pwd`/../cercs_env;
+   fi
+   if test -d "../../cercs_env"; then
+      tmp_search_results=`pwd`/../../cercs_env;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../cercs_env/libcercs_env.la"; then
+      tmp_search_results='${abs_top_srcdir}/../cercs_env';
+   fi
+   if test -f "$srcdir/../../cercs_env/libcercs_env.la"; then
+      tmp_search_results='${abs_top_srcdir}/../../cercs_env';
+   fi
 fi
 if test -n "$tmp_search_results"; then
-cercs_tmp=$tmp_search_results
+  cercs_tmp=$tmp_search_results
 fi
 
 if test -n "$cercs_tmp" -a "$cercs_tmp" != "libcercs_env.la"; then
@@ -15940,6 +16022,7 @@ arg="$cercs_cv_cercs_env_link_arg "`echo $cercs_cv_cercs_env_link_dir | sed "/./
 fi
 fi
 if test `echo $arg | grep -c "cercs_env"` -eq 0; then
+# if arg does not includes a project spec add it at the end
 new_flags="$new_flags $arg"
 else
 new_flags="$arg $new_flags"
@@ -15976,11 +16059,11 @@ else
 
 search_list="$PWD/../cercs_env $PWD/../../cercs_env $PWD/../../../cercs_env"
 tmp_search_results=""
-echo "configure:15979: searching for $search_list " >&5
+echo "configure:16062: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15983: first found $tmp_search_results " >&5
+	echo "configure:16066: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16018,11 +16101,11 @@ else
 
 search_list="$PWD/../cercs_env $PWD/../../cercs_env $PWD/../../../cercs_env"
 tmp_search_results=""
-echo "configure:16021: searching for $search_list " >&5
+echo "configure:16104: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16025: first found $tmp_search_results " >&5
+	echo "configure:16108: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16055,6 +16138,7 @@ arg="$cercs_cv_cercs_env_link_arg "`echo $cercs_cv_cercs_env_link_dir | sed "/./
 fi
 fi
 if test `echo $arg | grep -c "cercs_env"` -eq 0; then
+# if arg does not includes a project spec add it at the end
 new_flags="$new_flags $arg"
 else
 new_flags="$arg $new_flags"
@@ -16282,41 +16366,41 @@ cercs_tmp=""
 search_list="./atl.h"
 CHAOS_HOMEDIR=""
 if test -n "$CSH"; then
-CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
 fi
 if test -n "$with_atl"; then
-if test `echo $with_atl | cut -c1` = "~"; then
-EXPANDED=`echo "echo $with_atl" | csh -sf 2>/dev/null` || EXPANDED=""
-else
-EXPANDED=$with_atl
-fi
+    if test `echo $with_atl | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_atl" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_atl
+    fi
 
-search_list="$search_list $EXPANDED/atl.h $EXPANDED/include/atl.h $EXPANDED/share/atl.h $EXPANDED/$cercs_cv_archive/atl.h $EXPANDED/$cercs_cv_archive/include/atl.h $EXPANDED/atl/atl.h $EXPANDED/atl/$cercs_cv_archive/atl.h $EXPANDED/atl/include/atl.h $EXPANDED/atl/include/$cercs_cv_archive/atl.h"
+    search_list="$search_list $EXPANDED/atl.h $EXPANDED/include/atl.h $EXPANDED/share/atl.h $EXPANDED/$cercs_cv_archive/atl.h $EXPANDED/$cercs_cv_archive/include/atl.h $EXPANDED/atl/atl.h $EXPANDED/atl/$cercs_cv_archive/atl.h $EXPANDED/atl/include/atl.h $EXPANDED/atl/include/$cercs_cv_archive/atl.h"
 fi
 if test -z "$with_installed_specified"; then
-search_list="$search_list `pwd`/../atl/atl.h `pwd`/../include/atl.h `pwd`/../share/atl.h"
-if test "$CHAOS_HOMEDIR" != "$HOME"; then
-search_list="$search_list $HOME/atl/atl.h $HOME/$cercs_cv_archive/include/atl.h $HOME/include/atl.h"
-fi
+  search_list="$search_list `pwd`/../atl/atl.h `pwd`/../include/atl.h `pwd`/../share/atl.h"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/atl/atl.h $HOME/$cercs_cv_archive/include/atl.h $HOME/include/atl.h"
+  fi
 fi
 if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
-search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/atl/include/atl.h $CHAOS_HOMEDIR/$cercs_cv_archive/include/atl.h $CHAOS_HOMEDIR/atl/$cercs_cv_archive/include/atl.h $CHAOS_HOMEDIR/atl/include/atl.h $CHAOS_HOMEDIR/include/atl.h"
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/atl/include/atl.h $CHAOS_HOMEDIR/$cercs_cv_archive/include/atl.h $CHAOS_HOMEDIR/atl/$cercs_cv_archive/include/atl.h $CHAOS_HOMEDIR/atl/include/atl.h $CHAOS_HOMEDIR/include/atl.h"
 fi
 if test "$libdir" != '${exec_prefix}/lib'; then
-tmpdir=`echo ${libdir} |  sed 's%/$%%'`
-search_list="$tmpdir/atl.h $search_list"
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/atl.h $search_list"
 fi
 if test "$exec_prefix" != "NONE"; then
-tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/lib/atl.h $search_list"
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/atl.h $search_list"
 fi
 if test "$includedir" != '${prefix}/include'; then
-tmpdir=`echo ${includedir} |  sed 's%/$%%'`
-search_list="$tmpdir/atl.h $search_list"
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/atl.h $search_list"
 fi
 if test "$prefix" != "NONE"; then
-tmpdir=`echo ${prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/include/atl.h $search_list"
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/include/atl.h $search_list"
 fi
 if test "include" == "lib"; then
   for tmp_lib_value in $sys_lib_search_path_spec; do
@@ -16326,28 +16410,41 @@ fi
 
 search_list="$search_list /usr/include/atl.h /usr/local/include/atl.h /opt/atl/include/atl.h /opt/misc/include/atl.h /opt/misc/include/$cercs_cv_archive/atl.h"
 tmp_search_results=""
-echo "configure:16329: searching for $search_list " >&5
+echo "configure:16413: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16333: first found $tmp_search_results " >&5
+	echo "configure:16417: first found $tmp_search_results " >&5
 	break
    fi
 done
 
 if test -n "$with_rpm_build_specified"; then
-if test "include" == "lib"; then
-   tmp_search_results=$libdir;
-fi
-if test "include" == "include"; then
-   tmp_search_results=$incdir;
-fi
+  if test "include" == "lib"; then
+     tmp_search_results=$libdir;
+  fi
+  if test "include" == "include"; then
+     tmp_search_results=$incdir;
+  fi
 fi
 if test -n "$with_deb_build_specified"; then
-   tmp_search_results=../atl;
+# test build directories
+   if test -d "../atl"; then
+      tmp_search_results=`pwd`/../atl;
+   fi
+   if test -d "../../atl"; then
+      tmp_search_results=`pwd`/../../atl;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../atl/atl.h"; then
+      tmp_search_results='${abs_top_srcdir}/../atl';
+   fi
+   if test -f "$srcdir/../../atl/atl.h"; then
+      tmp_search_results='${abs_top_srcdir}/../../atl';
+   fi
 fi
 if test -n "$tmp_search_results"; then
-cercs_tmp=$tmp_search_results
+  cercs_tmp=$tmp_search_results
 fi
 
 if test -n "$cercs_tmp" -a "$cercs_tmp" != "/usr/include/atl.h"; then
@@ -16383,41 +16480,41 @@ cercs_tmp=""
 search_list="./libatl.la"
 CHAOS_HOMEDIR=""
 if test -n "$CSH"; then
-CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
 fi
 if test -n "$with_atl"; then
-if test `echo $with_atl | cut -c1` = "~"; then
-EXPANDED=`echo "echo $with_atl" | csh -sf 2>/dev/null` || EXPANDED=""
-else
-EXPANDED=$with_atl
-fi
+    if test `echo $with_atl | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_atl" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_atl
+    fi
 
-search_list="$search_list $EXPANDED/libatl.la $EXPANDED/lib/libatl.la $EXPANDED/share/libatl.la $EXPANDED/$cercs_cv_archive/libatl.la $EXPANDED/$cercs_cv_archive/lib/libatl.la $EXPANDED/atl/libatl.la $EXPANDED/atl/$cercs_cv_archive/libatl.la $EXPANDED/atl/lib/libatl.la $EXPANDED/atl/lib/$cercs_cv_archive/libatl.la"
+    search_list="$search_list $EXPANDED/libatl.la $EXPANDED/lib/libatl.la $EXPANDED/share/libatl.la $EXPANDED/$cercs_cv_archive/libatl.la $EXPANDED/$cercs_cv_archive/lib/libatl.la $EXPANDED/atl/libatl.la $EXPANDED/atl/$cercs_cv_archive/libatl.la $EXPANDED/atl/lib/libatl.la $EXPANDED/atl/lib/$cercs_cv_archive/libatl.la"
 fi
 if test -z "$with_installed_specified"; then
-search_list="$search_list `pwd`/../atl/libatl.la `pwd`/../lib/libatl.la `pwd`/../share/libatl.la"
-if test "$CHAOS_HOMEDIR" != "$HOME"; then
-search_list="$search_list $HOME/atl/libatl.la $HOME/$cercs_cv_archive/lib/libatl.la $HOME/lib/libatl.la"
-fi
+  search_list="$search_list `pwd`/../atl/libatl.la `pwd`/../lib/libatl.la `pwd`/../share/libatl.la"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/atl/libatl.la $HOME/$cercs_cv_archive/lib/libatl.la $HOME/lib/libatl.la"
+  fi
 fi
 if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
-search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/atl/lib/libatl.la $CHAOS_HOMEDIR/$cercs_cv_archive/lib/libatl.la $CHAOS_HOMEDIR/atl/$cercs_cv_archive/lib/libatl.la $CHAOS_HOMEDIR/atl/lib/libatl.la $CHAOS_HOMEDIR/lib/libatl.la"
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/atl/lib/libatl.la $CHAOS_HOMEDIR/$cercs_cv_archive/lib/libatl.la $CHAOS_HOMEDIR/atl/$cercs_cv_archive/lib/libatl.la $CHAOS_HOMEDIR/atl/lib/libatl.la $CHAOS_HOMEDIR/lib/libatl.la"
 fi
 if test "$libdir" != '${exec_prefix}/lib'; then
-tmpdir=`echo ${libdir} |  sed 's%/$%%'`
-search_list="$tmpdir/libatl.la $search_list"
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/libatl.la $search_list"
 fi
 if test "$exec_prefix" != "NONE"; then
-tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/lib/libatl.la $search_list"
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/libatl.la $search_list"
 fi
 if test "$includedir" != '${prefix}/include'; then
-tmpdir=`echo ${includedir} |  sed 's%/$%%'`
-search_list="$tmpdir/libatl.la $search_list"
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/libatl.la $search_list"
 fi
 if test "$prefix" != "NONE"; then
-tmpdir=`echo ${prefix} |  sed 's%/$%%'`
-search_list="$tmpdir/lib/libatl.la $search_list"
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/libatl.la $search_list"
 fi
 if test "lib" == "lib"; then
   for tmp_lib_value in $sys_lib_search_path_spec; do
@@ -16427,28 +16524,41 @@ fi
 
 search_list="$search_list /usr/lib/libatl.la /usr/local/lib/libatl.la /opt/atl/lib/libatl.la /opt/misc/lib/libatl.la /opt/misc/lib/$cercs_cv_archive/libatl.la"
 tmp_search_results=""
-echo "configure:16430: searching for $search_list " >&5
+echo "configure:16527: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16434: first found $tmp_search_results " >&5
+	echo "configure:16531: first found $tmp_search_results " >&5
 	break
    fi
 done
 
 if test -n "$with_rpm_build_specified"; then
-if test "lib" == "lib"; then
-   tmp_search_results=$libdir;
-fi
-if test "lib" == "include"; then
-   tmp_search_results=$incdir;
-fi
+  if test "lib" == "lib"; then
+     tmp_search_results=$libdir;
+  fi
+  if test "lib" == "include"; then
+     tmp_search_results=$incdir;
+  fi
 fi
 if test -n "$with_deb_build_specified"; then
-   tmp_search_results=../atl;
+# test build directories
+   if test -d "../atl"; then
+      tmp_search_results=`pwd`/../atl;
+   fi
+   if test -d "../../atl"; then
+      tmp_search_results=`pwd`/../../atl;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../atl/libatl.la"; then
+      tmp_search_results='${abs_top_srcdir}/../atl';
+   fi
+   if test -f "$srcdir/../../atl/libatl.la"; then
+      tmp_search_results='${abs_top_srcdir}/../../atl';
+   fi
 fi
 if test -n "$tmp_search_results"; then
-cercs_tmp=$tmp_search_results
+  cercs_tmp=$tmp_search_results
 fi
 
 if test -n "$cercs_tmp" -a "$cercs_tmp" != "libatl.la"; then
@@ -16475,6 +16585,7 @@ arg="$cercs_cv_atl_link_arg "`echo $cercs_cv_atl_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "atl"` -eq 0; then
+# if arg does not includes a project spec add it at the end
 new_flags="$new_flags $arg"
 else
 new_flags="$arg $new_flags"
@@ -16511,11 +16622,11 @@ else
 
 search_list="$PWD/../atl $PWD/../../atl $PWD/../../../atl"
 tmp_search_results=""
-echo "configure:16514: searching for $search_list " >&5
+echo "configure:16625: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16518: first found $tmp_search_results " >&5
+	echo "configure:16629: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16553,11 +16664,11 @@ else
 
 search_list="$PWD/../atl $PWD/../../atl $PWD/../../../atl"
 tmp_search_results=""
-echo "configure:16556: searching for $search_list " >&5
+echo "configure:16667: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16560: first found $tmp_search_results " >&5
+	echo "configure:16671: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16590,6 +16701,7 @@ arg="$cercs_cv_atl_link_arg "`echo $cercs_cv_atl_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "atl"` -eq 0; then
+# if arg does not includes a project spec add it at the end
 new_flags="$new_flags $arg"
 else
 new_flags="$arg $new_flags"
