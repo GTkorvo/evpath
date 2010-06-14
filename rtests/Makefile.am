@@ -3,6 +3,8 @@ AUTOMAKE_OPTIONS = no-dependencies foreign
 
 TESTS = evtest remote_terminal_test
 
+INCLUDES = -I$(srcdir)/.. -I..
+
 not-really-check-local:
 	@if CMTransport=udp ./evtest$(EXEEXT) ; then\
 	 echo "PASS: evtest(udp)";\

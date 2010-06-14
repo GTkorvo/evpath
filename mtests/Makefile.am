@@ -3,6 +3,8 @@ AUTOMAKE_OPTIONS = no-dependencies foreign
 
 TESTS = cmtest cmping bulktest take_test
 
+INCLUDES = -I$(srcdir)/.. -I..
+
 check-local:
 	@if CMTransport=udp ./cmtest$(EXEEXT) ; then\
 	 echo "PASS: cmtest(udp)";\
