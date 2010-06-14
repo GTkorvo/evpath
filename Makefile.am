@@ -46,7 +46,7 @@ AM_CPPFLAGS =
 noinst_HEADERS = cm_internal.h  ev_internal.h
 
 cm_interface.c revp.c revpath.h: evpath.h gen_interface.pl
-	@PERL@ ./gen_interface.pl
+	@PERL@ $(srcdir)/gen_interface.pl
 
 if !CNL
 libcmsockets_la_SOURCES = cmsockets.c
