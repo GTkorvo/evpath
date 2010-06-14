@@ -1075,7 +1075,7 @@ uninstall-am: uninstall-binPROGRAMS uninstall-includeHEADERS \
 
 
 cm_interface.c revp.c revpath.h: evpath.h gen_interface.pl
-	@PERL@ ./gen_interface.pl
+	@PERL@ $(srcdir)/gen_interface.pl
 all-local:
 check-local:
 install-exec-local:
