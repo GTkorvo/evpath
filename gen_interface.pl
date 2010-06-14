@@ -1,4 +1,6 @@
 #! /usr/bin/env - perl
+use File::Basename;
+my $dirname = dirname(__FILE__);
 
 sub gen_type
 {
@@ -255,7 +257,7 @@ sub mod_EVhandler {
 {
     local ($/, *INPUT);
 	
-    unless (open(INPUT,"<evpath.h")) {
+    unless (open(INPUT,'<', "$dirname/evpath.h")) {
 	die "sudden flaming death, no evpath.h\n";
     }
 
