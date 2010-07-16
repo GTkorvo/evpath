@@ -1498,6 +1498,19 @@ extern EVstone
 EVcreate_store_action(CManager cm, EVstone out_stone, int store_limit);
 
 /*!
+ * Create a new stone with a general action.
+ *
+ * This is the non-specific action stone creation call
+ *
+ * \param cm The CManager from which this stone is allocated.
+ * \param action_spec The spec returned from some create_*_action_spec() call
+ * \return The newly allocated stone.
+ */
+/*REMOTE*/
+extern EVstone
+EVcreate_stone_action(CManager cm, char *action_spec);
+
+/*!
  * Create a new storage action.
  *
  * Storage actions implement storage stones internally and will

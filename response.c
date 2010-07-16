@@ -388,6 +388,51 @@ create_terminal_action_spec(FMStructDescList format_list)
 }
 
 char *
+INT_create_bridge_action_spec(int stone_id, char *contact)
+{
+    int size = strlen(contact);
+    char *output;
+    size += strlen("Bridge Action") + 12;
+    output = malloc(size);
+    sprintf(output, "Bridge Action %d %s", stone_id, contact);
+    return output;
+}
+
+void
+parse_bridge_action_spec(char *action_spec, int *target, char **contact)
+{
+    action_spec += strlen("Bridge Action ");
+    sscanf(action_spec, "%d", target);
+    while(*action_spec != ' ') action_spec++;
+    action_spec++;
+    *contact = action_spec;
+}
+
+action_value
+action_type(char *action_spec)
+{
+    if (action_spec == NULL)
+	return Action_Split;
+    if (strncmp(action_spec, "Bridge Action", 13) == 0)
+	return Action_Bridge;
+    if (strncmp(action_spec, "Filter Action", 13) == 0)
+	return Action_Immediate;
+    if (strncmp(action_spec, "Router Action", 13) == 0)
+	return Action_Immediate;
+    if (strncmp(action_spec, "Transform Action", 16) == 0)
+	return Action_Immediate;
+    if (strncmp(action_spec, "Multityped Action", 17) == 0)
+	return Action_Multi;
+    if (strncmp(action_spec, "sink:", 5) == 0)
+	return Action_Terminal;
+    if (strncmp(action_spec, "source:", 7) == 0)
+	return Action_Source;
+    if (strncmp(action_spec, "Split Action", 7) == 0)
+	return Action_Split;
+    return Action_NoAction;
+}
+
+char *
 INT_create_filter_action_spec(FMStructDescList format_list, char *function)
 {
     int format_count = 0;
@@ -603,7 +648,7 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	ret = ((int(*)(void *, void *, attr_list))instance->u.transform.func_ptr)(event->decoded_event, out_event, attrs);
     }
 
-    if (out_stones[0] == -1) {
+    if (ret && (out_stones[0] == -1)) {
 	printf("Transform output stone ID not set, event discarded\n");
 	ret = 0;
     }

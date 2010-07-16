@@ -415,6 +415,8 @@ extern int INT_CMlisten ARGS((CManager cm));
 extern char *
 INT_create_filter_action_spec(FMStructDescList format_list, char *function);
 extern char *
+INT_create_bridge_action_spec(int stone_id, char *contact_string);
+extern char *
 INT_create_router_action_spec(FMStructDescList format_list, char *function);
 extern int INT_CMfork_comm_thread ARGS((CManager cm));
 extern int

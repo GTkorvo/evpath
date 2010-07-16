@@ -287,9 +287,9 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 	    static int warn_once = 0;
 	    if (warn_once == 0) {
 		warn_once++;
-		printf("Attempts to establish your fully qualified hostname, or indeed any\nuseful network name, have failed horribly.  Sorry.\n");
+		svc->trace_out(NULL, "Attempts to establish your fully qualified hostname, or indeed any\nuseful network name, have failed horribly.  using localhost.\n");
 	    }
-	    strncpy(buf, "Unknown", len);
+	    strncpy(buf, "localhost", len);
 	}
     }
     svc->trace_out(NULL, "CMSocket - GetQualHostname returning %s", buf);

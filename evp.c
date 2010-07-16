@@ -20,11 +20,34 @@ static void dump_action(stone_type stone, response_cache_element *resp,
 static void dump_stone(stone_type stone);
 static int is_output_stone(CManager cm, EVstone stone_num);
 
-static const char *action_str[] = { "Action_NoAction","Action_Bridge", "Action_Thread_Bridge", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Encode_to_Buffer", "Action_Split", "Action_Store", "Action_Congestion"};
+static const char *action_str[] = { "Action_NoAction","Action_Bridge", "Action_Thread_Bridge", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Encode_to_Buffer", "Action_Split", "Action_Store", "Action_Congestion", "Action_Source"};
+
+
+extern int
+lookup_local_stone(event_path_data evp, int stone_num)
+{
+    int i;
+    int ret = -1;
+    for (i=0; i < evp->stone_lookup_table_size; i++) {
+	if (evp->stone_lookup_table[i].global_id == stone_num) {
+	    ret = evp->stone_lookup_table[i].local_id;
+	    break;
+	}
+    }
+    if (ret == -1) {
+	printf("EVPATH: Invalid GLOBAL stone ID %d\n", stone_num);
+	return -1;
+    }
+    return ret;
+}
 
 stone_type
 stone_struct(event_path_data evp, int stone_num)
 {
+    if ((stone_num & 0x80000000) == 0x80000000) {
+	stone_num = lookup_local_stone(evp, stone_num);
+    }
+	    
     if (evp->stone_count <= stone_num - evp->stone_base_num) {
 	printf("EVPATH: Invalid stone ID %d\n", stone_num);
         return NULL;
@@ -136,6 +159,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	    free(act->matching_reference_formats);
 	switch(act->action_type) {
 	case Action_NoAction:
+	case Action_Source:
 	case Action_Encode_to_Buffer:
 	case Action_Thread_Bridge:
 	    break;
@@ -232,6 +256,14 @@ INT_EVcreate_terminal_action(CManager cm, FMStructDescList format_list,
     return stone;
 }    
 
+EVstone
+INT_EVcreate_stone_action(CManager cm, char *action_spec)
+{
+    EVstone stone = INT_EValloc_stone(cm);
+    (void) INT_EVassoc_general_action(cm, stone, action_spec, NULL);
+    return stone;
+}    
+
 EVaction
 INT_EVassoc_terminal_action(CManager cm, EVstone stone_num, 
 			    FMStructDescList format_list, EVSimpleHandlerFunc handler,
@@ -312,6 +344,69 @@ INT_EVcreate_immediate_action(CManager cm, char *action_spec,
 	INT_EVaction_set_output(cm, stone, action, i, target_list[i]);
     }
     return stone;
+}
+
+EVaction
+INT_EVassoc_general_action(CManager cm, EVstone stone_num, char*action_spec,
+    EVstone *output_list)
+{
+    event_path_data evp = cm->evp;
+    EVaction ret;
+    switch (action_type(action_spec))
+    {
+    case Action_Immediate:
+	ret = INT_EVassoc_immediate_action(cm, stone_num, action_spec, NULL);
+	break;
+    case Action_Bridge:
+    {
+	EVstone target;
+	char *contact;
+	attr_list attrs;
+	parse_bridge_action_spec(action_spec, &target, &contact);
+	attrs = attr_list_from_string(contact);
+	ret = INT_EVassoc_bridge_action(cm, stone_num, attrs, target);
+	free_attr_list(attrs);
+	break;
+    }
+    case Action_Terminal: {
+	char *name = action_spec+5;
+	int i;
+	for (i=0; i < evp->sink_handler_count; i++) {
+	    if (strcmp(name, evp->sink_handlers[i].name) == 0) {
+		ret = INT_EVassoc_terminal_action(cm, stone_num, 
+						  evp->sink_handlers[i].format_list,
+						  evp->sink_handlers[i].handler,
+						  NULL);
+		break;
+	    }
+	}
+	if (i == evp->sink_handler_count) {
+	    printf("Failed to find handler func \"%s\"\n", name);
+	}
+	break;
+    }
+    case Action_Split:
+	ret = INT_EVassoc_split_action(cm, stone_num, output_list);
+	break;
+    case Action_Source: {
+	char *name = action_spec+7;
+	int i;
+	for (i=0; i < evp->source_count; i++) {
+	    if (strcmp(name, evp->sources[i].name) == 0) {
+		evp->sources[i].src->local_stone_id = stone_num;
+		ret = INT_EVassoc_split_action(cm, stone_num, output_list);
+		break;
+	    }
+	}
+	if (i == evp->source_count) {
+	    printf("Failed to find source \"%s\"\n", name);
+	}
+	break;
+    }
+    default:
+	printf("Missed case\n");
+    } 
+    return ret;
 }
 
 EVaction
@@ -2687,7 +2782,9 @@ void
 INT_EVsubmit(EVsource source, void *data, attr_list attrs)
 {
     event_path_data evp = source->cm->evp;
-    event_item *event = get_free_event(evp);
+    event_item *event;
+    if (source->local_stone_id == -1) return;  /* not connected */
+    event = get_free_event(evp);
     if (source->free_func != NULL) {
 	event->contents = Event_Freeable;
     } else {

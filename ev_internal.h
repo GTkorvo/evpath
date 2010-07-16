@@ -24,7 +24,7 @@ typedef struct _event_item {
     EVFreeFunction free_func;
 } event_item, *event_queue;
 
-typedef enum { Action_NoAction = 0, Action_Bridge, Action_Thread_Bridge, Action_Terminal, Action_Filter, Action_Immediate, Action_Multi, Action_Decode, Action_Encode_to_Buffer, Action_Split, Action_Store, Action_Congestion } action_value;
+typedef enum { Action_NoAction = 0, Action_Bridge, Action_Thread_Bridge, Action_Terminal, Action_Filter, Action_Immediate, Action_Multi, Action_Decode, Action_Encode_to_Buffer, Action_Split, Action_Store, Action_Congestion, Action_Source } action_value;
 
 typedef enum {Immediate, Immediate_and_Multi, Bridge, Congestion} action_class;
 
@@ -208,10 +208,32 @@ typedef struct _extern_routine_struct {
 typedef void *extern_routines;
 #endif
 
+typedef struct _lookup_table_elem {
+    int global_id;
+    int local_id;
+} lookup_table_elem;
+
+typedef struct _sink_table_elem {
+    char *name;
+    FMStructDescList format_list;
+    EVSimpleHandlerFunc handler;
+} sink_table_elem;
+
+typedef struct _source_table_elem {
+    char *name;
+    EVsource src;
+} source_table_elem;
+
 typedef struct _event_path_data {
     int stone_count;
     int stone_base_num;
     stone_type stone_map;
+    int stone_lookup_table_size;
+    lookup_table_elem *stone_lookup_table;
+    int sink_handler_count;
+    sink_table_elem *sink_handlers;
+    int source_count;
+    source_table_elem *sources;
     void *as;
     FMContext fmc;
     FFSContext ffsc;
@@ -334,10 +356,12 @@ extern EVstone INT_EValloc_stone(CManager cm);
 extern void INT_EVsend_stored(CManager cm, EVstone stone, EVaction action);
 extern void INT_EVclear_stored(CManager cm, EVstone stone, EVaction action);
 extern EVaction INT_EVassoc_store_action(CManager cm, EVstone stone, EVstone out_stone, int store_limit); 
+extern EVaction INT_EVassoc_general_action(CManager cm, EVstone stone, char *action_spec, EVstone *target_list);
 extern EVaction
 INT_EVassoc_split_action(CManager cm, EVstone stone, EVstone *target_list);
 extern EVsource
 INT_EVcreate_submit_handle(CManager cm, EVstone stone, FMStructDescList data_format);
+extern EVstone INT_EVcreate_stone_action(CManager cm, char *action_spec);
 extern FMFormat INT_EVget_src_ref_format(EVsource source);
 extern int INT_EVfreeze_stone(CManager cm, EVstone stone_id);
 extern int INT_EVunfreeze_stone(CManager cm, EVstone stone_id);
@@ -353,3 +377,6 @@ extern int INT_EVdestroy_stone(CManager cm, EVstone stone_id);
 extern void INT_EVfree_source(EVsource source);
 extern void thread_bridge_transfer(CManager source_cm, event_item *event, CManager target_cm, EVstone target_stone);
 extern void ensure_ev_owned(CManager cm, event_item *event);
+extern int lookup_local_stone(event_path_data evp, int stone_num);
+extern action_value action_type(char *action_spec);
+extern void parse_bridge_action_spec(char *action_spec, int *target, char **contact);
