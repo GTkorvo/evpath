@@ -281,6 +281,9 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
 	int j;
 	for (j=0; j < msg->stone_list[i].out_count; j++) {
 	    local_list[j] = lookup_local_stone(evp, msg->stone_list[i].out_links[j]);
+	    if (local_list[j] == -1) {
+		printf("Didn't found global stone %d\n", msg->stone_list[i].out_links[j]);
+	    }
 	}
 	local_list[j] = -1;
 	INT_EVassoc_general_action(cm, local_stone, msg->stone_list[i].action, 
@@ -426,8 +429,8 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	for (node = 0; node < dfg->node_count; node++) {
 	    if (strcmp(dfg->nodes[node].name, node_name) == 0) {
 		dfg->nodes[node].self = 1;
+		break;
 	    }
-	    node = dfg->node_count + 1;
 	}
 	if (node == dfg->node_count) {
 	    printf("Node \"%s\" not found in node list\n", node_name);

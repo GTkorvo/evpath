@@ -342,6 +342,7 @@ INT_EVcreate_immediate_action(CManager cm, char *action_spec,
     EVaction action = EVassoc_immediate_action(cm, stone, action_spec, NULL);
     while (target_list && (target_list[i] != 0)) {
 	INT_EVaction_set_output(cm, stone, action, i, target_list[i]);
+	i++;
     }
     return stone;
 }
@@ -351,12 +352,18 @@ INT_EVassoc_general_action(CManager cm, EVstone stone_num, char*action_spec,
     EVstone *output_list)
 {
     event_path_data evp = cm->evp;
-    EVaction ret;
+    EVaction ret = -1;
     switch (action_type(action_spec))
     {
-    case Action_Immediate:
+    case Action_Immediate: {
+	int i = 0;
 	ret = INT_EVassoc_immediate_action(cm, stone_num, action_spec, NULL);
+	while (output_list && (output_list[i] != -1)) {
+	    INT_EVaction_set_output(cm, stone_num, ret, i, output_list[i]);
+	    i++;
+	}
 	break;
+    }
     case Action_Bridge:
     {
 	EVstone target;
