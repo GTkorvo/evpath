@@ -91,6 +91,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 
 static int do_regression_master_test();
 static int regression = 1;
+extern 	void EVthin_socket_listen(CManager cm,  char **hostname, int *thin_port);
 
 int
 main(int argc, char **argv)

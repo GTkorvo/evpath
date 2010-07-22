@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <strings.h>
 
 #include "evpath.h"
 #include "cm_internal.h"
@@ -195,6 +196,8 @@ dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg,
     EVdfg dfg = client_data;
     /* EVready_ptr msg =  vmsg; */
     (void) vmsg;
+    (void) conn;
+    (void) attrs;
     CMtrace_out(cm, EVerbose, "Client DFG %p is ready, signaling\n", dfg);
     CMCondition_signal(cm, dfg->ready_condition);
 }
@@ -205,6 +208,9 @@ dfg_shutdown_handler(CManager cm, CMConnection conn, void *vmsg,
 {
     EVdfg dfg = client_data;
     EVshutdown_ptr msg =  vmsg;
+    (void)cm;
+    (void)conn;
+    (void)attrs;
     if (dfg->master_connection == NULL) {
 	/* I got a shutdown message and I'm the master */
 	signal_shutdown(dfg, msg->value);
@@ -223,6 +229,9 @@ node_register_handler(CManager cm, CMConnection conn, void *vmsg,
     EVregister_ptr msg =  vmsg;
     int node;
     int new_node = -1;
+    (void)cm;
+    (void)conn;
+    (void)attrs;
     for (node = 0; node < dfg->node_count; node++) {
 	if (strcmp(dfg->nodes[node].name, msg->node_name) == 0) {
 	    dfg->nodes[node].conn = conn;
@@ -308,6 +317,7 @@ EVdfg_realize(EVdfg dfg)
 {
 //    check_connectivity(dfg);
 //    check_types(dfg);
+    (void) dfg;
     return 1;
 }
 

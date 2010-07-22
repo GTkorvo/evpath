@@ -100,7 +100,7 @@ do_connection(char * remote_host, int port)
     } else {
 	memcpy((char*)&sin.sin_addr, host_addr->h_addr, host_addr->h_length);
     }
-    sin.sin_port = htons(port);
+    sin.sin_port = (unsigned short) htons(port);
     sin.sin_family = AF_INET;
     if (connect(conn, (struct sockaddr *) &sin,
 		sizeof sin) == -1) {
