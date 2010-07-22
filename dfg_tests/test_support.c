@@ -187,14 +187,13 @@ test_fork_children(char **list, char *master_contact)
 
 int wait_for_children(char **list)
 {
+    (void)list;
     /* should wait for kids */
     return 0;
 }
 
 static int regression = 1;
 
-extern int be_test_master(int argc, char **argv);
-extern int be_test_child(int argc, char **argv);
 static void fail_and_die(int signal);
 
 int

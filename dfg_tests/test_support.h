@@ -25,3 +25,6 @@ extern int checksum_simple_record(simple_rec_ptr event, attr_list attrs,
 				  int quiet);
 extern void test_fork_children(char **list, char *master_contact);
 extern int wait_for_children(char **list);
+extern int quiet;
+extern int be_test_master(int argc, char **argv);
+extern int be_test_child(int argc, char **argv);

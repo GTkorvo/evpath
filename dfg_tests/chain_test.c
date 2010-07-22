@@ -6,7 +6,6 @@
 #include "ev_deploy.h"
 #include "test_support.h"
 
-extern int quiet;
 static int status;
 static EVdfg test_dfg;
 
@@ -16,6 +15,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     simple_rec_ptr event = vevent;
     (void)cm;
+    (void)client_data;
     checksum_simple_record(event, attrs, quiet);
     EVdfg_shutdown(test_dfg, 0);
     return 0;
@@ -106,7 +106,7 @@ be_test_master(int argc, char **argv)
 }
 
 
-extern void 
+extern int
 be_test_child(int argc, char **argv)
 {
     CManager cm;
@@ -131,5 +131,5 @@ be_test_child(int argc, char **argv)
 	/* submit will be quietly ignored if source is not active */
 	EVsubmit(src, &rec, NULL);
     }
-    EVdfg_wait_for_shutdown(test_dfg);
+    return EVdfg_wait_for_shutdown(test_dfg);
 }
