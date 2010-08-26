@@ -89,7 +89,7 @@ be_test_master(int argc, char **argv)
 	  // nbase = pow(2,(i-1))
 	  n = nbase + j;
 	  tmp[j] = EVdfg_create_stone(test_dfg,NULL);
-	  EVdfg_link_port(last[j/base], 0, tmp[j]);
+	  EVdfg_link_port(last[j/base], j%2 , tmp[j]);
 	  EVdfg_assign_node(tmp[j], nodes[n-1]);
 	}
 	for (j=0; j<nbase; j++) {
@@ -105,7 +105,7 @@ be_test_master(int argc, char **argv)
 	EVdfg_register_sink_handler(cm,chandle,simple_format_list, 
 				    (EVSimpleHandlerFunc) simple_handler);
 	tmp[j] = EVdfg_create_sink_stone(test_dfg,chandle);
-	EVdfg_link_port(last[j/base],0,tmp[j]);
+	EVdfg_link_port(last[j/base],j%2 ,tmp[j]);
 	EVdfg_assign_node(tmp[j], nodes[n-1]);
       }
    
