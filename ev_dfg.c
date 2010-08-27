@@ -1,3 +1,4 @@
+#include "config.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -198,7 +199,7 @@ dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg,
     (void) vmsg;
     (void) conn;
     (void) attrs;
-    CMtrace_out(cm, EVerbose, "Client DFG %p is ready, signaling\n", dfg);
+    CMtrace_out(cm, EVerbose, "Client DFG %p is ready, signaling %d\n", dfg, dfg->ready_condition);
     CMCondition_signal(cm, dfg->ready_condition);
 }
 
@@ -280,12 +281,16 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
 	int local_list[1024]; /* better be enough */
 	int j;
 	for (j=0; j < msg->stone_list[i].out_count; j++) {
-	    local_list[j] = lookup_local_stone(evp, msg->stone_list[i].out_links[j]);
-	    if (local_list[j] == -1) {
-		printf("Didn't found global stone %d\n", msg->stone_list[i].out_links[j]);
+	    if (msg->stone_list[i].out_links[j] != -1) {
+		local_list[j] = lookup_local_stone(evp, msg->stone_list[i].out_links[j]);
+		if (local_list[j] == -1) {
+		    printf("Didn't found global stone %d\n", msg->stone_list[i].out_links[j]);
+		}
+	    } else {
+		local_list[j] = -1;
 	    }
 	}
-	local_list[j] = -1;
+	local_list[msg->stone_list[i].out_count] = -1;
 	INT_EVassoc_general_action(cm, local_stone, msg->stone_list[i].action, 
 	    &local_list[0]);
     }    
@@ -356,9 +361,9 @@ EVdfg_assign_node(EVdfg_stone stone, char *node_name)
 extern int 
 EVdfg_ready_wait(EVdfg dfg)
 {
-    CMtrace_out(cm, EVerbose, "DFG wait for ready\n");
+    CMtrace_out(cm, EVerbose, "DFG %p wait for ready\n", dfg);
     CMCondition_wait(dfg->cm, dfg->ready_condition);
-    CMtrace_out(cm, EVerbose, "DFG ready wait released\n");
+    CMtrace_out(cm, EVerbose, "DFG %p ready wait released\n", dfg);
     return 1;
 }
 
@@ -460,6 +465,7 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	CMwrite(conn, register_msg, &msg);
 	free(my_contact_str);
 	dfg->master_connection = conn;
+	CMtrace_out(cm, EVerbose, "DFG %p node name %s\n", dfg, node_name);
     }
 }
 
@@ -486,7 +492,7 @@ add_bridge_stones(EVdfg dfg)
 	for (j = 0; j < dfg->stones[i]->out_count; j++) {
 	    EVdfg_stone cur = dfg->stones[i];
 	    EVdfg_stone target = cur->out_links[j];
-	    if ((!cur->bridge_stone) && (cur->node != target->node)) {
+	    if (target && (!cur->bridge_stone) && (cur->node != target->node)) {
 		cur->out_links[j] = create_bridge_stone(dfg, target);
 		/* put the bridget stone where the source stone is */
 		cur->out_links[j]->node = cur->node;
@@ -530,7 +536,11 @@ deploy_to_node(EVdfg dfg, int node)
 	    mstone->out_count = dstone->out_count;
 	    mstone->out_links = malloc(sizeof(mstone->out_links[0])*mstone->out_count);
 	    for (k=0; k< dstone->out_count; k++) {
-		mstone->out_links[k] = dstone->out_links[k]->stone_id;
+		if (dstone->out_links[k] != NULL) {
+		    mstone->out_links[k] = dstone->out_links[k]->stone_id;
+		} else {
+		    mstone->out_links[k] = -1;
+		}
 	    }
 	    mstone->action = dstone->action;
 	    mstone->extra_actions = 0;
