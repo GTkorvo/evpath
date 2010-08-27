@@ -20,6 +20,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     (void)cm;
     (void)client_data;
     checksum_simple_record(event, attrs, quiet);
+    printf("Received msg\n");
     EVdfg_shutdown(test_dfg, 0);
     return 0;
 }
@@ -52,6 +53,7 @@ be_test_master(int argc, char **argv)
 	nodes[i] = malloc(ndig+2);
 	sprintf(nodes[i], "N%d", i+1);
     }
+    nodes[node_count] = NULL;
     cm = CManager_create();
     CMlisten(cm);
     contact_list = CMget_contact_list(cm);
