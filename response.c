@@ -392,7 +392,7 @@ INT_create_bridge_action_spec(int stone_id, char *contact)
 {
     int size = strlen(contact);
     char *output;
-    size += strlen("Bridge Action") + 12;
+    size += strlen("Bridge Action") + 20;
     output = malloc(size);
     sprintf(output, "Bridge Action %d %s", stone_id, contact);
     return output;
