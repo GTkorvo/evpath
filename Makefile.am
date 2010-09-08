@@ -28,7 +28,7 @@ libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c \
                        cm_threadio.c cm_evol.c evp.c response.c metrics.c \
                        revp.c evp_compat.c thin_server.c evp_threads.c ev_dfg.c
 
-if !CNL
+if CNL
 libevpath_la_SOURCES += cmsockets.c cmselect.c
 endif
 
