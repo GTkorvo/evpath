@@ -12599,7 +12599,7 @@ if test "include" == "lib"; then
   done
 fi
 
-search_list="$search_list /usr/include/ffs.h /usr/local/include/ffs.h /opt/ffs/include/ffs.h /opt/misc/include/ffs.h /opt/misc/include/$cercs_cv_archive/ffs.h"
+search_list="$search_list /usr/include/ffs.h /usr/local/include/ffs.h /opt/ffs/include/ffs.h /opt/misc/include/ffs.h /opt/misc/include/$cercs_cv_archive/ffs.h /opt/local/include/ffs.h"
 tmp_search_results=""
 echo "configure:12604: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
@@ -12713,7 +12713,7 @@ if test "lib" == "lib"; then
   done
 fi
 
-search_list="$search_list /usr/lib/libffs.la /usr/local/lib/libffs.la /opt/ffs/lib/libffs.la /opt/misc/lib/libffs.la /opt/misc/lib/$cercs_cv_archive/libffs.la"
+search_list="$search_list /usr/lib/libffs.la /usr/local/lib/libffs.la /opt/ffs/lib/libffs.la /opt/misc/lib/libffs.la /opt/misc/lib/$cercs_cv_archive/libffs.la /opt/local/lib/libffs.la"
 tmp_search_results=""
 echo "configure:12718: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
@@ -12980,7 +12980,7 @@ if test "include" == "lib"; then
   done
 fi
 
-search_list="$search_list /usr/include/gen_thread.h /usr/local/include/gen_thread.h /opt/gen_thread/include/gen_thread.h /opt/misc/include/gen_thread.h /opt/misc/include/$cercs_cv_archive/gen_thread.h"
+search_list="$search_list /usr/include/gen_thread.h /usr/local/include/gen_thread.h /opt/gen_thread/include/gen_thread.h /opt/misc/include/gen_thread.h /opt/misc/include/$cercs_cv_archive/gen_thread.h /opt/local/include/gen_thread.h"
 tmp_search_results=""
 echo "configure:12985: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
@@ -13094,7 +13094,7 @@ if test "lib" == "lib"; then
   done
 fi
 
-search_list="$search_list /usr/lib/libgen_thread.la /usr/local/lib/libgen_thread.la /opt/gen_thread/lib/libgen_thread.la /opt/misc/lib/libgen_thread.la /opt/misc/lib/$cercs_cv_archive/libgen_thread.la"
+search_list="$search_list /usr/lib/libgen_thread.la /usr/local/lib/libgen_thread.la /opt/gen_thread/lib/libgen_thread.la /opt/misc/lib/libgen_thread.la /opt/misc/lib/$cercs_cv_archive/libgen_thread.la /opt/local/lib/libgen_thread.la"
 tmp_search_results=""
 echo "configure:13099: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
@@ -13361,7 +13361,7 @@ if test "include" == "lib"; then
   done
 fi
 
-search_list="$search_list /usr/include/cercs_env.h /usr/local/include/cercs_env.h /opt/cercs_env/include/cercs_env.h /opt/misc/include/cercs_env.h /opt/misc/include/$cercs_cv_archive/cercs_env.h"
+search_list="$search_list /usr/include/cercs_env.h /usr/local/include/cercs_env.h /opt/cercs_env/include/cercs_env.h /opt/misc/include/cercs_env.h /opt/misc/include/$cercs_cv_archive/cercs_env.h /opt/local/include/cercs_env.h"
 tmp_search_results=""
 echo "configure:13366: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
@@ -13475,7 +13475,7 @@ if test "lib" == "lib"; then
   done
 fi
 
-search_list="$search_list /usr/lib/libcercs_env.la /usr/local/lib/libcercs_env.la /opt/cercs_env/lib/libcercs_env.la /opt/misc/lib/libcercs_env.la /opt/misc/lib/$cercs_cv_archive/libcercs_env.la"
+search_list="$search_list /usr/lib/libcercs_env.la /usr/local/lib/libcercs_env.la /opt/cercs_env/lib/libcercs_env.la /opt/misc/lib/libcercs_env.la /opt/misc/lib/$cercs_cv_archive/libcercs_env.la /opt/local/lib/libcercs_env.la"
 tmp_search_results=""
 echo "configure:13480: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
@@ -13785,7 +13785,7 @@ if test "include" == "lib"; then
   done
 fi
 
-search_list="$search_list /usr/include/atl.h /usr/local/include/atl.h /opt/atl/include/atl.h /opt/misc/include/atl.h /opt/misc/include/$cercs_cv_archive/atl.h"
+search_list="$search_list /usr/include/atl.h /usr/local/include/atl.h /opt/atl/include/atl.h /opt/misc/include/atl.h /opt/misc/include/$cercs_cv_archive/atl.h /opt/local/include/atl.h"
 tmp_search_results=""
 echo "configure:13790: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
@@ -13899,7 +13899,7 @@ if test "lib" == "lib"; then
   done
 fi
 
-search_list="$search_list /usr/lib/libatl.la /usr/local/lib/libatl.la /opt/atl/lib/libatl.la /opt/misc/lib/libatl.la /opt/misc/lib/$cercs_cv_archive/libatl.la"
+search_list="$search_list /usr/lib/libatl.la /usr/local/lib/libatl.la /opt/atl/lib/libatl.la /opt/misc/lib/libatl.la /opt/misc/lib/$cercs_cv_archive/libatl.la /opt/local/lib/libatl.la"
 tmp_search_results=""
 echo "configure:13904: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
