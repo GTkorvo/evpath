@@ -90,17 +90,17 @@ LTLIBS="$cercs_cv_atl_link_dir/libatl.la $LTLIBS"
 
 
 computenode=disable
-dnl AC_DEFINE(NO_DYNAMIC_LINKING, 0, [Building normally])
+do_dyn_linking=0
 AC_ARG_ENABLE(CNL, [  --enable-CNL Enable a restricted socket only transport build to allow building on compute node linux. Default is disabled],
 	[ if test "x$enableval" = "xtrue"; then
 		echo "Configuring for compute node linux"
-		AC_DEFINE(NO_DYNAMIC_LINKING, 1, [Building for compute node linux])
+		do_dyn_linking=1
 		computenode=enable
 	else
-		AC_DEFINE(NO_DYNAMIC_LINKING, 0, [Building normally])
+		do_dyn_linking=0
 		computenode=disable
 	fi])
-
+AC_DEFINE_UNQUOTED([NO_DYNAMIC_LINKING], [$do_dyn_linking], [Build with dynamic linking])
 AM_CONDITIONAL([CNL], [test x$computenode = xenable])
 
 AC_SUBST(EVDIR)

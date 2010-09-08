@@ -44,16 +44,17 @@ subdir = .
 DIST_COMMON = README $(am__configure_deps) $(am__include_HEADERS_DIST) \
 	$(am__ltdlinclude_HEADERS_DIST) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config-h.in \
-	$(top_srcdir)/configure COPYING.LIB argz.c config/compile \
-	config/config.guess config/config.sub config/depcomp \
-	config/install-sh config/ltmain.sh  \
-	config/missing  lt__dirent.c lt__strl.c
+	$(top_srcdir)/configure COPYING.LIB argz.c config.guess \
+	config.sub config/compile config/config.guess \
+	config/config.sub config/depcomp config/install-sh \
+	config/ltmain.sh config/missing install-sh lt__dirent.c \
+	lt__strl.c ltmain.sh missing mkinstalldirs
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/argz.m4 \
 	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltdl.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
 	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/configure.ac
+	$(top_srcdir)/acinclude.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
@@ -672,8 +673,8 @@ install-includeHEADERS: $(include_HEADERS)
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo " $(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
-	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(includedir)" || exit $$?; \
+	  echo " cmp -s '$$files' '$(DESTDIR)$(includedir)/$xfiles' || $(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
+	  cmp -s '$$files' '$(DESTDIR)$(includedir)/$xfiles' || $(INSTALL_HEADER) $$files "$(DESTDIR)$(includedir)" || exit $$?; \
 	done
 
 uninstall-includeHEADERS:
@@ -692,8 +693,8 @@ install-ltdlincludeHEADERS: $(ltdlinclude_HEADERS)
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo " $(INSTALL_HEADER) $$files '$(DESTDIR)$(ltdlincludedir)'"; \
-	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(ltdlincludedir)" || exit $$?; \
+	  echo " cmp -s '$$files' '$(DESTDIR)$(ltdlincludedir)/$xfiles' || $(INSTALL_HEADER) $$files '$(DESTDIR)$(ltdlincludedir)'"; \
+	  cmp -s '$$files' '$(DESTDIR)$(ltdlincludedir)/$xfiles' || $(INSTALL_HEADER) $$files "$(DESTDIR)$(ltdlincludedir)" || exit $$?; \
 	done
 
 uninstall-ltdlincludeHEADERS:
