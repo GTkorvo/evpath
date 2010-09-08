@@ -334,7 +334,7 @@ main(int argc, char **argv)
 	    data->long_field--;
 	    memcpy(new_data, data, sizeof(simple_rec));
 	    printf("SUBMITTING  %d\n", i);
-	    set_attr(attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)i);
+	    set_int_attr(attrs, CMDEMO_TEST_ATOM, i);
 	    EVsubmit(source_handle, new_data, attrs);
 	    CMusleep(cm, 100000);
 	}

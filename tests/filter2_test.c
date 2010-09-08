@@ -7,7 +7,9 @@
  */
 
 
+#if defined (__INTEL_COMPILER)
 #pragma warning (disable:981)
+#endif
 #include "config.h"
 
 #include <stdio.h>

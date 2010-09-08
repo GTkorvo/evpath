@@ -1,4 +1,6 @@
-#pragma warning (disable:981)
+#if defined (__INTEL_COMPILER)
+ #pragma warning (disable:981)
+#endif
 /*
  *   Filter2_test differs from filter_test in that it checks to see if we
  *   can filter out events without changing them.  I.E. it submits two

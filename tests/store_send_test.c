@@ -273,7 +273,7 @@ main(int argc, char **argv)
             attr_list event_attrs;
             event_attrs = create_attr_list();
 	    generate_record(&data);
-            add_attr(event_attrs, CMDEMO_TEST_ATOM, Attr_Int4, (attr_value)(int)data.sequence_number);
+            add_int_attr(event_attrs, CMDEMO_TEST_ATOM, data.sequence_number);
 	    if (quiet <=0) {printf("submitting %ld\n", data.long_field);}
 	    EVsubmit(source_handle, &data, event_attrs);
             count--;
