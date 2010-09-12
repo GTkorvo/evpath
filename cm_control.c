@@ -124,20 +124,23 @@ CMCondition_destroy(CMControlList cl, int condition)
     CMCondition cond = NULL, prev = NULL;
     CMCondition next = NULL;
 
-    if (cl->condition_list->condition_num == condition) {
-	cond = cl->condition_list;
-	cl->condition_list = cl->condition_list->next;
-    } else {
-	prev = cl->condition_list;
-	next = cl->condition_list->next;
-	while (next != NULL) {
-	    if (next->condition_num == condition) {
-		cond = next;
-		prev->next = next->next;
-		break;
+    printf("Destroying condition %d\n", condition);
+    if (cl->condition_list) {
+	if (cl->condition_list->condition_num == condition) {
+	    cond = cl->condition_list;
+	    cl->condition_list = cl->condition_list->next;
+	} else {
+	    prev = cl->condition_list;
+	    next = cl->condition_list->next;
+	    while (next != NULL) {
+		if (next->condition_num == condition) {
+		    cond = next;
+		    prev->next = next->next;
+		    break;
+		}
+		prev = next;
+		next = next->next;
 	    }
-	    prev = next;
-	    next = next->next;
 	}
     }
     if (cond == NULL) {
