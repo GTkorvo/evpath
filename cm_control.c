@@ -124,7 +124,6 @@ CMCondition_destroy(CMControlList cl, int condition)
     CMCondition cond = NULL, prev = NULL;
     CMCondition next = NULL;
 
-    printf("Destroying condition %d\n", condition);
     if (cl->condition_list) {
 	if (cl->condition_list->condition_num == condition) {
 	    cond = cl->condition_list;
