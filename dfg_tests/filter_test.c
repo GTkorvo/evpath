@@ -10,15 +10,19 @@
 extern int quiet;
 static int status;
 static EVdfg test_dfg;
+static int repeat_count = 10;
 
 static
 int
 simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
+    static int count = 0;
     simple_rec_ptr event = vevent;
     (void)cm;
     checksum_simple_record(event, attrs, quiet);
-    EVdfg_shutdown(test_dfg, 0);
+    count++;
+    if (count == repeat_count) 
+	EVdfg_shutdown(test_dfg, 0);
     return 0;
 }
 
@@ -46,7 +50,6 @@ be_test_master(int argc, char **argv)
     EVdfg_stone src, filter, sink;
     EVsource source_handle;
     char *filter_action_spec;
-    int i;
 
     cm = CManager_create();
     CMlisten(cm);
@@ -115,13 +118,21 @@ be_test_master(int argc, char **argv)
     }
 
     
-    for (i=0; i < 20 ; i++) {
-	simple_rec rec;
-	generate_simple_record(&rec);
-	/* submit will be quietly ignored if source is not active */
-	EVsubmit(source_handle, &rec, NULL);
+    if (EVdfg_active_sink_count(test_dfg) == 0) {
+	EVdfg_ready_for_shutdown(test_dfg);
     }
 
+    if (EVdfg_source_active(source_handle)) {
+	int count = repeat_count;
+	while (count != 0) {
+	    simple_rec rec;
+	    generate_simple_record(&rec);
+	    EVsubmit(source_handle, &rec, NULL);
+	    if ((rec.long_field%2 == 1) && (count != -1)) {
+		count--;
+	    }
+	}
+    }
     status = EVdfg_wait_for_shutdown(test_dfg);
 
     wait_for_children(nodes);
@@ -151,11 +162,16 @@ be_test_child(int argc, char **argv)
 				(EVSimpleHandlerFunc) simple_handler);
     EVdfg_join_dfg(test_dfg, argv[1], argv[2]);
     EVdfg_ready_wait(test_dfg);
-    for (i=0; i < 20 ; i++) {
-	simple_rec rec;
-	generate_simple_record(&rec);
-	/* submit will be quietly ignored if source is not active */
-	EVsubmit(src, &rec, NULL);
+    if (EVdfg_active_sink_count(test_dfg) == 0) {
+	EVdfg_ready_for_shutdown(test_dfg);
+    }
+
+    if (EVdfg_source_active(src)) {
+	for (i=0; i < 20 ; i++) {
+	    simple_rec rec;
+	    generate_simple_record(&rec);
+	    EVsubmit(src, &rec, NULL);
+	}
     }
     return EVdfg_wait_for_shutdown(test_dfg);
 }

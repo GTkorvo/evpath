@@ -73,11 +73,15 @@ be_test_master(int argc, char **argv)
     }
 
     
-    {
+    if (EVdfg_source_active(source_handle)) {
 	simple_rec rec;
 	generate_simple_record(&rec);
-	/* submit will be quietly ignored if source is not active */
+	/* submit would be quietly ignored if source is not active */
 	EVsubmit(source_handle, &rec, NULL);
+    }
+
+    if (EVdfg_active_sink_count(test_dfg) == 0) {
+	EVdfg_ready_for_shutdown(test_dfg);
     }
 
     status = EVdfg_wait_for_shutdown(test_dfg);
@@ -108,10 +112,15 @@ be_test_child(int argc, char **argv)
 				(EVSimpleHandlerFunc) simple_handler);
     EVdfg_join_dfg(test_dfg, argv[1], argv[2]);
     EVdfg_ready_wait(test_dfg);
-    {
+
+    if (EVdfg_active_sink_count(test_dfg) == 0) {
+	EVdfg_ready_for_shutdown(test_dfg);
+    }
+
+    if (EVdfg_source_active(src)) {
 	simple_rec rec;
 	generate_simple_record(&rec);
-	/* submit will be quietly ignored if source is not active */
+	/* submit would be quietly ignored if source is not active */
 	EVsubmit(src, &rec, NULL);
     }
     return EVdfg_wait_for_shutdown(test_dfg);

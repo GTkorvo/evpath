@@ -10,6 +10,11 @@
 #include "cm_internal.h"
 #include "ev_deploy.h"
 
+#define STATUS_UNDETERMINED -2
+#define STATUS_NO_CONTRIBUTION -1
+#define STATUS_SUCCESS 0
+#define STATUS_FAILURE 1
+
 struct _EVdfg_stone {
     EVdfg dfg;
     int node;
@@ -28,6 +33,7 @@ typedef struct _EVint_node_rec {
     char *str_contact_list;
     CMConnection conn;
     int self;
+    int shutdown_status_contribution;
 } *EVint_node_list;
 
 
@@ -37,11 +43,14 @@ struct _EVdfg {
     CMConnection master_connection;
     int shutdown_value;
     int ready_condition;
-    int shutdown_condition;
+    int *shutdown_conditions;
     int stone_count;
     EVdfg_stone *stones;
     int node_count;
     EVint_node_list nodes;
+    int my_node_id;
+    int already_shutdown;
+    int active_sink_count;
 };
 
 EVdfg_stone
@@ -119,11 +128,11 @@ FMStructDescRec EVdeploy_register_format_list[] = {
 };
 
 typedef struct _EVready_msg {
-    int junk;
+    int node_id;
 } EVready_msg, *EVready_ptr;
 
 FMField EVready_msg_flds[] = {
-    {"junk", "integer", sizeof(int), FMOffset(EVready_ptr, junk)},
+    {"node_id", "integer", sizeof(int), FMOffset(EVready_ptr, node_id)},
     {NULL, NULL, 0, 0}
 };
 
@@ -189,18 +198,19 @@ FMStructDescRec EVdfg_deploy_format_list[] = {
 };
 
 static void check_all_nodes_registered(EVdfg dfg);
-static void signal_shutdown(EVdfg dfg, int value);
+static void possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn);
+static int new_shutdown_condition(EVdfg dfg, CMConnection conn);
 
 static void
 dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg, 
 		  void *client_data, attr_list attrs)
 {
     EVdfg dfg = client_data;
-    /* EVready_ptr msg =  vmsg; */
-    (void) vmsg;
+    EVready_ptr msg =  vmsg;
     (void) conn;
     (void) attrs;
     CMtrace_out(cm, EVerbose, "Client DFG %p is ready, signaling %d\n", dfg, dfg->ready_condition);
+    dfg->my_node_id = msg->node_id;
     CMCondition_signal(cm, dfg->ready_condition);
 }
 
@@ -215,11 +225,16 @@ dfg_shutdown_handler(CManager cm, CMConnection conn, void *vmsg,
     (void)attrs;
     if (dfg->master_connection == NULL) {
 	/* I got a shutdown message and I'm the master */
-	signal_shutdown(dfg, msg->value);
+	possibly_signal_shutdown(dfg, msg->value, conn);
     } else {
 	/* I'm the client, all is done */
+	int i = 0;
 	dfg->shutdown_value = msg->value;
-	CMCondition_signal(dfg->cm, dfg->shutdown_condition);
+	dfg->already_shutdown = 1;
+	CMtrace_out(cm, EVerbose, "Client %d has confirmed shutdown\n", dfg->my_node_id);
+	while (dfg->shutdown_conditions && (dfg->shutdown_conditions[i] != -1)){
+	    CMCondition_signal(dfg->cm, dfg->shutdown_conditions[i++]);
+	}
     }
 }
 
@@ -294,6 +309,9 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
 	local_list[msg->stone_list[i].out_count] = -1;
 	INT_EVassoc_general_action(cm, local_stone, msg->stone_list[i].action, 
 	    &local_list[0]);
+	if (action_type(msg->stone_list[i].action) == Action_Terminal) {
+	    dfg->active_sink_count++;
+	}
     }    
     CManager_unlock(cm);
 }
@@ -340,6 +358,7 @@ EVdfg_register_node_list(EVdfg dfg, char **nodes)
     memset(dfg->nodes, 0, sizeof(dfg->nodes[0]) * count);
     for (i = 0; i < dfg->node_count; i++) {
 	dfg->nodes[i].name = strdup(nodes[i]);
+	dfg->nodes[i].shutdown_status_contribution = STATUS_UNDETERMINED;
     }
 }
 
@@ -368,9 +387,10 @@ EVdfg_ready_wait(EVdfg dfg)
     return 1;
 }
 
-extern void 
+extern int
 EVdfg_shutdown(EVdfg dfg, int result)
 {
+    if (dfg->already_shutdown) printf("Node %d, already shut down BAD!\n", dfg->my_node_id);
     if (dfg->master_connection != NULL) {
 	/* we are a client, tell the master to shutdown */
 	CMFormat shutdown_msg = CMlookup_format(dfg->cm, EVdfg_shutdown_format_list);
@@ -379,15 +399,46 @@ EVdfg_shutdown(EVdfg dfg, int result)
 	CMwrite(dfg->master_connection, shutdown_msg, &msg);
 	/* and wait until we hear back */
     } else {
-	signal_shutdown(dfg, result);
+	possibly_signal_shutdown(dfg, result, NULL);
+    }
+    if (!dfg->already_shutdown) {
+	CMCondition_wait(dfg->cm, new_shutdown_condition(dfg, dfg->master_connection));
+    }
+    return dfg->shutdown_value;
+}
+
+extern int
+EVdfg_active_sink_count(EVdfg dfg)
+{
+    return dfg->active_sink_count;
+}
+
+extern void
+EVdfg_ready_for_shutdown(EVdfg dfg)
+{
+    if (dfg->already_shutdown) return;
+    if (dfg->master_connection != NULL) {
+	/* we are a client, tell the master to shutdown */
+	CMFormat shutdown_msg = CMlookup_format(dfg->cm, EVdfg_shutdown_format_list);
+	EVshutdown_msg msg;
+	msg.value = STATUS_NO_CONTRIBUTION;   /* no status contribution */
+	CMwrite(dfg->master_connection, shutdown_msg, &msg);
+    } else {
+	possibly_signal_shutdown(dfg, STATUS_NO_CONTRIBUTION, NULL);
     }
 }
 
 extern int 
 EVdfg_wait_for_shutdown(EVdfg dfg)
 {
-    CMCondition_wait(dfg->cm, dfg->shutdown_condition);
+    if (dfg->already_shutdown) return dfg->shutdown_value;
+    CMCondition_wait(dfg->cm, new_shutdown_condition(dfg, dfg->master_connection));
     return dfg->shutdown_value;
+}
+
+extern int EVdfg_source_active(EVsource src)
+{
+    return (src->local_stone_id != -1);
 }
 
 extern void
@@ -423,6 +474,23 @@ EVdfg_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSi
     evp->sink_handler_count++;
 }
 
+static int
+new_shutdown_condition(EVdfg dfg, CMConnection conn)
+{
+    int cur_count = 0;
+    if (dfg->shutdown_conditions == NULL) {
+	dfg->shutdown_conditions = malloc(2*sizeof(dfg->shutdown_conditions[0]));
+    } else {
+	while (dfg->shutdown_conditions[cur_count++] != -1) ; 
+	cur_count--;
+	dfg->shutdown_conditions = realloc(dfg->shutdown_conditions, 
+					   (cur_count+2)*sizeof(dfg->shutdown_conditions[0]));
+    }
+    dfg->shutdown_conditions[cur_count] = CMCondition_get(dfg->cm, conn);
+    dfg->shutdown_conditions[cur_count+1] = -1;
+    return dfg->shutdown_conditions[cur_count];
+}
+
 extern void
 EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 {
@@ -435,6 +503,7 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	for (node = 0; node < dfg->node_count; node++) {
 	    if (strcmp(dfg->nodes[node].name, node_name) == 0) {
 		dfg->nodes[node].self = 1;
+		dfg->my_node_id = node;
 		break;
 	    }
 	}
@@ -443,7 +512,6 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	    exit(1);
 	}
 	dfg->ready_condition = CMCondition_get(cm, NULL);
-	dfg->shutdown_condition = CMCondition_get(cm, NULL);
 	check_all_nodes_registered(dfg);
     } else {
 	CMConnection conn = CMget_conn(cm, master_attrs);
@@ -460,7 +528,6 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	free_attr_list(contact_list);
 
 	dfg->ready_condition = CMCondition_get(cm, conn);
-	dfg->shutdown_condition = CMCondition_get(cm, conn);
 	msg.node_name = node_name;
 	msg.contact_string = my_contact_str;
 	CMwrite(conn, register_msg, &msg);
@@ -495,7 +562,7 @@ add_bridge_stones(EVdfg dfg)
 	    EVdfg_stone target = cur->out_links[j];
 	    if (target && (!cur->bridge_stone) && (cur->node != target->node)) {
 		cur->out_links[j] = create_bridge_stone(dfg, target);
-		/* put the bridget stone where the source stone is */
+		/* put the bridge stone where the source stone is */
 		cur->out_links[j]->node = cur->node;
 	    }
 	}
@@ -552,7 +619,7 @@ deploy_to_node(EVdfg dfg, int node)
     if (dfg->nodes[node].conn) {
 	CMwrite(dfg->nodes[node].conn, deploy_msg, &msg);
     } else {
-	dfg_deploy_handler(dfg->cm, NULL, &msg, NULL, NULL);
+	dfg_deploy_handler(dfg->cm, NULL, &msg, dfg, NULL);
     }
     for(i=0 ; i < msg.stone_count; i++) {
 	free(msg.stone_list[i].out_links);
@@ -581,6 +648,7 @@ signal_ready(EVdfg dfg)
 		dfg);
     for (i=0; i < dfg->node_count; i++) {
 	if (dfg->nodes[i].conn != NULL) {
+	    msg.node_id = i;
 	    CMwrite(dfg->nodes[i].conn, ready_msg, &msg);
 	    CMtrace_out(cm, EVerbose, "Master - ready sent to node \"%s\"\n",
 			dfg->nodes[i].name);
@@ -596,13 +664,51 @@ signal_ready(EVdfg dfg)
 }
 
 static void
-signal_shutdown(EVdfg dfg, int value)
+possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn)
 {
     int i;
     CMFormat shutdown_msg = CMlookup_format(dfg->cm, EVdfg_shutdown_format_list);
     EVshutdown_msg msg;
-    msg.value = value;
-    CMtrace_out(cm, EVerbose, "DFG shutdown with value %d\n", value);
+    int status = STATUS_SUCCESS;
+    int shutdown = 1;
+    int signal_from_client = -1;
+    for (i=0; i < dfg->node_count; i++) {
+	if ((conn == NULL) && dfg->nodes[i].self) {
+	    /* we're the master and node i */
+	    signal_from_client = i;
+	} else if (conn == dfg->nodes[i].conn) {
+	    signal_from_client = i;
+	}
+    }
+	    
+    CMtrace_out(cm, EVerbose, "Client %d signals %d, See if we're all ready to signal shutdown\n", signal_from_client, value);
+    dfg->nodes[signal_from_client].shutdown_status_contribution = value;
+    for (i=0; i < dfg->node_count; i++) {
+	CMtrace_out(cm, EVerbose, "NODE %d status is :", i);
+	switch (dfg->nodes[i].shutdown_status_contribution) {
+	case STATUS_UNDETERMINED:
+	    CMtrace_out(cm, EVerbose, "NOT READY FOR SHUTDOWN\n");
+	    shutdown = 0;
+	    break;
+	case STATUS_NO_CONTRIBUTION:
+	    CMtrace_out(cm, EVerbose, "READY for shutdown, no status\n");
+	    break;
+	case STATUS_SUCCESS:
+	    CMtrace_out(cm, EVerbose, "READY for shutdown, SUCCESS\n");
+	    break;
+	default:
+	    CMtrace_out(cm, EVerbose, "READY for shutdown, FAILURE %d\n",
+			dfg->nodes[i].shutdown_status_contribution);
+	    status |= dfg->nodes[i].shutdown_status_contribution;
+	    break;
+	}	    
+    }
+    if (!shutdown) {
+	CMtrace_out(cm, EVerbose, "DFG not ready for shutdown\n");
+	return;
+    }
+    CMtrace_out(cm, EVerbose, "DFG shutdown with value %d\n", status);
+    msg.value = status;
     for (i=0; i < dfg->node_count; i++) {
 	if (dfg->nodes[i].conn != NULL) {
 	    CMwrite(dfg->nodes[i].conn, shutdown_msg, &msg);
@@ -614,8 +720,12 @@ signal_shutdown(EVdfg dfg, int value)
 	    }
 	}
     }
-    dfg->shutdown_value = value;
-    CMCondition_signal(dfg->cm, dfg->shutdown_condition);
+    dfg->shutdown_value = status;
+    i = 0;
+    dfg->already_shutdown = 1;
+    while(dfg->shutdown_conditions && (dfg->shutdown_conditions[i] != -1)) {
+	CMCondition_signal(dfg->cm, dfg->shutdown_conditions[i++]);
+    }
     CMtrace_out(cm, EVerbose, "Master DFG shutdown\n");
 }
 

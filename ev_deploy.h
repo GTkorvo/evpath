@@ -49,7 +49,7 @@ extern int EVdfg_realize(EVdfg dfg);
 extern int EVdfg_ready_wait(EVdfg dfg);
 extern void EVdfg_join_dfg(EVdfg dfg, char *node_name, char *master_contact);
 
-extern void EVdfg_shutdown(EVdfg dfg, int result);
+extern int EVdfg_shutdown(EVdfg dfg, int result);
 extern int EVdfg_wait_for_shutdown(EVdfg dfg);
 
 /* 
@@ -62,3 +62,6 @@ EVdfg_register_source(char *name, EVsource src);
 extern void
 EVdfg_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler);
 
+extern void EVdfg_ready_for_shutdown(EVdfg dfg);
+extern int EVdfg_source_active(EVsource src);
+extern int EVdfg_active_sink_count(EVdfg dfg);
