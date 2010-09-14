@@ -198,6 +198,7 @@ INT_CMCondition_wait(CManager cm, int condition)
     }
     cond = CMCondition_find(cl, condition);
 
+    if (cond == NULL) return -1;
     if (cond->signaled) {
 	if (cm_control_debug_flag) {
 	    printf("CMcondition %d already signalled\n", condition);
