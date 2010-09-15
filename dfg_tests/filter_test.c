@@ -19,6 +19,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     static int count = 0;
     simple_rec_ptr event = vevent;
     (void)cm;
+    (void) client_data;
     checksum_simple_record(event, attrs, quiet);
     count++;
     if (count == repeat_count) 

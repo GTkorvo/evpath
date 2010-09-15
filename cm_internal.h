@@ -21,6 +21,8 @@
 #  pragma warning (disable: 981)
 //  Don't tell me about floating point equality tests
 #  pragma warning (disable: 1572)
+// Assert warning
+#  pragma warning (disable: 181)
 #endif
 struct _ecl_code_struct;
 

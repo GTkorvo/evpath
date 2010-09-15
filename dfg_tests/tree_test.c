@@ -43,8 +43,8 @@ be_test_master(int argc, char **argv)
     if (argc == 1) {
 	sscanf(argv[0], "%d", &level_count);
     }
-    node_count = pow(base,level_count) -1;
-    last_row_size = pow(base,level_count - 1);
+    node_count = (int) pow(base,level_count) -1;
+    last_row_size = (int)pow(base,level_count - 1);
     ndig = (int) (level_count*log10((double)base)) +1;
 
     nodes = malloc(sizeof(nodes[0]) * (node_count+1));

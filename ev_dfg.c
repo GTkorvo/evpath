@@ -274,6 +274,8 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
     EVdfg dfg = (EVdfg) client_data;
     event_path_data evp = cm->evp;
     (void) dfg;
+    (void) conn;
+    (void) attrs;
     EVdeploy_stones_ptr msg =  vmsg;
     int i, base = evp->stone_lookup_table_size;
 
