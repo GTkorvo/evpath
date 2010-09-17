@@ -442,6 +442,11 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
     stone->proto_actions[action_num].o.imm.mutable_response_data = 
  	install_response_handler(cm, stone_num, action_spec, client_data, 
 				 &stone->proto_actions[action_num].matching_reference_formats);
+    if (stone->proto_actions[action_num].matching_reference_formats &&
+	(stone->proto_actions[action_num].matching_reference_formats[0] == NULL)) {
+	stone->default_action = action_num;
+	stone->proto_actions[action_num].data_state = Accepts_All;
+    }	
     clear_response_cache(stone);
     return action_num;
 }
@@ -768,7 +773,6 @@ static storage_queue_ops storage_queue_default_ops = {
     /* dequeue */ storage_queue_default_dequeue,
     /* empty   */ storage_queue_default_empty
 };
-/* }}} */
 
 
 extern void
@@ -2614,9 +2618,11 @@ INT_EVhandle_control_message(CManager cm, CMConnection conn, unsigned char type,
 extern FMFormat
 EVregister_format_set(CManager cm, FMStructDescList list)
 {
-    FMFormat format;
+    FMFormat format = NULL;
 
-    format = register_data_format(cm->evp->fmc, list);
+    if (list[0].format_name != NULL) {
+	format = register_data_format(cm->evp->fmc, list);
+    }
     return format;
 }
 

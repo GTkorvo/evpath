@@ -36,10 +36,11 @@ build_triplet = @build@
 host_triplet = @host@
 TESTS = evtest$(EXEEXT) bulktest$(EXEEXT) http_test$(EXEEXT) \
 	filter_test$(EXEEXT) router_test$(EXEEXT) \
-	router_test2$(EXEEXT) filter2_test$(EXEEXT) \
-	transform_test$(EXEEXT) auto_test$(EXEEXT) \
-	extract_test$(EXEEXT) submit_test$(EXEEXT) thin_test$(EXEEXT) \
-	rawtest$(EXEEXT) multi_thread$(EXEEXT) multiq_test$(EXEEXT)
+	router_test2$(EXEEXT) no_type_router_test$(EXEEXT) \
+	filter2_test$(EXEEXT) transform_test$(EXEEXT) \
+	auto_test$(EXEEXT) extract_test$(EXEEXT) submit_test$(EXEEXT) \
+	thin_test$(EXEEXT) rawtest$(EXEEXT) multi_thread$(EXEEXT) \
+	multiq_test$(EXEEXT)
 noinst_PROGRAMS = $(am__EXEEXT_1) thin_client$(EXEEXT) \
 	congestion_test$(EXEEXT) congest_bulktest$(EXEEXT) \
 	multiq_test$(EXEEXT) store_send_test$(EXEEXT) \
@@ -66,10 +67,11 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__EXEEXT_1 = evtest$(EXEEXT) bulktest$(EXEEXT) http_test$(EXEEXT) \
 	filter_test$(EXEEXT) router_test$(EXEEXT) \
-	router_test2$(EXEEXT) filter2_test$(EXEEXT) \
-	transform_test$(EXEEXT) auto_test$(EXEEXT) \
-	extract_test$(EXEEXT) submit_test$(EXEEXT) thin_test$(EXEEXT) \
-	rawtest$(EXEEXT) multi_thread$(EXEEXT) multiq_test$(EXEEXT)
+	router_test2$(EXEEXT) no_type_router_test$(EXEEXT) \
+	filter2_test$(EXEEXT) transform_test$(EXEEXT) \
+	auto_test$(EXEEXT) extract_test$(EXEEXT) submit_test$(EXEEXT) \
+	thin_test$(EXEEXT) rawtest$(EXEEXT) multi_thread$(EXEEXT) \
+	multiq_test$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
 auto_test_SOURCES = auto_test.c
 auto_test_OBJECTS = auto_test.$(OBJEXT)
@@ -119,6 +121,10 @@ multiq_test_SOURCES = multiq_test.c
 multiq_test_OBJECTS = multiq_test.$(OBJEXT)
 multiq_test_LDADD = $(LDADD)
 multiq_test_DEPENDENCIES = ../libevpath.la
+no_type_router_test_SOURCES = no_type_router_test.c
+no_type_router_test_OBJECTS = no_type_router_test.$(OBJEXT)
+no_type_router_test_LDADD = $(LDADD)
+no_type_router_test_DEPENDENCIES = ../libevpath.la
 rawtest_SOURCES = rawtest.c
 rawtest_OBJECTS = rawtest.$(OBJEXT)
 rawtest_LDADD = $(LDADD)
@@ -176,15 +182,17 @@ LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 SOURCES = auto_test.c block_test.c bulktest.c congest_bulktest.c \
 	congestion_test.c evtest.c extract_test.c filter2_test.c \
 	filter_test.c http_test.c multi_thread.c multiq_test.c \
-	rawtest.c router_test.c router_test2.c store_limit_test.c \
-	store_pressure_test.c store_send_test.c submit_test.c \
-	submit_wait_test.c thin_client.c thin_test.c transform_test.c
+	no_type_router_test.c rawtest.c router_test.c router_test2.c \
+	store_limit_test.c store_pressure_test.c store_send_test.c \
+	submit_test.c submit_wait_test.c thin_client.c thin_test.c \
+	transform_test.c
 DIST_SOURCES = auto_test.c block_test.c bulktest.c congest_bulktest.c \
 	congestion_test.c evtest.c extract_test.c filter2_test.c \
 	filter_test.c http_test.c multi_thread.c multiq_test.c \
-	rawtest.c router_test.c router_test2.c store_limit_test.c \
-	store_pressure_test.c store_send_test.c submit_test.c \
-	submit_wait_test.c thin_client.c thin_test.c transform_test.c
+	no_type_router_test.c rawtest.c router_test.c router_test2.c \
+	store_limit_test.c store_pressure_test.c store_send_test.c \
+	submit_test.c submit_wait_test.c thin_client.c thin_test.c \
+	transform_test.c
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-dvi-recursive install-exec-recursive \
@@ -454,6 +462,9 @@ multi_thread$(EXEEXT): $(multi_thread_OBJECTS) $(multi_thread_DEPENDENCIES)
 multiq_test$(EXEEXT): $(multiq_test_OBJECTS) $(multiq_test_DEPENDENCIES) 
 	@rm -f multiq_test$(EXEEXT)
 	$(LINK) $(multiq_test_OBJECTS) $(multiq_test_LDADD) $(LIBS)
+no_type_router_test$(EXEEXT): $(no_type_router_test_OBJECTS) $(no_type_router_test_DEPENDENCIES) 
+	@rm -f no_type_router_test$(EXEEXT)
+	$(LINK) $(no_type_router_test_OBJECTS) $(no_type_router_test_LDADD) $(LIBS)
 rawtest$(EXEEXT): $(rawtest_OBJECTS) $(rawtest_DEPENDENCIES) 
 	@rm -f rawtest$(EXEEXT)
 	$(LINK) $(rawtest_OBJECTS) $(rawtest_LDADD) $(LIBS)
