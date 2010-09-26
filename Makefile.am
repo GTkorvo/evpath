@@ -10,10 +10,16 @@ INCLUDES = $(INCLTDL)
 
 EXTRA_DIST = 
 
+if BUILD_IB
+LIB_IB = libcmib.la 
+else
+LIB_IB =
+endif
+
 if CNL
 lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la 
 else
-lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la libcmsockets.la libcmselect.la
+lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la libcmsockets.la libcmselect.la $(LIB_IB)
 endif 
 EXTRA_LTLIBRARIES = 
 
@@ -44,6 +50,12 @@ noinst_HEADERS = cm_internal.h  ev_internal.h
 
 cm_interface.c revp.c revpath.h: evpath.h gen_interface.pl
 	@PERL@ $(srcdir)/gen_interface.pl
+
+if BUILD_IB
+libcmib_la_SOURCES = cmib.c
+libcmib_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env
+libcmib_la_LDFLAGS = -module -export-symbols-regex "libcmib.*"
+endif
 
 if !CNL
 libcmsockets_la_SOURCES = cmsockets.c

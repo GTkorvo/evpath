@@ -90,6 +90,15 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" \
 	"$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(includedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
+@BUILD_IB_TRUE@libcmib_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+@BUILD_IB_TRUE@	$(am__DEPENDENCIES_1)
+am__libcmib_la_SOURCES_DIST = cmib.c
+@BUILD_IB_TRUE@am_libcmib_la_OBJECTS = cmib.lo
+libcmib_la_OBJECTS = $(am_libcmib_la_OBJECTS)
+libcmib_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libcmib_la_LDFLAGS) $(LDFLAGS) -o $@
+@BUILD_IB_TRUE@@CNL_FALSE@am_libcmib_la_rpath = -rpath $(libdir)
 libcmmulticast_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am_libcmmulticast_la_OBJECTS = cmmulticast.lo
@@ -156,10 +165,11 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(libcmmulticast_la_SOURCES) $(libcmselect_la_SOURCES) \
-	$(libcmsockets_la_SOURCES) $(libcmudp_la_SOURCES) \
-	$(libevpath_la_SOURCES)
-DIST_SOURCES = $(libcmmulticast_la_SOURCES) \
+SOURCES = $(libcmib_la_SOURCES) $(libcmmulticast_la_SOURCES) \
+	$(libcmselect_la_SOURCES) $(libcmsockets_la_SOURCES) \
+	$(libcmudp_la_SOURCES) $(libevpath_la_SOURCES)
+DIST_SOURCES = $(am__libcmib_la_SOURCES_DIST) \
+	$(libcmmulticast_la_SOURCES) \
 	$(am__libcmselect_la_SOURCES_DIST) \
 	$(am__libcmsockets_la_SOURCES_DIST) $(libcmudp_la_SOURCES) \
 	$(am__libevpath_la_SOURCES_DIST)
@@ -361,7 +371,9 @@ ACLOCAL_AMFLAGS = "-Iconfig" "-I libltdl/m4"
 SUBDIRS = libltdl . tests dfg_tests mtests rtests old_tests
 INCLUDES = $(INCLTDL)
 EXTRA_DIST = 
-@CNL_FALSE@lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la libcmsockets.la libcmselect.la
+@BUILD_IB_FALSE@LIB_IB = 
+@BUILD_IB_TRUE@LIB_IB = libcmib.la 
+@CNL_FALSE@lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la libcmsockets.la libcmselect.la $(LIB_IB)
 @CNL_TRUE@lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la 
 EXTRA_LTLIBRARIES = 
 pkgconfigdir = $(libdir)/pkgconfig
@@ -377,6 +389,9 @@ libevpath_la_DEPENDENCIES = $(LIBLTDL) $(LTLIBS)
 include_HEADERS = evpath.h evpath_old.h revpath.h cm_transport.h
 AM_CPPFLAGS = 
 noinst_HEADERS = cm_internal.h  ev_internal.h
+@BUILD_IB_TRUE@libcmib_la_SOURCES = cmib.c
+@BUILD_IB_TRUE@libcmib_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env
+@BUILD_IB_TRUE@libcmib_la_LDFLAGS = -module -export-symbols-regex "libcmib.*"
 @CNL_FALSE@libcmsockets_la_SOURCES = cmsockets.c
 @CNL_FALSE@libcmsockets_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env
 @CNL_FALSE@libcmsockets_la_LDFLAGS = -module -export-symbols-regex "libcmsockets.*"
@@ -479,6 +494,8 @@ clean-libLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
+libcmib.la: $(libcmib_la_OBJECTS) $(libcmib_la_DEPENDENCIES) 
+	$(libcmib_la_LINK) $(am_libcmib_la_rpath) $(libcmib_la_OBJECTS) $(libcmib_la_LIBADD) $(LIBS)
 libcmmulticast.la: $(libcmmulticast_la_OBJECTS) $(libcmmulticast_la_DEPENDENCIES) 
 	$(libcmmulticast_la_LINK) $(am_libcmmulticast_la_rpath) $(libcmmulticast_la_OBJECTS) $(libcmmulticast_la_LIBADD) $(LIBS)
 libcmselect.la: $(libcmselect_la_OBJECTS) $(libcmselect_la_DEPENDENCIES) 
@@ -558,6 +575,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_threadio.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_transport.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_util.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmmulticast.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmselect.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmsockets.Plo@am__quote@
