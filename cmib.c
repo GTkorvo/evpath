@@ -163,8 +163,8 @@ CMtrans_services svc;
     socket_conn_data->remote_host = NULL;
     socket_conn_data->remote_contact_port = -1;
     socket_conn_data->fd = 0;
-    socket_conn_data->read_buffer = svc->malloc_func(1);
-    socket_conn_data->read_buffer_len = 1;
+    socket_conn_data->read_buffer = NULL;
+    socket_conn_data->read_buffer_len = 0;
     socket_conn_data->block_state = Block;
     return socket_conn_data;
 }
@@ -218,7 +218,6 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     int length;
   } transport_head;
   int iget;
-  char *buf;
   socket_client_data_ptr sd = (socket_client_data_ptr) trans->trans_data;
   CMtrans_services svc = sd->svc;
 
@@ -241,8 +240,13 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
   } else {
     printf("Would start to read %d bytes of data\n", transport_head.length);
   }
-  buf = malloc(transport_head.length);
-  read(scd->fd, buf, transport_head.length);
+
+  /* the +4 stuff is a stupid hack.  Ask me.  GSE */
+  scd->read_buffer = malloc(transport_head.length+4);
+  scd->read_buffer_len = transport_head.length+4;
+  read(scd->fd, scd->read_buffer+4, transport_head.length);
+  memcpy(scd->read_buffer, scd->read_buffer+4, 4);
+  trans->data_available(trans, conn);
 }
 
 /* 
@@ -943,6 +947,17 @@ set_block_state(CMtrans_services svc, socket_conn_data_ptr scd,
     }
 }
 
+extern CMbuffer
+libcmib_LTX_read_block_func(svc, scd, len_ptr)
+CMtrans_services svc;
+socket_conn_data_ptr scd;
+int *len_ptr;
+{
+  *len_ptr = scd->read_buffer_len;
+  return svc->create_data_buffer(scd->sd->cm, scd->read_buffer, scd->read_buffer_len);
+}
+
+#ifdef NOTDEF
 extern int
 libcmib_LTX_read_to_buffer_func(svc, scd, buffer, requested_len, 
 				     non_blocking)
@@ -1026,7 +1041,7 @@ int non_blocking;
     }
     return requested_len;
 }
-
+#endif
 
 extern int
 libcmib_LTX_write_func(svc, scd, buffer, length)

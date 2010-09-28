@@ -318,6 +318,7 @@ extern void CMinit_local_formats ARGS((CManager cm));
 
 extern CMbuffer cm_get_data_buf ARGS((CManager cm, int length));
 extern void cm_return_data_buf ARGS((CMbuffer cmb));
+extern CMbuffer cm_create_transport_buffer ARGS((CManager cmb, void* buffer, int length));
 
 extern CMincoming_format_list CMidentify_rollbackCMformat 
 	ARGS((CManager cm, char *data_buffer));

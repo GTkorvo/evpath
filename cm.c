@@ -75,7 +75,8 @@ struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, IN
 					       INT_CMadd_shutdown_task,
 					       cm_get_data_buf,
 					       cm_return_data_buf,
-					       INT_CMConnection_close};
+					       INT_CMConnection_close,
+					       cm_create_transport_buffer};
 static void CMControlList_close ARGS((CMControlList cl));
 static int CMcontrol_list_poll ARGS((CMControlList cl));
 int CMdo_non_CM_handler ARGS((CMConnection conn, int header,
@@ -1279,6 +1280,17 @@ INT_CMcontact_self_check(CManager cm, attr_list attrs)
     return 0;
 }
 
+extern CMbuffer
+cm_create_transport_buffer(CManager cm, void *buffer, int length)
+{
+    CMbuffer tmp;
+    tmp = INT_CMmalloc(sizeof(*tmp));
+    tmp->buffer = buffer;
+    tmp->size = length;
+    tmp->in_use_by_cm = 1;
+    return tmp;
+}
+
 /* alloc temporary buffer for CM use */
 extern CMbuffer
 cm_get_data_buf(CManager cm, int length)  
@@ -1493,9 +1505,13 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	    buffer = conn->partial_buffer->buffer;
 	    length = conn->buffer_data_end;
 	} else {
-	    buffer = trans->read_block_func(&CMstatic_trans_svcs, 
-					    conn->transport_data,
-					    &length);
+	    conn->partial_buffer = trans->read_block_func(&CMstatic_trans_svcs, 
+							  conn->transport_data,
+							  &length);
+	    buffer = conn->partial_buffer->buffer;
+	    conn->buffer_data_end = length;
+	    cm->abort_read_ahead = 1;
+
 	    if (length == 0) {
 		CManager_unlock(cm);
 		return;
@@ -1507,8 +1523,6 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 		return;
 	    }
 	    CMtrace_out(cm, CMLowLevelVerbose, "CMdata read_block returned %d bytes of data\n", length);
-	    conn->partial_buffer = NULL;
-	    conn->buffer_data_end = 0;
 	}
 	if (cm_postread_hook) {
 	    cm_postread_hook(conn->buffer_full_point - conn->buffer_data_end, 
