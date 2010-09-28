@@ -64,7 +64,7 @@ get_self_ip_addr(CMtrans_services svc)
 	    struct in_addr *in = *(struct in_addr **) p;
 	    if (ntohl(in->s_addr) != INADDR_LOOPBACK) {
 		if (svc)
-		    svc->trace_out(NULL, "CMSocket - Get self IP addr %lx, net %d.%d.%d.%d",
+		    svc->trace_out(NULL, "CM<transport> - Get self IP addr %lx, net %d.%d.%d.%d",
 				   ntohl(in->s_addr),
 				   *((unsigned char *) &in->s_addr),
 				   *(((unsigned char *) &in->s_addr) + 1),
@@ -100,19 +100,19 @@ get_self_ip_addr(CMtrans_services svc)
 	    sai = (struct sockaddr_in *) &(ifr->ifr_addr);
 	    if (ifr->ifr_flags & IFF_LOOPBACK) {
 		if (svc)
-		    svc->trace_out(NULL, "CMSocket - Get self IP addr %lx, rejected, loopback",
+		    svc->trace_out(NULL, "CM<transport> - Get self IP addr %lx, rejected, loopback",
 				   ntohl(sai->sin_addr.s_addr));
 		continue;
 	    }
 	    if (!(ifr->ifr_flags & IFF_UP)) {
 		if (svc)
-		    svc->trace_out(NULL, "CMSocket - Get self IP addr %lx, rejected, not UP",
+		    svc->trace_out(NULL, "CM<transport> - Get self IP addr %lx, rejected, not UP",
 				   ntohl(sai->sin_addr.s_addr));
 		continue;
 	    }
 	    if (!(ifr->ifr_flags & IFF_RUNNING)) {
 		if (svc)
-		    svc->trace_out(NULL, "CMSocket - Get self IP addr %lx, rejected, not RUNNING",
+		    svc->trace_out(NULL, "CM<transport> - Get self IP addr %lx, rejected, not RUNNING",
 				   ntohl(sai->sin_addr.s_addr));
 		continue;
 	    }
@@ -127,7 +127,7 @@ get_self_ip_addr(CMtrans_services svc)
 		continue;
 	    rv = ntohl(sai->sin_addr.s_addr);
 	    if (svc)
-		svc->trace_out(NULL, "CMSocket - Get self IP addr DHCP %lx, net %d.%d.%d.%d",
+		svc->trace_out(NULL, "CM<transport> - Get self IP addr DHCP %lx, net %d.%d.%d.%d",
 			       ntohl(sai->sin_addr.s_addr),
 			       *((unsigned char *) &sai->sin_addr.s_addr),
 			       *(((unsigned char *) &sai->sin_addr.s_addr) + 1),
@@ -146,10 +146,10 @@ get_self_ip_addr(CMtrans_services svc)
     if (rv == 0) {
 	char *c = cercs_getenv("CM_LAST_RESORT_IP_ADDR");
 	if (svc)
-	    svc->trace_out(NULL, "CMSocket - Get self IP addr at last resort");
+	    svc->trace_out(NULL, "CM<transport> - Get self IP addr at last resort");
 	if (c != NULL) {
 	    if (svc)
-		svc->trace_out(NULL, "CMSocket - Translating last resort %s", c);
+		svc->trace_out(NULL, "CM<transport> - Translating last resort %s", c);
 	    rv = inet_addr(c);
 	}
     }
@@ -197,7 +197,7 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 #endif
 	buf[len - 1] = '\0';
     }
-    svc->trace_out(NULL, "CMSocket - Tentative Qualified hostname %s", buf);
+    svc->trace_out(NULL, "CM<transport> - Tentative Qualified hostname %s", buf);
     if (memchr(buf, '.', strlen(buf)) == NULL) {
 	/* useless hostname if it's not fully qualified */
 	buf[0] = 0;
@@ -214,7 +214,7 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 	    if (ntohl(in->s_addr) != INADDR_LOOPBACK) {
 		good_addr++;
 		svc->trace_out(NULL,
-			       "CMSocket - Hostname gets good addr %lx, %d.%d.%d.%d",
+			       "CM<transport> - Hostname gets good addr %lx, %d.%d.%d.%d",
 			       ntohl(in->s_addr),
 			       *((unsigned char *) &in->s_addr),
 			       *(((unsigned char *) &in->s_addr) + 1),
@@ -234,7 +234,7 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 	/* bloody hell, what do you have to do? */
 	struct in_addr IP;
 	IP.s_addr = htonl(get_self_ip_addr(svc));
-	svc->trace_out(NULL, "CMSocket - No hostname yet, trying gethostbyaddr on IP %lx", IP);
+	svc->trace_out(NULL, "CM<transport> - No hostname yet, trying gethostbyaddr on IP %lx", IP);
 	host = gethostbyaddr((char *) &IP, sizeof(IP), AF_INET);
 	if (host != NULL) {
 	    svc->trace_out(NULL, "     result was %s", host->h_name);
@@ -292,6 +292,6 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 	    strncpy(buf, "localhost", len);
 	}
     }
-    svc->trace_out(NULL, "CMSocket - GetQualHostname returning %s", buf);
+    svc->trace_out(NULL, "CM<transport> - GetQualHostname returning %s", buf);
 }
 

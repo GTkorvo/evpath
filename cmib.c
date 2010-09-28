@@ -62,7 +62,6 @@
 #include <cercs_env.h>
 #include "evpath.h"
 #include "cm_transport.h"
-#include "redirect.h"
 
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
@@ -123,6 +122,7 @@ static atom_t CM_NETWORK_POSTFIX = -1;
 static atom_t CM_IP_PORT = -1;
 static atom_t CM_IP_HOSTNAME = -1;
 static atom_t CM_IP_ADDR = -1;
+static atom_t CM_TRANSPORT = -1;
 
 static int
 check_host(hostname, sin_addr)
@@ -208,6 +208,42 @@ int fd;
 }
 
 #endif
+
+
+void
+CMIB_data_available(transport_entry trans, CMConnection conn)
+{
+  struct {
+    int magic;
+    int length;
+  } transport_head;
+  int iget;
+  char *buf;
+  socket_client_data_ptr sd = (socket_client_data_ptr) trans->trans_data;
+  CMtrans_services svc = sd->svc;
+
+  printf("CMIB data available\n");
+
+  socket_conn_data_ptr scd = INT_CMget_transport_data(conn);
+
+  iget = read(scd->fd, (char *) &transport_head, 8);
+  if (iget == 0) {
+      svc->connection_close(conn);
+      return;
+  }
+  if (iget != 8) {
+    int lerrno = errno;
+    svc->trace_out(scd->sd->cm, "CMIB iget was %d, errno is %d, returning 0 for read",
+		   iget, lerrno);
+  }
+  if (transport_head.magic != 0xdeadbeef) {
+    printf("Dead beef panic, 0x%x\n", transport_head.magic);
+  } else {
+    printf("Would start to read %d bytes of data\n", transport_head.length);
+  }
+  buf = malloc(transport_head.length);
+  read(scd->fd, buf, transport_head.length);
+}
 
 /* 
  * Accept socket connection
@@ -315,11 +351,9 @@ void *void_conn_sock;
 		   socket_conn_data->remote_contact_port);
 
 /* dump_sockinfo("accept ", sock); */
-    if (trans->data_available) {
-        svc->fd_add_select(sd->cm, sock,
-                           (void (*)(void *, void *)) trans->data_available,
-                           (void *) trans, (void *) conn);
-    }
+    svc->fd_add_select(sd->cm, sock,
+		       (void (*)(void *, void *)) CMIB_data_available,
+		       (void *) trans, (void *) conn);
 }
 
 extern void
@@ -336,232 +370,6 @@ socket_conn_data_ptr scd;
 
 
 #include "qual_hostname.c"
-
-#ifndef REDIRECT_SERVER_HOST
-#define REDIRECT_SERVER_HOST "redirecthost.cercs.gatech.edu";
-#endif
-
-/* Send a message to redirect server */
-static int
-send_msg_to_redirect_server(cm, svc, msg)
-CManager cm;
-CMtrans_services svc;
-redirect_msg_ptr msg;
-{
-    int redirect_sock;
-    struct sockaddr_in redirect_server_addr;
-    struct sockaddr_in *redirect_server_addri = (struct sockaddr_in *) &redirect_server_addr;
-    char *redirect_server_host;
-
-    /* Create a stream socket */
-    redirect_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (redirect_sock == SOCKET_ERROR) {
-	fprintf(stderr, "Cannot open INET socket\n");
-	return -1;
-    }
-    /* Bind an address to the socket */
-    memset((char *) &redirect_server_addr, 0, sizeof(struct sockaddr_in));
-    redirect_server_addr.sin_family = AF_INET;
-
-    redirect_server_host = cercs_getenv("REDIRECT_SERVER_HOST");
-    if (redirect_server_host == NULL) {
-	redirect_server_host = REDIRECT_SERVER_HOST;	/* from configure */
-    }
-    if (check_host(redirect_server_host, (void *) &redirect_server_addri->sin_addr) == 0) {
-	svc->trace_out(cm, "CMSocket connect FAILURE --> Redirect server host not found %s", redirect_server_host);
-	return -1;
-    }
-    redirect_server_addr.sin_port = htons(RS_PORT);
-
-    /* Connecting to the server */
-    if (connect(redirect_sock, (struct sockaddr *) &redirect_server_addr,
-		sizeof redirect_server_addr) == SOCKET_ERROR) {
-#ifdef WSAEWOULDBLOCK
-	int err = WSAGetLastError();
-	if (err != WSAEWOULDBLOCK || err != WSAEINPROGRESS) {
-#endif
-	    svc->trace_out(cm, "CMSocket redirect server connect FAILURE");
-	    close(redirect_sock);
-	    return -1;
-#ifdef WSAEWOULDBLOCK
-	}
-#endif
-    } {
-	int iget = 0;
-	int len = strlen(msg->content) + 2;
-	int left = len + 4;
-	int hton_len = htons(len);
-	char *buffer = (char *) svc->malloc_func(len + 4);
-	memcpy(buffer, &hton_len, 4);
-	buffer[4] = msg->type;
-	strncpy(buffer + 5, msg->content, len - 1);
-
-	/* send message out */
-	while (left > 0) {
-	    iget = write(redirect_sock, (char *) buffer + len + 4 - left, left);
-	    if (iget == -1) {
-		int lerrno = errno;
-		if ((lerrno != EWOULDBLOCK) &&
-		    (lerrno != EAGAIN) &&
-		    (lerrno != EINTR)) {
-		    /* serious error */
-		    fprintf(stderr, "Send message to redirect server fail\n");
-		} else {
-		    iget = 0;
-		}
-	    }
-	    left -= iget;
-	}
-	svc->free_func(buffer);
-    }
-
-    return redirect_sock;
-}
-
-/* Tell redirect server to let it connect to me instead */
-static int
-request_redirect(cm, svc, attrs)
-CManager cm;
-CMtrans_services svc;
-attr_list attrs;
-{
-    unsigned int length;
-    struct sockaddr_in sock_addr;
-    int conn_sock;
-    int int_port_num = 0;
-    u_short port_num = 0;
-    attr_list conn_attr_list;
-    char redir_response = REDIRECTION_REQUESTED;
-
-    conn_attr_list = create_attr_list();
-    svc->trace_out(cm, "CMSocket request redirect");
-
-    /* creat listen socket */
-    conn_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (conn_sock == SOCKET_ERROR) {
-	fprintf(stderr, "Cannot open INET socket\n");
-	return -1;
-    }
-    svc->trace_out(cm, "CMSocket begin listen, requested port %d", int_port_num);
-    sock_addr.sin_family = AF_INET;
-    sock_addr.sin_addr.s_addr = INADDR_ANY;
-    sock_addr.sin_port = htons(port_num);
-    if (bind(conn_sock, (struct sockaddr *) &sock_addr,
-	     sizeof sock_addr) == SOCKET_ERROR) {
-	fprintf(stderr, "Cannot bind INET socket\n");
-	return -1;
-    }
-    length = sizeof sock_addr;
-    if (getsockname(conn_sock, (struct sockaddr *) &sock_addr, &length) < 0) {
-	fprintf(stderr, "Cannot get socket name\n");
-	return -1;
-    }
-    int_port_num = ntohs(sock_addr.sin_port);
-
-    /* add local listen addr to attrs */
-    {
-	char host_name[256];
-	int IP = get_self_ip_addr(svc);
-	char *peer_host_name;
-	int peer_listen_port = -1;
-	int peer_ip = 0;
-	int network_added = 0;
-
-	get_qual_hostname(host_name, sizeof(host_name), svc, NULL, 
-			  &network_added);
-
-	if ((IP != 0) && (cercs_getenv("CM_NETWORK") == NULL)) {
-	    add_attr(conn_attr_list, CM_IP_ADDR, Attr_Int4,
-		     (attr_value) (long)IP);
-	} else {
-	    add_attr(conn_attr_list, CM_IP_HOSTNAME, Attr_String,
-		     (attr_value) strdup(host_name));
-	    if (network_added) {
-		char *network_string = NULL;
-		if (query_attr(attrs, CM_NETWORK_POSTFIX, NULL,
-			       (attr_value *) (long)& network_string)) {
-		    add_attr(conn_attr_list, CM_NETWORK_POSTFIX, Attr_String,
-			     (attr_value) strdup(network_string));
-		}
-	    }
-	}
-	add_attr(conn_attr_list, CM_IP_PORT, Attr_Int4,
-		 (attr_value) (long)int_port_num);
-
-	if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
-	/* value pointer */ (attr_value *) (long)& peer_host_name)) {
-	    svc->trace_out(cm, "TCP/IP transport found no IP_HOST attribute");
-	    peer_host_name = NULL;
-	}
-	if (peer_host_name != NULL)
-	    add_attr(conn_attr_list, CM_PEER_HOSTNAME, Attr_String,
-		     (attr_value) strdup(peer_host_name));
-
-	if (!query_attr(attrs, CM_IP_ADDR, /* type pointer */ NULL,
-	/* value pointer */ (attr_value *)(long) & peer_ip)) {
-	    svc->trace_out(cm, "TCP/IP transport found no IP_ADDR attribute");
-	    peer_ip = 0;
-	}
-	if (peer_ip != 0)
-	    add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
-		     (attr_value) (long)peer_ip);
-	if ((peer_host_name == NULL) && (peer_ip == 0)) {
-	    svc->trace_out(cm, "No HOST_NAME and HOST_IP attribute");
-	    return -1;
-	}
-	if (!query_attr(attrs, CM_IP_PORT, /* type pointer */ NULL,
-	/* value pointer */ (attr_value *)(long) & peer_listen_port)) {
-	    svc->trace_out(cm, "TCP/IP transport found no IP_PORT attribute");
-	    return -1;
-	}
-	add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
-		 (attr_value) (long)peer_listen_port);
-    }
-
-    if (listen(conn_sock, 1)) {
-	fprintf(stderr, "listen failed\n");
-	return -1;
-    }
-    svc->trace_out(cm, "CMSocket listen succeeded on port %d",
-		   int_port_num);
-
-
-    /* send request redirect message */
-    {
-	int request_sock;
-	redirect_msg request_msg;
-	char *attr_str = attr_list_to_string(conn_attr_list);
-
-	request_msg.type = REQUEST;
-	request_msg.content = svc->malloc_func(strlen(attr_str) + 1);
-	strcpy(request_msg.content, attr_str);
-	if ((request_sock = send_msg_to_redirect_server(cm, svc, &request_msg)) < 0)
-	    return -1;
-	svc->trace_out(cm, "Send out request redirect message");
-	svc->free_func(attr_str);
-	if (read(request_sock, &redir_response, 1) != 1) {
-	    redir_response = REDIRECTION_IMPOSSIBLE;
-	}
-	close(request_sock);
-    }
-
-    if (redir_response == REDIRECTION_REQUESTED) {
-	int redirect_sock;
-	unsigned int client_len;
-	struct sockaddr_in client;
-
-	client_len = sizeof(client);
-	if ((redirect_sock = accept(conn_sock, (struct sockaddr *) &client, &client_len)) == -1) {
-	    fprintf(stderr, "Can't accept client\n");
-	    return -1;
-	}
-	close(conn_sock);
-
-	return redirect_sock;
-    } else {
-	return -1;
-    }
-}
 
 static int
 is_private_192(int IP)
@@ -603,15 +411,10 @@ int no_more_redirect;
     socket_client_data_ptr sd = (socket_client_data_ptr) trans->trans_data;
     char *host_name;
     int remote_IP = -1;
-    int IP = get_self_ip_addr(svc);
     static int host_ip = 0;
     unsigned int sock_len;
     struct sockaddr sock_addr;
     struct sockaddr_in *sock_addri = (struct sockaddr_in *) &sock_addr;
-
-    int redirect_needed = 0;	/* set to true if we should try the
-				 * redirect server instead of making a
-				 * direct connection */
 
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
@@ -663,7 +466,7 @@ int no_more_redirect;
 	/* INET socket connection, host_name is the machine name */
 	char *network_string;
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR) {
-	    svc->trace_out(cm, " CMSocket connect FAILURE --> Couldn't create socket");
+	    svc->trace_out(cm, " CMIB connect FAILURE --> Couldn't create socket");
 	    return -1;
 	}
 	((struct sockaddr_in *) &sock_addr)->sin_family = AF_INET;
@@ -686,7 +489,6 @@ int no_more_redirect;
 		if (check_host(host_name, (void *) &sock_addri->sin_addr) == 0) {
 		    svc->trace_out(cm, "--> Host not found \"%s\"",
 				   host_name);
-		    redirect_needed = 1;
 		}
 	    } else {
 		svc->trace_out(cm, "--> Using non default network interface with hostname %s",
@@ -697,10 +499,9 @@ int no_more_redirect;
 	    if (host_name != NULL) {
 		if (check_host(host_name, (void *) &sock_addri->sin_addr) == 0) {
 		    if (host_ip == 0) {
-			svc->trace_out(cm, "CMSocket connect FAILURE --> Host not found \"%s\", no IP addr supplied in contact list", host_name);
-			redirect_needed = 1;
+			svc->trace_out(cm, "CMIB connect FAILURE --> Host not found \"%s\", no IP addr supplied in contact list", host_name);
 		    } else {
-			svc->trace_out(cm, "CMSOCKET --> Host not found \"%s\", Using supplied IP addr %x",
+			svc->trace_out(cm, "CMIB --> Host not found \"%s\", Using supplied IP addr %x",
 			     host_name == NULL ? "(unknown)" : host_name,
 				       host_ip);
 			sock_addri->sin_addr.s_addr = ntohl(host_ip);
@@ -721,44 +522,24 @@ int no_more_redirect;
 	if (is_private_10(remote_IP)) {
 	    svc->trace_out(cm, "Target IP is on a private 10.x.x.x network");
 	}
-	if ((is_private_192(remote_IP) && !is_private_192(IP)) ||
-	    (is_private_182(remote_IP) && !is_private_182(IP))/* ||
-	    (is_private_10(remote_IP) && !is_private_10(IP))*/) {
-	    /* 
-	     * if the target address is on a reserved private network and
-	     * our IP address is not also on the same type of private
-	     * network, then we certainly need redirection because a
-	     * connection will not succeed.
-	     */
-	    redirect_needed = 1;
-	}
-	if (!redirect_needed) {
-	    svc->trace_out(cm, "Attempting TCP/IP socket connection, host=\"%s\", IP = %s, port %d",
-			   host_name == 0 ? "(unknown)" : host_name, 
-			   inet_ntoa(sock_addri->sin_addr),
-			   int_port_num);
-	    if (connect(sock, (struct sockaddr *) &sock_addr,
-			sizeof sock_addr) == SOCKET_ERROR) {
+	svc->trace_out(cm, "Attempting TCP/IP socket connection, host=\"%s\", IP = %s, port %d",
+		       host_name == 0 ? "(unknown)" : host_name, 
+		       inet_ntoa(sock_addri->sin_addr),
+		       int_port_num);
+	if (connect(sock, (struct sockaddr *) &sock_addr,
+		    sizeof sock_addr) == SOCKET_ERROR) {
 #ifdef WSAEWOULDBLOCK
-		int err = WSAGetLastError();
-		if (err != WSAEWOULDBLOCK || err != WSAEINPROGRESS) {
+	    int err = WSAGetLastError();
+	    if (err != WSAEWOULDBLOCK || err != WSAEINPROGRESS) {
 #endif
-		    svc->trace_out(cm, "CMSocket connect FAILURE --> Connect() to IP %s failed", inet_ntoa(sock_addri->sin_addr));
-		    close(sock);
-		    redirect_needed = 1;
+		svc->trace_out(cm, "CMIB connect FAILURE --> Connect() to IP %s failed", inet_ntoa(sock_addri->sin_addr));
+		close(sock);
 #ifdef WSAEWOULDBLOCK
-		}
-#endif
 	    }
+#endif
 	}
     }
 
-    if (redirect_needed) {
-	if ((sock = request_redirect(cm, svc, attrs)) < 0) {
-	    svc->trace_out(cm, "CMSocket request redirect failed");
-	    return -1;
-	}
-    }
     sock_opt_val = 1;
     setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &sock_opt_val,
 	       sizeof(sock_opt_val));
@@ -838,10 +619,8 @@ attr_list attrs;
     socket_conn_data->conn = conn;
 
     svc->trace_out(cm, "Cmib Adding trans->data_available as action on fd %d", sock);
-    if (trans->data_available) {
-        svc->fd_add_select(cm, sock, (select_list_func) trans->data_available,
-                           (void *) trans, (void *) conn);
-    }
+    svc->fd_add_select(cm, sock, (select_list_func) CMIB_data_available,
+		       (void *) trans, (void *) conn);
 
 /* dump_sockinfo("initiate ", sock); */
     return conn;
@@ -950,157 +729,6 @@ socket_conn_data_ptr scd;
     return 0;
 }
 
-static void
-initiate_conn_redirect(void_trans, void_conn_sock)
-void *void_trans;
-void *void_conn_sock;
-{
-    transport_entry trans = (transport_entry) void_trans;
-    int conn_sock = (int) (long) void_conn_sock;
-    socket_client_data_ptr sd = (socket_client_data_ptr) trans->trans_data;
-    CMtrans_services svc = sd->svc;
-    CManager cm = sd->cm;
-
-    attr_list attrs;
-    redirect_msg_ptr msg = (redirect_msg_ptr) svc->malloc_func(sizeof(redirect_msg));
-    char *buffer;
-    int iget, msg_len, left;
-
-    iget = read(conn_sock, (char *) &msg_len, 4);
-    msg_len = ntohs(msg_len);
-    if (iget == 0) {
-	return;
-    } else if (iget == -1) {
-	int lerrno = errno;
-	if ((lerrno != EWOULDBLOCK) &&
-	    (lerrno != EAGAIN) &&
-	    (lerrno != EINTR)) {
-	    /* serious error */
-	    return;
-	}
-    }
-    buffer = (char *) malloc(msg_len);
-    left = msg_len;
-    while (left > 0) {
-	iget = read(conn_sock, buffer + msg_len - left, left);
-	left -= iget;
-    }
-
-    msg->type = buffer[0];
-    msg->content = (char *) svc->malloc_func(msg_len - 1);
-    strncpy(msg->content, buffer + 1, msg_len - 1);
-
-    {
-	socket_conn_data_ptr socket_conn_data;
-	attr_list conn_attr_list;
-	CMConnection conn;
-	int sock;
-
-	switch (msg->type) {
-	case NO_NEED_REGISTER:
-	    svc->fd_remove_select(cm, conn_sock);
-	    svc->trace_out(cm, "CMSocket Redirect - registration unnecessary");
-	    break;
-	case REQUEST:
-	    {
-		socket_conn_data = create_socket_conn_data(svc);
-		conn_attr_list = create_attr_list();
-		attrs = attr_list_from_string(msg->content);
-
-		svc->trace_out(cm, "CMSocket Redirect - Request redirect message received");
-		svc->trace_out(cm, "CMSocket Redirect - attr_list_string: %s", msg->content);
-
-		/* The following code is for simulation to test redirect
-		 * service when no host is behind firewall. */
-		if ((sock = initiate_conn(cm, svc, trans, attrs, socket_conn_data, conn_attr_list, 1)) < 0)
-		    break;
-
-		{
-		    iget = read(sock, (char *) &socket_conn_data->remote_contact_port, 4);
-		    if (iget == 0) {
-			break;
-		    } else if (iget == -1) {
-			int lerrno = errno;
-			if ((lerrno != EWOULDBLOCK) &&
-			    (lerrno != EAGAIN) &&
-			    (lerrno != EINTR)) {
-			    /* serious error */
-			    break;
-			} else {
-			    iget = 0;
-			}
-		    }
-		    left = 4 - iget;
-		    while (left > 0) {
-			iget = read(sock, (char *) &socket_conn_data->remote_contact_port + 4 - left,
-				    left);
-			if (iget == 0) {
-			    break;
-			} else if (iget == -1) {
-			    int lerrno = errno;
-			    if ((lerrno != EWOULDBLOCK) &&
-				(lerrno != EAGAIN) &&
-				(lerrno != EINTR)) {
-				/* serious error */
-				break;
-			    } else {
-				iget = 0;
-			    }
-			}
-			left -= iget;
-		    }
-		    svc->trace_out(NULL, "Remote host (IP %x)is listening at port %d\n",
-				   socket_conn_data->remote_IP,
-				   socket_conn_data->remote_contact_port);
-		}
-
-		add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
-		     (attr_value) (long)socket_conn_data->remote_contact_port);
-		conn = svc->connection_create(trans, socket_conn_data, conn_attr_list);
-
-		svc->trace_out(cm, "Cmib Adding trans->data_available as action on fd %d", sock);
-                if (trans->data_available) {
-                    svc->fd_add_select(cm, sock, (select_list_func) trans->data_available,
-                                       (void *) trans, (void *) conn);
-                }
-		break;
-	    }
-	default:
-	    svc->trace_out(cm, "CMSocket Redirect - Invalid message");
-	}
-	svc->free_func(msg->content);
-	svc->free_func(msg);
-    }
-}
-
-/* initiate a connection with redirect sever redirecthost.cercs.gatech.edu, *
- * register the host name and port number */
-static void
-redirect_register(cm, svc, trans, attrs)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
-{
-    int redirect_sock;
-    redirect_msg register_msg;
-    char *attr_str = attr_list_to_string(attrs);
-
-    register_msg.type = REGISTER;
-    register_msg.content = svc->malloc_func(strlen(attr_str) + 1);
-    strcpy(register_msg.content, attr_str);
-    if ((redirect_sock = send_msg_to_redirect_server(cm, svc, &register_msg)) < 0) {
-	svc->trace_out(cm, "Can't register");
-	svc->free_func(attr_str);
-	return;
-    }
-    svc->trace_out(cm, "Send out register message");
-    svc->free_func(attr_str);
-
-    svc->trace_out(cm, "Cmib Adding initiate_conn_redirect as action on fd %d", redirect_sock);
-    svc->fd_add_select(cm, redirect_sock, initiate_conn_redirect,
-		       (void *) trans, (void *) (long)redirect_sock);
-}
 
 /* 
  * Create an IP socket for connection from other CMs
@@ -1119,7 +747,6 @@ attr_list listen_info;
     int conn_sock;
     int attr_port_num = 0;
     u_short port_num = 0;
-    static int register_with_redirect_server = -1;
     char *network_string;
 
     conn_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -1142,7 +769,7 @@ attr_list listen_info;
 	port_num = attr_port_num;
     }
 
-    svc->trace_out(cm, "CMSocket begin listen, requested port %d", attr_port_num);
+    svc->trace_out(cm, "CMIB begin listen, requested port %d", attr_port_num);
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_addr.s_addr = INADDR_ANY;
     sock_addr.sin_port = htons(port_num);
@@ -1153,7 +780,7 @@ attr_list listen_info;
     }
     if (sock_addr.sin_port != 0) {
 	/* specific port requested */
-	svc->trace_out(cm, "CMSocket trying to bind selected port %d", port_num);
+	svc->trace_out(cm, "CMIB trying to bind selected port %d", port_num);
 	if (bind(conn_sock, (struct sockaddr *) &sock_addr,
 		 sizeof sock_addr) == SOCKET_ERROR) {
 	    fprintf(stderr, "Cannot bind INET socket\n");
@@ -1170,7 +797,7 @@ attr_list listen_info;
 	while (tries > 0) {
 	    int target = low_bound + size * drand48();
 	    sock_addr.sin_port = htons(target);
-	    svc->trace_out(cm, "CMSocket trying to bind port %d", target);
+	    svc->trace_out(cm, "CMIB trying to bind port %d", target);
 	    result = bind(conn_sock, (struct sockaddr *) &sock_addr,
 			  sizeof sock_addr);
 	    tries--;
@@ -1218,7 +845,7 @@ attr_list listen_info;
 	int IP = get_self_ip_addr(svc);
 	int network_added = 0;
 
-	svc->trace_out(cm, "CMSocket listen succeeded on port %d, fd %d",
+	svc->trace_out(cm, "CMIB listen succeeded on port %d, fd %d",
 		       int_port_num, conn_sock);
 	ret_list = create_attr_list();
 #if !NO_DYNAMIC_LINKING
@@ -1228,6 +855,8 @@ attr_list listen_info;
 
 	sd->hostname = strdup(host_name);
 	sd->listen_port = int_port_num;
+	add_attr(ret_list, CM_TRANSPORT, Attr_String,
+		 (attr_value) strdup("ib"));
 	if ((IP != 0) && (cercs_getenv("CM_NETWORK") == NULL) &&
 	    (!query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
 			 (attr_value *) (long)& network_string))) {
@@ -1253,16 +882,6 @@ attr_list listen_info;
 	}
 	add_attr(ret_list, CM_IP_PORT, Attr_Int4,
 		 (attr_value) (long)int_port_num);
-
-	if (register_with_redirect_server == -1) {
-	    if (cercs_getenv("CM_REDIR_REGISTER") == NULL) {
-		register_with_redirect_server = 0;
-	    } else {
-		register_with_redirect_server = 1;
-	    }
-	}
-	if (register_with_redirect_server)
-	    redirect_register(cm, svc, trans, ret_list);
 
 	return ret_list;
     }
@@ -1311,7 +930,7 @@ set_block_state(CMtrans_services svc, socket_conn_data_ptr scd,
 	if (fcntl(scd->fd, F_SETFL, fdflags) == -1) 
 	    perror("fcntl block");
 	scd->block_state = Block;
-	svc->trace_out(scd->sd->cm, "CMSocket switch fd %d to blocking",
+	svc->trace_out(scd->sd->cm, "CMIB switch fd %d to blocking",
 		       scd->fd);
     } else if ((needed_block_state == Non_Block) && 
 	       (scd->block_state == Block)) {
@@ -1319,7 +938,7 @@ set_block_state(CMtrans_services svc, socket_conn_data_ptr scd,
 	if (fcntl(scd->fd, F_SETFL, fdflags) == -1) 
 	    perror("fcntl nonblock");
 	scd->block_state = Non_Block;
-	svc->trace_out(scd->sd->cm, "CMSocket switch fd %d to nonblocking",
+	svc->trace_out(scd->sd->cm, "CMIB switch fd %d to nonblocking",
 		       scd->fd);
     }
 }
@@ -1341,14 +960,14 @@ int non_blocking;
 	return -1;
     }
     if (scd->block_state == Block) {
-	svc->trace_out(scd->sd->cm, "CMSocket fd %d state block", scd->fd);
+	svc->trace_out(scd->sd->cm, "CMIB fd %d state block", scd->fd);
     } else {
-	svc->trace_out(scd->sd->cm, "CMSocket fd %d state nonblock", scd->fd);
+	svc->trace_out(scd->sd->cm, "CMIB fd %d state nonblock", scd->fd);
     }
-    svc->trace_out(scd->sd->cm, "CMSocket read of %d bytes on fd %d, non_block %d", requested_len,
+    svc->trace_out(scd->sd->cm, "CMIB read of %d bytes on fd %d, non_block %d", requested_len,
 		   scd->fd, non_blocking);
     if (non_blocking && (scd->block_state == Block)) {
-	svc->trace_out(scd->sd->cm, "CMSocket switch to non-blocking fd %d",
+	svc->trace_out(scd->sd->cm, "CMIB switch to non-blocking fd %d",
 		       scd->fd);
 	set_block_state(svc, scd, Non_Block);
     }
@@ -1359,12 +978,12 @@ int non_blocking;
 	    (lerrno != EAGAIN) &&
 	    (lerrno != EINTR)) {
 	    /* serious error */
-	    svc->trace_out(scd->sd->cm, "CMSocket iget was -1, errno is %d, returning 0 for read",
+	    svc->trace_out(scd->sd->cm, "CMIB iget was -1, errno is %d, returning 0 for read",
 			   lerrno);
 	    return -1;
 	} else {
 	    if (non_blocking) {
-		svc->trace_out(scd->sd->cm, "CMSocket iget was -1, would block, errno is %d",
+		svc->trace_out(scd->sd->cm, "CMIB iget was -1, would block, errno is %d",
 			   lerrno);
 		return 0;
 	    }
@@ -1372,7 +991,7 @@ int non_blocking;
 	}
     } else if (iget == 0) {
 	/* serious error */
-	svc->trace_out(scd->sd->cm, "CMSocket iget was 0, errno is %d, returning -1 for read",
+	svc->trace_out(scd->sd->cm, "CMIB iget was 0, errno is %d, returning -1 for read",
 		       errno);
 	return -1;
     }
@@ -1387,19 +1006,19 @@ int non_blocking;
 		(lerrno != EAGAIN) &&
 		(lerrno != EINTR)) {
 		/* serious error */
-		svc->trace_out(scd->sd->cm, "CMSocket iget was -1, errno is %d, returning %d for read", 
+		svc->trace_out(scd->sd->cm, "CMIB iget was -1, errno is %d, returning %d for read", 
 			   lerrno, requested_len - left);
 		return (requested_len - left);
 	    } else {
 		iget = 0;
 		if (!non_blocking && (scd->block_state == Non_Block)) {
-		    svc->trace_out(scd->sd->cm, "CMSocket switch to blocking fd %d",
+		    svc->trace_out(scd->sd->cm, "CMIB switch to blocking fd %d",
 				   scd->fd);
 		    set_block_state(svc, scd, Block);
 		}
 	    }
 	} else if (iget == 0) {
-	    svc->trace_out(scd->sd->cm, "CMSocket iget was 0, errno is %d, returning %d for read", 
+	    svc->trace_out(scd->sd->cm, "CMIB iget was 0, errno is %d, returning %d for read", 
 			   lerrno, requested_len - left);
 	    return requested_len - left;	/* end of file */
 	}
@@ -1420,7 +1039,7 @@ int length;
     int iget = 0;
     int fd = scd->fd;
 
-    svc->trace_out(scd->sd->cm, "CMSocket write of %d bytes on fd %d",
+    svc->trace_out(scd->sd->cm, "CMIB write of %d bytes on fd %d",
 		   length, fd);
     while (left > 0) {
 	iget = write(fd, (char *) buffer + length - left, left);
@@ -1433,7 +1052,7 @@ int length;
 		return (length - left);
 	    } else {
 		if (lerrno == EWOULDBLOCK) {
-		    svc->trace_out(scd->sd->cm, "CMSocket write blocked - switch to blocking fd %d",
+		    svc->trace_out(scd->sd->cm, "CMIB write blocked - switch to blocking fd %d",
 				   scd->fd);
 		    set_block_state(svc, scd, Block);
 		}
@@ -1504,11 +1123,19 @@ attr_list attrs;
     iovleft = iovcnt;
     struct iovec * iov = (struct iovec*) iovs;
     /* sum lengths */
+    struct {
+      int magic;
+      int length;
+    } transport_head;
     for (i = 0; i < iovcnt; i++)
 	left += iov[i].iov_len;
 
-    svc->trace_out(scd->sd->cm, "CMSocket writev of %d bytes on fd %d",
+    transport_head.magic = 0xdeadbeef;
+    transport_head.length = left;
+    svc->trace_out(scd->sd->cm, "CMIB writev of %d bytes on fd %d",
 		   left, fd);
+    
+    write(fd, &transport_head, 8);
     while (left > 0) {
 	int write_count = iovleft;
 	if (write_count > IOV_MAX)
@@ -1522,7 +1149,7 @@ attr_list attrs;
 		return (iovcnt - iovleft);
 	    } else {
 		if (errno == EWOULDBLOCK) {
-		    svc->trace_out(scd->sd->cm, "CMSocket writev blocked - switch to blocking fd %d",
+		    svc->trace_out(scd->sd->cm, "CMIB writev blocked - switch to blocking fd %d",
 				   scd->fd);
 		    set_block_state(svc, scd, Block);
 		}
@@ -1579,7 +1206,7 @@ attr_list attrs;
 
     init_bytes = left;
 
-    svc->trace_out(scd->sd->cm, "CMSocket Non-blocking writev of %d bytes on fd %d",
+    svc->trace_out(scd->sd->cm, "CMIB Non-blocking writev of %d bytes on fd %d",
 		   left, fd);
     set_block_state(svc, scd, Non_Block);
     while (left > 0) {
@@ -1593,7 +1220,7 @@ attr_list attrs;
 	iget = writev(fd, (struct iovec *) &iov[iovcnt - iovleft],
 		      write_count);
 	if (iget == -1) {
-	    svc->trace_out(scd->sd->cm, "CMSocket writev returned -1, errno %d",
+	    svc->trace_out(scd->sd->cm, "CMIB writev returned -1, errno %d",
 		   errno);
 	    if ((errno != EWOULDBLOCK) && (errno != EAGAIN)) {
 		/* serious error */
@@ -1602,11 +1229,11 @@ attr_list attrs;
 		return init_bytes - left;
 	    }
 	}
-	svc->trace_out(scd->sd->cm, "CMSocket writev returned %d", iget);
+	svc->trace_out(scd->sd->cm, "CMIB writev returned %d", iget);
 	left -= iget;
 	if (iget != this_write_bytes) {
 	    /* didn't write everything, the rest would block, return */
-	    svc->trace_out(scd->sd->cm, "CMSocket blocked, return %d", 
+	    svc->trace_out(scd->sd->cm, "CMIB blocked, return %d", 
 			   init_bytes -left);
 	    return init_bytes - left;
 	}
@@ -1683,6 +1310,7 @@ CMtrans_services svc;
 	CM_PEER_HOSTNAME = attr_atom_from_string("PEER_HOSTNAME");
 	CM_PEER_LISTEN_PORT = attr_atom_from_string("PEER_LISTEN_PORT");
 	CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
+	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
 	atom_init++;
     }
     socket_data = svc->malloc_func(sizeof(struct socket_client_data));

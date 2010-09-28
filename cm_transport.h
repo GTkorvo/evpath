@@ -36,6 +36,7 @@ typedef void (*CMTransport_add_shut_task) ARGS((CManager cm, CMPollFunc func,
 						void *client_data));
 typedef CMbuffer (*CMTransport_get_data_buffer) ARGS((CManager cm, int length));
 typedef void (*CMTransport_return_data_buffer) ARGS((CMbuffer cmb));
+typedef void (*CMTransport_connection_close) ARGS((CMConnection conn));
 
 
 typedef struct CMtrans_services_s {
@@ -50,6 +51,7 @@ typedef struct CMtrans_services_s {
     CMTransport_add_shut_task add_shutdown_task;
     CMTransport_get_data_buffer get_data_buffer;
     CMTransport_return_data_buffer return_data_buffer;
+    CMTransport_connection_close connection_close;
 } *CMtrans_services;
 
 
