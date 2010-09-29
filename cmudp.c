@@ -343,15 +343,13 @@ libcmudp_data_available(void *vtrans, void *vinput)
     udp_conn_data_ptr ucd = utd->connections;
     struct sockaddr_in addr;
     unsigned int addrlen = sizeof(addr);
-    int key = 0;
     char *msgbuf;
-    int read_pointer = 0;
+    int unused;
 
-    if (recvfrom(input_fd, &key, 4, MSG_PEEK,
+    if (recvfrom(input_fd, &unused, 4, MSG_PEEK,
 		 (struct sockaddr *) &addr, &addrlen) != 4) {
-	return;
+        return;
     }
-    
     while (ucd != NULL) {
 	if (memcmp(&addr, &ucd->dest_addr, sizeof(addr)) == 0) {
 	    utd->svc->trace_out(trans->cm, "UDP data available on existing connetion, IP addr %lx\n", 
@@ -387,31 +385,13 @@ libcmudp_data_available(void *vtrans, void *vinput)
 
     ucd->read_buffer = utd->svc->get_data_buffer(trans->cm, MSGBUFSIZE + 4);
 
-    /* 
-     * here, we cheat a little bit.  The bulk of the data read should be 
-     * 8-byte aligned or PBIO decodes don't work well.  CMs CMD (CM data) 
-     * messages have 8 bytes of header information (the CMD\0 and a 
-     * length word), which is followed by the PBIO-encoded data, so 
-     * that's naturally aligned if the read buffer is aligned.
-     * CMA (CM attribute) messages have 12 bytes of header information, 
-     * so they need an alignment fix for the PBIO stuff to be aligned.
-     * For those messages we set the buffer at 4 % 8 alignment.
-     */
-    read_pointer = 0;
-    switch (key) {
-    case 0x434d4100:  /* CMA\0 */
-    case 0x00414d43: /* \0AMC reversed byte order */
-	read_pointer = 4;
-	*(int*)ucd->read_buffer->buffer = key;
-	break;
-    }
-    msgbuf = &((char*)ucd->read_buffer->buffer)[read_pointer];
+    msgbuf = &((char*)ucd->read_buffer->buffer)[0];
     if ((nbytes = recvfrom(input_fd, msgbuf, MSGBUFSIZE, 0,
 			   (struct sockaddr *) &addr, &addrlen)) < 0) {
 	perror("recvfrom");
 	exit(1);
     }
-    ucd->read_buf_len = nbytes + read_pointer;
+    ucd->read_buf_len = nbytes;
     /* kick this upstairs */
     trans->data_available(vtrans, ucd->conn);
     utd->svc->return_data_buffer(ucd->read_buffer);
@@ -650,10 +630,9 @@ CMtrans_services svc;
 udp_conn_data_ptr ucd;
 int *actual_len;
 {
-    char *ret = (char*)ucd->read_buffer->buffer;
     *actual_len = ucd->read_buf_len;
     ucd->read_buf_len = 0;
-    return ret;
+    return ucd->read_buffer;
 }
 
 extern int

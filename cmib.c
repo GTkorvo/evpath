@@ -241,11 +241,9 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     printf("Would start to read %d bytes of data\n", transport_head.length);
   }
 
-  /* the +4 stuff is a stupid hack.  Ask me.  GSE */
-  scd->read_buffer = malloc(transport_head.length+4);
-  scd->read_buffer_len = transport_head.length+4;
-  read(scd->fd, scd->read_buffer+4, transport_head.length);
-  memcpy(scd->read_buffer, scd->read_buffer+4, 4);
+  scd->read_buffer = malloc(transport_head.length);
+  scd->read_buffer_len = transport_head.length;
+  read(scd->fd, scd->read_buffer, transport_head.length);
   trans->data_available(trans, conn);
 }
 

@@ -1567,7 +1567,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     char *base = buffer;
     int byte_swap = 0;
     int get_attrs = 0;
-    int padding = 0;
+    int skip = 0;
     int performance_msg = 0, event_msg = 0, evcontrol_msg = 0;
     int performance_func = 0;
     CMbuffer cm_decode_buf = NULL, cm_data_buf;
@@ -1622,8 +1622,8 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 
     if (get_attrs == 1) {
 	if (!event_msg) {
-	    header_len = 12;/* magic plus two 4-byte sizes (attrs + data) */
-	    padding = 4;	/* maintain 8 byte alignment for data */
+	    header_len = 16;/* magic plus two 4-byte sizes (attrs + data) */
+	    skip = 4;
 	    if (conn->buffer_data_end == 4) {
 		cm_extend_data_buf(cm, conn->partial_buffer, 8);
 		memcpy((char*)conn->partial_buffer->buffer + 4, 
@@ -1633,17 +1633,15 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	    }
 	} else {
 	    header_len = 16;
-	    padding = 0;
 	}
     } else {
 	header_len = 8; /* magic plus 4-byte size */
-	padding = 0;	/* maintain 8 byte alignment for data */
     }
 
     if (length < header_len) {
-	return header_len + padding - length;
+	return header_len - length;
     }
-    base = buffer + 4 + padding; /* skip used data */
+    base = buffer + 4 + skip; /* skip used data */
     if (byte_swap) {
 	((char*)&data_length)[0] = base[3];
 	((char*)&data_length)[1] = base[2];
@@ -1678,11 +1676,11 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	}
     }
 
-    if (length < header_len + padding + data_length + attr_length) {
-	return header_len + padding + data_length + attr_length - 
+    if (length < header_len + data_length + attr_length) {
+	return header_len + data_length + attr_length - 
 	    length;
     }
-    base = buffer + header_len + padding;
+    base = buffer + header_len;
     if (performance_msg) {
 	CMdo_performance_response(conn, data_length, performance_func, byte_swap,
 				  base);
@@ -2189,7 +2187,7 @@ INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data,
 		 attr_list attrs)
 {
     int no_attr_header[2] = {0x434d4400, 0};  /* CMD\0 in first entry */
-    int attr_header[3] = {0x434d4100, 0, 0};  /* CMA\0 in first entry */
+    int attr_header[4] = {0x434d4100, 0x434d4100, 0, 0};  /* CMA\0 in first entry */
     FFSEncodeVector vec;
     int length = 0, vec_count = 0, actual;
     int do_write = 1;
@@ -2252,14 +2250,14 @@ INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data,
 	vec_count++;
     }
     no_attr_header[1] = length;
-    attr_header[1] = length;
+    attr_header[2] = length;
     if (attrs != NULL) {
 	attrs_present++;
 	encoded_attrs = encode_attr_for_xmit(attrs, conn->attr_encode_buffer,
-					     &attr_header[2]);
-	attr_header[2] = (attr_header[2] +7) & -8;  /* round up to even 8 */
+					     &attr_header[3]);
+	attr_header[3] = (attr_header[3] +7) & -8;  /* round up to even 8 */
     }
-    CMtrace_out(conn->cm, CMDataVerbose, "CM - Total write size is %d bytes data + %d bytes attrs\n", length, attr_header[2]);
+    CMtrace_out(conn->cm, CMDataVerbose, "CM - Total write size is %d bytes data + %d bytes attrs\n", length, attr_header[3]);
     if (cm_write_hook != NULL) {
 	do_write = cm_write_hook(length);
     }
@@ -2283,14 +2281,15 @@ INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data,
 	    tmp_vec[0].iov_base = &attr_header;
 	    tmp_vec[0].iov_len = sizeof(attr_header);
 	    tmp_vec[1].iov_base = encoded_attrs;
-	    tmp_vec[1].iov_len = attr_header[2];
+	    tmp_vec[1].iov_len = attr_header[3];
 	    memcpy(&tmp_vec[2], vec, sizeof(*tmp_vec) * vec_count);
-	    byte_count += sizeof(attr_header) + attr_header[2];
+	    byte_count += sizeof(attr_header) + attr_header[3];
 	    vec_count += 2;
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			"Writing %d vectors, total %d bytes (including attrs) in writev\n", 
 			vec_count, byte_count);
 	}
+	
         actual = INT_CMwrite_raw(conn, tmp_vec, vec, vec_count, byte_count, attrs, 0, 0);
 	if (tmp_vec != &static_vec[0]) {
 	    INT_CMfree(tmp_vec);
