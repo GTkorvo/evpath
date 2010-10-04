@@ -1624,13 +1624,6 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	if (!event_msg) {
 	    header_len = 16;/* magic plus two 4-byte sizes (attrs + data) */
 	    skip = 4;
-	    if (conn->buffer_data_end == 4) {
-		cm_extend_data_buf(cm, conn->partial_buffer, 8);
-		memcpy((char*)conn->partial_buffer->buffer + 4, 
-		       conn->partial_buffer->buffer, 4); /* duplicate magic */
-		conn->buffer_data_end = 8;
-		conn->buffer_full_point = 8;
-	    }
 	} else {
 	    header_len = 16;
 	}
