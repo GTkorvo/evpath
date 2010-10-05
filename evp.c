@@ -364,6 +364,16 @@ INT_EVassoc_general_action(CManager cm, EVstone stone_num, char*action_spec,
 	}
 	break;
     }
+    case Action_Multi: {
+	int i = 0;
+	ret = INT_EVassoc_multi_action(cm, stone_num, action_spec, NULL);
+	while (output_list && (output_list[i] != -1)) {
+	    INT_EVaction_set_output(cm, stone_num, ret, i, output_list[i]);
+	    i++;
+	}
+	break;
+    }
+
     case Action_Bridge:
     {
 	EVstone target;
