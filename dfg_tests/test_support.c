@@ -124,7 +124,7 @@ static void
 fail_and_die(int signal)
 {
     (void) signal;
-    fprintf(stderr, "EVtest failed to complete in reasonable time\n");
+    fprintf(stderr, "EVPath test failed to complete in reasonable time\n");
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
     }
@@ -236,9 +236,9 @@ main(int argc, char **argv)
     sigaddset(&sigact.sa_mask, SIGALRM);
     sigaction(SIGALRM, &sigact, NULL);
     if (regression == 0) {
-	alarm(300);
+	alarm(600);
     } else {
-	alarm(30);
+	alarm(60);
     }
 #endif
 
