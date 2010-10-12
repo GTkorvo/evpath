@@ -67,6 +67,9 @@
 #define SOCKET_ERROR -1
 #endif
 
+#ifdef _WIHT_IB_
+
+
 #if defined (__INTEL_COMPILER)
 #  pragma warning (disable: 869)
 #  pragma warning (disable: 310)
@@ -82,26 +85,89 @@ typedef struct func_list_item {
     void *arg2;
 } FunctionListElement;
 
-typedef struct socket_client_data {
+typedef struct ib_client_data {
     CManager cm;
     char *hostname;
     int listen_port;
     CMtrans_services svc;
-} *socket_client_data_ptr;
+    int lid;
+    int qpn;
+    int psn;
+    int port;
+    struct ibv_device *ibdev;
+    struct ibv_context *context;
+    struct ibv_comp_channel *send_channel;
+    struct ibv_comp_channel *recv_channel;
+    struct ibv_pd *pd;
+    struct ibv_cq *recv_cq;
+    struct ibv_cq *send_cq;
+    struct ibv_qp *qp;
+    struct ibv_srq *srq;
+    struct ibv_mr *mr;
+    struct ibv_qp *dataqp;
+} *ib_client_data_ptr;
+
+inline static struct ibv_device * IB_getdevice(char *name)
+{
+    struct ibv_device **dev_list;
+    struct ibv_device *ib_dev;
+
+    dev_list = ibv_get_device_list(NULL);
+    if(!dev_list || !*(dev_list))
+    {
+	fprintf(stderr, "%s %d:%s - Couldn't get IB device list\n",
+		__FILE__, __LINE__, __FUNCTION__);
+	return NULL;
+    }
+	
+    if(name)
+    {
+	for(; (ib_dev= *dev_list); ++dev_list)
+	{
+	    printf("device name = %s\n", 
+		   ibv_get_device_name(ib_dev));
+	    if(!strcmp(ibv_get_device_name(ib_dev), name))
+	    {
+		break;
+	    }
+	}
+	if(!ib_dev)
+	{
+	    fprintf(stderr, "%s %d:%s - Couldn't get IB device of name %s\n",
+		    __FILE__, __LINE__, __FUNCTION__, name);
+	}
+    }
+    else
+	ib_dev = *dev_list; //return very first device so obtained
+
+    return ib_dev; //could be null
+}
+
+
+static inline uint16_t get_local_lid(struct ibv_context *context, int port)
+{
+    struct ibv_port_attr attr;
+
+    if (ibv_query_port(context, port, &attr))
+	return 0;
+
+    return attr.lid;
+}
 
 typedef enum {Block, Non_Block} socket_block_state;
 
-typedef struct socket_connection_data {
+typedef struct ib_connection_data {
     char *remote_host;
     int remote_IP;
     int remote_contact_port;
     int fd;
     void *read_buffer;
     int read_buffer_len;
-    socket_client_data_ptr sd;
+    ib_client_data_ptr sd;
     socket_block_state block_state;
     CMConnection conn;
-} *socket_conn_data_ptr;
+    struct ibv_qp dataqp;    
+} *ib_conn_data_ptr;
 
 #ifdef WSAEWOULDBLOCK
 #define EWOULDBLOCK WSAEWOULDBLOCK
@@ -154,19 +220,19 @@ void *sin_addr;
 #endif
 }
 
-static socket_conn_data_ptr 
-create_socket_conn_data(svc)
+static ib_conn_data_ptr 
+create_ib_conn_data(svc)
 CMtrans_services svc;
 {
-    socket_conn_data_ptr socket_conn_data =
-    svc->malloc_func(sizeof(struct socket_connection_data));
-    socket_conn_data->remote_host = NULL;
-    socket_conn_data->remote_contact_port = -1;
-    socket_conn_data->fd = 0;
-    socket_conn_data->read_buffer = NULL;
-    socket_conn_data->read_buffer_len = 0;
-    socket_conn_data->block_state = Block;
-    return socket_conn_data;
+    ib_conn_data_ptr ib_conn_data =
+    svc->malloc_func(sizeof(struct ib_connection_data));
+    ib_conn_data->remote_host = NULL;
+    ib_conn_data->remote_contact_port = -1;
+    ib_conn_data->fd = 0;
+    ib_conn_data->read_buffer = NULL;
+    ib_conn_data->read_buffer_len = 0;
+    ib_conn_data->block_state = Block;
+    return ib_conn_data;
 }
 
 #ifdef NOTDEF
@@ -218,12 +284,12 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     int length;
   } transport_head;
   int iget;
-  socket_client_data_ptr sd = (socket_client_data_ptr) trans->trans_data;
+  ib_client_data_ptr sd = (ib_client_data_ptr) trans->trans_data;
   CMtrans_services svc = sd->svc;
 
   printf("CMIB data available\n");
 
-  socket_conn_data_ptr scd = INT_CMget_transport_data(conn);
+  ib_conn_data_ptr scd = INT_CMget_transport_data(conn);
 
   iget = read(scd->fd, (char *) &transport_head, 8);
   if (iget == 0) {
@@ -257,9 +323,9 @@ void *void_conn_sock;
 {
     transport_entry trans = (transport_entry) void_trans;
     int conn_sock = (int) (long) void_conn_sock;
-    socket_client_data_ptr sd = (socket_client_data_ptr) trans->trans_data;
+    ib_client_data_ptr sd = (ib_client_data_ptr) trans->trans_data;
     CMtrans_services svc = sd->svc;
-    socket_conn_data_ptr socket_conn_data;
+    ib_conn_data_ptr ib_conn_data;
     int sock;
     struct sockaddr sock_addr;
     unsigned int sock_len = sizeof(sock_addr);
@@ -294,12 +360,12 @@ void *void_conn_sock;
     setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &delay_value,
 	       sizeof(delay_value));
 #endif
-    socket_conn_data = create_socket_conn_data(svc);
-    socket_conn_data->sd = sd;
-    socket_conn_data->fd = sock;
+    ib_conn_data = create_ib_conn_data(svc);
+    ib_conn_data->sd = sd;
+    ib_conn_data->fd = sock;
     conn_attr_list = create_attr_list();
-    conn = svc->connection_create(trans, socket_conn_data, conn_attr_list);
-    socket_conn_data->conn = conn;
+    conn = svc->connection_create(trans, ib_conn_data, conn_attr_list);
+    ib_conn_data->conn = conn;
 
     add_attr(conn_attr_list, CM_FD, Attr_Int4,
 	     (attr_value) (long)sock);
@@ -317,9 +383,9 @@ void *void_conn_sock;
 	int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
 	add_attr(conn_attr_list, CM_PEER_CONN_PORT, Attr_Int4,
 		 (attr_value) (long)int_port_num);
-	socket_conn_data->remote_IP = ntohl(((struct sockaddr_in *) &sock_addr)->sin_addr.s_addr);
+	ib_conn_data->remote_IP = ntohl(((struct sockaddr_in *) &sock_addr)->sin_addr.s_addr);
 	add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
-		 (attr_value) (long)socket_conn_data->remote_IP);
+		 (attr_value) (long)ib_conn_data->remote_IP);
 	if (sock_addr.sa_family == AF_INET) {
 #ifdef HAS_STRUCT_HOSTENT
 	    struct hostent *host;
@@ -327,30 +393,30 @@ void *void_conn_sock;
 	    host = gethostbyaddr((char *) &in_sock->sin_addr,
 				 sizeof(struct in_addr), AF_INET);
 	    if (host != NULL) {
-		socket_conn_data->remote_host = strdup(host->h_name);
+		ib_conn_data->remote_host = strdup(host->h_name);
 		add_attr(conn_attr_list, CM_PEER_HOSTNAME, Attr_String,
 			 (attr_value) strdup(host->h_name));
 	    }
 #endif
 	}
     }
-    if (socket_conn_data->remote_host != NULL) {
+    if (ib_conn_data->remote_host != NULL) {
 	svc->trace_out(NULL, "Accepted TCP/IP socket connection from host \"%s\"",
-		       socket_conn_data->remote_host);
+		       ib_conn_data->remote_host);
     } else {
 	svc->trace_out(NULL, "Accepted TCP/IP socket connection from UNKNOWN host");
     }
-    if (read(sock, (char *) &socket_conn_data->remote_contact_port, 4) != 4) {
+    if (read(sock, (char *) &ib_conn_data->remote_contact_port, 4) != 4) {
 	svc->trace_out(NULL, "Remote host dropped connection without data");
 	return;
     }
-    socket_conn_data->remote_contact_port =
-	ntohs(socket_conn_data->remote_contact_port);
+    ib_conn_data->remote_contact_port =
+	ntohs(ib_conn_data->remote_contact_port);
     add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
-	     (attr_value) (long)socket_conn_data->remote_contact_port);
+	     (attr_value) (long)ib_conn_data->remote_contact_port);
     svc->trace_out(NULL, "Remote host (IP %x) is listening at port %d\n",
-		   socket_conn_data->remote_IP,
-		   socket_conn_data->remote_contact_port);
+		   ib_conn_data->remote_IP,
+		   ib_conn_data->remote_contact_port);
 
 /* dump_sockinfo("accept ", sock); */
     svc->fd_add_select(sd->cm, sock,
@@ -361,7 +427,7 @@ void *void_conn_sock;
 extern void
 libcmib_LTX_shutdown_conn(svc, scd)
 CMtrans_services svc;
-socket_conn_data_ptr scd;
+ib_conn_data_ptr scd;
 {
     svc->fd_remove_select(scd->sd->cm, scd->fd);
     close(scd->fd);
@@ -392,12 +458,12 @@ is_private_10(int IP)
 }
 
 static int
-initiate_conn(cm, svc, trans, attrs, socket_conn_data, conn_attr_list, no_more_redirect)
+initiate_conn(cm, svc, trans, attrs, ib_conn_data, conn_attr_list, no_more_redirect)
 CManager cm;
 CMtrans_services svc;
 transport_entry trans;
 attr_list attrs;
-socket_conn_data_ptr socket_conn_data;
+ib_conn_data_ptr ib_conn_data;
 attr_list conn_attr_list;
 int no_more_redirect;
 {
@@ -410,7 +476,7 @@ int no_more_redirect;
     int sock_opt_val = 1;
     int int_port_num;
     u_short port_num;
-    socket_client_data_ptr sd = (socket_client_data_ptr) trans->trans_data;
+    ib_client_data_ptr sd = (ib_client_data_ptr) trans->trans_data;
     char *host_name;
     int remote_IP = -1;
     static int host_ip = 0;
@@ -558,11 +624,11 @@ int no_more_redirect;
 	write(sock, &local_listen_port, 4);
     }
     svc->trace_out(cm, "--> Connection established");
-    socket_conn_data->remote_host = host_name == NULL ? NULL : strdup(host_name);
-    socket_conn_data->remote_IP = remote_IP;
-    socket_conn_data->remote_contact_port = int_port_num;
-    socket_conn_data->fd = sock;
-    socket_conn_data->sd = sd;
+    ib_conn_data->remote_host = host_name == NULL ? NULL : strdup(host_name);
+    ib_conn_data->remote_IP = remote_IP;
+    ib_conn_data->remote_contact_port = int_port_num;
+    ib_conn_data->fd = sock;
+    ib_conn_data->sd = sd;
 
     add_attr(conn_attr_list, CM_FD, Attr_Int4,
 	     (attr_value) (long)sock);
@@ -572,7 +638,7 @@ int no_more_redirect;
     add_attr(conn_attr_list, CM_THIS_CONN_PORT, Attr_Int4,
 	     (attr_value) (long)int_port_num);
     add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
-	     (attr_value) (long)socket_conn_data->remote_IP);
+	     (attr_value) (long)ib_conn_data->remote_IP);
     if (getpeername(sock, &sock_addr, &sock_len) == 0) {
 	int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
 	add_attr(conn_attr_list, CM_PEER_CONN_PORT, Attr_Int4,
@@ -584,13 +650,16 @@ int no_more_redirect;
 	    host = gethostbyaddr((char *) &in_sock->sin_addr,
 				 sizeof(struct in_addr), AF_INET);
 	    if (host != NULL) {
-		socket_conn_data->remote_host = strdup(host->h_name);
+		ib_conn_data->remote_host = strdup(host->h_name);
 		add_attr(conn_attr_list, CM_PEER_HOSTNAME, Attr_String,
 			 (attr_value) strdup(host->h_name));
 	    }
 #endif
 	}
     }
+    //once socket connection is established we don't need to do anything since we 
+    //will use the socket connection to exchange rdma info
+
     return sock;
 }
 
@@ -607,18 +676,18 @@ CMtrans_services svc;
 transport_entry trans;
 attr_list attrs;
 {
-    socket_conn_data_ptr socket_conn_data = create_socket_conn_data(svc);
+    ib_conn_data_ptr ib_conn_data = create_ib_conn_data(svc);
     attr_list conn_attr_list = create_attr_list();
     CMConnection conn;
     int sock;
 
-    if ((sock = initiate_conn(cm, svc, trans, attrs, socket_conn_data, conn_attr_list, 0)) < 0)
+    if ((sock = initiate_conn(cm, svc, trans, attrs, ib_conn_data, conn_attr_list, 0)) < 0)
 	return NULL;
 
     add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
-	     (attr_value) (long)socket_conn_data->remote_contact_port);
-    conn = svc->connection_create(trans, socket_conn_data, conn_attr_list);
-    socket_conn_data->conn = conn;
+	     (attr_value) (long)ib_conn_data->remote_contact_port);
+    conn = svc->connection_create(trans, ib_conn_data, conn_attr_list);
+    ib_conn_data->conn = conn;
 
     svc->trace_out(cm, "Cmib Adding trans->data_available as action on fd %d", sock);
     svc->fd_add_select(cm, sock, (select_list_func) CMIB_data_available,
@@ -642,7 +711,7 @@ transport_entry trans;
 attr_list attrs;
 {
 
-    socket_client_data_ptr sd = trans->trans_data;
+    ib_client_data_ptr sd = trans->trans_data;
     int host_addr;
     int int_port_num;
     char *host_name;
@@ -692,7 +761,7 @@ CManager cm;
 CMtrans_services svc;
 transport_entry trans;
 attr_list attrs;
-socket_conn_data_ptr scd;
+ib_conn_data_ptr scd;
 {
 
     int int_port_num;
@@ -742,7 +811,7 @@ CMtrans_services svc;
 transport_entry trans;
 attr_list listen_info;
 {
-    socket_client_data_ptr sd = trans->trans_data;
+    ib_client_data_ptr sd = trans->trans_data;
     unsigned int length;
     struct sockaddr_in sock_addr;
     int sock_opt_val = 1;
@@ -905,7 +974,7 @@ extern void
 libcmib_LTX_set_write_notify(trans, svc, scd, enable)
 transport_entry trans;
 CMtrans_services svc;
-socket_conn_data_ptr scd;
+ib_conn_data_ptr scd;
 int enable;
 {
     if (enable != 0) {
@@ -919,7 +988,7 @@ int enable;
 
 
 static void
-set_block_state(CMtrans_services svc, socket_conn_data_ptr scd,
+set_block_state(CMtrans_services svc, ib_conn_data_ptr scd,
 		socket_block_state needed_block_state)
 {
     int fdflags = fcntl(scd->fd, F_GETFL, 0);
@@ -948,7 +1017,7 @@ set_block_state(CMtrans_services svc, socket_conn_data_ptr scd,
 extern CMbuffer
 libcmib_LTX_read_block_func(svc, scd, len_ptr)
 CMtrans_services svc;
-socket_conn_data_ptr scd;
+ib_conn_data_ptr scd;
 int *len_ptr;
 {
   *len_ptr = scd->read_buffer_len;
@@ -960,7 +1029,7 @@ extern int
 libcmib_LTX_read_to_buffer_func(svc, scd, buffer, requested_len, 
 				     non_blocking)
 CMtrans_services svc;
-socket_conn_data_ptr scd;
+ib_conn_data_ptr scd;
 void *buffer;
 int requested_len;
 int non_blocking;
@@ -1044,36 +1113,131 @@ int non_blocking;
 extern int
 libcmib_LTX_write_func(svc, scd, buffer, length)
 CMtrans_services svc;
-socket_conn_data_ptr scd;
+ib_conn_data_ptr scd;
 void *buffer;
 int length;
 {
+    //this is the main function 
+    //basically we follow the steps:
+    //1 register the buffer memory 
+    //2 create a request structure with the info for the buffer memory
+    //3 send it over the socket
+    //4 wait for response on the socket
+    //5 read out response structure
+    //6 use response to issue the rdma write
+    //7 wait for write to complete
+    //8 unregister memory
+    //9 return
+
     int left = length;
     int iget = 0;
     int fd = scd->fd;
 
+    //1. register memory
+    struct ibv_mr *mr;
+    mr = ibv_reg_mr(scd->sd->pd, buffer, length, 
+		    IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
+
+    //2. create request struct
+    struct request *r = (struct request*)malloc(sizeof(struct request));
+    r->lid = scd->sd->lid;
+    r->psn = scd->sd->psn;
+    r->port = scd->sd->port;
+    r->remote_addr = int64_from_ptr(buffer);
+    r->rkey = mr->rkey;
+    r->size = length;
+    
     svc->trace_out(scd->sd->cm, "CMIB write of %d bytes on fd %d",
-		   length, fd);
-    while (left > 0) {
-	iget = write(fd, (char *) buffer + length - left, left);
-	if (iget == -1) {
-	    int lerrno = errno;
-	    if ((lerrno != EWOULDBLOCK) &&
-		(lerrno != EAGAIN) &&
-		(lerrno != EINTR)) {
-		/* serious error */
-		return (length - left);
-	    } else {
-		if (lerrno == EWOULDBLOCK) {
-		    svc->trace_out(scd->sd->cm, "CMIB write blocked - switch to blocking fd %d",
-				   scd->fd);
-		    set_block_state(svc, scd, Block);
-		}
-		iget = 0;
-	    }
+		   sizeof(struct request), fd);
+
+    //3. send it over socket
+    iget = write(fd, r, sizeof(struct request));
+
+    struct response *resp = (struct response*)malloc(sizeof(struct response));
+    
+    //4 . wait for response
+    iget = read(fd, resp, sizeof(struct response));
+    
+    //5. use the response to set up the data qp
+
+    struct ibv_qp_attr qp_attr;
+    memset(&qp_attr, 0, sizeof(struct ibv_qp_attr));
+
+    qp_attr.qp_state = IBV_QPS_RTR;
+    qp_attr.dest_qp_num = rep->dest_qpn;
+    qp_attr.rq_psn = scd->sd->psn;
+    qp_attr.sq_psn = scd->sd->psn;
+    qp_attr.ah_attr.is_global = 0;
+    qp_attr.ah_attr.dlid = resp->lid;
+    qp_attr.ah_attr.sl = 0;
+    qp_attr.ah_attr.src_path_bits = 0;
+    qp_attr.ah_attr.port_num = resp->port;	
+    qp_attr.path_mtu = IBV_MTU_1024;
+    qp_attr.max_dest_rd_atomic = 4;
+    qp_attr.min_rnr_timer = 24;
+    qp_attr.timeout = 28;
+    qp_attr.retry_cnt = 18;
+    qp_attr.rnr_retry = 18;
+    qp_attr.max_rd_atomic = 4;
+    
+    retval = ibv_modify_qp(scd->dataqp, &qp_attr,
+			   IBV_QP_STATE |
+			   IBV_QP_AV |
+			   IBV_QP_PATH_MTU |
+			   IBV_QP_DEST_QPN |
+			   IBV_QP_RQ_PSN |  
+			   IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC);
+    
+    qp_attr.qp_state = IBV_QPS_RTS;
+    retval = ibv_modify_qp(scd->dataqp, &qp_attr, IBV_QP_STATE|
+			   IBV_QP_TIMEOUT|
+			   IBV_QP_RETRY_CNT|
+			   IBV_QP_RNR_RETRY|
+			   IBV_QP_SQ_PSN| IBV_QP_MAX_QP_RD_ATOMIC |
+			   IBV_QP_MAX_QP_RD_ATOMIC);
+
+    
+    //6. now issue the RDMA write call
+    struct ibv_sge sg = 
+	{
+	    .addr = buffer,
+	    .length = length,
+	    .lkey = mr->lkey
+	};
+    
+    
+    struct ibv_send_wr wr = 
+	{
+	    .wr_id = int64_from_ptr(scd),
+	    .next = NULL,
+	    .sg_list = &sg,
+	    .num_sge = 1,
+	    .opcode = IBV_WR_RDMA_WRITE,
+	    .send_flags = IBV_SEND_FENCE | IBV_SEND_SIGNALED,
+	    .imm_data = 0,
+	    .rdma.remote_addr = resp->remote_addr,
+	    .rdma.rkey = resp->rkey
+	};
+    
+    ibv_post_send(scd->dataqp, &wr, NULL);
+    
+	    
+    //7.poll the cq to wait for completion of the transfer
+    struct ibv_wc wc;
+    memset(&wc, 0, sizeof(wc));
+    
+    while(1)
+    {
+	
+	iget = ibv_poll_cq(scd->sd->send_cq, 1, &wc);
+	if(iget > 0 && wc.status == IBV_WC_SUCCESS)
+	{
+	    //send completeled
+	    //we can break out after derigstering the memory
+	    ibv_dereg_mr(mr);
+	    break;	    
 	}
-	left -= iget;
-    }
+    }	
     return length;
 }
 
@@ -1124,7 +1288,7 @@ int iovcnt;
 extern int
 libcmib_LTX_writev_attr_func(svc, scd, iovs, iovcnt, attrs)
 CMtrans_services svc;
-socket_conn_data_ptr scd;
+ib_conn_data_ptr scd;
 void *iovs;
 int iovcnt;
 attr_list attrs;
@@ -1201,7 +1365,7 @@ attr_list attrs;
 extern int
 libcmib_LTX_NBwritev_attr_func(svc, scd, iovs, iovcnt, attrs)
 CMtrans_services svc;
-socket_conn_data_ptr scd;
+ib_conn_data_ptr scd;
 void *iovs;
 int iovcnt;
 attr_list attrs;
@@ -1258,7 +1422,7 @@ attr_list attrs;
 extern int
 libcmib_LTX_writev_func(svc, scd, iov, iovcnt)
 CMtrans_services svc;
-socket_conn_data_ptr scd;
+ib_conn_data_ptr scd;
 void *iov;
 int iovcnt;
 {
@@ -1276,7 +1440,7 @@ static WSADATA wsaData;
 static void
 free_socket_data(CManager cm, void *sdv)
 {
-    socket_client_data_ptr sd = (socket_client_data_ptr) sdv;
+    ib_client_data_ptr sd = (ib_client_data_ptr) sdv;
     CMtrans_services svc = sd->svc;
     if (sd->hostname != NULL)
 	svc->free_func(sd->hostname);
@@ -1290,24 +1454,10 @@ CMtrans_services svc;
 {
     static int atom_init = 0;
 
-    socket_client_data_ptr socket_data;
+    ib_client_data_ptr socket_data;
     svc->trace_out(cm, "Initialize TCP/IP Socket transport built in %s",
 		   EVPATH_LIBRARY_BUILD_DIR);
     if (socket_global_init == 0) {
-#ifdef HAVE_WINDOWS_H
-	int nErrorStatus;
-	/* initialize the winsock package */
-	nErrorStatus = WSAStartup(wVersionRequested, &wsaData);
-	if (nErrorStatus != 0) {
-	    fprintf(stderr, "Could not initialize windows socket library!");
-	    WSACleanup();
-	    exit(-1);
-	}
-#endif
-	/* 
-	 * ignore SIGPIPE's  (these pop up when ports die.  we catch the 
-	 * failed writes) 
-	 */
 #ifdef SIGPIPE
 	signal(SIGPIPE, SIG_IGN);
 #endif
@@ -1326,11 +1476,65 @@ CMtrans_services svc;
 	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
 	atom_init++;
     }
-    socket_data = svc->malloc_func(sizeof(struct socket_client_data));
+    socket_data = svc->malloc_func(sizeof(struct ib_client_data));
     socket_data->cm = cm;
     socket_data->hostname = NULL;
     socket_data->listen_port = -1;
     socket_data->svc = svc;
+    socket_data->ibdev = IB_getdevice(NULL);
+    socket_data->context = ibv_open_device(socket_data->ibdev);
+    socket_data->port = 0; //need to somehow get proper port here
+    socket_data->lid = get_local_lid(socket_data->conext, socket_data->port);
+    socket_data->pd = ibv_alloc_pd(socket_data->context);
+    socket_data->recv_channel = ibv_create_comp_channel(socket_data->context);
+    socket_data->send_channel = ibv_create_comp_channel(socket_data->context);
+    socket_data->recv_cq = ibv_create_cq(socket_data->context, 1024, 
+					 (void*)socket_data, socket_data->recv_channel, 0);
+    socket_data->send_cq = ibv_create_cq(socket_data->context, 1024, 
+					 (void*)socket_data, socket_data->send_channel, 0);
+    
+
+    struct ibv_srq_init_attr srq_init_attr;
+    srq_init_attr.attr.max_wr = LISTSIZE;
+    srq_init_attr.attr.max_sge = 32;
+    srq_init_attr.attr.srq_limit = 1;
+    srq_init_attr.srq_context = (void*)socket_data;
+
+    socket_data->srq = ibb_create_srq(socket_data->pd, &srq_init_attr);
+    
+    socket_data->psn = lrand48()%256;
+    //since we are using sockets to initialize the connection no need to create the udp qp
+    struct ibv_qp_init_attr  qp_init_attr;
+    memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
+    qp_init_attr.qp_context = socket_data->context;
+    qp_init_attr.send_cq = socket_data->send_cq;
+    qp_init_attr.recv_cq = socket_data->send_cq;
+    qp_init_attr.cap.max_recv_wr = LISTSIZE;
+    qp_init_attr.cap.max_send_wr = LISTSIZE;
+    qp_init_attr.cap.max_send_sge = 1;
+    qp_init_attr.cap.max_recv_sge = 1;
+    qp_init_attr.cap.max_inline_data = 32;
+    qp_init_attr.qp_type = IBV_QPT_RC;
+    
+    socket_data->dataqp = ibv_create_qp(socket_data->pd, &qp_init_attr);
+
+    struct ibv_qp_attr qp_attr;
+    memset(&qp_attr, 0, sizeof(qp_attr));
+    qp_attr.qp_state = IBV_QPS_INIT;
+    qp_attr.pkey_index = 0;
+    qp_attr.port_num = socket_data->port;
+    qp_attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
+    qp_attr.qkey = 0x11111111;
+
+    retval = ibv_modify_qp(h->dataqp, &qp_attr, 
+			   IBV_QP_STATE |
+			   IBV_QP_PKEY_INDEX | 
+			   IBV_QP_PORT | 
+			   IBV_QP_ACCESS_FLAGS);
+    
+
     svc->add_shutdown_task(cm, free_socket_data, (void *) socket_data);
     return (void *) socket_data;
 }
+
+#endif
