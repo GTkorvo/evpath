@@ -63,6 +63,8 @@
 #include "evpath.h"
 #include "cm_transport.h"
 
+#include <infiniband/verbs.h>
+
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
 #endif
@@ -1164,7 +1166,7 @@ int length;
     memset(&qp_attr, 0, sizeof(struct ibv_qp_attr));
 
     qp_attr.qp_state = IBV_QPS_RTR;
-    qp_attr.dest_qp_num = rep->dest_qpn;
+    qp_attr.dest_qp_num = resp->dest_qpn;
     qp_attr.rq_psn = scd->sd->psn;
     qp_attr.sq_psn = scd->sd->psn;
     qp_attr.ah_attr.is_global = 0;
@@ -1447,6 +1449,29 @@ free_socket_data(CManager cm, void *sdv)
     svc->free_func(sd);
 }
 
+struct request
+{
+    int lid;
+    int psn;
+    
+    int port;
+    uint64_t remote_addr;
+    uint32_t rkey;
+    uint32_t size;
+    
+};
+
+
+struct response
+{
+    int lid;
+    int psn;
+    int dest_qpn;
+    uint64_t remote_addr;
+    uint32_t rkey;
+};
+
+    
 extern void *
 libcmib_LTX_initialize(cm, svc)
 CManager cm;
