@@ -557,6 +557,13 @@ int no_more_redirect;
     struct sockaddr sock_addr;
     struct sockaddr_in *sock_addri = (struct sockaddr_in *) &sock_addr;
 
+    //ib stuff
+
+    struct ibv_qp_init_attr  qp_init_attr;
+    struct ibv_qp_attr qp_attr;
+    int retval = 0;
+
+
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
 	svc->trace_out(cm, "TCP/IP transport found no IP_HOST attribute");
@@ -730,9 +737,41 @@ int no_more_redirect;
 #endif
 	}
     }
+
+    
     //once socket connection is established we don't need to do anything since we 
     //will use the socket connection to exchange rdma info
+   //initialize the dataqp that will be used for all RC comms
+    memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
+    qp_init_attr.qp_context = sd->context;
+    qp_init_attr.send_cq = sd->send_cq;
+    qp_init_attr.recv_cq = sd->recv_cq;
+    qp_init_attr.cap.max_recv_wr = LISTSIZE;
+    qp_init_attr.cap.max_send_wr = LISTSIZE;
+    qp_init_attr.cap.max_send_sge = 1;
+    qp_init_attr.cap.max_recv_sge = 1;
+    qp_init_attr.cap.max_inline_data = 32;
+    qp_init_attr.qp_type = IBV_QPT_RC;
 
+    ib_conn_data->dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
+
+    memset(&qp_attr, 0, sizeof(qp_attr));
+    qp_attr.qp_state = IBV_QPS_INIT;
+    qp_attr.pkey_index = 0;
+    qp_attr.port_num = sd->port;
+    qp_attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
+    qp_attr.qkey = 0x11111111;
+
+    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, 
+    			   IBV_QP_STATE |
+    			   IBV_QP_PKEY_INDEX | 
+    			   IBV_QP_PORT | 
+    			   IBV_QP_ACCESS_FLAGS);
+    if(retval)
+    {
+	svc->trace_out(sd->cm, "CMIB unable to set qp to INIT %d\n", retval);
+	return retval*-1;
+    }
     
 
     return sock;
