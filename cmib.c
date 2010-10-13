@@ -62,6 +62,7 @@
 #include <cercs_env.h>
 #include "evpath.h"
 #include "cm_transport.h"
+#include "cm_internal.h"
 
 #include <infiniband/verbs.h>
 
