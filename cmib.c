@@ -262,6 +262,7 @@ CMtrans_services svc;
     ib_conn_data->read_buffer = NULL;
     ib_conn_data->read_buffer_len = 0;
     ib_conn_data->block_state = Block;
+
     return ib_conn_data;
 }
 
@@ -319,7 +320,7 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 
   printf("CMIB data available\n");
 
-  ib_conn_data_ptr scd = (int_conn_data_ptr) INT_CMget_transport_data(conn);
+  ib_conn_data_ptr scd = (ib_conn_data_ptr) INT_CMget_transport_data(conn);
 
   iget = read(scd->fd, (char *) &transport_head, 8);
   if (iget == 0) {
@@ -367,7 +368,14 @@ void *void_conn_sock;
     int delay_value = 1;
 #endif
     CMConnection conn;
-    attr_list conn_attr_list = NULL;;
+    attr_list conn_attr_list = NULL;
+
+    //ib stuff
+    struct ibv_qp_init_attr  qp_init_attr;
+    struct ibv_qp_attr qp_attr;
+    int retval = 0;
+    
+
 
     svc->trace_out(NULL, "Trying to accept something, socket %d\n", conn_sock);
     linger_val.l_onoff = 1;
@@ -393,6 +401,41 @@ void *void_conn_sock;
     ib_conn_data = create_ib_conn_data(svc);
     ib_conn_data->sd = sd;
     ib_conn_data->fd = sock;
+
+    //initialize the dataqp that will be used for all RC comms
+    memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
+    qp_init_attr.qp_context = sd->context;
+    qp_init_attr.send_cq = sd->send_cq;
+    qp_init_attr.recv_cq = sd->recv_cq;
+    qp_init_attr.cap.max_recv_wr = LISTSIZE;
+    qp_init_attr.cap.max_send_wr = LISTSIZE;
+    qp_init_attr.cap.max_send_sge = 1;
+    qp_init_attr.cap.max_recv_sge = 1;
+    qp_init_attr.cap.max_inline_data = 32;
+    qp_init_attr.qp_type = IBV_QPT_RC;
+
+    ib_conn_data->dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
+
+    memset(&qp_attr, 0, sizeof(qp_attr));
+    qp_attr.qp_state = IBV_QPS_INIT;
+    qp_attr.pkey_index = 0;
+    qp_attr.port_num = sd->port;
+    qp_attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
+    qp_attr.qkey = 0x11111111;
+
+    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, 
+    			   IBV_QP_STATE |
+    			   IBV_QP_PKEY_INDEX | 
+    			   IBV_QP_PORT | 
+    			   IBV_QP_ACCESS_FLAGS);
+    if(retval)
+    {
+	svc->trace_out(sd->cm, "CMIB unable to set qp to INIT %d\n", retval);
+	return;
+    }
+
+    
+
     conn_attr_list = create_attr_list();
     conn = svc->connection_create(trans, ib_conn_data, conn_attr_list);
     ib_conn_data->conn = conn;
@@ -689,6 +732,8 @@ int no_more_redirect;
     }
     //once socket connection is established we don't need to do anything since we 
     //will use the socket connection to exchange rdma info
+
+    
 
     return sock;
 }
@@ -1582,16 +1627,6 @@ CMtrans_services svc;
     socket_data->psn = lrand48()%256;
     //since we are using sockets to initialize the connection no need to create the udp qp
     struct ibv_qp_init_attr  qp_init_attr;
-    memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
-    qp_init_attr.qp_context = socket_data->context;
-    qp_init_attr.send_cq = socket_data->send_cq;
-    qp_init_attr.recv_cq = socket_data->send_cq;
-    qp_init_attr.cap.max_recv_wr = LISTSIZE;
-    qp_init_attr.cap.max_send_wr = LISTSIZE;
-    qp_init_attr.cap.max_send_sge = 1;
-    qp_init_attr.cap.max_recv_sge = 1;
-    qp_init_attr.cap.max_inline_data = 32;
-    qp_init_attr.qp_type = IBV_QPT_RC;
     
     // socket_data->dataqp = ibv_create_qp(socket_data->pd, &qp_init_attr);
 
