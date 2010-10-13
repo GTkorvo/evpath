@@ -69,7 +69,10 @@
 #define SOCKET_ERROR -1
 #endif
 
-#ifdef _WIHT_IB_
+#define LISTSIZE 1024
+#define _WITH_IB_
+
+#ifdef _WITH_IB_
 
 
 #if defined (__INTEL_COMPILER)
@@ -87,6 +90,33 @@ typedef struct func_list_item {
     void *arg2;
 } FunctionListElement;
 
+struct request
+{
+    int lid;
+    int psn;    
+    int port;
+    uint64_t remote_addr;
+    uint32_t rkey;
+    uint32_t size;
+    
+};
+
+
+struct response
+{
+    int lid;
+    int psn;
+    int dest_qpn;
+    uint64_t remote_addr;
+    uint32_t rkey;
+    int port;    
+};
+
+
+#define ptr_from_int64(p) (void *)(unsigned long)(p)
+#define int64_from_ptr(p) (u_int64_t)(unsigned long)(p)
+
+
 typedef struct ib_client_data {
     CManager cm;
     char *hostname;
@@ -103,10 +133,7 @@ typedef struct ib_client_data {
     struct ibv_pd *pd;
     struct ibv_cq *recv_cq;
     struct ibv_cq *send_cq;
-    struct ibv_qp *qp;
     struct ibv_srq *srq;
-    struct ibv_mr *mr;
-    struct ibv_qp *dataqp;
 } *ib_client_data_ptr;
 
 inline static struct ibv_device * IB_getdevice(char *name)
@@ -168,7 +195,8 @@ typedef struct ib_connection_data {
     ib_client_data_ptr sd;
     socket_block_state block_state;
     CMConnection conn;
-    struct ibv_qp dataqp;    
+    struct ibv_qp *dataqp;    
+    struct ibv_mr *mr;
 } *ib_conn_data_ptr;
 
 #ifdef WSAEWOULDBLOCK
@@ -291,7 +319,7 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 
   printf("CMIB data available\n");
 
-  ib_conn_data_ptr scd = INT_CMget_transport_data(conn);
+  ib_conn_data_ptr scd = (int_conn_data_ptr) INT_CMget_transport_data(conn);
 
   iget = read(scd->fd, (char *) &transport_head, 8);
   if (iget == 0) {
@@ -1134,14 +1162,29 @@ int length;
     int left = length;
     int iget = 0;
     int fd = scd->fd;
+    int retval = 0;
+    struct ibv_send_wr *bad_wr;
+    struct ibv_mr *mr;
+    struct request *r;
+    struct ibv_qp_attr qp_attr;    
+    struct response *resp;
+    struct ibv_wc wc;
 
     //1. register memory
-    struct ibv_mr *mr;
     mr = ibv_reg_mr(scd->sd->pd, buffer, length, 
 		    IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
+    if(mr  == NULL)
+    {
+	svc->trace_out(scd->sd->cm, "Unable to register memory %p %d\n", buffer, length);
+	return -1;	
+    }
+
+    scd->mr = mr;
+    
+    
 
     //2. create request struct
-    struct request *r = (struct request*)malloc(sizeof(struct request));
+    r = (struct request*)malloc(sizeof(struct request));
     r->lid = scd->sd->lid;
     r->psn = scd->sd->psn;
     r->port = scd->sd->port;
@@ -1154,15 +1197,26 @@ int length;
 
     //3. send it over socket
     iget = write(fd, r, sizeof(struct request));
+    if(iget <= 0)
+    {
+	svc->trace_out(scd->sd->cm, "CMIB write failed %d\n", iget);
+	return iget;	
+    }
+    
 
-    struct response *resp = (struct response*)malloc(sizeof(struct response));
+    resp = (struct response*)malloc(sizeof(struct response));
     
     //4 . wait for response
     iget = read(fd, resp, sizeof(struct response));
+    if(iget <= 0)
+    {
+	svc->trace_out(scd->sd->cm, "CMIB read failed %d\n", iget);
+	return iget;	
+    }
+    
     
     //5. use the response to set up the data qp
 
-    struct ibv_qp_attr qp_attr;
     memset(&qp_attr, 0, sizeof(struct ibv_qp_attr));
 
     qp_attr.qp_state = IBV_QPS_RTR;
@@ -1189,6 +1243,14 @@ int length;
 			   IBV_QP_DEST_QPN |
 			   IBV_QP_RQ_PSN |  
 			   IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC);
+    if(retval)
+    {
+	svc->trace_out(scd->sd->cm, "CMIB unable to set qp to RTR %d\n", retval);
+	return retval;	
+
+    }
+    
+
     
     qp_attr.qp_state = IBV_QPS_RTS;
     retval = ibv_modify_qp(scd->dataqp, &qp_attr, IBV_QP_STATE|
@@ -1198,11 +1260,17 @@ int length;
 			   IBV_QP_SQ_PSN| IBV_QP_MAX_QP_RD_ATOMIC |
 			   IBV_QP_MAX_QP_RD_ATOMIC);
 
+    if(retval)
+    {
+	svc->trace_out(scd->sd->cm, "CMIB unable to set qp to RTS %d\n", retval);
+	return retval;	
+
+    }
     
     //6. now issue the RDMA write call
     struct ibv_sge sg = 
 	{
-	    .addr = buffer,
+	    .addr = int64_from_ptr(buffer),
 	    .length = length,
 	    .lkey = mr->lkey
 	};
@@ -1217,15 +1285,20 @@ int length;
 	    .opcode = IBV_WR_RDMA_WRITE,
 	    .send_flags = IBV_SEND_FENCE | IBV_SEND_SIGNALED,
 	    .imm_data = 0,
-	    .rdma.remote_addr = resp->remote_addr,
-	    .rdma.rkey = resp->rkey
+	    .wr.rdma.remote_addr = int64_from_ptr(resp->remote_addr),
+	    .wr.rdma.rkey = resp->rkey
 	};
     
-    ibv_post_send(scd->dataqp, &wr, NULL);
+    retval = ibv_post_send(scd->dataqp, &wr, &bad_wr);
+    if(retval)
+    {
+	svc->trace_out(scd->sd->cm, "CMIB unable to post send %d\n", retval);
+	//we can get the error from the *bad_wr
+	return retval;	
+    }
     
 	    
     //7.poll the cq to wait for completion of the transfer
-    struct ibv_wc wc;
     memset(&wc, 0, sizeof(wc));
     
     while(1)
@@ -1449,27 +1522,6 @@ free_socket_data(CManager cm, void *sdv)
     svc->free_func(sd);
 }
 
-struct request
-{
-    int lid;
-    int psn;
-    
-    int port;
-    uint64_t remote_addr;
-    uint32_t rkey;
-    uint32_t size;
-    
-};
-
-
-struct response
-{
-    int lid;
-    int psn;
-    int dest_qpn;
-    uint64_t remote_addr;
-    uint32_t rkey;
-};
 
     
 extern void *
@@ -1509,7 +1561,7 @@ CMtrans_services svc;
     socket_data->ibdev = IB_getdevice(NULL);
     socket_data->context = ibv_open_device(socket_data->ibdev);
     socket_data->port = 0; //need to somehow get proper port here
-    socket_data->lid = get_local_lid(socket_data->conext, socket_data->port);
+    socket_data->lid = get_local_lid(socket_data->context, socket_data->port);
     socket_data->pd = ibv_alloc_pd(socket_data->context);
     socket_data->recv_channel = ibv_create_comp_channel(socket_data->context);
     socket_data->send_channel = ibv_create_comp_channel(socket_data->context);
@@ -1525,7 +1577,7 @@ CMtrans_services svc;
     srq_init_attr.attr.srq_limit = 1;
     srq_init_attr.srq_context = (void*)socket_data;
 
-    socket_data->srq = ibb_create_srq(socket_data->pd, &srq_init_attr);
+    socket_data->srq = ibv_create_srq(socket_data->pd, &srq_init_attr);
     
     socket_data->psn = lrand48()%256;
     //since we are using sockets to initialize the connection no need to create the udp qp
@@ -1541,21 +1593,21 @@ CMtrans_services svc;
     qp_init_attr.cap.max_inline_data = 32;
     qp_init_attr.qp_type = IBV_QPT_RC;
     
-    socket_data->dataqp = ibv_create_qp(socket_data->pd, &qp_init_attr);
+    // socket_data->dataqp = ibv_create_qp(socket_data->pd, &qp_init_attr);
 
-    struct ibv_qp_attr qp_attr;
-    memset(&qp_attr, 0, sizeof(qp_attr));
-    qp_attr.qp_state = IBV_QPS_INIT;
-    qp_attr.pkey_index = 0;
-    qp_attr.port_num = socket_data->port;
-    qp_attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
-    qp_attr.qkey = 0x11111111;
+    // struct ibv_qp_attr qp_attr;
+    // memset(&qp_attr, 0, sizeof(qp_attr));
+    // qp_attr.qp_state = IBV_QPS_INIT;
+    // qp_attr.pkey_index = 0;
+    // qp_attr.port_num = socket_data->port;
+    // qp_attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
+    // qp_attr.qkey = 0x11111111;
 
-    retval = ibv_modify_qp(h->dataqp, &qp_attr, 
-			   IBV_QP_STATE |
-			   IBV_QP_PKEY_INDEX | 
-			   IBV_QP_PORT | 
-			   IBV_QP_ACCESS_FLAGS);
+    // retval = ibv_modify_qp(h->dataqp, &qp_attr, 
+    // 			   IBV_QP_STATE |
+    // 			   IBV_QP_PKEY_INDEX | 
+    // 			   IBV_QP_PORT | 
+    // 			   IBV_QP_ACCESS_FLAGS);
     
 
     svc->add_shutdown_task(cm, free_socket_data, (void *) socket_data);
