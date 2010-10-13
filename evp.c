@@ -1539,6 +1539,7 @@ process_events_stone(CManager cm, int s, action_class c)
 				    client_data, event->attrs);
 		}
 		CManager_lock(cm);
+		stone = stone_struct(cm->evp, s);
 		stone->is_processing = 0;
 		cm->evp->current_event_item = NULL;
 		if (act->action_type == Action_Filter) {
@@ -1585,6 +1586,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		out_count = p->o.imm.output_count;
 		stone->is_processing = 1;
 		func(cm, event, client_data, event->attrs, out_count, out_stones);
+		stone = stone_struct(cm->evp, s);
 		stone->is_processing = 0;
 		return_event(evp, event);
 		if (as->events_in_play > in_play)
@@ -1627,6 +1629,7 @@ process_events_stone(CManager cm, int s, action_class c)
 					act->o.multi.client_data, p->o.imm.output_count,
 					p->o.imm.output_stone_ids))
                 more_pending++;
+	    stone = stone_struct(cm->evp, s);
 	    stone->is_processing = 0;
             break;    
 	} 
