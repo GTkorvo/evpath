@@ -13,6 +13,8 @@ typedef struct _CMbuffer {
     int size;
     int in_use_by_cm;
     struct _CMbuffer *next;
+    void (*return_callback)(void *);
+    void *return_callback_data;
 } *CMbuffer;
 
 typedef void *(*CMTransport_malloc_func) ARGS((int));
