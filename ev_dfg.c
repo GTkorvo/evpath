@@ -341,10 +341,34 @@ EVdfg_create(CManager cm)
     return dfg;
 }
 
+static void
+check_connectivity(EVdfg dfg)
+{
+    int i;
+    for (i=0; i< dfg->stone_count; i++) {
+	if (dfg->stones[i]->action_count == 0) {
+	    printf("Warning, stone %d (assigned to node %s) has no actions registered", i, dfg->nodes[dfg->stones[i]->node].name);
+	    continue;
+	}
+	if (dfg->stones[i]->out_count == 0) {
+	    char *action_spec = dfg->stones[i]->action;
+	    switch(action_type(action_spec)) {
+	    case Action_Terminal:
+		break;
+	    default:
+		printf("Warning, stone %d (assigned to node %s) has no outputs connected to other stones\n", i, dfg->nodes[dfg->stones[i]->node].name);
+		printf("	This stone's first registered action is \"%s\"\n",
+		       action_spec);
+		break;
+	    }
+	}
+    }
+}
+
 extern int
 EVdfg_realize(EVdfg dfg)
 {
-//    check_connectivity(dfg);
+    check_connectivity(dfg);
 //    check_types(dfg);
     (void) dfg;
     return 1;
