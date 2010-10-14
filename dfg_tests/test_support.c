@@ -8,8 +8,7 @@
 #include <string.h>
 #include <signal.h>
 #include <arpa/inet.h>
-#include "evpath.h"
-#include "ev_deploy.h"
+#include "ev_dfg.h"
 #include "gen_thread.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>

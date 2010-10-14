@@ -3,8 +3,7 @@
 #include <string.h>
 
 #include "config.h"
-#include "evpath.h"
-#include "ev_deploy.h"
+#include "ev_dfg.h"
 #include "test_support.h"
 
 static int status;

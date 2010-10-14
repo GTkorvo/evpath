@@ -15,6 +15,11 @@
 #define STATUS_SUCCESS 0
 #define STATUS_FAILURE 1
 
+typedef struct {
+    char *name;
+    attr_list contact_list;
+} *EVnode_list, EVnode_rec;
+
 struct _EVdfg_stone {
     EVdfg dfg;
     int node;
