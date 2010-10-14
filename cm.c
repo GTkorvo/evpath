@@ -1285,6 +1285,7 @@ cm_create_transport_buffer(CManager cm, void *buffer, int length)
 {
     CMbuffer tmp;
     tmp = INT_CMmalloc(sizeof(*tmp));
+    memset(tmp, 0, sizeof(*tmp));
     tmp->buffer = buffer;
     tmp->size = length;
     tmp->in_use_by_cm = 1;
@@ -1311,10 +1312,7 @@ cm_get_data_buf(CManager cm, int length)
 	}
 	tmp = tmp->next;
     }
-    tmp = INT_CMmalloc(sizeof(*tmp));
-    tmp->buffer = INT_CMmalloc(length);
-    tmp->size = length;
-    tmp->in_use_by_cm = 1;
+    tmp = cm_create_transport_buffer(cm, INT_CMmalloc(length), length);
     tmp->next = cm->cm_buffer_list;
     cm->cm_buffer_list = tmp;
     return tmp;
@@ -1341,6 +1339,9 @@ extern void
 cm_return_data_buf(CMbuffer cmb)
 {
     if (cmb) cmb->in_use_by_cm = 0;
+    if (cmb->return_callback != NULL) {
+	(cmb->return_callback)(cmb->return_callback_data);
+    }
 }
 
 /* user wants CM temporary buffer */
@@ -1750,7 +1751,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     }
     assert(FFShas_conversion(format));
 
-    if (decode_in_place_possible(format)) {
+    if (FFSdecode_in_place_possible(format)) {
 	if (!FFSdecode_in_place(cm->FFScontext, data_buffer, 
 				       (void**) (long) &decode_buffer)) {
 	    printf("Decode failed\n");
