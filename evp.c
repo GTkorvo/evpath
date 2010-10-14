@@ -1029,7 +1029,7 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
 	
     switch(event->contents) {
     case Event_CM_Owned:
-	if (decode_in_place_possible(act->o.decode.decode_format)) {
+	if (FFSdecode_in_place_possible(act->o.decode.decode_format)) {
 	    void *decode_buffer;
 	    if (!FFSdecode_in_place(act->o.decode.context,
 				    event->encoded_event, 
