@@ -218,6 +218,9 @@ inline static struct ibv_device * IB_getdevice(char *name)
     }
     else
 	ib_dev = *dev_list; //return very first device so obtained
+    if(ib_dev)
+      printf("device name = %s\n", 
+	     ibv_get_device_name(ib_dev));
 
     return ib_dev; //could be null
 }
@@ -333,7 +336,7 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 
   printf("CMIB data available\n");
 
-  ib_conn_data_ptr scd = (ib_conn_data_ptr) INT_CMget_transport_data(conn);
+  ib_conn_data_ptr scd = (ib_conn_data_ptr) svc->get_transport_data(conn);
 
   iget = read(scd->fd, (char *) &transport_head, 8);
   if (iget == 0) {
@@ -422,10 +425,11 @@ void *void_conn_sock;
     qp_init_attr.recv_cq = sd->recv_cq;
     qp_init_attr.cap.max_recv_wr = LISTSIZE;
     qp_init_attr.cap.max_send_wr = LISTSIZE;
-    qp_init_attr.cap.max_send_sge = 1;
+    qp_init_attr.cap.max_send_sge = 32;
     qp_init_attr.cap.max_recv_sge = 1;
     qp_init_attr.cap.max_inline_data = 32;
     qp_init_attr.qp_type = IBV_QPT_RC;
+    
 
     ib_conn_data->dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
     if(ib_conn_data->dataqp == NULL)
@@ -453,6 +457,25 @@ void *void_conn_sock;
 	return;
     }
 
+    struct ibv_qp_init_attr qp_init;
+
+    if(1)
+      {
+	qp_attr.cap.max_send_sge = 1024;
+	retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_CAP);
+	fprintf(stderr, "%d %s retval = %d\n", __LINE__, __FUNCTION__, retval);				       
+	
+	retval = ibv_query_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_CAP,
+			      &qp_init);
+	fprintf(stderr, "max_send_wr = %d\nmax_recv_wr=%d\nmax_send_sge=%d\n",
+		qp_attr.cap.max_send_wr,
+		qp_attr.cap.max_recv_wr,
+		qp_attr.cap.max_send_sge);
+	fprintf(stderr, "max_recv_sge=%d\nmax_inline_data=%d\n",
+		qp_attr.cap.max_recv_sge,
+		qp_attr.cap.max_inline_data);
+
+      }
     
 
     conn_attr_list = create_attr_list();
@@ -1433,6 +1456,7 @@ int length;
     struct ibv_qp_attr qp_attr;    
     struct response *resp;
     struct ibv_wc wc;
+    struct ibv_qp_init_attr qp_init;
 
     //1. register memory
     mr = ibv_reg_mr(scd->sd->pd, buffer, length, 
@@ -1774,7 +1798,7 @@ CMtrans_services svc;
     socket_data->svc = svc;
     socket_data->ibdev = IB_getdevice(NULL);
     socket_data->context = ibv_open_device(socket_data->ibdev);
-    socket_data->port = 0; //need to somehow get proper port here
+    socket_data->port = 1; //need to somehow get proper port here
     socket_data->lid = get_local_lid(socket_data->context, socket_data->port);
     socket_data->pd = ibv_alloc_pd(socket_data->context);
     socket_data->recv_channel = ibv_create_comp_channel(socket_data->context);
