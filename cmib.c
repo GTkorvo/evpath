@@ -823,7 +823,7 @@ int no_more_redirect;
     qp_init_attr.recv_cq = sd->recv_cq;
     qp_init_attr.cap.max_recv_wr = LISTSIZE;
     qp_init_attr.cap.max_send_wr = LISTSIZE;
-    qp_init_attr.cap.max_send_sge = 1;
+    qp_init_attr.cap.max_send_sge = 32;
     qp_init_attr.cap.max_recv_sge = 1;
     qp_init_attr.cap.max_inline_data = 32;
     qp_init_attr.qp_type = IBV_QPT_RC;
@@ -835,6 +835,26 @@ int no_more_redirect;
 	return -1;
 	
     }
+
+    
+    if(1)
+      {
+	  
+	qp_attr.cap.max_send_sge = 1024;
+	retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_CAP);
+	fprintf(stderr, "%d %s retval = %d\n", __LINE__, __FUNCTION__, retval);				       
+	
+	retval = ibv_query_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_CAP,
+			      &qp_init_attr);
+	fprintf(stderr, "max_send_wr = %d\nmax_recv_wr=%d\nmax_send_sge=%d\n",
+		qp_attr.cap.max_send_wr,
+		qp_attr.cap.max_recv_wr,
+		qp_attr.cap.max_send_sge);
+	fprintf(stderr, "max_recv_sge=%d\nmax_inline_data=%d\n",
+		qp_attr.cap.max_recv_sge,
+		qp_attr.cap.max_inline_data);
+
+      }
     
 
     memset(&qp_attr, 0, sizeof(qp_attr));
@@ -1340,92 +1360,6 @@ int *len_ptr;
   *len_ptr = scd->read_buffer_len;
   return svc->create_data_buffer(scd->sd->cm, scd->read_buffer, scd->read_buffer_len);
 }
-
-#ifdef NOTDEF
-extern int
-libcmib_LTX_read_to_buffer_func(svc, scd, buffer, requested_len, 
-				     non_blocking)
-CMtrans_services svc;
-ib_conn_data_ptr scd;
-void *buffer;
-int requested_len;
-int non_blocking;
-{
-    int left, iget;
-
-    int fdflags = fcntl(scd->fd, F_GETFL, 0);
-    if (fdflags == -1) {
-	perror("getflags\n");
-	return -1;
-    }
-    if (scd->block_state == Block) {
-	svc->trace_out(scd->sd->cm, "CMIB fd %d state block", scd->fd);
-    } else {
-	svc->trace_out(scd->sd->cm, "CMIB fd %d state nonblock", scd->fd);
-    }
-    svc->trace_out(scd->sd->cm, "CMIB read of %d bytes on fd %d, non_block %d", requested_len,
-		   scd->fd, non_blocking);
-    if (non_blocking && (scd->block_state == Block)) {
-	svc->trace_out(scd->sd->cm, "CMIB switch to non-blocking fd %d",
-		       scd->fd);
-	set_block_state(svc, scd, Non_Block);
-    }
-    iget = read(scd->fd, (char *) buffer, requested_len);
-    if (iget == -1) {
-	int lerrno = errno;
-	if ((lerrno != EWOULDBLOCK) &&
-	    (lerrno != EAGAIN) &&
-	    (lerrno != EINTR)) {
-	    /* serious error */
-	    svc->trace_out(scd->sd->cm, "CMIB iget was -1, errno is %d, returning 0 for read",
-			   lerrno);
-	    return -1;
-	} else {
-	    if (non_blocking) {
-		svc->trace_out(scd->sd->cm, "CMIB iget was -1, would block, errno is %d",
-			   lerrno);
-		return 0;
-	    }
-	    return -1;
-	}
-    } else if (iget == 0) {
-	/* serious error */
-	svc->trace_out(scd->sd->cm, "CMIB iget was 0, errno is %d, returning -1 for read",
-		       errno);
-	return -1;
-    }
-    left = requested_len - iget;
-    while (left > 0) {
-	int lerrno;
-	iget = read(scd->fd, (char *) buffer + requested_len - left,
-		    left);
-	lerrno = errno;
-	if (iget == -1) {
-	    if ((lerrno != EWOULDBLOCK) &&
-		(lerrno != EAGAIN) &&
-		(lerrno != EINTR)) {
-		/* serious error */
-		svc->trace_out(scd->sd->cm, "CMIB iget was -1, errno is %d, returning %d for read", 
-			   lerrno, requested_len - left);
-		return (requested_len - left);
-	    } else {
-		iget = 0;
-		if (!non_blocking && (scd->block_state == Non_Block)) {
-		    svc->trace_out(scd->sd->cm, "CMIB switch to blocking fd %d",
-				   scd->fd);
-		    set_block_state(svc, scd, Block);
-		}
-	    }
-	} else if (iget == 0) {
-	    svc->trace_out(scd->sd->cm, "CMIB iget was 0, errno is %d, returning %d for read", 
-			   lerrno, requested_len - left);
-	    return requested_len - left;	/* end of file */
-	}
-	left -= iget;
-    }
-    return requested_len;
-}
-#endif
 
 extern int
 libcmib_LTX_write_func(svc, scd, buffer, length)
