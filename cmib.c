@@ -99,7 +99,6 @@ struct request
     uint64_t remote_addr;
     uint32_t rkey;
     uint32_t size;
-    
 };
 
 
@@ -112,6 +111,17 @@ struct response
     uint32_t rkey;
     int port;    
 };
+
+struct ibparam
+{
+    int lid;
+    int psn;
+    int qpn;
+    int port;
+    //anything else?
+};
+
+    
 
 
 #define ptr_from_int64(p) (void *)(unsigned long)(p)
@@ -136,6 +146,45 @@ typedef struct ib_client_data {
     struct ibv_cq *send_cq;
     struct ibv_srq *srq;
 } *ib_client_data_ptr;
+
+
+typedef enum {Block, Non_Block} socket_block_state;
+
+typedef struct ib_connection_data {
+    char *remote_host;
+    int remote_IP;
+    int remote_contact_port;
+    int fd;
+    void *read_buffer;
+    int read_buffer_len;
+    ib_client_data_ptr sd;
+    socket_block_state block_state;
+    CMConnection conn;
+    struct ibv_qp *dataqp;    
+    struct ibv_mr *mr;
+} *ib_conn_data_ptr;
+
+#ifdef WSAEWOULDBLOCK
+#define EWOULDBLOCK WSAEWOULDBLOCK
+#define EAGAIN WSAEINPROGRESS
+#define EINTR WSAEINTR
+#define errno GetLastError()
+#define read(fd, buf, len) recv(fd, buf, len, 0)
+#define write(fd, buf, len) send(fd, buf, len, 0)
+#endif
+
+static atom_t CM_FD = -1;
+static atom_t CM_THIS_CONN_PORT = -1;
+static atom_t CM_PEER_CONN_PORT = -1;
+static atom_t CM_PEER_IP = -1;
+static atom_t CM_PEER_HOSTNAME = -1;
+static atom_t CM_PEER_LISTEN_PORT = -1;
+static atom_t CM_NETWORK_POSTFIX = -1;
+static atom_t CM_IP_PORT = -1;
+static atom_t CM_IP_HOSTNAME = -1;
+static atom_t CM_IP_ADDR = -1;
+static atom_t CM_TRANSPORT = -1;
+
 
 inline static struct ibv_device * IB_getdevice(char *name)
 {
@@ -183,43 +232,6 @@ static inline uint16_t get_local_lid(struct ibv_context *context, int port)
 
     return attr.lid;
 }
-
-typedef enum {Block, Non_Block} socket_block_state;
-
-typedef struct ib_connection_data {
-    char *remote_host;
-    int remote_IP;
-    int remote_contact_port;
-    int fd;
-    void *read_buffer;
-    int read_buffer_len;
-    ib_client_data_ptr sd;
-    socket_block_state block_state;
-    CMConnection conn;
-    struct ibv_qp *dataqp;    
-    struct ibv_mr *mr;
-} *ib_conn_data_ptr;
-
-#ifdef WSAEWOULDBLOCK
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define EAGAIN WSAEINPROGRESS
-#define EINTR WSAEINTR
-#define errno GetLastError()
-#define read(fd, buf, len) recv(fd, buf, len, 0)
-#define write(fd, buf, len) send(fd, buf, len, 0)
-#endif
-
-static atom_t CM_FD = -1;
-static atom_t CM_THIS_CONN_PORT = -1;
-static atom_t CM_PEER_CONN_PORT = -1;
-static atom_t CM_PEER_IP = -1;
-static atom_t CM_PEER_HOSTNAME = -1;
-static atom_t CM_PEER_LISTEN_PORT = -1;
-static atom_t CM_NETWORK_POSTFIX = -1;
-static atom_t CM_IP_PORT = -1;
-static atom_t CM_IP_HOSTNAME = -1;
-static atom_t CM_IP_ADDR = -1;
-static atom_t CM_TRANSPORT = -1;
 
 static int
 check_host(hostname, sin_addr)
@@ -416,6 +428,12 @@ void *void_conn_sock;
     qp_init_attr.qp_type = IBV_QPT_RC;
 
     ib_conn_data->dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
+    if(ib_conn_data->dataqp == NULL)
+    {
+	svc->trace_out(sd->cm, "CMIB can't create qp\n");
+	return;
+	
+    }
 
     memset(&qp_attr, 0, sizeof(qp_attr));
     qp_attr.qp_state = IBV_QPS_INIT;
@@ -480,10 +498,85 @@ void *void_conn_sock;
     } else {
 	svc->trace_out(NULL, "Accepted TCP/IP socket connection from UNKNOWN host");
     }
+
+    //here we read the incoming remote contact port number. 
+    //in IB we'll extend this to include ib connection parameters
+    struct ibparam param, remote_param;
+    param.lid  = sd->lid;
+    param.qpn  = ib_conn_data->dataqp->qp_num;
+    param.port = sd->port;
+    param.psn  = sd->psn;
+
+    
     if (read(sock, (char *) &ib_conn_data->remote_contact_port, 4) != 4) {
 	svc->trace_out(NULL, "Remote host dropped connection without data");
 	return;
     }
+
+    if (read(sock, (char *) &remote_param, sizeof(remote_param)) != sizeof(remote_param)) {
+	svc->trace_out(NULL, "CMIB Remote host dropped connection without data");
+	return;
+    }
+    
+    if(write(sock, &param, sizeof(param)) != sizeof(param))
+    {
+	svc->trace_out(NULL, "CMIB remote side failed to send its parameters");
+	return;	
+    }
+    
+    
+    memset(&qp_attr, 0, sizeof(struct ibv_qp_attr));
+
+    qp_attr.qp_state = IBV_QPS_RTR;
+    qp_attr.dest_qp_num = remote_param.qpn;
+    qp_attr.rq_psn = sd->psn;
+    qp_attr.sq_psn = sd->psn;
+    qp_attr.ah_attr.is_global = 0;
+    qp_attr.ah_attr.dlid = remote_param.lid;
+    qp_attr.ah_attr.sl = 0;
+    qp_attr.ah_attr.src_path_bits = 0;
+    qp_attr.ah_attr.port_num = remote_param.port;	
+    qp_attr.path_mtu = IBV_MTU_1024;
+    qp_attr.max_dest_rd_atomic = 4;
+    qp_attr.min_rnr_timer = 24;
+    qp_attr.timeout = 28;
+    qp_attr.retry_cnt = 18;
+    qp_attr.rnr_retry = 18;
+    qp_attr.max_rd_atomic = 4;
+    
+    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr,
+			   IBV_QP_STATE |
+			   IBV_QP_AV |
+			   IBV_QP_PATH_MTU |
+			   IBV_QP_DEST_QPN |
+			   IBV_QP_RQ_PSN |  
+			   IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC);
+    if(retval)
+    {
+	svc->trace_out(sd->cm, "CMIB unable to set qp to RTR %d\n", retval);
+	return;	
+
+    }
+    
+
+    
+    qp_attr.qp_state = IBV_QPS_RTS;
+    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_STATE|
+			   IBV_QP_TIMEOUT|
+			   IBV_QP_RETRY_CNT|
+			   IBV_QP_RNR_RETRY|
+			   IBV_QP_SQ_PSN| IBV_QP_MAX_QP_RD_ATOMIC |
+			   IBV_QP_MAX_QP_RD_ATOMIC);
+
+    if(retval)
+    {
+	svc->trace_out(sd->cm, "CMIB unable to set qp to RTS %d\n", retval);
+	return;	
+
+    }
+    
+
+
     ib_conn_data->remote_contact_port =
 	ntohs(ib_conn_data->remote_contact_port);
     add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
@@ -700,10 +793,130 @@ int no_more_redirect;
 	       sizeof(delay_value));
 #endif
 
+    //initialize the dataqp that will be used for all RC comms
+    memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
+    qp_init_attr.qp_context = sd->context;
+    qp_init_attr.send_cq = sd->send_cq;
+    qp_init_attr.recv_cq = sd->recv_cq;
+    qp_init_attr.cap.max_recv_wr = LISTSIZE;
+    qp_init_attr.cap.max_send_wr = LISTSIZE;
+    qp_init_attr.cap.max_send_sge = 1;
+    qp_init_attr.cap.max_recv_sge = 1;
+    qp_init_attr.cap.max_inline_data = 32;
+    qp_init_attr.qp_type = IBV_QPT_RC;
+
+    ib_conn_data->dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
+    if(ib_conn_data->dataqp == NULL)
+    {
+	svc->trace_out(sd->cm, "CMIB can't create qp\n");
+	return -1;
+	
+    }
+    
+
+    memset(&qp_attr, 0, sizeof(qp_attr));
+    qp_attr.qp_state = IBV_QPS_INIT;
+    qp_attr.pkey_index = 0;
+    qp_attr.port_num = sd->port;
+    qp_attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
+    qp_attr.qkey = 0x11111111;
+
+    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, 
+    			   IBV_QP_STATE |
+    			   IBV_QP_PKEY_INDEX | 
+    			   IBV_QP_PORT | 
+    			   IBV_QP_ACCESS_FLAGS);
+    if(retval)
+    {
+	svc->trace_out(sd->cm, "CMIB unable to set qp to INIT %d\n", retval);
+	return retval*-1;
+    }
+    
+
+//here we write out the connection port to the other side. 
+//for sockets thats all thats required. For IB we can use this to exchange information about the 
+//IB parameters for the other side
+
+//What does no_more_redirect check?
     if (!no_more_redirect) {
 	int local_listen_port = htons(sd->listen_port);
 	write(sock, &local_listen_port, 4);
+	
     }
+
+    struct ibparam param, remote_param;
+    param.lid  = sd->lid;
+    param.qpn  = ib_conn_data->dataqp->qp_num;
+    param.port = sd->port;
+    param.psn  = sd->psn;
+    
+    retval = write(sock, &param, sizeof(param));
+    if(retval <= 0)
+    {
+	svc->trace_out(sd->cm, "CMIB write parameter to socket failed %d\n", retval);
+	return retval;
+	
+    }
+    
+    retval = read(sock, &remote_param, sizeof(param));
+    if(retval <= 0)
+    {
+	svc->trace_out(sd->cm, "CMIB write parameter to socket failed %d\n", retval);
+	return retval;
+    }    
+    
+
+    memset(&qp_attr, 0, sizeof(struct ibv_qp_attr));
+
+    qp_attr.qp_state = IBV_QPS_RTR;
+    qp_attr.dest_qp_num = remote_param.qpn;
+    qp_attr.rq_psn = sd->psn;
+    qp_attr.sq_psn = sd->psn;
+    qp_attr.ah_attr.is_global = 0;
+    qp_attr.ah_attr.dlid = remote_param.lid;
+    qp_attr.ah_attr.sl = 0;
+    qp_attr.ah_attr.src_path_bits = 0;
+    qp_attr.ah_attr.port_num = remote_param.port;	
+    qp_attr.path_mtu = IBV_MTU_1024;
+    qp_attr.max_dest_rd_atomic = 4;
+    qp_attr.min_rnr_timer = 24;
+    qp_attr.timeout = 28;
+    qp_attr.retry_cnt = 18;
+    qp_attr.rnr_retry = 18;
+    qp_attr.max_rd_atomic = 4;
+    
+    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr,
+			   IBV_QP_STATE |
+			   IBV_QP_AV |
+			   IBV_QP_PATH_MTU |
+			   IBV_QP_DEST_QPN |
+			   IBV_QP_RQ_PSN |  
+			   IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC);
+    if(retval)
+    {
+	svc->trace_out(sd->cm, "CMIB unable to set qp to RTR %d\n", retval);
+	return retval;	
+
+    }
+    
+
+    
+    qp_attr.qp_state = IBV_QPS_RTS;
+    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_STATE|
+			   IBV_QP_TIMEOUT|
+			   IBV_QP_RETRY_CNT|
+			   IBV_QP_RNR_RETRY|
+			   IBV_QP_SQ_PSN| IBV_QP_MAX_QP_RD_ATOMIC |
+			   IBV_QP_MAX_QP_RD_ATOMIC);
+
+    if(retval)
+    {
+	svc->trace_out(sd->cm, "CMIB unable to set qp to RTS %d\n", retval);
+	return retval;	
+
+    }
+    
+
     svc->trace_out(cm, "--> Connection established");
     ib_conn_data->remote_host = host_name == NULL ? NULL : strdup(host_name);
     ib_conn_data->remote_IP = remote_IP;
@@ -739,40 +952,6 @@ int no_more_redirect;
 	}
     }
 
-    
-    //once socket connection is established we don't need to do anything since we 
-    //will use the socket connection to exchange rdma info
-   //initialize the dataqp that will be used for all RC comms
-    memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
-    qp_init_attr.qp_context = sd->context;
-    qp_init_attr.send_cq = sd->send_cq;
-    qp_init_attr.recv_cq = sd->recv_cq;
-    qp_init_attr.cap.max_recv_wr = LISTSIZE;
-    qp_init_attr.cap.max_send_wr = LISTSIZE;
-    qp_init_attr.cap.max_send_sge = 1;
-    qp_init_attr.cap.max_recv_sge = 1;
-    qp_init_attr.cap.max_inline_data = 32;
-    qp_init_attr.qp_type = IBV_QPT_RC;
-
-    ib_conn_data->dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
-
-    memset(&qp_attr, 0, sizeof(qp_attr));
-    qp_attr.qp_state = IBV_QPS_INIT;
-    qp_attr.pkey_index = 0;
-    qp_attr.port_num = sd->port;
-    qp_attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
-    qp_attr.qkey = 0x11111111;
-
-    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, 
-    			   IBV_QP_STATE |
-    			   IBV_QP_PKEY_INDEX | 
-    			   IBV_QP_PORT | 
-    			   IBV_QP_ACCESS_FLAGS);
-    if(retval)
-    {
-	svc->trace_out(sd->cm, "CMIB unable to set qp to INIT %d\n", retval);
-	return retval*-1;
-    }
     
 
     return sock;
@@ -1302,56 +1481,6 @@ int length;
     
     //5. use the response to set up the data qp
 
-    memset(&qp_attr, 0, sizeof(struct ibv_qp_attr));
-
-    qp_attr.qp_state = IBV_QPS_RTR;
-    qp_attr.dest_qp_num = resp->dest_qpn;
-    qp_attr.rq_psn = scd->sd->psn;
-    qp_attr.sq_psn = scd->sd->psn;
-    qp_attr.ah_attr.is_global = 0;
-    qp_attr.ah_attr.dlid = resp->lid;
-    qp_attr.ah_attr.sl = 0;
-    qp_attr.ah_attr.src_path_bits = 0;
-    qp_attr.ah_attr.port_num = resp->port;	
-    qp_attr.path_mtu = IBV_MTU_1024;
-    qp_attr.max_dest_rd_atomic = 4;
-    qp_attr.min_rnr_timer = 24;
-    qp_attr.timeout = 28;
-    qp_attr.retry_cnt = 18;
-    qp_attr.rnr_retry = 18;
-    qp_attr.max_rd_atomic = 4;
-    
-    retval = ibv_modify_qp(scd->dataqp, &qp_attr,
-			   IBV_QP_STATE |
-			   IBV_QP_AV |
-			   IBV_QP_PATH_MTU |
-			   IBV_QP_DEST_QPN |
-			   IBV_QP_RQ_PSN |  
-			   IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC);
-    if(retval)
-    {
-	svc->trace_out(scd->sd->cm, "CMIB unable to set qp to RTR %d\n", retval);
-	return retval;	
-
-    }
-    
-
-    
-    qp_attr.qp_state = IBV_QPS_RTS;
-    retval = ibv_modify_qp(scd->dataqp, &qp_attr, IBV_QP_STATE|
-			   IBV_QP_TIMEOUT|
-			   IBV_QP_RETRY_CNT|
-			   IBV_QP_RNR_RETRY|
-			   IBV_QP_SQ_PSN| IBV_QP_MAX_QP_RD_ATOMIC |
-			   IBV_QP_MAX_QP_RD_ATOMIC);
-
-    if(retval)
-    {
-	svc->trace_out(scd->sd->cm, "CMIB unable to set qp to RTS %d\n", retval);
-	return retval;	
-
-    }
-    
     //6. now issue the RDMA write call
     struct ibv_sge sg = 
 	{
@@ -1665,25 +1794,6 @@ CMtrans_services svc;
     socket_data->srq = ibv_create_srq(socket_data->pd, &srq_init_attr);
     
     socket_data->psn = lrand48()%256;
-    //since we are using sockets to initialize the connection no need to create the udp qp
-    struct ibv_qp_init_attr  qp_init_attr;
-    
-    // socket_data->dataqp = ibv_create_qp(socket_data->pd, &qp_init_attr);
-
-    // struct ibv_qp_attr qp_attr;
-    // memset(&qp_attr, 0, sizeof(qp_attr));
-    // qp_attr.qp_state = IBV_QPS_INIT;
-    // qp_attr.pkey_index = 0;
-    // qp_attr.port_num = socket_data->port;
-    // qp_attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
-    // qp_attr.qkey = 0x11111111;
-
-    // retval = ibv_modify_qp(h->dataqp, &qp_attr, 
-    // 			   IBV_QP_STATE |
-    // 			   IBV_QP_PKEY_INDEX | 
-    // 			   IBV_QP_PORT | 
-    // 			   IBV_QP_ACCESS_FLAGS);
-    
 
     svc->add_shutdown_task(cm, free_socket_data, (void *) socket_data);
     return (void *) socket_data;
