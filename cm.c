@@ -76,7 +76,8 @@ struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, IN
 					       cm_get_data_buf,
 					       cm_return_data_buf,
 					       INT_CMConnection_close,
-					       cm_create_transport_buffer};
+					       cm_create_transport_buffer,
+					       INT_CMget_transport_data};
 static void CMControlList_close ARGS((CMControlList cl));
 static int CMcontrol_list_poll ARGS((CMControlList cl));
 int CMdo_non_CM_handler ARGS((CMConnection conn, int header,
