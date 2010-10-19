@@ -1,7 +1,9 @@
 #!/bin/sh
 # install - install a program, script, or datafile
+# Customized for CHAOS to compare with the installed file and only 
+# install if there is a difference
 
-scriptversion=2006-10-14.15
+scriptversion=2010-10-19.09
 
 # This originates from X11R5 (mit/util/scripts/install.sh), which was
 # later released in X11R6 (xc/config/util/install.sh) with the
@@ -463,6 +465,8 @@ do
       && { test -z "$chgrpcmd" || $doit $chgrpcmd "$dsttmp"; } \
       && { test -z "$stripcmd" || $doit $stripcmd "$dsttmp"; } \
       && { test -z "$chmodcmd" || $doit $chmodcmd $mode "$dsttmp"; } &&
+
+    { $doit cmp -s "$dsttmp" "$dst" ; } &&
 
     # Now rename the file to the real destination.
     { $doit $mvcmd -f "$dsttmp" "$dst" 2>/dev/null \
