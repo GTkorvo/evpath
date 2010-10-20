@@ -55,7 +55,7 @@ cm_interface.c revp.c revpath.h: evpath.h gen_interface.pl
 
 if BUILD_IB
 libcmib_la_SOURCES = cmib.c
-libcmib_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env
+libcmib_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env -libverbs
 libcmib_la_LDFLAGS = -module -export-symbols-regex "libcmib.*"
 endif
 
