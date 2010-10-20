@@ -376,6 +376,7 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     //find the memory for it and create the resonse
 
     scd->read_buffer = malloc(req.length);
+    memset(scd->read_buffer, 0, req.length);    
     scd->read_buffer_len = req.length;
 
     //register the memory
@@ -390,30 +391,45 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 
     //send response to other side
 
+    retval = ibv_req_notify_cq(sd->send_cq, 0);
+
     write(scd->fd, &rep, sizeof(struct response));
 
-    //now we need to poll for completion
-    while(1)
-    {
-	memset(&wc, 0, sizeof(wc));
+//    sleep(10);
+    
+//     void *cq_context;
+
+//     retval = ibv_get_cq_event(sd->send_channel, 
+//      			      &sd->send_cq, &cq_context);
 	
-	retval = ibv_poll_cq(sd->send_cq, 1, &wc);
-	if(retval == 0)
-	{
-	    fprintf(stderr, "no event\n");
-//	    sleep(1);	    
-	}
-	else if(retval > 0 && wc.status == IBV_WC_SUCCESS)
-	{
-	    //I think data transfer completed?
-	    break;	    
-	}
-	else
-	{
-	    fprintf(stderr, "error in polling\n");
-//	    sleep(1);	    
-	}	
-    }
+//     ibv_req_notify_cq(sd->send_cq, 0);
+    
+    
+//     //now we need to poll for completion
+//     while(1)
+//     {
+// 	memset(&wc, 0, sizeof(wc));
+
+	
+	
+// 	retval = ibv_poll_cq(sd->send_cq, 1, &wc);
+// 	if(retval == 0)
+// 	{
+// 	    fprintf(stderr, "no event\n");
+// 	}
+// 	else if(retval > 0 && wc.status == IBV_WC_SUCCESS)
+// 	{
+// 	    //I think data transfer completed?
+	    
+// 	    break;	    
+// 	}
+// 	else
+// 	{
+// 	    fprintf(stderr, "error in polling\n");
+// //	    sleep(1);	    
+// 	}	
+	
+//     }
 
     trans->data_available(trans, conn);
 }
@@ -1361,6 +1377,12 @@ int length;
 	    ibv_dereg_mr(mr);
 	    break;	    
 	}
+	else if(wc.status != IBV_WC_SUCCESS)
+	{
+	    fprintf(stderr, "errror\n");
+	    
+	}
+	
     }	
     return length;
 }
@@ -1601,7 +1623,7 @@ CMtrans_services svc;
     static int atom_init = 0;
 
     ib_client_data_ptr socket_data;
-    svc->trace_out(cm, "Initialize TCP/IP Socket transport built in %s",
+    svc->trace_out(cm, "Initialize CM IB transport built in %s",
 		   EVPATH_LIBRARY_BUILD_DIR);
     if (socket_global_init == 0) {
 #ifdef SIGPIPE
@@ -1780,6 +1802,8 @@ static struct ibv_mr ** regblocks(ib_client_data_ptr sd,
     
     struct ibv_mr **mrlist;
 
+    fprintf(stderr, "iovec count = %d\n", iovcnt);
+    
     mrlist = (struct ibv_mr**) malloc(sizeof(struct ibv_mr *) * iovcnt);
     if(mrlist == NULL)
     {
@@ -1789,6 +1813,7 @@ static struct ibv_mr ** regblocks(ib_client_data_ptr sd,
     
     for(i = 0; i < iovcnt; i++)
     {
+	
 	mrlist[i] = ibv_reg_mr(sd->pd, iovs[i].iov_base, 
 			       iovs[i].iov_len, 
 			       flags);
