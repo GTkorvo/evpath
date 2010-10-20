@@ -93,23 +93,16 @@ typedef struct func_list_item {
 
 struct request
 {
-    int lid;
-    int psn;    
-    int port;
-    uint64_t remote_addr;
-    uint32_t rkey;
-    uint32_t size;
+    int magic;    
+    uint32_t length;    
 };
 
 
 struct response
 {
-    int lid;
-    int psn;
-    int dest_qpn;
     uint64_t remote_addr;
     uint32_t rkey;
-    int port;    
+    uint32_t max_length;    
 };
 
 struct ibparam
@@ -145,6 +138,8 @@ typedef struct ib_client_data {
     struct ibv_cq *recv_cq;
     struct ibv_cq *send_cq;
     struct ibv_srq *srq;
+
+    int max_sge;    
 } *ib_client_data_ptr;
 
 
@@ -163,6 +158,24 @@ typedef struct ib_connection_data {
     struct ibv_qp *dataqp;    
     struct ibv_mr *mr;
 } *ib_conn_data_ptr;
+
+static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
+			      ib_client_data_ptr sd);
+static int connectqp(ib_conn_data_ptr ib_conn_data,
+		     ib_client_data_ptr sd,
+		     struct ibparam lparam,
+		     struct ibparam rparam);
+static struct ibv_mr ** regblocks(ib_client_data_ptr sd,
+				 struct iovec *iovs, int iovcnt, int flags,
+				 int *mrlen);
+
+
+static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn, 
+					 struct ibv_mr **mrlist,
+					 struct iovec *iovlist,
+					 int mrlen, int *wrlen, 
+					 struct response rep);
+
 
 #ifdef WSAEWOULDBLOCK
 #define EWOULDBLOCK WSAEWOULDBLOCK
@@ -326,38 +339,83 @@ int fd;
 void
 CMIB_data_available(transport_entry trans, CMConnection conn)
 {
-  struct {
-    int magic;
-    int length;
-  } transport_head;
-  int iget;
-  ib_client_data_ptr sd = (ib_client_data_ptr) trans->trans_data;
-  CMtrans_services svc = sd->svc;
+    int iget;
+    ib_client_data_ptr sd = (ib_client_data_ptr) trans->trans_data;
+    CMtrans_services svc = sd->svc;
+    struct request req;
+    struct response rep;
+    struct ibv_mr *mr;
+    int retval = 0;
+    struct ibv_wc wc;
+    
+  
+  
 
-  printf("CMIB data available\n");
+    fprintf(stderr, "CMIB data available\n");
 
-  ib_conn_data_ptr scd = (ib_conn_data_ptr) svc->get_transport_data(conn);
+    ib_conn_data_ptr scd = (ib_conn_data_ptr) svc->get_transport_data(conn);
 
-  iget = read(scd->fd, (char *) &transport_head, 8);
-  if (iget == 0) {
-      svc->connection_close(conn);
-      return;
-  }
-  if (iget != 8) {
-    int lerrno = errno;
-    svc->trace_out(scd->sd->cm, "CMIB iget was %d, errno is %d, returning 0 for read",
-		   iget, lerrno);
-  }
-  if (transport_head.magic != 0xdeadbeef) {
-    printf("Dead beef panic, 0x%x\n", transport_head.magic);
-  } else {
-    printf("Would start to read %d bytes of data\n", transport_head.length);
-  }
+    iget = read(scd->fd, (char *) &req, sizeof(struct request));
 
-  scd->read_buffer = malloc(transport_head.length);
-  scd->read_buffer_len = transport_head.length;
-  read(scd->fd, scd->read_buffer, transport_head.length);
-  trans->data_available(trans, conn);
+    if (iget == 0) {
+	svc->connection_close(conn);
+	return;
+    }
+    if (iget != sizeof(struct request)) {
+	int lerrno = errno;
+	svc->trace_out(scd->sd->cm, "CMIB iget was %d, errno is %d, returning 0 for read",
+		       iget, lerrno);
+    }
+
+    if (req.magic != 0xdeadbeef) {
+	printf("Dead beef panic, 0x%x\n", req.magic);
+    } else {
+	printf("Would start to read %d bytes of data\n", req.length);
+    }
+
+    //find the memory for it and create the resonse
+
+    scd->read_buffer = malloc(req.length);
+    scd->read_buffer_len = req.length;
+
+    //register the memory
+    mr = ibv_reg_mr(scd->sd->pd, scd->read_buffer, scd->read_buffer_len,
+		    IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | 
+		    IBV_ACCESS_REMOTE_READ);
+  
+    //create response
+    rep.remote_addr = int64_from_ptr(scd->read_buffer);
+    rep.rkey = mr->rkey;
+    rep.max_length = scd->read_buffer_len;
+
+    //send response to other side
+
+    write(scd->fd, &rep, sizeof(struct response));
+
+    //now we need to poll for completion
+    while(1)
+    {
+	memset(&wc, 0, sizeof(wc));
+	
+	retval = ibv_poll_cq(sd->send_cq, 1, &wc);
+	if(retval == 0)
+	{
+	    fprintf(stderr, "no event\n");
+//	    sleep(1);	    
+	}
+	else if(retval > 0 && wc.status == IBV_WC_SUCCESS)
+	{
+	    //I think data transfer completed?
+	    break;	    
+	}
+	else
+	{
+	    fprintf(stderr, "error in polling\n");
+//	    sleep(1);	    
+	}	
+    }
+
+    trans->data_available(trans, conn);
 }
 
 /* 
@@ -431,7 +489,7 @@ void *void_conn_sock;
     qp_init_attr.qp_type = IBV_QPT_RC;
     
 
-    ib_conn_data->dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
+    ib_conn_data->dataqp = initqp(ib_conn_data, sd);    
     if(ib_conn_data->dataqp == NULL)
     {
 	svc->trace_out(sd->cm, "CMIB can't create qp\n");
@@ -439,44 +497,6 @@ void *void_conn_sock;
 	
     }
 
-    memset(&qp_attr, 0, sizeof(qp_attr));
-    qp_attr.qp_state = IBV_QPS_INIT;
-    qp_attr.pkey_index = 0;
-    qp_attr.port_num = sd->port;
-    qp_attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
-    qp_attr.qkey = 0x11111111;
-
-    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, 
-    			   IBV_QP_STATE |
-    			   IBV_QP_PKEY_INDEX | 
-    			   IBV_QP_PORT | 
-    			   IBV_QP_ACCESS_FLAGS);
-    if(retval)
-    {
-	svc->trace_out(sd->cm, "CMIB unable to set qp to INIT %d\n", retval);
-	return;
-    }
-
-    struct ibv_qp_init_attr qp_init;
-
-    if(1)
-      {
-	qp_attr.cap.max_send_sge = 1024;
-	retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_CAP);
-	fprintf(stderr, "%d %s retval = %d\n", __LINE__, __FUNCTION__, retval);				       
-	
-	retval = ibv_query_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_CAP,
-			      &qp_init);
-	fprintf(stderr, "max_send_wr = %d\nmax_recv_wr=%d\nmax_send_sge=%d\n",
-		qp_attr.cap.max_send_wr,
-		qp_attr.cap.max_recv_wr,
-		qp_attr.cap.max_send_sge);
-	fprintf(stderr, "max_recv_sge=%d\nmax_inline_data=%d\n",
-		qp_attr.cap.max_recv_sge,
-		qp_attr.cap.max_inline_data);
-
-      }
-    
 
     conn_attr_list = create_attr_list();
     conn = svc->connection_create(trans, ib_conn_data, conn_attr_list);
@@ -547,59 +567,13 @@ void *void_conn_sock;
 	return;	
     }
     
-    
-    memset(&qp_attr, 0, sizeof(struct ibv_qp_attr));
-
-    qp_attr.qp_state = IBV_QPS_RTR;
-    qp_attr.dest_qp_num = remote_param.qpn;
-    qp_attr.rq_psn = sd->psn;
-    qp_attr.sq_psn = sd->psn;
-    qp_attr.ah_attr.is_global = 0;
-    qp_attr.ah_attr.dlid = remote_param.lid;
-    qp_attr.ah_attr.sl = 0;
-    qp_attr.ah_attr.src_path_bits = 0;
-    qp_attr.ah_attr.port_num = remote_param.port;	
-    qp_attr.path_mtu = IBV_MTU_1024;
-    qp_attr.max_dest_rd_atomic = 4;
-    qp_attr.min_rnr_timer = 24;
-    qp_attr.timeout = 28;
-    qp_attr.retry_cnt = 18;
-    qp_attr.rnr_retry = 18;
-    qp_attr.max_rd_atomic = 4;
-    
-    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr,
-			   IBV_QP_STATE |
-			   IBV_QP_AV |
-			   IBV_QP_PATH_MTU |
-			   IBV_QP_DEST_QPN |
-			   IBV_QP_RQ_PSN |  
-			   IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC);
-    if(retval)
+    if(connectqp(ib_conn_data, sd, param, remote_param))
     {
-	svc->trace_out(sd->cm, "CMIB unable to set qp to RTR %d\n", retval);
+	svc->trace_out(NULL, "CMIB connectqp failed in accept connection");
 	return;	
-
     }
     
-
     
-    qp_attr.qp_state = IBV_QPS_RTS;
-    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_STATE|
-			   IBV_QP_TIMEOUT|
-			   IBV_QP_RETRY_CNT|
-			   IBV_QP_RNR_RETRY|
-			   IBV_QP_SQ_PSN| IBV_QP_MAX_QP_RD_ATOMIC |
-			   IBV_QP_MAX_QP_RD_ATOMIC);
-
-    if(retval)
-    {
-	svc->trace_out(sd->cm, "CMIB unable to set qp to RTS %d\n", retval);
-	return;	
-
-    }
-    
-
-
     ib_conn_data->remote_contact_port =
 	ntohs(ib_conn_data->remote_contact_port);
     add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
@@ -817,65 +791,14 @@ int no_more_redirect;
 #endif
 
     //initialize the dataqp that will be used for all RC comms
-    memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
-    qp_init_attr.qp_context = sd->context;
-    qp_init_attr.send_cq = sd->send_cq;
-    qp_init_attr.recv_cq = sd->recv_cq;
-    qp_init_attr.cap.max_recv_wr = LISTSIZE;
-    qp_init_attr.cap.max_send_wr = LISTSIZE;
-    qp_init_attr.cap.max_send_sge = 32;
-    qp_init_attr.cap.max_recv_sge = 1;
-    qp_init_attr.cap.max_inline_data = 32;
-    qp_init_attr.qp_type = IBV_QPT_RC;
 
-    ib_conn_data->dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
+    ib_conn_data->dataqp = initqp(ib_conn_data, sd);
     if(ib_conn_data->dataqp == NULL)
     {
-	svc->trace_out(sd->cm, "CMIB can't create qp\n");
-	return -1;
-	
-    }
-
-    
-    if(1)
-      {
-	  
-	qp_attr.cap.max_send_sge = 1024;
-	retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_CAP);
-	fprintf(stderr, "%d %s retval = %d\n", __LINE__, __FUNCTION__, retval);				       
-	
-	retval = ibv_query_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_CAP,
-			      &qp_init_attr);
-	fprintf(stderr, "max_send_wr = %d\nmax_recv_wr=%d\nmax_send_sge=%d\n",
-		qp_attr.cap.max_send_wr,
-		qp_attr.cap.max_recv_wr,
-		qp_attr.cap.max_send_sge);
-	fprintf(stderr, "max_recv_sge=%d\nmax_inline_data=%d\n",
-		qp_attr.cap.max_recv_sge,
-		qp_attr.cap.max_inline_data);
-
-      }
-    
-
-    memset(&qp_attr, 0, sizeof(qp_attr));
-    qp_attr.qp_state = IBV_QPS_INIT;
-    qp_attr.pkey_index = 0;
-    qp_attr.port_num = sd->port;
-    qp_attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
-    qp_attr.qkey = 0x11111111;
-
-    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, 
-    			   IBV_QP_STATE |
-    			   IBV_QP_PKEY_INDEX | 
-    			   IBV_QP_PORT | 
-    			   IBV_QP_ACCESS_FLAGS);
-    if(retval)
-    {
-	svc->trace_out(sd->cm, "CMIB unable to set qp to INIT %d\n", retval);
-	return retval*-1;
+	svc->trace_out(sd->cm, "CMIB initqp failed in initiate_conn\n");
+	return -1;	
     }
     
-
 //here we write out the connection port to the other side. 
 //for sockets thats all thats required. For IB we can use this to exchange information about the 
 //IB parameters for the other side
@@ -909,54 +832,13 @@ int no_more_redirect;
     }    
     
 
-    memset(&qp_attr, 0, sizeof(struct ibv_qp_attr));
-
-    qp_attr.qp_state = IBV_QPS_RTR;
-    qp_attr.dest_qp_num = remote_param.qpn;
-    qp_attr.rq_psn = sd->psn;
-    qp_attr.sq_psn = sd->psn;
-    qp_attr.ah_attr.is_global = 0;
-    qp_attr.ah_attr.dlid = remote_param.lid;
-    qp_attr.ah_attr.sl = 0;
-    qp_attr.ah_attr.src_path_bits = 0;
-    qp_attr.ah_attr.port_num = remote_param.port;	
-    qp_attr.path_mtu = IBV_MTU_1024;
-    qp_attr.max_dest_rd_atomic = 4;
-    qp_attr.min_rnr_timer = 24;
-    qp_attr.timeout = 28;
-    qp_attr.retry_cnt = 18;
-    qp_attr.rnr_retry = 18;
-    qp_attr.max_rd_atomic = 4;
-    
-    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr,
-			   IBV_QP_STATE |
-			   IBV_QP_AV |
-			   IBV_QP_PATH_MTU |
-			   IBV_QP_DEST_QPN |
-			   IBV_QP_RQ_PSN |  
-			   IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC);
+    retval = connectqp(ib_conn_data, sd,
+		       param, remote_param);
     if(retval)
     {
-	svc->trace_out(sd->cm, "CMIB unable to set qp to RTR %d\n", retval);
-	return retval;	
-
-    }
-    
-
-    
-    qp_attr.qp_state = IBV_QPS_RTS;
-    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_STATE|
-			   IBV_QP_TIMEOUT|
-			   IBV_QP_RETRY_CNT|
-			   IBV_QP_RNR_RETRY|
-			   IBV_QP_SQ_PSN| IBV_QP_MAX_QP_RD_ATOMIC |
-			   IBV_QP_MAX_QP_RD_ATOMIC);
-
-    if(retval)
-    {
-	svc->trace_out(sd->cm, "CMIB unable to set qp to RTS %d\n", retval);
-	return retval;	
-
+	//svc->trace_out(sd->cm, "CMIB connectqp failed in initiate connection\n");
+	return -1;
+	
     }
     
 
@@ -994,8 +876,6 @@ int no_more_redirect;
 #endif
 	}
     }
-
-    
 
     return sock;
 }
@@ -1407,12 +1287,9 @@ int length;
 
     //2. create request struct
     r = (struct request*)malloc(sizeof(struct request));
-    r->lid = scd->sd->lid;
-    r->psn = scd->sd->psn;
-    r->port = scd->sd->port;
-    r->remote_addr = int64_from_ptr(buffer);
-    r->rkey = mr->rkey;
-    r->size = length;
+//    r->remote_addr = int64_from_ptr(buffer);
+//    r->rkey = mr->rkey;
+//    r->size = length;
     
     svc->trace_out(scd->sd->cm, "CMIB write of %d bytes on fd %d",
 		   sizeof(struct request), fd);
@@ -1546,65 +1423,85 @@ attr_list attrs;
     int iovleft, i;
     iovleft = iovcnt;
     struct iovec * iov = (struct iovec*) iovs;
-    /* sum lengths */
-    struct {
-      int magic;
-      int length;
-    } transport_head;
+    struct ibv_mr **mrlist;
+    struct ibv_send_wr *wr;
+    int mrlen, wrlen;
+    struct ibv_send_wr *bad_wr;
+    struct ibv_wc wc;    
+    int retval  = 0;
+    
+
     for (i = 0; i < iovcnt; i++)
 	left += iov[i].iov_len;
 
-    transport_head.magic = 0xdeadbeef;
-    transport_head.length = left;
+    struct request req;
+    struct response rep;
+    
+    req.magic = 0xdeadbeef;
+    req.length = left;
+    
+
     svc->trace_out(scd->sd->cm, "CMIB writev of %d bytes on fd %d",
 		   left, fd);
     
-    write(fd, &transport_head, 8);
-    while (left > 0) {
-	int write_count = iovleft;
-	if (write_count > IOV_MAX)
-	    write_count = IOV_MAX;
-	iget = writev(fd, (struct iovec *) &iov[iovcnt - iovleft],
-		      write_count);
-	if (iget == -1) {
-	    svc->trace_out(scd->sd->cm, "	writev failed, errno was %d", errno);
-	    if ((errno != EWOULDBLOCK) && (errno != EAGAIN)) {
-		/* serious error */
-		return (iovcnt - iovleft);
-	    } else {
-		if (errno == EWOULDBLOCK) {
-		    svc->trace_out(scd->sd->cm, "CMIB writev blocked - switch to blocking fd %d",
-				   scd->fd);
-		    set_block_state(svc, scd, Block);
-		}
-		iget = 0;
-	    }
-	}
-	if (iget == left) {
-	    return iovcnt;
-	}
-	svc->trace_out(scd->sd->cm, "	writev partial success, %d bytes written", iget);
-	left -= iget;
-	while (iget > 0) {
-	    iget -= iov[iovcnt - iovleft].iov_len;
-	    iovleft--;
-	}
+    //write out request
+    write(fd, &req, sizeof(struct request));
 
-	if (iget < 0) {
-	    /* 
-	     * Only part of the last block was written.  Modify IO 
-	     * vector to indicate the remaining block to be written.
-	     */
-	    /* restore iovleft and iget to cover remaining block */
-	    iovleft++;
-	    iget += iov[iovcnt - iovleft].iov_len;
-
-	    /* adjust count down and base up by number of bytes written */
-	    iov[iovcnt - iovleft].iov_len -= iget;
-	    iov[iovcnt - iovleft].iov_base =
-		(char *) (iov[iovcnt - iovleft].iov_base) + iget;
-	}
+    mrlist = regblocks(scd->sd, iov, iovcnt, IBV_ACCESS_LOCAL_WRITE, &mrlen);
+    if(mrlist == NULL)
+    {
+	return -0x10000;	
     }
+
+    //read back response
+    read(fd, &rep, sizeof(struct response));
+    
+    //get the workrequests
+    wr = createwrlist(scd, mrlist, iov, mrlen, &wrlen,
+		      rep);
+    
+    if(wr == NULL)
+    {
+	fprintf(stderr, "failed to get work request - aborting write\n");
+	return -0x01000;	
+    }
+    
+    retval = ibv_post_send(scd->dataqp, wr, &bad_wr);
+    if(retval)
+    {
+	svc->trace_out(scd->sd->cm, "CMIB unable to post send %d\n", retval);
+	//we can get the error from the *bad_wr
+	return retval;	
+
+    }
+    
+    memset(&wc, 0, sizeof(wc));    
+    while(1)
+    {
+	
+	iget = ibv_poll_cq(scd->sd->send_cq, 1, &wc);
+	if(iget > 0 && wc.status == IBV_WC_SUCCESS)
+	{
+	    //send completeled
+	    //we can break out after derigstering the memory
+	    fprintf(stderr, "succeeded in the post send %d\n", wc.opcode);
+	    
+	    for(i = 0; i < mrlen; i ++)
+	    {
+		ibv_dereg_mr(mrlist[i]);		
+		
+	    }
+
+	    free(wr->sg_list);	    
+	    free(wr);
+	    
+	    
+	    break;	    
+	}
+    }	
+
+    
+
     return iovcnt;
 }
 
@@ -1737,10 +1634,10 @@ CMtrans_services svc;
     socket_data->pd = ibv_alloc_pd(socket_data->context);
     socket_data->recv_channel = ibv_create_comp_channel(socket_data->context);
     socket_data->send_channel = ibv_create_comp_channel(socket_data->context);
-    socket_data->recv_cq = ibv_create_cq(socket_data->context, 1024, 
-					 (void*)socket_data, socket_data->recv_channel, 0);
     socket_data->send_cq = ibv_create_cq(socket_data->context, 1024, 
 					 (void*)socket_data, socket_data->send_channel, 0);
+    socket_data->recv_cq = socket_data->send_cq;
+    
     
 
     struct ibv_srq_init_attr srq_init_attr;
@@ -1756,5 +1653,238 @@ CMtrans_services svc;
     svc->add_shutdown_task(cm, free_socket_data, (void *) socket_data);
     return (void *) socket_data;
 }
+
+static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
+			      ib_client_data_ptr sd)					
+{
+    struct ibv_qp_init_attr qp_init_attr;
+    struct ibv_qp_attr qp_attr;
+    struct ibv_qp *dataqp;
+    int retval = 0;
+
+    sd->svc->trace_out(sd->cm, "CMIB initqp\n");
+    
+    
+    memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
+    qp_init_attr.qp_context = sd->context;
+    qp_init_attr.send_cq = sd->send_cq;
+    qp_init_attr.recv_cq = sd->recv_cq;
+    qp_init_attr.cap.max_recv_wr = LISTSIZE;
+    qp_init_attr.cap.max_send_wr = LISTSIZE;
+    qp_init_attr.cap.max_send_sge = 32;
+    qp_init_attr.cap.max_recv_sge = 1;
+    qp_init_attr.cap.max_inline_data = 32;
+    qp_init_attr.qp_type = IBV_QPT_RC;
+
+    dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
+    if(dataqp == NULL)
+    {
+	sd->svc->trace_out(sd->cm, "CMIB can't create qp\n");
+	return NULL;	
+    }
+
+    memset(&qp_attr, 0, sizeof(qp_attr));
+    qp_attr.qp_state = IBV_QPS_INIT;
+    qp_attr.pkey_index = 0;
+    qp_attr.port_num = sd->port;
+    qp_attr.qp_access_flags = IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ | IBV_ACCESS_REMOTE_WRITE;
+    qp_attr.qkey = 0x11111111;
+
+    retval = ibv_modify_qp(dataqp, &qp_attr, 
+    			   IBV_QP_STATE |
+    			   IBV_QP_PKEY_INDEX | 
+    			   IBV_QP_PORT | 
+    			   IBV_QP_ACCESS_FLAGS);
+    if(retval)
+    {
+	sd->svc->trace_out(sd->cm, "CMIB unable to set qp to INIT %d\n", retval);
+	ibv_destroy_qp(dataqp);	
+	return NULL;
+    }
+    
+
+    return dataqp;
+}
+
+
+static int connectqp(ib_conn_data_ptr ib_conn_data,
+		     ib_client_data_ptr sd,
+		     struct ibparam lparam,
+		     struct ibparam rparam)
+{
+    struct ibv_qp_attr qp_attr;
+    int retval = 0;
+    
+    if(ib_conn_data == NULL || ib_conn_data->dataqp == NULL)
+	return -1;    
+
+    memset(&qp_attr, 0, sizeof(struct ibv_qp_attr));
+
+    qp_attr.qp_state = IBV_QPS_RTR;
+    qp_attr.dest_qp_num = rparam.qpn;
+    qp_attr.rq_psn = sd->psn;
+    qp_attr.sq_psn = sd->psn;
+    qp_attr.ah_attr.is_global = 0;
+    qp_attr.ah_attr.dlid = rparam.lid;
+    qp_attr.ah_attr.sl = 0;
+    qp_attr.ah_attr.src_path_bits = 0;
+    qp_attr.ah_attr.port_num = rparam.port;	
+    qp_attr.path_mtu = IBV_MTU_1024;
+    qp_attr.max_dest_rd_atomic = 4;
+    qp_attr.min_rnr_timer = 24;
+    qp_attr.timeout = 28;
+    qp_attr.retry_cnt = 18;
+    qp_attr.rnr_retry = 18;
+    qp_attr.max_rd_atomic = 4;
+    
+    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr,
+			   IBV_QP_STATE |
+			   IBV_QP_AV |
+			   IBV_QP_PATH_MTU |
+			   IBV_QP_DEST_QPN |
+			   IBV_QP_RQ_PSN |  
+			   IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC);
+    if(retval)
+    {
+	sd->svc->trace_out(sd->cm, "CMIB unable to set qp to RTR %d\n", retval);
+	return retval;	
+
+    }
+    
+
+    
+    qp_attr.qp_state = IBV_QPS_RTS;
+    retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_STATE|
+			   IBV_QP_TIMEOUT|
+			   IBV_QP_RETRY_CNT|
+			   IBV_QP_RNR_RETRY|
+			   IBV_QP_SQ_PSN| IBV_QP_MAX_QP_RD_ATOMIC |
+			   IBV_QP_MAX_QP_RD_ATOMIC);
+
+    if(retval)
+    {
+	sd->svc->trace_out(sd->cm, "CMIB unable to set qp to RTS %d\n", retval);
+	return retval;	
+
+    }
+
+    return 0;    
+}
+
+
+static struct ibv_mr ** regblocks(ib_client_data_ptr sd,
+				 struct iovec *iovs, int iovcnt, int flags, 
+				 int *mrlen)				  
+{
+    int i =0;
+    
+    struct ibv_mr **mrlist;
+
+    mrlist = (struct ibv_mr**) malloc(sizeof(struct ibv_mr *) * iovcnt);
+    if(mrlist == NULL)
+    {
+	//failed to allocate memory - big issue
+	return NULL;	
+    }
+    
+    for(i = 0; i < iovcnt; i++)
+    {
+	mrlist[i] = ibv_reg_mr(sd->pd, iovs[i].iov_base, 
+			       iovs[i].iov_len, 
+			       flags);
+	if(mrlist[i] == NULL)
+	{
+	    fprintf(stderr, "registeration failed \n");
+	    for(; i > 0; i--)
+	    {
+		ibv_dereg_mr(mrlist[i-1]);		
+	    }
+	    free(mrlist);
+	    return NULL;	    
+	}	
+    }
+    *mrlen = iovcnt;
+    
+    return mrlist;    
+}
+
+
+
+static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn, 
+					 struct ibv_mr **mrlist,
+					 struct iovec *iovlist,
+					 int mrlen, int *wrlen, 
+					 struct response rep)
+{
+    //create an array of work requests that can be posted for the transter
+    struct ibv_qp_attr attr;
+    struct ibv_qp_init_attr init_attr;
+    struct ibv_sge *sge;
+    struct ibv_send_wr *wr;
+    
+    
+    
+    memset(&attr, 0, sizeof(attr));
+    memset(&init_attr, 0, sizeof(init_attr));
+    
+    //query to get qp params
+    ibv_query_qp(conn->dataqp, &attr, IBV_QP_CAP, &init_attr);
+    
+    fprintf(stderr, "maximum wr = %d\t maximum sge = %d\n",
+	    attr.cap.max_send_wr, attr.cap.max_send_sge);
+
+    fprintf(stderr, "INIT\tmaximum wr = %d\t maximum sge = %d\n",
+	    init_attr.cap.max_send_wr, init_attr.cap.max_send_sge);
+    
+    if(mrlen > attr.cap.max_send_sge)
+    {
+	fprintf(stderr, "too many sge fall back to slow mode\n");
+	//do the slow mode here
+	//TODO still
+    }
+    else
+	*wrlen = 1;
+    
+
+    sge = (struct ibv_sge*)malloc(sizeof(struct ibv_sge) * mrlen);
+    if(sge == NULL)
+    {
+	fprintf(stderr, "couldn't allocate memory\n");
+	return NULL;
+	
+    }
+    
+    wr=(struct ibv_send_wr*)malloc(sizeof(struct ibv_send_wr)*(*wrlen));
+    if(wr == NULL)
+    {
+	fprintf(stderr, "malloc failed for wr\n");
+	free(sge);
+	return NULL;	
+    }
+    
+    
+    wr->wr_id = int64_from_ptr(conn);
+    wr->next = NULL;    
+    wr->sg_list = sge;    
+    wr->num_sge = mrlen;    
+    wr->opcode = IBV_WR_RDMA_WRITE;    
+    wr->send_flags = IBV_SEND_FENCE | IBV_SEND_SIGNALED;    
+    wr->imm_data = 0;    
+    wr->wr.rdma.remote_addr = rep.remote_addr;    
+    wr->wr.rdma.rkey = rep.rkey;
+
+    int i = 0;
+    
+    for(i = 0; i <mrlen; i++)
+    {
+	sge[i].addr = int64_from_ptr(iovlist[i].iov_base);
+	sge[i].length = iovlist[i].iov_len;
+	sge[i].lkey = mrlist[i]->lkey;	
+    }
+    
+    return wr;
+}
+
+
 
 #endif
