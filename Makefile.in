@@ -393,7 +393,7 @@ include_HEADERS = evpath.h evpath_old.h revpath.h cm_transport.h ev_dfg.h
 AM_CPPFLAGS = 
 noinst_HEADERS = cm_internal.h  ev_internal.h
 @BUILD_IB_TRUE@libcmib_la_SOURCES = cmib.c
-@BUILD_IB_TRUE@libcmib_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env
+@BUILD_IB_TRUE@libcmib_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env -libverbs
 @BUILD_IB_TRUE@libcmib_la_LDFLAGS = -module -export-symbols-regex "libcmib.*"
 @CNL_FALSE@libcmsockets_la_SOURCES = cmsockets.c
 @CNL_FALSE@libcmsockets_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env
@@ -631,8 +631,8 @@ install-pkgconfigDATA: $(pkgconfig_DATA)
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo "$(INSTALL_DATA) $$files '$(DESTDIR)$(pkgconfigdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(pkgconfigdir)" || exit $$?; \
+	  echo " cmp -s '$$files' '$(DESTDIR)$(pkgconfigdir)/$xfiles' || $(INSTALL_DATA) $$files '$(DESTDIR)$(pkgconfigdir)'"; \
+	  cmp -s '$$files' '$(DESTDIR)$(pkgconfigdir)/$xfiles' || $(INSTALL_DATA) $$files "$(DESTDIR)$(pkgconfigdir)" || exit $$?; \
 	done
 
 uninstall-pkgconfigDATA:
@@ -651,8 +651,8 @@ install-includeHEADERS: $(include_HEADERS)
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo "$(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
-	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(includedir)" || exit $$?; \
+	  echo " cmp -s '$$files' '$(DESTDIR)$(includedir)/$xfiles' || $(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
+	  cmp -s '$$files' '$(DESTDIR)$(includedir)/$xfiles' || $(INSTALL_HEADER) $$files "$(DESTDIR)$(includedir)" || exit $$?; \
 	done
 
 uninstall-includeHEADERS:
