@@ -115,6 +115,12 @@ struct ibparam
 };
 
     
+struct _pad
+{
+    unsigned char pad[1024];
+    struct ibv_mr *mr;
+};
+
 
 
 #define ptr_from_int64(p) (void *)(unsigned long)(p)
@@ -139,6 +145,8 @@ typedef struct ib_client_data {
     struct ibv_cq *send_cq;
     struct ibv_srq *srq;
     int max_sge;
+//    struct _pad pad;
+    
 } *ib_client_data_ptr;
 
 
@@ -167,6 +175,7 @@ typedef struct ib_connection_data {
     struct ibv_qp *dataqp;    
     struct ibv_mr *mr;    
     notify isDone;    
+    int max_imm_data;
 } *ib_conn_data_ptr;
 
 
@@ -393,7 +402,7 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     scd->read_buffer_len = req.length;
 
     //register the memory
-    mr = ibv_reg_mr(scd->sd->pd, scd->read_buffer, scd->read_buffer_len,
+    mr = ibv_reg_mr(scd->sd->pd, scd->read_buffer, req.length,
 		    IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | 
 		    IBV_ACCESS_REMOTE_READ);
   
@@ -1279,171 +1288,13 @@ ib_conn_data_ptr scd;
 void *buffer;
 int length;
 {
-    //this is the main function 
-    //basically we follow the steps:
-    //1 register the buffer memory 
-    //2 create a request structure with the info for the buffer memory
-    //3 send it over the socket
-    //4 wait for response on the socket
-    //5 read out response structure
-    //6 use response to issue the rdma write
-    //7 wait for write to complete
-    //8 unregister memory
-    //9 return
-
-    int left = length;
-    int iget = 0;
-    int fd = scd->fd;
-    int retval = 0;
-    struct ibv_send_wr *bad_wr;
-    struct ibv_mr *mr;
-    struct request *r;
-    struct ibv_qp_attr qp_attr;    
-    struct response *resp;
-    struct ibv_wc wc;
-    struct ibv_qp_init_attr qp_init;
-
-    //1. register memory
-    mr = ibv_reg_mr(scd->sd->pd, buffer, length, 
-		    IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);
-    if(mr  == NULL)
-    {
-	svc->trace_out(scd->sd->cm, "Unable to register memory %p %d\n", buffer, length);
-	return -1;	
-    }
-
-    scd->mr = mr;
+    return -16;
     
-    
-
-    //2. create request struct
-    r = (struct request*)malloc(sizeof(struct request));
-//    r->remote_addr = int64_from_ptr(buffer);
-//    r->rkey = mr->rkey;
-//    r->size = length;
-    
-    svc->trace_out(scd->sd->cm, "CMIB write of %d bytes on fd %d",
-		   sizeof(struct request), fd);
-
-    //3. send it over socket
-    iget = write(fd, r, sizeof(struct request));
-    if(iget <= 0)
-    {
-	svc->trace_out(scd->sd->cm, "CMIB write failed %d\n", iget);
-	return iget;	
-    }
-    
-
-    resp = (struct response*)malloc(sizeof(struct response));
-    
-    //4 . wait for response
-    iget = read(fd, resp, sizeof(struct response));
-    if(iget <= 0)
-    {
-	svc->trace_out(scd->sd->cm, "CMIB read failed %d\n", iget);
-	return iget;	
-    }
-    
-    
-    //5. use the response to set up the data qp
-
-    //6. now issue the RDMA write call
-    struct ibv_sge sg = 
-	{
-	    .addr = int64_from_ptr(buffer),
-	    .length = length,
-	    .lkey = mr->lkey
-	};
-    
-    
-    struct ibv_send_wr wr = 
-	{
-	    .wr_id = int64_from_ptr(scd),
-	    .next = NULL,
-	    .sg_list = &sg,
-	    .num_sge = 1,
-	    .opcode = IBV_WR_RDMA_WRITE,
-	    .send_flags = IBV_SEND_FENCE | IBV_SEND_SIGNALED,
-	    .imm_data = 0,
-	    .wr.rdma.remote_addr = int64_from_ptr(resp->remote_addr),
-	    .wr.rdma.rkey = resp->rkey
-	};
-    
-    retval = ibv_post_send(scd->dataqp, &wr, &bad_wr);
-    if(retval)
-    {
-	svc->trace_out(scd->sd->cm, "CMIB unable to post send %d\n", retval);
-	//we can get the error from the *bad_wr
-	return retval;	
-    }
-    
-	    
-    //7.poll the cq to wait for completion of the transfer
-    memset(&wc, 0, sizeof(wc));
-    
-    while(1)
-    {
-	
-	iget = ibv_poll_cq(scd->sd->send_cq, 1, &wc);
-	if(iget > 0 && wc.status == IBV_WC_SUCCESS)
-	{
-	    //send completeled
-	    //we can break out after derigstering the memory
-	    ibv_dereg_mr(mr);
-	    break;	    
-	}
-	else if(wc.status != IBV_WC_SUCCESS)
-	{
-	    fprintf(stderr, "errror\n");
-	    
-	}
-	
-    }	
-    return length;
 }
 
 #ifndef IOV_MAX
 /* this is not defined in some places where it should be.  Conservative. */
 #define IOV_MAX 16
-#endif
-
-#ifndef HAVE_WRITEV
-static
-int 
-writev(fd, iov, iovcnt)
-int fd;
-struct iovec *iov;
-int iovcnt;
-{
-    int wrote = 0;
-    int i;
-    for (i = 0; i < iovcnt; i++) {
-	int left = iov[i].iov_len;
-	int iget = 0;
-
-	while (left > 0) {
-	    iget = write(fd, (char *) iov[i].iov_base + iov[i].iov_len - left, left);
-	    if (iget == -1) {
-		int lerrno = errno;
-		if ((lerrno != EWOULDBLOCK) &&
-		    (lerrno != EAGAIN) &&
-		    (lerrno != EINTR)) {
-		    /* serious error */
-		    return -1;
-		} else {
-		    if (lerrno == EWOULDBLOCK) {
-			printf("Cmib write Would block, fd %d, length %d",
-				       fd, left);
-		    }
-		    iget = 0;
-		}
-	    }
-	    left -= iget;
-	}
-	wrote += iov[i].iov_len;
-    }
-    return wrote;
-}
 #endif
 
 extern int
@@ -1476,7 +1327,7 @@ attr_list attrs;
     struct response rep;
     
     req.magic = 0xdeadbeef;
-    req.length = left;
+    req.length = left ;
     
 
     svc->trace_out(scd->sd->cm, "CMIB writev of %d bytes on fd %d",
@@ -1485,7 +1336,7 @@ attr_list attrs;
     //write out request
     write(fd, &req, sizeof(struct request));
 
-    mrlist = regblocks(scd->sd, iov, iovcnt, IBV_ACCESS_LOCAL_WRITE, &mrlen);
+    mrlist = regblocks(scd->sd, iov, iovcnt, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ, &mrlen);
     if(mrlist == NULL)
     {
 	return -0x10000;	
@@ -1503,6 +1354,15 @@ attr_list attrs;
 	fprintf(stderr, "failed to get work request - aborting write\n");
 	return -0x01000;	
     }
+
+    retval = ibv_req_notify_cq(scd->sd->send_cq, 0);
+    if(retval)
+    {
+	scd->sd->svc->trace_out(scd->sd->cm, "CMib notification request failed\n");
+
+	//cleaqnup
+	return -1;	
+    }
     
     retval = ibv_post_send(scd->dataqp, wr, &bad_wr);
     if(retval)
@@ -1519,14 +1379,12 @@ attr_list attrs;
 	svc->trace_out(scd->sd->cm, "Error while waiting\n");
 	return -1;		
     }
-    
-    //reequest notify on cq 
 
+    svc->trace_out(scd->sd->cm, " send comp\n");
+    
 
     do
     {
-    
-
 	//empty the poll cq 1 by 1
 	iget = ibv_poll_cq(scd->sd->send_cq, 1, &wc);
 	if(iget > 0 && wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_RDMA_WRITE)
@@ -1589,6 +1447,11 @@ attr_list attrs;
 	}
 	
     }while(1);
+
+    
+    //reequest notify on cq 
+
+
     
     return iovcnt;
 }
@@ -1749,6 +1612,11 @@ CMtrans_services svc;
     
     socket_data->psn = lrand48()%256;
 
+    // //set up padding
+    // socket_data->pad.mr = ibv_reg_mr(socket_data->pd, socket_data->pad.pad, 
+    // 				     sizeof(socket_data->pad.pad), IBV_ACCESS_LOCAL_WRITE);
+    
+
     svc->add_shutdown_task(cm, free_ib_data, (void *) socket_data);
     return (void *) socket_data;
 }
@@ -1772,11 +1640,12 @@ static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
     qp_init_attr.cap.max_send_wr = LISTSIZE;
     qp_init_attr.cap.max_send_sge = 32;
     qp_init_attr.cap.max_recv_sge = 1;
-    qp_init_attr.cap.max_inline_data = 32;
+    qp_init_attr.cap.max_inline_data = 0;
     qp_init_attr.qp_type = IBV_QPT_RC;
     qp_init_attr.srq = NULL;
-    
+    qp_init_attr.sq_sig_all = 1;
 
+    
     dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
     if(dataqp == NULL)
     {
@@ -1816,6 +1685,8 @@ static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
 	ibv_destroy_qp(dataqp);
 	return NULL;
     }
+
+    //register padding
 
     ib_conn_data->isDone.sg.addr = int64_from_ptr(&ib_conn_data->isDone.done);
     ib_conn_data->isDone.sg.length = sizeof(ib_conn_data->isDone.done);
@@ -1865,6 +1736,8 @@ static int connectqp(ib_conn_data_ptr ib_conn_data,
 		     struct ibparam rparam)
 {
     struct ibv_qp_attr qp_attr;
+    struct ibv_qp_init_attr init_attr;
+    
     int retval = 0;
     
     if(ib_conn_data == NULL || ib_conn_data->dataqp == NULL)
@@ -1874,8 +1747,8 @@ static int connectqp(ib_conn_data_ptr ib_conn_data,
 
     qp_attr.qp_state = IBV_QPS_RTR;
     qp_attr.dest_qp_num = rparam.qpn;
-    qp_attr.rq_psn = sd->psn;
-    qp_attr.sq_psn = sd->psn;
+    qp_attr.rq_psn = rparam.psn;
+    qp_attr.sq_psn = lparam.psn;
     qp_attr.ah_attr.is_global = 0;
     qp_attr.ah_attr.dlid = rparam.lid;
     qp_attr.ah_attr.sl = 0;
@@ -1888,6 +1761,7 @@ static int connectqp(ib_conn_data_ptr ib_conn_data,
     qp_attr.retry_cnt = 18;
     qp_attr.rnr_retry = 18;
     qp_attr.max_rd_atomic = 4;
+    
     
     retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr,
 			   IBV_QP_STATE |
@@ -1904,10 +1778,15 @@ static int connectqp(ib_conn_data_ptr ib_conn_data,
     }
     
 
+    //   qp_attr.cap.max_inline_data = 1;    
+    // qp_attr.cap.max_send_wr = 1024;
+    // qp_attr.cap.max_recv_wr = 1024;
+    // qp_attr.cap.max_send_sge = 32;
+    // qp_attr.cap.max_recv_sge = 1;
     
     qp_attr.qp_state = IBV_QPS_RTS;
     retval = ibv_modify_qp(ib_conn_data->dataqp, &qp_attr, IBV_QP_STATE|
-			   IBV_QP_TIMEOUT|
+			   IBV_QP_TIMEOUT| 
 			   IBV_QP_RETRY_CNT|
 			   IBV_QP_RNR_RETRY|
 			   IBV_QP_SQ_PSN| IBV_QP_MAX_QP_RD_ATOMIC |
@@ -1918,6 +1797,25 @@ static int connectqp(ib_conn_data_ptr ib_conn_data,
 	sd->svc->trace_out(sd->cm, "CMIB unable to set qp to RTS %d\n", retval);
 	return retval;	
 
+    }
+
+    retval = ibv_req_notify_cq(sd->send_cq, 0);
+    if(retval)
+    {
+	sd->svc->trace_out(sd->cm, "CMib notification request failed\n");
+
+	//cleaqnup
+	return -1;	
+    }
+
+
+    retval = ibv_req_notify_cq(sd->recv_cq, 0);
+    if(retval)
+    {
+	sd->svc->trace_out(sd->cm, "CMib notification request failed\n");
+
+	//cleaqnup
+	return -1;	
     }
 
     return 0;    
@@ -1976,6 +1874,8 @@ static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn,
     struct ibv_qp_init_attr init_attr;
     struct ibv_sge *sge;
     struct ibv_send_wr *wr;
+    int retval = 0;
+    ib_client_data_ptr sd = conn->sd;
     
     
     
@@ -1983,14 +1883,22 @@ static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn,
     memset(&init_attr, 0, sizeof(init_attr));
     
     //query to get qp params
-    ibv_query_qp(conn->dataqp, &attr, IBV_QP_CAP, &init_attr);
+    retval = ibv_query_qp(conn->dataqp, &attr, IBV_QP_CAP, &init_attr);
+    if(retval)
+    {
+	sd->svc->trace_out(sd->cm, "CMIB unable to query initial state %d\n", retval);
+	return NULL;	
+    }
     
-    fprintf(stderr, "maximum wr = %d\t maximum sge = %d\n",
-	    attr.cap.max_send_wr, attr.cap.max_send_sge);
+    conn->max_imm_data = attr.cap.max_inline_data;
+    
+    
+    fprintf(stderr, "wr = %d\tsge = %d\timm = %d %d\n",
+	    attr.cap.max_send_wr, attr.cap.max_send_sge, attr.cap.max_inline_data, 
+	    init_attr.cap.max_inline_data);
+    fprintf(stderr, "mrlen = %d\n", mrlen);
+    
 
-    fprintf(stderr, "INIT\tmaximum wr = %d\t maximum sge = %d\n",
-	    init_attr.cap.max_send_wr, init_attr.cap.max_send_sge);
-    
     if(mrlen > attr.cap.max_send_sge)
     {
 	fprintf(stderr, "too many sge fall back to slow mode\n");
@@ -2001,7 +1909,7 @@ static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn,
 	*wrlen = 1;
     
 
-    sge = (struct ibv_sge*)malloc(sizeof(struct ibv_sge) * mrlen);
+    sge = (struct ibv_sge*)malloc(sizeof(struct ibv_sge) * (mrlen));
     if(sge == NULL)
     {
 	fprintf(stderr, "couldn't allocate memory\n");
@@ -2023,7 +1931,7 @@ static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn,
     wr->sg_list = sge;    
     wr->num_sge = mrlen;    
     wr->opcode = IBV_WR_RDMA_WRITE;    
-    wr->send_flags = IBV_SEND_FENCE | IBV_SEND_SIGNALED;    
+    wr->send_flags = IBV_SEND_FENCE| IBV_SEND_SIGNALED ;    
     wr->imm_data = 0;    
     wr->wr.rdma.remote_addr = rep.remote_addr;    
     wr->wr.rdma.rkey = rep.rkey;
@@ -2036,6 +1944,10 @@ static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn,
 	sge[i].length = iovlist[i].iov_len;
 	sge[i].lkey = mrlist[i]->lkey;	
     }
+    // sge[mrlen].addr = int64_from_ptr(sd->pad.pad);
+    // sge[mrlen].length = sizeof(sd->pad.pad);
+    // sge[mrlen].lkey = sd->pad.mr->lkey;
+    
     
     return wr;
 }
@@ -2057,7 +1969,7 @@ static int waitoncq(ib_conn_data_ptr scd,
     {
 	svc->trace_out(scd->sd->cm, "CMib notification request failed\n");
 
-	//cleanup
+	//cleaqnup
 	return -1;	
     }
     
@@ -2072,15 +1984,14 @@ static int waitoncq(ib_conn_data_ptr scd,
     }
     
     //ack the event
-    ibv_ack_cq_events(ev_cq, 1);
+    ibv_ack_cq_events(cq, 1);
 
     //reequest notify on cq 
 
     retval = ibv_req_notify_cq(ev_cq, 0);
     if(retval)
     {
-	svc->trace_out(sd->cm, "CMib notification request failed\n");
-	
+	svc->trace_out(sd->cm, "CMib notification request failed\n");	
 	//cleanup
 	return -1;	
     }
