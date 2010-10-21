@@ -1336,7 +1336,7 @@ attr_list attrs;
     //write out request
     write(fd, &req, sizeof(struct request));
 
-    mrlist = regblocks(scd->sd, iov, iovcnt, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ, &mrlen);
+    mrlist = regblocks(scd->sd, iov, iovcnt, IBV_ACCESS_LOCAL_WRITE, &mrlen);
     if(mrlist == NULL)
     {
 	return -0x10000;	
