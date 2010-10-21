@@ -425,6 +425,14 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 	    
 	    svc->trace_out(scd->sd->cm, "data move completed %p\n", 
 			   ptr_from_int64(wc.wr_id));
+	    //issue a reccieve so we don't run out
+	    retval = ibv_post_recv(scd->dataqp, &scd->isDone.rwr, 
+				   &scd->isDone.badrwr);
+	    if(retval)
+	    {
+		sd->svc->trace_out(sd->cm, "CMib unable to post recv %d\n", retval);
+	    }
+	
 	    break;	    
 	}
 	else
@@ -1574,6 +1582,9 @@ attr_list attrs;
 	else
 	{
 	    svc->trace_out(scd->sd->cm, "error in polling queue\n");
+	    svc->trace_out(scd->sd->cm, "%X %d %d\n", 
+			   wc.wr_id, wc.status,  wc.opcode);
+	    
 	    return -1;	    
 	}
 	
