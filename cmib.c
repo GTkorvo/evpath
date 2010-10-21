@@ -138,12 +138,21 @@ typedef struct ib_client_data {
     struct ibv_cq *recv_cq;
     struct ibv_cq *send_cq;
     struct ibv_srq *srq;
-
-    int max_sge;    
+    int max_sge;
 } *ib_client_data_ptr;
 
 
 typedef enum {Block, Non_Block} socket_block_state;
+
+typedef struct notification
+{
+    int done;
+    struct ibv_mr *mr;    
+    struct ibv_send_wr wr;
+    struct ibv_sge sg;    
+    struct ibv_recv_wr rwr;    
+    struct ibv_recv_wr *badrwr;    
+}notify;
 
 typedef struct ib_connection_data {
     char *remote_host;
@@ -156,8 +165,10 @@ typedef struct ib_connection_data {
     socket_block_state block_state;
     CMConnection conn;
     struct ibv_qp *dataqp;    
-    struct ibv_mr *mr;
+    struct ibv_mr *mr;    
+    notify isDone;    
 } *ib_conn_data_ptr;
+
 
 static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
 			      ib_client_data_ptr sd);
@@ -175,6 +186,10 @@ static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn,
 					 struct iovec *iovlist,
 					 int mrlen, int *wrlen, 
 					 struct response rep);
+
+static int waitoncq(ib_conn_data_ptr scd,
+		    ib_client_data_ptr sd,
+		    CMtrans_services svc);
 
 
 #ifdef WSAEWOULDBLOCK
@@ -283,8 +298,7 @@ static ib_conn_data_ptr
 create_ib_conn_data(svc)
 CMtrans_services svc;
 {
-    ib_conn_data_ptr ib_conn_data =
-    svc->malloc_func(sizeof(struct ib_connection_data));
+    ib_conn_data_ptr ib_conn_data = svc->malloc_func(sizeof(struct ib_connection_data));
     ib_conn_data->remote_host = NULL;
     ib_conn_data->remote_contact_port = -1;
     ib_conn_data->fd = 0;
@@ -348,10 +362,7 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     int retval = 0;
     struct ibv_wc wc;
     
-  
-  
-
-    fprintf(stderr, "CMIB data available\n");
+    fprintf(stderr, "\nCMIB data available\n");
 
     ib_conn_data_ptr scd = (ib_conn_data_ptr) svc->get_transport_data(conn);
 
@@ -390,46 +401,40 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     rep.max_length = scd->read_buffer_len;
 
     //send response to other side
-
-    retval = ibv_req_notify_cq(sd->send_cq, 0);
-
     write(scd->fd, &rep, sizeof(struct response));
 
-//    sleep(10);
-    
-//     void *cq_context;
+    //now the sender will start the data transfer. When it finishes he will 
+    //issue a notification after which the data is in memory
+    retval = waitoncq(scd, scd->sd, svc);    
+    if(retval)
+    {
+	svc->trace_out(scd->sd->cm, "Error while waiting\n");
+	return;		
+    }
 
-//     retval = ibv_get_cq_event(sd->send_channel, 
-//      			      &sd->send_cq, &cq_context);
-	
-//     ibv_req_notify_cq(sd->send_cq, 0);
-    
-    
-//     //now we need to poll for completion
-//     while(1)
-//     {
-// 	memset(&wc, 0, sizeof(wc));
+    //now we start polling the cq
 
-	
-	
-// 	retval = ibv_poll_cq(sd->send_cq, 1, &wc);
-// 	if(retval == 0)
-// 	{
-// 	    fprintf(stderr, "no event\n");
-// 	}
-// 	else if(retval > 0 && wc.status == IBV_WC_SUCCESS)
-// 	{
-// 	    //I think data transfer completed?
+    do
+    {
+	retval = ibv_poll_cq(scd->sd->send_cq, 1, &wc);
+	if(retval > 0 && wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_RECV)
+	{
+	    //cool beans - send completed we can go on with our life
 	    
-// 	    break;	    
-// 	}
-// 	else
-// 	{
-// 	    fprintf(stderr, "error in polling\n");
-// //	    sleep(1);	    
-// 	}	
+	    svc->trace_out(scd->sd->cm, "data move completed %p\n", 
+			   ptr_from_int64(wc.wr_id));
+	    break;	    
+	}
+	else
+	{
+	    svc->trace_out(scd->sd->cm, "Error polling for write completion\n");
+	    break;	    
+	}
 	
-//     }
+    }while(1);
+    
+    
+
 
     trans->data_available(trans, conn);
 }
@@ -1448,9 +1453,10 @@ attr_list attrs;
     struct ibv_mr **mrlist;
     struct ibv_send_wr *wr;
     int mrlen, wrlen;
-    struct ibv_send_wr *bad_wr;
-    struct ibv_wc wc;    
+    struct ibv_send_wr *bad_wr;    
     int retval  = 0;
+    struct ibv_wc wc;
+    
     
 
     for (i = 0; i < iovcnt; i++)
@@ -1497,17 +1503,39 @@ attr_list attrs;
 
     }
     
-    memset(&wc, 0, sizeof(wc));    
-    while(1)
+    retval = waitoncq(scd, scd->sd, svc);
+    if(retval)
     {
-	
+	svc->trace_out(scd->sd->cm, "Error while waiting\n");
+	return -1;		
+    }
+    
+    //reequest notify on cq 
+
+
+    do
+    {
+    
+
+	//empty the poll cq 1 by 1
 	iget = ibv_poll_cq(scd->sd->send_cq, 1, &wc);
-	if(iget > 0 && wc.status == IBV_WC_SUCCESS)
+	if(iget > 0 && wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_RDMA_WRITE)
 	{
-	    //send completeled
+	    //send completeled for RDMA write
 	    //we can break out after derigstering the memory
 	    fprintf(stderr, "succeeded in the post send %d\n", wc.opcode);
+
+	    //now post a send
+	    retval = ibv_post_send(scd->dataqp, &scd->isDone.wr, 
+				   &bad_wr);
 	    
+	    if(retval)
+	    {
+		//we got an error - ideally we'll fall through and post an error on the connection socket
+		svc->trace_out(scd->sd->cm, "CMib unable to notify over ib\n");
+		break;		
+	    }
+
 	    for(i = 0; i < mrlen; i ++)
 	    {
 		ibv_dereg_mr(mrlist[i]);		
@@ -1516,14 +1544,39 @@ attr_list attrs;
 
 	    free(wr->sg_list);	    
 	    free(wr);
+
+	    //no we wait for the send even to get anoutput
+	    retval = waitoncq(scd, scd->sd, svc);
+	    if(retval)
+	    {
+		svc->trace_out(scd->sd->cm, "Error while waiting\n");
+		return -1;		
+	    }
 	    
 	    
+	}
+	else if(iget > 0 && wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_SEND)
+	{
+	    //cool beans - send completed we can go on with our life
+	    
+	    svc->trace_out(scd->sd->cm, "notification for send done %p\n", 
+			   ptr_from_int64(wc.wr_id));
 	    break;	    
 	}
-    }	
-
+	else if(iget == 0)
+	{
+	    //cq is empty - we shouldn't even be here!
+	    svc->trace_out(scd->sd->cm, "CMib something went wrong\n");
+	    continue;	    
+	}
+	else
+	{
+	    svc->trace_out(scd->sd->cm, "error in polling queue\n");
+	    return -1;	    
+	}
+	
+    }while(1);
     
-
     return iovcnt;
 }
 
@@ -1654,21 +1707,28 @@ CMtrans_services svc;
     socket_data->port = 1; //need to somehow get proper port here
     socket_data->lid = get_local_lid(socket_data->context, socket_data->port);
     socket_data->pd = ibv_alloc_pd(socket_data->context);
-    socket_data->recv_channel = ibv_create_comp_channel(socket_data->context);
     socket_data->send_channel = ibv_create_comp_channel(socket_data->context);
     socket_data->send_cq = ibv_create_cq(socket_data->context, 1024, 
 					 (void*)socket_data, socket_data->send_channel, 0);
-    socket_data->recv_cq = socket_data->send_cq;
     
     
 
-    struct ibv_srq_init_attr srq_init_attr;
-    srq_init_attr.attr.max_wr = LISTSIZE;
-    srq_init_attr.attr.max_sge = 32;
-    srq_init_attr.attr.srq_limit = 1;
-    srq_init_attr.srq_context = (void*)socket_data;
-
-    socket_data->srq = ibv_create_srq(socket_data->pd, &srq_init_attr);
+    //create srq
+    struct ibv_srq_init_attr sqa;
+    
+    sqa.attr.max_wr = 16;
+    sqa.attr.max_sge = 1;
+    sqa.attr.srq_limit = 1;
+    sqa.srq_context = (void*)socket_data;
+    
+    
+    
+    socket_data->srq = ibv_create_srq(socket_data->pd, 
+				      &sqa);
+    if(socket_data->srq == NULL)
+    {
+	svc->trace_out(cm, "unable to create srq\n");
+    }    
     
     socket_data->psn = lrand48()%256;
 
@@ -1690,13 +1750,15 @@ static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
     memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
     qp_init_attr.qp_context = sd->context;
     qp_init_attr.send_cq = sd->send_cq;
-    qp_init_attr.recv_cq = sd->recv_cq;
+    qp_init_attr.recv_cq = sd->send_cq;
     qp_init_attr.cap.max_recv_wr = LISTSIZE;
     qp_init_attr.cap.max_send_wr = LISTSIZE;
     qp_init_attr.cap.max_send_sge = 32;
     qp_init_attr.cap.max_recv_sge = 1;
     qp_init_attr.cap.max_inline_data = 32;
     qp_init_attr.qp_type = IBV_QPT_RC;
+    qp_init_attr.srq = sd->srq;
+    
 
     dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
     if(dataqp == NULL)
@@ -1723,8 +1785,57 @@ static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
 	ibv_destroy_qp(dataqp);	
 	return NULL;
     }
-    
 
+    //register the notification memory block
+    memset(&ib_conn_data->isDone, 0, sizeof(notify));
+    ib_conn_data->isDone.mr = ibv_reg_mr(sd->pd, 
+				       &ib_conn_data->isDone.done, 
+				       sizeof(ib_conn_data->isDone.done), 
+				       IBV_ACCESS_LOCAL_WRITE);
+
+    if(ib_conn_data->isDone.mr == NULL)
+    {
+	sd->svc->trace_out(sd->cm, "CMib unable to create notification mr\n");
+	ibv_destroy_qp(dataqp);
+	return NULL;
+    }
+
+    ib_conn_data->isDone.sg.addr = int64_from_ptr(&ib_conn_data->isDone.done);
+    ib_conn_data->isDone.sg.length = sizeof(ib_conn_data->isDone.done);
+    ib_conn_data->isDone.sg.lkey = ib_conn_data->isDone.mr->lkey;
+    
+    ib_conn_data->isDone.wr.wr_id = int64_from_ptr(ib_conn_data);
+    ib_conn_data->isDone.wr.sg_list = &ib_conn_data->isDone.sg;
+    ib_conn_data->isDone.wr.num_sge = 1;
+    ib_conn_data->isDone.wr.opcode = IBV_WR_SEND;
+    ib_conn_data->isDone.wr.send_flags = IBV_SEND_SIGNALED;
+    ib_conn_data->isDone.wr.next = NULL;
+
+    ib_conn_data->isDone.rwr.wr_id = int64_from_ptr(ib_conn_data);
+    ib_conn_data->isDone.rwr.next = NULL;
+    ib_conn_data->isDone.rwr.sg_list = &ib_conn_data->isDone.sg;
+    ib_conn_data->isDone.rwr.num_sge = 1;
+
+
+    //issue some 10 receives on the qp  so we can get 10 notifications 
+    int i = 0;
+    for(i = 0; i < 10; i++)
+    {
+	retval = ibv_post_srq_recv(sd->srq, &ib_conn_data->isDone.rwr, 
+			       &ib_conn_data->isDone.badrwr);
+	if(retval)
+	{
+	    sd->svc->trace_out(sd->cm, "CMib unable to post recv %d\n", retval);
+	    ibv_dereg_mr(ib_conn_data->isDone.mr);
+	    ibv_destroy_qp(dataqp);
+	    
+	    return NULL;	    
+	}
+	
+    }
+    
+    
+    
     return dataqp;
 }
 
@@ -1908,6 +2019,54 @@ static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn,
     }
     
     return wr;
+}
+
+static int waitoncq(ib_conn_data_ptr scd,
+		    ib_client_data_ptr sd,
+		    CMtrans_services svc)
+{
+
+
+    struct ibv_wc wc;    
+    int retval  = 0;
+    struct ibv_cq *ev_cq;
+
+    memset(&wc, 0, sizeof(wc));    
+
+    retval = ibv_req_notify_cq(sd->send_cq, 0);
+    if(retval)
+    {
+	svc->trace_out(scd->sd->cm, "CMib notification request failed\n");
+
+	//cleanup
+	return -1;	
+    }
+    
+    
+    retval = ibv_get_cq_event(scd->sd->send_channel,
+			      &ev_cq, (void*)scd);
+    if(retval)
+    {
+	svc->trace_out(sd->cm, "Failed to get event\n");
+	//cleanup
+	return -1;	
+    }
+    
+    //ack the event
+    ibv_ack_cq_events(ev_cq, 1);
+
+    //reequest notify on cq 
+
+    retval = ibv_req_notify_cq(sd->send_cq, 0);
+    if(retval)
+    {
+	svc->trace_out(sd->cm, "CMib notification request failed\n");
+	
+	//cleanup
+	return -1;	
+    }
+    
+    return 0;    
 }
 
 
