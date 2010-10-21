@@ -189,7 +189,7 @@ static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn,
 
 static int waitoncq(ib_conn_data_ptr scd,
 		    ib_client_data_ptr sd,
-		    CMtrans_services svc);
+		    CMtrans_services svc, struct ibv_cq *cq);
 
 
 #ifdef WSAEWOULDBLOCK
@@ -386,6 +386,8 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 
     //find the memory for it and create the resonse
 
+    if(scd->read_buffer)
+	free(scd->read_buffer);    
     scd->read_buffer = malloc(req.length);
     memset(scd->read_buffer, 0, req.length);    
     scd->read_buffer_len = req.length;
@@ -405,7 +407,7 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 
     //now the sender will start the data transfer. When it finishes he will 
     //issue a notification after which the data is in memory
-    retval = waitoncq(scd, scd->sd, svc);    
+    retval = waitoncq(scd, scd->sd, svc, sd->recv_cq);    
     if(retval)
     {
 	svc->trace_out(scd->sd->cm, "Error while waiting\n");
@@ -416,7 +418,7 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 
     do
     {
-	retval = ibv_poll_cq(scd->sd->send_cq, 1, &wc);
+	retval = ibv_poll_cq(scd->sd->recv_cq, 1, &wc);
 	if(retval > 0 && wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_RECV)
 	{
 	    //cool beans - send completed we can go on with our life
@@ -432,10 +434,8 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 	}
 	
     }while(1);
-    
-    
 
-
+    ibv_dereg_mr(mr);    
     trans->data_available(trans, conn);
 }
 
@@ -443,7 +443,7 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
  * Accept socket connection
  */
 static void
-socket_accept_conn(void_trans, void_conn_sock)
+ib_accept_conn(void_trans, void_conn_sock)
 void *void_trans;
 void *void_conn_sock;
 {
@@ -472,7 +472,7 @@ void *void_conn_sock;
     
 
 
-    svc->trace_out(NULL, "Trying to accept something, socket %d\n", conn_sock);
+    svc->trace_out(sd->cm, "\n\n\n\n\nTrying to accept something, socket %d\n\n\n\n\n", conn_sock);
     linger_val.l_onoff = 1;
     linger_val.l_linger = 60;
     if ((sock = accept(conn_sock, (struct sockaddr *) 0, (unsigned int *) 0)) == SOCKET_ERROR) {
@@ -557,10 +557,10 @@ void *void_conn_sock;
 	}
     }
     if (ib_conn_data->remote_host != NULL) {
-	svc->trace_out(NULL, "Accepted TCP/IP socket connection from host \"%s\"",
+	svc->trace_out(NULL, "Accepted CMIB socket connection from host \"%s\"",
 		       ib_conn_data->remote_host);
     } else {
-	svc->trace_out(NULL, "Accepted TCP/IP socket connection from UNKNOWN host");
+	svc->trace_out(NULL, "Accepted CMIB socket connection from UNKNOWN host");
     }
 
     //here we read the incoming remote contact port number. 
@@ -616,7 +616,7 @@ ib_conn_data_ptr scd;
 {
     svc->fd_remove_select(scd->sd->cm, scd->fd);
     close(scd->fd);
-    free(scd->remote_host);
+    // free(scd->remote_host);
     free(scd->read_buffer);
     free(scd);
 }
@@ -674,32 +674,34 @@ int no_more_redirect;
     struct ibv_qp_init_attr  qp_init_attr;
     struct ibv_qp_attr qp_attr;
     int retval = 0;
-
+    
+    svc->trace_out(sd->cm, "\n\n\n\nCMIB initiate conn\n\n\n\n");
+    
 
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
-	svc->trace_out(cm, "TCP/IP transport found no IP_HOST attribute");
+	svc->trace_out(cm, "CMIB transport found no IP_HOST attribute");
 	host_name = NULL;
     } else {
-        svc->trace_out(cm, "TCP/IP transport connect to host %s", host_name);
+        svc->trace_out(cm, "CMIB transport connect to host %s", host_name);
     }
     if (!query_attr(attrs, CM_IP_ADDR, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_ip)) {
-	svc->trace_out(cm, "TCP/IP transport found no IP_ADDR attribute");
+	svc->trace_out(cm, "CMIB transport found no IP_ADDR attribute");
 	/* wasn't there */
 	host_ip = 0;
     } else {
-        svc->trace_out(cm, "TCP/IP transport connect to host_IP %lx", host_ip);
+        svc->trace_out(cm, "CMIB transport connect to host_IP %lx", host_ip);
     }
     if ((host_name == NULL) && (host_ip == 0))
 	return -1;
 
     if (!query_attr(attrs, CM_IP_PORT, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & int_port_num)) {
-	svc->trace_out(cm, "TCP/IP transport found no IP_PORT attribute");
+	svc->trace_out(cm, "CMIB transport found no IP_PORT attribute");
 	return -1;
     } else {
-        svc->trace_out(cm, "TCP/IP transport connect to port %d", int_port_num);
+        svc->trace_out(cm, "CMIB transport connect to port %d", int_port_num);
     }
     port_num = int_port_num;
     linger_val.l_onoff = 1;
@@ -782,7 +784,7 @@ int no_more_redirect;
 	if (is_private_10(remote_IP)) {
 	    svc->trace_out(cm, "Target IP is on a private 10.x.x.x network");
 	}
-	svc->trace_out(cm, "Attempting TCP/IP socket connection, host=\"%s\", IP = %s, port %d",
+	svc->trace_out(cm, "Attempting CMIB socket connection, host=\"%s\", IP = %s, port %d",
 		       host_name == 0 ? "(unknown)" : host_name, 
 		       inet_ntoa(sock_addri->sin_addr),
 		       int_port_num);
@@ -961,18 +963,18 @@ attr_list attrs;
     }
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
-	svc->trace_out(cm, "CMself check TCP/IP transport found no IP_HOST attribute");
+	svc->trace_out(cm, "CMself check CMIB transport found no IP_HOST attribute");
 	host_name = NULL;
     }
     if (!query_attr(attrs, CM_IP_ADDR, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_addr)) {
-	svc->trace_out(cm, "CMself check TCP/IP transport found no IP_ADDR attribute");
+	svc->trace_out(cm, "CMself check CMIB transport found no IP_ADDR attribute");
 	if (host_name == NULL) return 0;
 	host_addr = 0;
     }
     if (!query_attr(attrs, CM_IP_PORT, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & int_port_num)) {
-	svc->trace_out(cm, "CMself check TCP/IP transport found no IP_PORT attribute");
+	svc->trace_out(cm, "CMself check CMIB transport found no IP_PORT attribute");
 	return 0;
     }
     get_qual_hostname(my_host_name, sizeof(my_host_name), svc, NULL, NULL);
@@ -1008,16 +1010,16 @@ ib_conn_data_ptr scd;
 
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
-	svc->trace_out(cm, "TCP/IP transport found no IP_HOST attribute");
+	svc->trace_out(cm, "CMIB transport found no IP_HOST attribute");
     }
     if (!query_attr(attrs, CM_IP_PORT, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & int_port_num)) {
-	svc->trace_out(cm, "Conn Eq TCP/IP transport found no IP_PORT attribute");
+	svc->trace_out(cm, "Conn Eq CMIB transport found no IP_PORT attribute");
 	return 0;
     }
     if (!query_attr(attrs, CM_IP_ADDR, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & requested_IP)) {
-	svc->trace_out(cm, "TCP/IP transport found no IP_ADDR attribute");
+	svc->trace_out(cm, "CMIB transport found no IP_ADDR attribute");
     }
     if (requested_IP == -1) {
 	check_host(host_name, (void *) &requested_IP);
@@ -1135,8 +1137,8 @@ attr_list listen_info;
     }
     /* set the port num as one we can be contacted at */
 
-    svc->trace_out(cm, "Cmib Adding socket_accept_conn as action on fd %d", conn_sock);
-    svc->fd_add_select(cm, conn_sock, socket_accept_conn,
+    svc->trace_out(cm, "Cmib Adding ib_accept_conn as action on fd %d", conn_sock);
+    svc->fd_add_select(cm, conn_sock, ib_accept_conn,
 		       (void *) trans, (void *) (long)conn_sock);
 
     /* in the event the DE is shut down, close the socket */
@@ -1503,7 +1505,7 @@ attr_list attrs;
 
     }
     
-    retval = waitoncq(scd, scd->sd, svc);
+    retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
     if(retval)
     {
 	svc->trace_out(scd->sd->cm, "Error while waiting\n");
@@ -1546,7 +1548,7 @@ attr_list attrs;
 	    free(wr);
 
 	    //no we wait for the send even to get anoutput
-	    retval = waitoncq(scd, scd->sd, svc);
+	    retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
 	    if(retval)
 	    {
 		svc->trace_out(scd->sd->cm, "Error while waiting\n");
@@ -1657,7 +1659,7 @@ static WSADATA wsaData;
 #endif
 
 static void
-free_socket_data(CManager cm, void *sdv)
+free_ib_data(CManager cm, void *sdv)
 {
     ib_client_data_ptr sd = (ib_client_data_ptr) sdv;
     CMtrans_services svc = sd->svc;
@@ -1676,7 +1678,7 @@ CMtrans_services svc;
     static int atom_init = 0;
 
     ib_client_data_ptr socket_data;
-    svc->trace_out(cm, "Initialize CM IB transport built in %s",
+    svc->trace_out(cm, "\n\n\n\n\n\nInitialize CM IB transport built in %s\n\n\n\n\n\n",
 		   EVPATH_LIBRARY_BUILD_DIR);
     if (socket_global_init == 0) {
 #ifdef SIGPIPE
@@ -1711,12 +1713,16 @@ CMtrans_services svc;
     socket_data->send_cq = ibv_create_cq(socket_data->context, 1024, 
 					 (void*)socket_data, socket_data->send_channel, 0);
     
+
+    socket_data->recv_channel = ibv_create_comp_channel(socket_data->context);
+    socket_data->recv_cq = ibv_create_cq(socket_data->context, 1024, 
+					 (void*)socket_data, socket_data->recv_channel, 0);
     
 
     //create srq
     struct ibv_srq_init_attr sqa;
     
-    sqa.attr.max_wr = 16;
+    sqa.attr.max_wr = 64;
     sqa.attr.max_sge = 1;
     sqa.attr.srq_limit = 1;
     sqa.srq_context = (void*)socket_data;
@@ -1732,7 +1738,7 @@ CMtrans_services svc;
     
     socket_data->psn = lrand48()%256;
 
-    svc->add_shutdown_task(cm, free_socket_data, (void *) socket_data);
+    svc->add_shutdown_task(cm, free_ib_data, (void *) socket_data);
     return (void *) socket_data;
 }
 
@@ -1750,14 +1756,14 @@ static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
     memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
     qp_init_attr.qp_context = sd->context;
     qp_init_attr.send_cq = sd->send_cq;
-    qp_init_attr.recv_cq = sd->send_cq;
+    qp_init_attr.recv_cq = sd->recv_cq;
     qp_init_attr.cap.max_recv_wr = LISTSIZE;
     qp_init_attr.cap.max_send_wr = LISTSIZE;
     qp_init_attr.cap.max_send_sge = 32;
     qp_init_attr.cap.max_recv_sge = 1;
     qp_init_attr.cap.max_inline_data = 32;
     qp_init_attr.qp_type = IBV_QPT_RC;
-    qp_init_attr.srq = sd->srq;
+    qp_init_attr.srq = NULL;
     
 
     dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
@@ -1821,7 +1827,9 @@ static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
     int i = 0;
     for(i = 0; i < 10; i++)
     {
-	retval = ibv_post_srq_recv(sd->srq, &ib_conn_data->isDone.rwr, 
+	fprintf(stderr, "%p %d\n", dataqp, i);
+	
+	retval = ibv_post_recv(dataqp, &ib_conn_data->isDone.rwr, 
 			       &ib_conn_data->isDone.badrwr);
 	if(retval)
 	{
@@ -2023,7 +2031,7 @@ static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn,
 
 static int waitoncq(ib_conn_data_ptr scd,
 		    ib_client_data_ptr sd,
-		    CMtrans_services svc)
+		    CMtrans_services svc, struct ibv_cq *cq)
 {
 
 
@@ -2033,7 +2041,7 @@ static int waitoncq(ib_conn_data_ptr scd,
 
     memset(&wc, 0, sizeof(wc));    
 
-    retval = ibv_req_notify_cq(sd->send_cq, 0);
+    retval = ibv_req_notify_cq(cq, 0);
     if(retval)
     {
 	svc->trace_out(scd->sd->cm, "CMib notification request failed\n");
@@ -2043,7 +2051,7 @@ static int waitoncq(ib_conn_data_ptr scd,
     }
     
     
-    retval = ibv_get_cq_event(scd->sd->send_channel,
+    retval = ibv_get_cq_event(cq->channel,
 			      &ev_cq, (void*)scd);
     if(retval)
     {
@@ -2057,7 +2065,7 @@ static int waitoncq(ib_conn_data_ptr scd,
 
     //reequest notify on cq 
 
-    retval = ibv_req_notify_cq(sd->send_cq, 0);
+    retval = ibv_req_notify_cq(ev_cq, 0);
     if(retval)
     {
 	svc->trace_out(sd->cm, "CMib notification request failed\n");
