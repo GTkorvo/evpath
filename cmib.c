@@ -371,8 +371,6 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     int retval = 0;
     struct ibv_wc wc;
     
-    fprintf(stderr, "\nCMIB data available\n");
-
     ib_conn_data_ptr scd = (ib_conn_data_ptr) svc->get_transport_data(conn);
 
     iget = read(scd->fd, (char *) &req, sizeof(struct request));
@@ -432,8 +430,6 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 	{
 	    //cool beans - send completed we can go on with our life
 	    
-	    svc->trace_out(scd->sd->cm, "data move completed %p\n", 
-			   ptr_from_int64(wc.wr_id));
 	    //issue a reccieve so we don't run out
 	    retval = ibv_post_recv(scd->dataqp, &scd->isDone.rwr, 
 				   &scd->isDone.badrwr);
@@ -489,7 +485,7 @@ void *void_conn_sock;
     
 
 
-    svc->trace_out(sd->cm, "\n\n\n\n\nTrying to accept something, socket %d\n\n\n\n\n", conn_sock);
+    svc->trace_out(sd->cm, "Trying to accept something, socket %d\n", conn_sock);
     linger_val.l_onoff = 1;
     linger_val.l_linger = 60;
     if ((sock = accept(conn_sock, (struct sockaddr *) 0, (unsigned int *) 0)) == SOCKET_ERROR) {
@@ -692,7 +688,6 @@ int no_more_redirect;
     struct ibv_qp_attr qp_attr;
     int retval = 0;
     
-    svc->trace_out(sd->cm, "\n\n\n\nCMIB initiate conn\n\n\n\n");
     
 
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
@@ -1308,8 +1303,7 @@ attr_list attrs;
     int fd = scd->fd;
     int left = 0;
     int iget = 0;
-    int iovleft, i;
-    iovleft = iovcnt;
+    int i;
     struct iovec * iov = (struct iovec*) iovs;
     struct ibv_mr **mrlist;
     struct ibv_send_wr *wr;
@@ -1380,7 +1374,6 @@ attr_list attrs;
 	return -1;		
     }
 
-    svc->trace_out(scd->sd->cm, " send comp\n");
     
 
     do
@@ -1391,7 +1384,6 @@ attr_list attrs;
 	{
 	    //send completeled for RDMA write
 	    //we can break out after derigstering the memory
-	    fprintf(stderr, "succeeded in the post send %d\n", wc.opcode);
 
 	    //now post a send
 	    retval = ibv_post_send(scd->dataqp, &scd->isDone.wr, 
@@ -1434,12 +1426,11 @@ attr_list attrs;
 	else if(iget == 0)
 	{
 	    //cq is empty - we shouldn't even be here!
-	    svc->trace_out(scd->sd->cm, "CMib something went wrong\n");
 	    continue;	    
 	}
 	else
 	{
-	    svc->trace_out(scd->sd->cm, "error in polling queue\n");
+	    svc->trace_out(scd->sd->cm, "error in polling queue\t");
 	    svc->trace_out(scd->sd->cm, "%X %d %d\n", 
 			   wc.wr_id, wc.status,  wc.opcode);
 	    
@@ -1465,53 +1456,9 @@ void *iovs;
 int iovcnt;
 attr_list attrs;
 {
-    int fd = scd->fd;
-    int init_bytes, left = 0;
-    int iget = 0;
-    int iovleft, i;
-    struct iovec * iov = (struct iovec*) iovs;
-    iovleft = iovcnt;
 
-    /* sum lengths */
-    for (i = 0; i < iovcnt; i++)
-	left += iov[i].iov_len;
-
-    init_bytes = left;
-
-    svc->trace_out(scd->sd->cm, "CMIB Non-blocking writev of %d bytes on fd %d",
-		   left, fd);
-    set_block_state(svc, scd, Non_Block);
-    while (left > 0) {
-	int write_count = iovleft;
-	int this_write_bytes = 0;
-	if (write_count > IOV_MAX)
-	    write_count = IOV_MAX;
-	for (i = 0; i < write_count; i++)
-	    this_write_bytes += iov[i].iov_len;
-
-	iget = writev(fd, (struct iovec *) &iov[iovcnt - iovleft],
-		      write_count);
-	if (iget == -1) {
-	    svc->trace_out(scd->sd->cm, "CMIB writev returned -1, errno %d",
-		   errno);
-	    if ((errno != EWOULDBLOCK) && (errno != EAGAIN)) {
-		/* serious error */
-		return -1;
-	    } else {
-		return init_bytes - left;
-	    }
-	}
-	svc->trace_out(scd->sd->cm, "CMIB writev returned %d", iget);
-	left -= iget;
-	if (iget != this_write_bytes) {
-	    /* didn't write everything, the rest would block, return */
-	    svc->trace_out(scd->sd->cm, "CMIB blocked, return %d", 
-			   init_bytes -left);
-	    return init_bytes - left;
-	}
-	iovleft -= write_count;
-    }
-    return init_bytes - left;
+    return -16;
+    
 }
 
 extern int
@@ -1552,7 +1499,7 @@ CMtrans_services svc;
     static int atom_init = 0;
 
     ib_client_data_ptr socket_data;
-    svc->trace_out(cm, "\n\n\n\n\n\nInitialize CM IB transport built in %s\n\n\n\n\n\n",
+    svc->trace_out(cm, "Initialize CM IB transport built in %s\n",
 		   EVPATH_LIBRARY_BUILD_DIR);
     if (socket_global_init == 0) {
 #ifdef SIGPIPE
@@ -1629,9 +1576,6 @@ static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
     struct ibv_qp *dataqp;
     int retval = 0;
 
-    sd->svc->trace_out(sd->cm, "CMIB initqp\n");
-    
-    
     memset(&qp_init_attr, 0, sizeof(struct ibv_qp_init_attr));
     qp_init_attr.qp_context = sd->context;
     qp_init_attr.send_cq = sd->send_cq;
@@ -1643,7 +1587,7 @@ static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
     qp_init_attr.cap.max_inline_data = 0;
     qp_init_attr.qp_type = IBV_QPT_RC;
     qp_init_attr.srq = NULL;
-    qp_init_attr.sq_sig_all = 1;
+//    qp_init_attr.sq_sig_all = 1;
 
     
     dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
@@ -1709,7 +1653,6 @@ static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
     int i = 0;
     for(i = 0; i < 10; i++)
     {
-	fprintf(stderr, "%p %d\n", dataqp, i);
 	
 	retval = ibv_post_recv(dataqp, &ib_conn_data->isDone.rwr, 
 			       &ib_conn_data->isDone.badrwr);
@@ -1830,7 +1773,6 @@ static struct ibv_mr ** regblocks(ib_client_data_ptr sd,
     
     struct ibv_mr **mrlist;
 
-    fprintf(stderr, "iovec count = %d\n", iovcnt);
     
     mrlist = (struct ibv_mr**) malloc(sizeof(struct ibv_mr *) * iovcnt);
     if(mrlist == NULL)
@@ -1893,10 +1835,10 @@ static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn,
     conn->max_imm_data = attr.cap.max_inline_data;
     
     
-    fprintf(stderr, "wr = %d\tsge = %d\timm = %d %d\n",
-	    attr.cap.max_send_wr, attr.cap.max_send_sge, attr.cap.max_inline_data, 
-	    init_attr.cap.max_inline_data);
-    fprintf(stderr, "mrlen = %d\n", mrlen);
+    // fprintf(stderr, "wr = %d\tsge = %d\timm = %d %d\n",
+    // 	    attr.cap.max_send_wr, attr.cap.max_send_sge, attr.cap.max_inline_data, 
+    // 	    init_attr.cap.max_inline_data);
+    // fprintf(stderr, "mrlen = %d\n", mrlen);
     
 
     if(mrlen > attr.cap.max_send_sge)
