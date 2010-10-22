@@ -1273,7 +1273,8 @@ ib_conn_data_ptr scd;
 int *len_ptr;
 {
   *len_ptr = scd->read_buffer_len;
-  return svc->create_data_buffer(scd->sd->cm, scd->read_buffer, scd->read_buffer_len);
+  return svc->create_data_buffer
+      (scd->sd->cm, scd->read_buffer, scd->read_buffer_len);
 }
 
 extern int
