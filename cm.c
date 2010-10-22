@@ -1290,6 +1290,8 @@ cm_create_transport_buffer(CManager cm, void *buffer, int length)
     tmp->buffer = buffer;
     tmp->size = length;
     tmp->in_use_by_cm = 1;
+    tmp->next = cm->cm_buffer_list;
+    cm->cm_buffer_list = tmp;
     return tmp;
 }
 
