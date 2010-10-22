@@ -5,9 +5,11 @@ SUBDIRS = .
 
 INCLUDES = -I$(srcdir)/.. -I..
 
-TESTS = evtest chain_test filter_test tree_test multi_test
+TESTS = evtest rawtest chain_test filter_test tree_test multi_test
 
 evtest_SOURCES = evtest.c test_support.c
+
+rawtest_SOURCES = rawtest.c test_support.c
 
 chain_test_SOURCES = chain_test.c test_support.c
 

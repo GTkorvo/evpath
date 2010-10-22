@@ -34,8 +34,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-TESTS = evtest$(EXEEXT) chain_test$(EXEEXT) filter_test$(EXEEXT) \
-	tree_test$(EXEEXT) multi_test$(EXEEXT)
+TESTS = evtest$(EXEEXT) rawtest$(EXEEXT) chain_test$(EXEEXT) \
+	filter_test$(EXEEXT) tree_test$(EXEEXT) multi_test$(EXEEXT)
 noinst_PROGRAMS = $(am__EXEEXT_1)
 subdir = dfg_tests
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
@@ -55,7 +55,7 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am__EXEEXT_1 = evtest$(EXEEXT) chain_test$(EXEEXT) \
+am__EXEEXT_1 = evtest$(EXEEXT) rawtest$(EXEEXT) chain_test$(EXEEXT) \
 	filter_test$(EXEEXT) tree_test$(EXEEXT) multi_test$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
 am_chain_test_OBJECTS = chain_test.$(OBJEXT) test_support.$(OBJEXT)
@@ -74,6 +74,10 @@ am_multi_test_OBJECTS = multi_test.$(OBJEXT) test_support.$(OBJEXT)
 multi_test_OBJECTS = $(am_multi_test_OBJECTS)
 multi_test_LDADD = $(LDADD)
 multi_test_DEPENDENCIES = ../libevpath.la
+am_rawtest_OBJECTS = rawtest.$(OBJEXT) test_support.$(OBJEXT)
+rawtest_OBJECTS = $(am_rawtest_OBJECTS)
+rawtest_LDADD = $(LDADD)
+rawtest_DEPENDENCIES = ../libevpath.la
 am_tree_test_OBJECTS = tree_test.$(OBJEXT) test_support.$(OBJEXT)
 tree_test_OBJECTS = $(am_tree_test_OBJECTS)
 tree_test_LDADD = $(LDADD)
@@ -92,10 +96,10 @@ LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	$(LDFLAGS) -o $@
 SOURCES = $(chain_test_SOURCES) $(evtest_SOURCES) \
 	$(filter_test_SOURCES) $(multi_test_SOURCES) \
-	$(tree_test_SOURCES)
+	$(rawtest_SOURCES) $(tree_test_SOURCES)
 DIST_SOURCES = $(chain_test_SOURCES) $(evtest_SOURCES) \
 	$(filter_test_SOURCES) $(multi_test_SOURCES) \
-	$(tree_test_SOURCES)
+	$(rawtest_SOURCES) $(tree_test_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
 	install-dvi-recursive install-exec-recursive \
@@ -286,6 +290,7 @@ AUTOMAKE_OPTIONS = no-dependencies foreign
 SUBDIRS = .
 INCLUDES = -I$(srcdir)/.. -I..
 evtest_SOURCES = evtest.c test_support.c
+rawtest_SOURCES = rawtest.c test_support.c
 chain_test_SOURCES = chain_test.c test_support.c
 filter_test_SOURCES = filter_test.c test_support.c
 tree_test_SOURCES = tree_test.c test_support.c
@@ -346,6 +351,9 @@ filter_test$(EXEEXT): $(filter_test_OBJECTS) $(filter_test_DEPENDENCIES)
 multi_test$(EXEEXT): $(multi_test_OBJECTS) $(multi_test_DEPENDENCIES) 
 	@rm -f multi_test$(EXEEXT)
 	$(LINK) $(multi_test_OBJECTS) $(multi_test_LDADD) $(LIBS)
+rawtest$(EXEEXT): $(rawtest_OBJECTS) $(rawtest_DEPENDENCIES) 
+	@rm -f rawtest$(EXEEXT)
+	$(LINK) $(rawtest_OBJECTS) $(rawtest_LDADD) $(LIBS)
 tree_test$(EXEEXT): $(tree_test_OBJECTS) $(tree_test_DEPENDENCIES) 
 	@rm -f tree_test$(EXEEXT)
 	$(LINK) $(tree_test_OBJECTS) $(tree_test_LDADD) $(LIBS)

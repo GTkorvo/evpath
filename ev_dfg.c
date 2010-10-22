@@ -505,6 +505,22 @@ EVdfg_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSi
     evp->sink_handler_count++;
 }
 
+extern void
+EVdfg_register_raw_sink_handler(CManager cm, char *name, EVRawHandlerFunc handler)
+{
+    event_path_data evp = cm->evp;
+    if (evp->sink_handler_count == 0) {
+	evp->sink_handlers = malloc(sizeof(evp->sink_handlers[0]));
+    } else {
+	evp->sink_handlers = realloc(evp->sink_handlers,
+				     sizeof(evp->sink_handlers[0]) * (evp->sink_handler_count + 1));
+    }
+    evp->sink_handlers[evp->sink_handler_count].name = name;
+    evp->sink_handlers[evp->sink_handler_count].format_list = NULL;
+    evp->sink_handlers[evp->sink_handler_count].handler = (EVSimpleHandlerFunc)handler;
+    evp->sink_handler_count++;
+}
+
 static int
 new_shutdown_condition(EVdfg dfg, CMConnection conn)
 {

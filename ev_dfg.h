@@ -65,6 +65,9 @@ EVdfg_register_source(char *name, EVsource src);
 extern void
 EVdfg_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler);
 
+extern void
+EVdfg_register_raw_sink_handler(CManager cm, char *name, EVRawHandlerFunc handler);
+
 extern void EVdfg_ready_for_shutdown(EVdfg dfg);
 extern int EVdfg_source_active(EVsource src);
 extern int EVdfg_active_sink_count(EVdfg dfg);
