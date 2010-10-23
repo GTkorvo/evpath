@@ -1342,7 +1342,7 @@ extern void
 cm_return_data_buf(CMbuffer cmb)
 {
     if (cmb) cmb->in_use_by_cm = 0;
-    if (cmb->return_callback != NULL) {
+    if (cmb && cmb->return_callback != NULL) {
 	(cmb->return_callback)(cmb->return_callback_data);
     }
 }
