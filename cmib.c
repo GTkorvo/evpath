@@ -65,6 +65,7 @@
 #include "cm_internal.h"
 
 #include <infiniband/verbs.h>
+#include <sys/queue.h>
 
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
@@ -114,14 +115,6 @@ struct ibparam
     //anything else?
 };
 
-    
-struct _pad
-{
-    unsigned char pad[1024];
-    struct ibv_mr *mr;
-};
-
-
 
 #define ptr_from_int64(p) (void *)(unsigned long)(p)
 #define int64_from_ptr(p) (u_int64_t)(unsigned long)(p)
@@ -144,9 +137,7 @@ typedef struct ib_client_data {
     struct ibv_cq *recv_cq;
     struct ibv_cq *send_cq;
     struct ibv_srq *srq;
-    int max_sge;
-//    struct _pad pad;
-    
+    int max_sge;    
 } *ib_client_data_ptr;
 
 
@@ -178,7 +169,21 @@ typedef struct ib_connection_data {
     int max_imm_data;
 } *ib_conn_data_ptr;
 
+typedef struct tbuffer_
+{
+    CMbuffer buf;
+    struct ibv_mr *mr;
+    ib_conn_data_ptr scd;
+    int size;
+    int offset;
+    void *cur;    
+    LIST_ENTRY(tbuffer_) entries;    
+}tbuffer;
 
+LIST_HEAD(tblist, tbuffer_) memlist;
+LIST_HEAD(inuselist, tbuffer_) uselist;
+
+    
 static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
 			      ib_client_data_ptr sd);
 static int connectqp(ib_conn_data_ptr ib_conn_data,
@@ -188,6 +193,8 @@ static int connectqp(ib_conn_data_ptr ib_conn_data,
 static struct ibv_mr ** regblocks(ib_client_data_ptr sd,
 				 struct iovec *iovs, int iovcnt, int flags,
 				 int *mrlen);
+static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd, 
+			   CMtrans_services svc, int req_size);
 
 
 static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn, 
@@ -393,16 +400,30 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 
     //find the memory for it and create the resonse
 
-    if(scd->read_buffer)
-	free(scd->read_buffer);    
-    scd->read_buffer = malloc(req.length);
-    memset(scd->read_buffer, 0, req.length);    
+    // if(scd->read_buffer)
+    // 	free(scd->read_buffer);    
+    // scd->read_buffer = malloc(req.length);
+    // memset(scd->read_buffer, 0, req.length);    
+    // scd->read_buffer_len = req.length;
+//register the memory
+    // mr = ibv_reg_mr(scd->sd->pd, scd->read_buffer, req.length,
+    // 		    IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | 
+    // 		    IBV_ACCESS_REMOTE_READ);
+    tbuffer *tb = findMemory(scd, scd->sd, svc, req.length);
+    if(tb == NULL)
+    {
+	svc->trace_out(scd->sd->cm, "Failed to get memory\n");
+	rep.remote_addr = 0;
+	rep.rkey = 0;
+	rep.max_length = 0;
+	write(scd->fd, &rep, sizeof(struct response));	
+	return;
+    }
+    
+    scd->read_buffer = tb->cur;
     scd->read_buffer_len = req.length;
-
-    //register the memory
-    mr = ibv_reg_mr(scd->sd->pd, scd->read_buffer, req.length,
-		    IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | 
-		    IBV_ACCESS_REMOTE_READ);
+    mr = tb->mr;
+    
   
     //create response
     rep.remote_addr = int64_from_ptr(scd->read_buffer);
@@ -448,7 +469,6 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 	
     }while(1);
 
-    ibv_dereg_mr(mr);    
     trans->data_available(trans, conn);
 }
 
@@ -629,8 +649,8 @@ ib_conn_data_ptr scd;
 {
     svc->fd_remove_select(scd->sd->cm, scd->fd);
     close(scd->fd);
-    // free(scd->remote_host);
-    free(scd->read_buffer);
+    //free(scd->remote_host);
+    //free(scd->read_buffer);
     free(scd);
 }
 
@@ -1277,16 +1297,6 @@ int *len_ptr;
       (scd->sd->cm, scd->read_buffer, scd->read_buffer_len);
 }
 
-extern int
-libcmib_LTX_write_func(svc, scd, buffer, length)
-CMtrans_services svc;
-ib_conn_data_ptr scd;
-void *buffer;
-int length;
-{
-    return -16;
-    
-}
 
 #ifndef IOV_MAX
 /* this is not defined in some places where it should be.  Conservative. */
@@ -1490,6 +1500,21 @@ free_ib_data(CManager cm, void *sdv)
     svc->free_func(sd);
 }
 
+extern int
+libcmib_LTX_write_func(svc, scd, buffer, length)
+CMtrans_services svc;
+ib_conn_data_ptr scd;
+void *buffer;
+int length;
+{
+    struct iovec iov;
+    
+    iov.iov_base = buffer;
+    iov.iov_len = length;
+    
+    return libcmib_LTX_writev_attr_func(svc, scd, &iov, 1, NULL);
+}
+
 
     
 extern void *
@@ -1566,6 +1591,32 @@ CMtrans_services svc;
     
 
     svc->add_shutdown_task(cm, free_ib_data, (void *) socket_data);
+
+    //here we will add the first 4MB memory buffer
+    LIST_INIT(&memlist);
+    LIST_INIT(&uselist);
+    int bsize = 4*1024*1024;
+    
+    void* buffer = (void*)malloc(sizeof(char)*bsize);
+    tbuffer *tb = (tbuffer*)malloc(sizeof(tbuffer));
+    CMbuffer cb = svc->create_data_buffer(socket_data->cm, buffer, bsize);
+    tb->buf = cb;
+    tb->scd = NULL;
+    tb->size = bsize;
+    tb->offset = 0;
+    tb->cur = buffer;    
+    tb->mr = ibv_reg_mr(socket_data->pd, tb->buf->buffer, bsize,
+			IBV_ACCESS_LOCAL_WRITE | 
+			IBV_ACCESS_REMOTE_WRITE | 
+			IBV_ACCESS_REMOTE_READ);
+    if(!tb->mr)
+    {
+	svc->trace_out(socket_data->cm, "Unable to register initial memory - this is bad!\n");
+	return NULL;	
+    }    
+
+    LIST_INSERT_HEAD(&memlist, tb, entries);
+
     return (void *) socket_data;
 }
 
@@ -1943,5 +1994,67 @@ static int waitoncq(ib_conn_data_ptr scd,
 }
 
 
+static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd, 
+			   CMtrans_services svc, int req_size)
+{
+    tbuffer *temp = NULL, *current = NULL, *prov= NULL;
+    int retval = 0;
+    
+    for(temp = memlist.lh_first;temp != NULL; temp = temp->entries.le_next)
+    {
+	if((temp->size - temp->offset) >= req_size)
+	{
+	    //possible match
+	    if(!prov || (prov->size - prov->offset) >= (temp->size - temp->offset))
+	    {
+		prov = temp;
+		svc->trace_out(sd->cm, "Provisionally selecting %p to hold data of size %d\n",
+			       prov, req_size);		
+	    }
+	}	
+    }
+    if(!prov)
+    {
+	//couldn't find matching memory
+	//allocate new buffer
+	tbuffer *tb = (tbuffer*)malloc(sizeof(tbuffer));
+	void *buffer = (void*)malloc(req_size);
+	CMbuffer cb = cm_create_transport_buffer(sd->cm, buffer, req_size);
+	tb->buf = buffer;
+	tb->scd = scd;
+	tb->size = req_size;
+	tb->offset = 0;
+	tb->mr = ibv_reg_mr(sd->pd, tb->buf->buffer, req_size,
+			    IBV_ACCESS_LOCAL_WRITE | 
+			    IBV_ACCESS_REMOTE_WRITE | 
+			    IBV_ACCESS_REMOTE_READ);
+	if(!tb->mr)
+	{
+	    svc->trace_out(sd->cm, "Unable to register initial memory - this is bad!\n");
+	    return NULL;	
+	}	
+	LIST_INSERT_HEAD(&memlist, tb, entries);	
+	return tb;			    
+    }
+    else
+    {
+	//lets do some magic here!
+	//update the offset
+	
+	prov->cur = ((void*)prov->buf->buffer + prov->offset);
+	//allign pointer
+	uint64_t ptr = int64_from_ptr(prov->cur);
+	prov->cur = ptr_from_int64(((ptr+(8-1))& ~(8-1)));
+	
+	
+	prov->offset = int64_from_ptr(prov->cur) - int64_from_ptr(prov->buf->buffer) + req_size;
+	
+	return prov;	
+    }
+    
+    
+}
+
 
 #endif
+
