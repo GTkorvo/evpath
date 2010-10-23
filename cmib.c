@@ -235,6 +235,8 @@ static atom_t CM_TRANSPORT = -1;
 static void free_func(void *cbd)
 {
     tbuffer *tb = (tbuffer*)cbd;
+    tbuffer *temp;
+    
     // fprintf(stderr, "tb: size = %llu offset = %llu\n", tb->size, tb->offset);
     // fprintf(stderr, "tb: parent = %p childcount = %d\n", tb->parent, tb->childcount);
     
@@ -548,8 +550,6 @@ void *void_conn_sock;
 
     //ib stuff
     struct ibv_qp_init_attr  qp_init_attr;
-    struct ibv_qp_attr qp_attr;
-    int retval = 0;
     
 
 
@@ -752,8 +752,6 @@ int no_more_redirect;
 
     //ib stuff
 
-    struct ibv_qp_init_attr  qp_init_attr;
-    struct ibv_qp_attr qp_attr;
     int retval = 0;
     
     
@@ -1307,33 +1305,6 @@ int enable;
 }
 
 
-static void
-set_block_state(CMtrans_services svc, ib_conn_data_ptr scd,
-		socket_block_state needed_block_state)
-{
-    int fdflags = fcntl(scd->fd, F_GETFL, 0);
-    if (fdflags == -1) {
-	perror("getflags\n");
-	return;
-    }
-    if ((needed_block_state == Block) && (scd->block_state == Non_Block)) {
-	fdflags &= ~O_NONBLOCK;
-	if (fcntl(scd->fd, F_SETFL, fdflags) == -1) 
-	    perror("fcntl block");
-	scd->block_state = Block;
-	svc->trace_out(scd->sd->cm, "CMIB switch fd %d to blocking",
-		       scd->fd);
-    } else if ((needed_block_state == Non_Block) && 
-	       (scd->block_state == Block)) {
-	fdflags |= O_NONBLOCK;
-	if (fcntl(scd->fd, F_SETFL, fdflags) == -1) 
-	    perror("fcntl nonblock");
-	scd->block_state = Non_Block;
-	svc->trace_out(scd->sd->cm, "CMIB switch fd %d to nonblocking",
-		       scd->fd);
-    }
-}
-
 extern CMbuffer
 libcmib_LTX_read_block_func(svc, scd, len_ptr)
 CMtrans_services svc;
@@ -1343,7 +1314,7 @@ int *len_ptr;
   *len_ptr = scd->read_buffer_len;
   if(scd->tb)
       return scd->tb->buf;
-  
+  return NULL;  
 }
 
 
@@ -1785,7 +1756,6 @@ static int connectqp(ib_conn_data_ptr ib_conn_data,
 		     struct ibparam rparam)
 {
     struct ibv_qp_attr qp_attr;
-    struct ibv_qp_init_attr init_attr;
     
     int retval = 0;
     
@@ -2051,8 +2021,7 @@ static int waitoncq(ib_conn_data_ptr scd,
 static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd, 
 			   CMtrans_services svc, int req_size)
 {
-    tbuffer *temp = NULL, *current = NULL, *prov= NULL;
-    int retval = 0;
+    tbuffer *temp = NULL, *prov= NULL;
     
     for(temp = memlist.lh_first;temp != NULL; temp = temp->entries.le_next)
     {
@@ -2117,7 +2086,6 @@ static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd,
 	uint64_t bsize = prov->size - newsize;	
 	// fprintf(stderr, "Resizing %p tbuff to %d from %d\n", prov, prov->size, 
 	// 	newsize);
-	fprintf(stderr, "New tb %p of size %d\n", tb,bsize);
 	
 	prov->size = newsize;
 	tb->size = bsize;
