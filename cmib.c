@@ -160,6 +160,7 @@ typedef struct ib_connection_data {
     int fd;
     void *read_buffer;
     int read_buffer_len;
+    struct tbuffer_ *tb;    
     ib_client_data_ptr sd;
     socket_block_state block_state;
     CMConnection conn;
@@ -174,9 +175,10 @@ typedef struct tbuffer_
     CMbuffer buf;
     struct ibv_mr *mr;
     ib_conn_data_ptr scd;
-    int size;
-    int offset;
-    void *cur;    
+    uint64_t size;
+    uint64_t offset;
+    struct tbuffer_ *parent;
+    int childcount;    
     LIST_ENTRY(tbuffer_) entries;    
 }tbuffer;
 
@@ -229,6 +231,51 @@ static atom_t CM_IP_HOSTNAME = -1;
 static atom_t CM_IP_ADDR = -1;
 static atom_t CM_TRANSPORT = -1;
 
+
+static void free_func(void *cbd)
+{
+    tbuffer *tb = (tbuffer*)cbd;
+    // fprintf(stderr, "tb: size = %llu offset = %llu\n", tb->size, tb->offset);
+    // fprintf(stderr, "tb: parent = %p childcount = %d\n", tb->parent, tb->childcount);
+    
+    // tbuffer * temp;
+    // for(temp = memlist.lh_first; temp != NULL; 
+    // 	temp = temp->entries.le_next)
+    // {
+    // 	fprintf(stderr, "\ttb:size = %llu offset = %llu\n", 
+    // 		temp->size, temp->offset);
+    // 	fprintf(stderr, "\ttb: parent = %p childcount = %d\n", temp->parent, temp->childcount);
+	
+    // }
+    
+
+    if(tb->childcount == 0)
+    {
+	//we can merge upwards
+	temp = tb->parent;
+	if(!temp)
+	{
+	    //is the top level - at the top it means we don't need to merge or do anything other than drop offset to 0
+	    tb->offset = 0;	    
+	}
+	else
+	{
+	    //is a child of someone - we merge up
+	    temp->size += tb->size;
+	    temp->childcount --;
+	    
+	    //we can free the CMbuffer now
+	    free(tb->buf);
+	    
+	    //now remove tb from list and free it
+	    LIST_REMOVE(tb, entries);
+	    free(tb);	    
+	}
+    }
+    
+    
+    
+}
 
 inline static struct ibv_device * IB_getdevice(char *name)
 {
@@ -420,8 +467,9 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 	return;
     }
     
-    scd->read_buffer = tb->cur;
+    scd->read_buffer = tb->buf->buffer;
     scd->read_buffer_len = req.length;
+    scd->tb = tb;    
     mr = tb->mr;
     
   
@@ -1293,8 +1341,9 @@ ib_conn_data_ptr scd;
 int *len_ptr;
 {
   *len_ptr = scd->read_buffer_len;
-  return svc->create_data_buffer
-      (scd->sd->cm, scd->read_buffer, scd->read_buffer_len);
+  if(scd->tb)
+      return scd->tb->buf;
+  
 }
 
 
@@ -1600,11 +1649,16 @@ CMtrans_services svc;
     void* buffer = (void*)malloc(sizeof(char)*bsize);
     tbuffer *tb = (tbuffer*)malloc(sizeof(tbuffer));
     CMbuffer cb = svc->create_data_buffer(socket_data->cm, buffer, bsize);
+    cb->return_callback = free_func;
+    cb->return_callback_data = (void*)tb;
+    
+    
     tb->buf = cb;
     tb->scd = NULL;
     tb->size = bsize;
     tb->offset = 0;
-    tb->cur = buffer;    
+    tb->parent = NULL;
+    tb->childcount = 0;    
     tb->mr = ibv_reg_mr(socket_data->pd, tb->buf->buffer, bsize,
 			IBV_ACCESS_LOCAL_WRITE | 
 			IBV_ACCESS_REMOTE_WRITE | 
@@ -2019,11 +2073,16 @@ static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd,
 	//allocate new buffer
 	tbuffer *tb = (tbuffer*)malloc(sizeof(tbuffer));
 	void *buffer = (void*)malloc(req_size);
-	CMbuffer cb = cm_create_transport_buffer(sd->cm, buffer, req_size);
+	CMbuffer cb = svc->create_data_buffer(sd->cm, buffer, req_size);
 	tb->buf = buffer;
 	tb->scd = scd;
 	tb->size = req_size;
 	tb->offset = 0;
+	cb->return_callback = free_func;
+	cb->return_callback_data = (void*)tb;
+	tb->childcount = 0;
+	tb->parent = NULL;	
+
 	tb->mr = ibv_reg_mr(sd->pd, tb->buf->buffer, req_size,
 			    IBV_ACCESS_LOCAL_WRITE | 
 			    IBV_ACCESS_REMOTE_WRITE | 
@@ -2038,18 +2097,69 @@ static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd,
     }
     else
     {
-	//lets do some magic here!
-	//update the offset
+	//found matching memory but we can't just use this block still 
+	//because FFS will blow up if we don't make new CMbuffer
+	//on the other hand we don't have to register atleast!
+	tbuffer *tb = (tbuffer*)malloc(sizeof(tbuffer));
+	//tb = new tbuffer, prov = old tbuffer
+	tb->parent = prov;
+	prov->childcount ++;
+	// fprintf(stderr, "Original buffer = %p req_size = %d offset = %d\n",
+	// 	prov->buf, req_size, prov->offset);
+
+	void *buffer = ((void*)prov->buf->buffer + prov->offset);
 	
-	prov->cur = ((void*)prov->buf->buffer + prov->offset);
-	//allign pointer
-	uint64_t ptr = int64_from_ptr(prov->cur);
-	prov->cur = ptr_from_int64(((ptr+(8-1))& ~(8-1)));
+	uint64_t oldsize = prov->size;
+	
+	uint64_t ptr = int64_from_ptr(buffer);
+	buffer = ptr_from_int64(((ptr+(8-1))& ~(8-1)));
+	uint64_t newsize = int64_from_ptr(buffer) - int64_from_ptr(prov->buf->buffer);
+	uint64_t bsize = prov->size - newsize;	
+	// fprintf(stderr, "Resizing %p tbuff to %d from %d\n", prov, prov->size, 
+	// 	newsize);
+	fprintf(stderr, "New tb %p of size %d\n", tb,bsize);
+	
+	prov->size = newsize;
+	tb->size = bsize;
+	if(oldsize != (newsize + bsize))
+	{
+	    fprintf(stderr, "lost some memory here\n");	    
+	}
+	
+	tb->buf = svc->create_data_buffer(sd->cm, buffer, tb->size);
+	tb->buf->return_callback = free_func;
+	tb->buf->return_callback_data = tb;
+	
+	tb->offset = req_size;
+	
+	tb->scd = scd;
+	tb->childcount = 0;
+	tb->mr = prov->mr;
 	
 	
-	prov->offset = int64_from_ptr(prov->cur) - int64_from_ptr(prov->buf->buffer) + req_size;
+	LIST_INSERT_HEAD(&memlist, tb, entries);
 	
-	return prov;	
+	
+	
+
+	// void *buffer = ((void*)prov->buf->buffer + prov->offset);	
+	// uint64_t ptr = int64_from_ptr(buffer);
+	// buffer = ptr_from_int64(((ptr+(8-1))& ~(8-1)));	
+	// int newsize = prov->size - prov->offset;	
+	// CMbuffer cb = svc->create_data_buffer(sd->cm, buffer, req_size);
+	// prov->offset = ptr - int64_from_ptr(prov->buf->buffer) + req_size; 
+	
+	
+	// //lets do some magic here!
+	// //update the offset
+	// prov->scd = scd;	
+	// prov->cur = ((void*)prov->buf->buffer + prov->offset);
+	// //allign pointer
+	// uint64_t ptr = int64_from_ptr(prov->cur);
+	// prov->cur = ptr_from_int64(((ptr+(8-1))& ~(8-1)));	
+	// prov->offset = int64_from_ptr(prov->cur) - int64_from_ptr(prov->buf->buffer) + req_size;
+	
+	return tb;	
     }
     
     
