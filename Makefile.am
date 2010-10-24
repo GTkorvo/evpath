@@ -44,7 +44,7 @@ libevpath_la_DEPENDENCIES = $(LIBLTDL) $(LTLIBS)
 
 INSTALL_HEADER = ${srcdir}/config/install-sh -m 644
 
-include_HEADERS = evpath.h evpath_old.h revpath.h cm_transport.h ev_dfg.h
+include_HEADERS = evpath.h evpath_old.h revpath.h  ev_dfg.h cm_transport.h
 
 AM_CPPFLAGS =
 
