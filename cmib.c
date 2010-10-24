@@ -469,7 +469,7 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 	rep.rkey = 0;
 	rep.max_length = 0;
 	write(scd->fd, &rep, sizeof(struct response));	
-	return;
+	goto wait_on_q;	
     }
     
     scd->read_buffer = tb->buf->buffer;
@@ -486,6 +486,7 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     //send response to other side
     write(scd->fd, &rep, sizeof(struct response));
 
+wait_on_q:
     //now the sender will start the data transfer. When it finishes he will 
     //issue a notification after which the data is in memory
     retval = waitoncq(scd, scd->sd, svc, sd->recv_cq);    
@@ -522,7 +523,14 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 	
     }while(1);
 
-    trans->data_available(trans, conn);
+    if(scd->isDone.done == 0)
+	trans->data_available(trans, conn);
+    else
+    {
+	fprintf(stderr, "error in the protocol\n");
+	
+    }
+    
 }
 
 /* 
@@ -1365,14 +1373,17 @@ attr_list attrs;
     write(fd, &req, sizeof(struct request));
 
     mrlist = regblocks(scd->sd, iov, iovcnt, IBV_ACCESS_LOCAL_WRITE, &mrlen);
+    read(fd, &rep, sizeof(struct response));
+
     if(mrlist == NULL)
     {
-	return -0x10000;	
+	wr = NULL;	
+	goto send_error;
+	
     }
 
     //read back response
-    read(fd, &rep, sizeof(struct response));
-    
+
     //get the workrequests
     wr = createwrlist(scd, mrlist, iov, mrlen, &wrlen,
 		      rep);
@@ -1382,32 +1393,77 @@ attr_list attrs;
 	fprintf(stderr, "failed to get work request - aborting write\n");
 	return -0x01000;	
     }
-
+    
     retval = ibv_req_notify_cq(scd->sd->send_cq, 0);
     if(retval)
     {
 	scd->sd->svc->trace_out(scd->sd->cm, "CMib notification request failed\n");
-
+	
 	//cleaqnup
 	return -1;	
     }
     
-    retval = ibv_post_send(scd->dataqp, wr, &bad_wr);
-    if(retval)
-    {
-	svc->trace_out(scd->sd->cm, "CMIB unable to post send %d\n", retval);
-	//we can get the error from the *bad_wr
-	return retval;	
 
+
+    if(rep.remote_addr == 0)
+    {
+	//error on the recieving side just send a -1 as the isdone and return
+    send_error:
+	scd->isDone.done = -1;
+	
+	retval = ibv_post_send(scd->dataqp, &scd->isDone.wr, 
+			       &bad_wr);
+	    
+	if(retval)
+	{
+	    //we got an error - ideally we'll fall through and post an error on the connection socket
+	    svc->trace_out(scd->sd->cm, "CMib unable to notify over ib\n");
+	}
+
+	for(i = 0; i < mrlen && mrlist; i ++)
+	{
+	    ibv_dereg_mr(mrlist[i]);		
+		
+	}
+
+	if(wr)
+	{	    
+	    free(wr->sg_list);	    
+	    free(wr);
+	}
+	
+	//no we wait for the send even to get anoutput
+	retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
+	if(retval)
+	{
+	    svc->trace_out(scd->sd->cm, "Error while waiting\n");
+	    return -1;		
+	}
+	    
+	    
+	
     }
+    else
+    {
+	
     
-    retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
-    if(retval)
-    {
-	svc->trace_out(scd->sd->cm, "Error while waiting\n");
-	return -1;		
-    }
+	retval = ibv_post_send(scd->dataqp, wr, &bad_wr);
+	if(retval)
+	{
+	    svc->trace_out(scd->sd->cm, "CMIB unable to post send %d\n", retval);
+	    //we can get the error from the *bad_wr
+	    return retval;	
 
+	}
+    
+	retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
+	if(retval)
+	{
+	    svc->trace_out(scd->sd->cm, "Error while waiting\n");
+	    return -1;		
+	}
+
+    }
     
 
     do
@@ -1420,6 +1476,8 @@ attr_list attrs;
 	    //we can break out after derigstering the memory
 
 	    //now post a send
+	    scd->isDone.done = 0;
+	    
 	    retval = ibv_post_send(scd->dataqp, &scd->isDone.wr, 
 				   &bad_wr);
 	    
@@ -2083,7 +2141,8 @@ static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd,
 	// fprintf(stderr, "Original buffer = %p req_size = %d offset = %d\n",
 	// 	prov->buf, req_size, prov->offset);
 
-	void *buffer = ((void*)prov->buf->buffer + prov->offset);
+	void *buffer = ptr_from_int64((int64_from_ptr(prov->buf->buffer) + prov->offset));
+	
 	
 	uint64_t oldsize = prov->size;
 	
