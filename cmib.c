@@ -66,6 +66,7 @@
 
 #include <infiniband/verbs.h>
 #include <sys/queue.h>
+#include <stdlib.h>
 
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
@@ -115,6 +116,8 @@ struct ibparam
     //anything else?
 };
 
+
+int page_size = 0;
 
 #define ptr_from_int64(p) (void *)(unsigned long)(p)
 #define int64_from_ptr(p) (u_int64_t)(unsigned long)(p)
@@ -1547,6 +1550,7 @@ CMtrans_services svc;
     ib_client_data_ptr socket_data;
     svc->trace_out(cm, "Initialize CM IB transport built in %s\n",
 		   EVPATH_LIBRARY_BUILD_DIR);
+    page_size = sysconf(_SC_PAGE_SIZE);
     if (socket_global_init == 0) {
 #ifdef SIGPIPE
 	signal(SIGPIPE, SIG_IGN);
@@ -1616,8 +1620,9 @@ CMtrans_services svc;
     LIST_INIT(&memlist);
     LIST_INIT(&uselist);
     int bsize = 4*1024*1024;
+    void *buffer;
     
-    void* buffer = (void*)malloc(sizeof(char)*bsize);
+    posix_memalign(&buffer, page_size, bsize);
     tbuffer *tb = (tbuffer*)malloc(sizeof(tbuffer));
     CMbuffer cb = svc->create_data_buffer(socket_data->cm, buffer, bsize);
     cb->return_callback = free_func;
@@ -2041,9 +2046,11 @@ static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd,
 	//couldn't find matching memory
 	//allocate new buffer
 	tbuffer *tb = (tbuffer*)malloc(sizeof(tbuffer));
-	void *buffer = (void*)malloc(req_size);
+	void *buffer;
+	posix_memalign(&buffer, page_size, req_size);
+	
 	CMbuffer cb = svc->create_data_buffer(sd->cm, buffer, req_size);
-	tb->buf = buffer;
+	tb->buf = cb;
 	tb->scd = scd;
 	tb->size = req_size;
 	tb->offset = 0;
@@ -2052,7 +2059,7 @@ static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd,
 	tb->childcount = 0;
 	tb->parent = NULL;	
 
-	tb->mr = ibv_reg_mr(sd->pd, tb->buf->buffer, req_size,
+	tb->mr = ibv_reg_mr(sd->pd, buffer, req_size,
 			    IBV_ACCESS_LOCAL_WRITE | 
 			    IBV_ACCESS_REMOTE_WRITE | 
 			    IBV_ACCESS_REMOTE_READ);
