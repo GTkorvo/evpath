@@ -41,6 +41,7 @@ extern int CMtrace_init(CMTraceType trace_type)
     CMtrace_val[CMFreeVerbose] = (cercs_getenv("CMFreeVerbose") != NULL);
     CMtrace_val[CMAttrVerbose] = (cercs_getenv("CMAttrVerbose") != NULL);
     CMtrace_val[EVerbose] = (cercs_getenv("EVerbose") != NULL);
+    CMtrace_val[CMIBTransportVerbose] = (cercs_getenv("CMIBTransportVerbose") != NULL);    
     if ((str = cercs_getenv("EVWarning")) != NULL) {
 	sscanf(str, "%d", &CMtrace_val[EVWarning]);
     }
