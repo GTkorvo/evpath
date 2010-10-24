@@ -43,6 +43,7 @@
 #include <fcntl.h>
 #ifndef HAVE_WINDOWS_H
 #include <net/if.h>
+#include <netinet/tcp.h>
 #include <sys/ioctl.h>
 #include <errno.h>
 #endif
@@ -118,6 +119,8 @@ struct ibparam
 
 
 int page_size = 0;
+int perftrace =0;
+
 
 #define ptr_from_int64(p) (void *)(unsigned long)(p)
 #define int64_from_ptr(p) (u_int64_t)(unsigned long)(p)
@@ -154,7 +157,10 @@ typedef struct notification
     struct ibv_sge sg;    
     struct ibv_recv_wr rwr;    
     struct ibv_recv_wr *badrwr;    
+
 }notify;
+
+
 
 typedef struct ib_connection_data {
     char *remote_host;
@@ -233,6 +239,14 @@ static atom_t CM_IP_PORT = -1;
 static atom_t CM_IP_HOSTNAME = -1;
 static atom_t CM_IP_ADDR = -1;
 static atom_t CM_TRANSPORT = -1;
+
+static double getlocaltime()
+{
+    struct timeval t;
+    gettimeofday(&t, NULL);
+    double dt = (double) t.tv_usec / 1e6 + t.tv_sec;
+    return dt;
+}
 
 
 static void free_func(void *cbd)
@@ -418,9 +432,13 @@ int fd;
 #endif
 
 
+static double read_t = 0, write_t = 0, find_t = 0, wait_t = 0, call_t = 0;
+static double da_t = 0;
+
+
 void
 CMIB_data_available(transport_entry trans, CMConnection conn)
-{
+{    
     int iget;
     ib_client_data_ptr sd = (ib_client_data_ptr) trans->trans_data;
     CMtrans_services svc = sd->svc;
@@ -429,10 +447,17 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     struct ibv_mr *mr;
     int retval = 0;
     struct ibv_wc wc;
+    double start =0, end = 0;
+    struct ibv_send_wr *badwr;
+    
+    
+    da_t = getlocaltime();
     
     ib_conn_data_ptr scd = (ib_conn_data_ptr) svc->get_transport_data(conn);
 
+    start = getlocaltime();    
     iget = read(scd->fd, (char *) &req, sizeof(struct request));
+    
 
     if (iget == 0) {
 	svc->connection_close(conn);
@@ -446,9 +471,11 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 
     if (req.magic != 0xdeadbeef) {
 	printf("Dead beef panic, 0x%x\n", req.magic);
-    } else {
-	printf("Would start to read %d bytes of data\n", req.length);
-    }
+    } 
+    end = getlocaltime();
+    read_t = end - start;
+    
+    
 
     //find the memory for it and create the resonse
 
@@ -461,6 +488,8 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     // mr = ibv_reg_mr(scd->sd->pd, scd->read_buffer, req.length,
     // 		    IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | 
     // 		    IBV_ACCESS_REMOTE_READ);
+    start = getlocaltime();
+    
     tbuffer *tb = findMemory(scd, scd->sd, svc, req.length);
     if(tb == NULL)
     {
@@ -483,12 +512,52 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     rep.rkey = mr->rkey;
     rep.max_length = scd->read_buffer_len;
 
+    end = getlocaltime();
+    find_t = end - start;
+    
     //send response to other side
-    write(scd->fd, &rep, sizeof(struct response));
+    start = getlocaltime();
 
+    // memcpy(&scd->isDone.done, &rep, sizeof(rep));
+    
+    // retval = ibv_post_send(scd->dataqp, &scd->isDone.wr, 
+    // 			   &badwr);
+    
+    // if(retval)
+    // {
+    // 	//we got an error - ideally we'll fall through and post an error on the connection socket
+    // 	svc->trace_out(scd->sd->cm, "CMib unable to notify over ib\n");
+    // 	return;	
+    // }
+    
+    // retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
+    // if(retval)
+    // {
+    // 	svc->trace_out(scd->sd->cm, "Error while waiting\n");
+    // 	return;
+	
+    // }
+    
+    // //now pull this event off the q
+    // do
+    // {
+    // 	//empty the poll cq 1 by 1
+    // 	iget = ibv_poll_cq(scd->sd->send_cq, 1, &wc);
+    // 	if(iget == 0)
+    // 	{
+    // 	    retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);	    
+    // 	}	
+    // }while(iget == 0);
+    write(scd->fd, &rep, sizeof(struct response));
+    end = getlocaltime();
+    write_t = end - start;
+    
+
+    
 wait_on_q:
     //now the sender will start the data transfer. When it finishes he will 
     //issue a notification after which the data is in memory
+    start = getlocaltime();
     retval = waitoncq(scd, scd->sd, svc, sd->recv_cq);    
     if(retval)
     {
@@ -523,6 +592,12 @@ wait_on_q:
 	
     }while(1);
 
+    end = getlocaltime();
+    wait_t = end - start;
+    
+
+    start = getlocaltime();
+    
     if(scd->isDone.done == 0)
 	trans->data_available(trans, conn);
     else
@@ -530,6 +605,22 @@ wait_on_q:
 	fprintf(stderr, "error in the protocol\n");
 	
     }
+    end = getlocaltime();
+    
+    call_t = end - start;
+    
+
+    da_t = getlocaltime() - da_t;
+    
+    if(perftrace)
+    {	
+	fprintf(stderr, "%d %f %f %f %f %f %f %f %f\n",
+		req.length, da_t,
+		read_t, find_t, write_t, wait_t, call_t,
+		(req.length/(read_t + find_t + write_t + wait_t))/(1024*1024),
+		(req.length/(read_t + find_t + write_t + wait_t + call_t))/(1024*1024));
+    }
+    
     
 }
 
@@ -553,9 +644,7 @@ void *void_conn_sock;
     struct linger linger_val;
     int sock_opt_val = 1;
 
-#ifdef TCP_NODELAY
     int delay_value = 1;
-#endif
     CMConnection conn;
     attr_list conn_attr_list = NULL;
 
@@ -581,10 +670,8 @@ void *void_conn_sock;
 	perror("set SO_LINGER");
 	return;
     }
-#ifdef TCP_NODELAY
     setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &delay_value,
 	       sizeof(delay_value));
-#endif
     ib_conn_data = create_ib_conn_data(svc);
     ib_conn_data->sd = sd;
     ib_conn_data->fd = sock;
@@ -699,6 +786,8 @@ void *void_conn_sock;
     svc->fd_add_select(sd->cm, sock,
 		       (void (*)(void *, void *)) CMIB_data_available,
 		       (void *) trans, (void *) conn);
+
+
 }
 
 extern void
@@ -746,9 +835,7 @@ int no_more_redirect;
 {
     int sock;
 
-#ifdef TCP_NODELAY
     int delay_value = 1;
-#endif
     struct linger linger_val;
     int sock_opt_val = 1;
     int int_port_num;
@@ -897,10 +984,8 @@ int no_more_redirect;
     setsockopt(sock, SOL_SOCKET, SO_LINGER, (char *) &linger_val,
 	       sizeof(struct linger));
 
-#ifdef TCP_NODELAY
     setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &delay_value,
 	       sizeof(delay_value));
-#endif
 
     //initialize the dataqp that will be used for all RC comms
 
@@ -1334,6 +1419,11 @@ int *len_ptr;
 #define IOV_MAX 16
 #endif
 
+static double reg_t = 0, createwr_t = 0, post_t = 0, notify_t = 0;
+
+static double writev_t = 0;
+
+
 extern int
 libcmib_LTX_writev_attr_func(svc, scd, iovs, iovcnt, attrs)
 CMtrans_services svc;
@@ -1353,9 +1443,13 @@ attr_list attrs;
     struct ibv_send_wr *bad_wr;    
     int retval  = 0;
     struct ibv_wc wc;
+    double start = 0, end = 0;
     
     
-
+    writev_t = getlocaltime();
+    
+    start = getlocaltime();
+    
     for (i = 0; i < iovcnt; i++)
 	left += iov[i].iov_len;
 
@@ -1371,10 +1465,16 @@ attr_list attrs;
     
     //write out request
     write(fd, &req, sizeof(struct request));
+    end = getlocaltime();
+    write_t = end - start;
+    
 
+    start = getlocaltime();    
     mrlist = regblocks(scd->sd, iov, iovcnt, IBV_ACCESS_LOCAL_WRITE, &mrlen);
-    read(fd, &rep, sizeof(struct response));
-
+    end = getlocaltime();
+    
+    reg_t = end - start;
+    
     if(mrlist == NULL)
     {
 	wr = NULL;	
@@ -1384,7 +1484,55 @@ attr_list attrs;
 
     //read back response
 
+    start = getlocaltime();    
+
+    // retval = waitoncq(scd, scd->sd, svc, scd->sd->recv_cq);    
+    // if(retval)
+    // {
+    // 	svc->trace_out(scd->sd->cm, "Error while waiting for response\n");
+    // 	return -1;		
+    // }
+
+    // //now we start polling the cq
+
+    // do
+    // {
+    // 	retval = ibv_poll_cq(scd->sd->recv_cq, 1, &wc);
+    // 	if(retval > 0 && wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_RECV)
+    // 	{
+    // 	    //cool beans - send completed we can go on with our life
+	    
+    // 	    //issue a reccieve so we don't run out
+    // 	    retval = ibv_post_recv(scd->dataqp, &scd->isDone.rwr, 
+    // 				   &scd->isDone.badrwr);
+    // 	    if(retval)
+    // 	    {
+    // 		scd->sd->svc->trace_out(scd->sd->cm, "CMib unable to post recv %d\n", retval);
+    // 	    }
+	
+    // 	    break;	    
+    // 	}
+    // 	else
+    // 	{
+    // 	    svc->trace_out(scd->sd->cm, "Error polling for response\n");
+    // 	    break;	    
+    // 	}
+	
+    // }while(1);
+
+
+
+    iget = read(fd, &rep, sizeof(struct response));
+    if(iget != sizeof(rep))
+       fprintf(stderr, "read %d\n", iget);
+    end = getlocaltime();
+
+    read_t = end - start;
+    
+
+
     //get the workrequests
+    start = getlocaltime();    
     wr = createwrlist(scd, mrlist, iov, mrlen, &wrlen,
 		      rep);
     
@@ -1393,13 +1541,15 @@ attr_list attrs;
 	fprintf(stderr, "failed to get work request - aborting write\n");
 	return -0x01000;	
     }
+    end = getlocaltime();
+    createwr_t = end - start;
     
+    
+    start = getlocaltime();    
     retval = ibv_req_notify_cq(scd->sd->send_cq, 0);
     if(retval)
     {
 	scd->sd->svc->trace_out(scd->sd->cm, "CMib notification request failed\n");
-	
-	//cleaqnup
 	return -1;	
     }
     
@@ -1444,9 +1594,7 @@ attr_list attrs;
 	
     }
     else
-    {
-	
-    
+    {    
 	retval = ibv_post_send(scd->dataqp, wr, &bad_wr);
 	if(retval)
 	{
@@ -1465,7 +1613,12 @@ attr_list attrs;
 
     }
     
-
+    
+    end = getlocaltime();
+    post_t = end - start;
+    
+    
+    start = getlocaltime();    
     do
     {
 	//empty the poll cq 1 by 1
@@ -1532,7 +1685,21 @@ attr_list attrs;
     }while(1);
 
     
+    end = getlocaltime();    
+    notify_t = end - start;
+    
+    writev_t = getlocaltime() - writev_t;    
     //reequest notify on cq 
+    if(perftrace)
+    {
+	
+	fprintf(stderr, "%d %f %f %f %f %f %f %f %f %f\n",
+		req.length, writev_t,
+		write_t, reg_t, read_t, createwr_t, post_t, notify_t, 
+		(req.length/(read_t + reg_t + write_t + notify_t + createwr_t))/(1024*1024),
+		(req.length/(read_t + reg_t + write_t + createwr_t))/(1024*1024));
+    }
+    
 
 
     
@@ -1704,6 +1871,7 @@ CMtrans_services svc;
     }    
 
     LIST_INSERT_HEAD(&memlist, tb, entries);
+    perftrace = (cercs_getenv("CMIBTransportVerbose") != NULL);    
 
     return (void *) socket_data;
 }
@@ -1769,6 +1937,7 @@ static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
 	ibv_destroy_qp(dataqp);
 	return NULL;
     }
+
 
     //register padding
 
