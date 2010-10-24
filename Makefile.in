@@ -389,7 +389,7 @@ libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c \
 libevpath_la_LDFLAGS = $(MATH_LIB) -version-info 1:0:0
 libevpath_la_LIBADD = $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lffs -lcod @SOCKET_LIBS@ 
 libevpath_la_DEPENDENCIES = $(LIBLTDL) $(LTLIBS)
-include_HEADERS = evpath.h evpath_old.h revpath.h cm_transport.h ev_dfg.h
+include_HEADERS = evpath.h evpath_old.h revpath.h  ev_dfg.h cm_transport.h
 AM_CPPFLAGS = 
 noinst_HEADERS = cm_internal.h  ev_internal.h
 @BUILD_IB_TRUE@libcmib_la_SOURCES = cmib.c
@@ -631,8 +631,8 @@ install-pkgconfigDATA: $(pkgconfig_DATA)
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo "$(INSTALL_DATA) $$files '$(DESTDIR)$(pkgconfigdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(pkgconfigdir)" || exit $$?; \
+	  echo " cmp -s '$$files' '$(DESTDIR)$(pkgconfigdir)/$xfiles' || $(INSTALL_DATA) $$files '$(DESTDIR)$(pkgconfigdir)'"; \
+	  cmp -s '$$files' '$(DESTDIR)$(pkgconfigdir)/$xfiles' || $(INSTALL_DATA) $$files "$(DESTDIR)$(pkgconfigdir)" || exit $$?; \
 	done
 
 uninstall-pkgconfigDATA:
@@ -651,8 +651,8 @@ install-includeHEADERS: $(include_HEADERS)
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo "$(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
-	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(includedir)" || exit $$?; \
+	  echo " cmp -s '$$files' '$(DESTDIR)$(includedir)/$xfiles' || $(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
+	  cmp -s '$$files' '$(DESTDIR)$(includedir)/$xfiles' || $(INSTALL_HEADER) $$files "$(DESTDIR)$(includedir)" || exit $$?; \
 	done
 
 uninstall-includeHEADERS:
