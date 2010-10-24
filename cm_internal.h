@@ -267,7 +267,7 @@ extern void IntCMConn_write_unlock ARGS((CMConnection cl, char *file,
 extern int CMConn_write_locked ARGS((CMConnection cl));
 
 typedef enum _CMTraceType {
-    CMAlwaysTrace, CMControlVerbose, CMConnectionVerbose, CMLowLevelVerbose, CMDataVerbose, CMTransportVerbose, CMFormatVerbose, CMFreeVerbose, CMAttrVerbose, EVerbose, EVWarning, 
+    CMAlwaysTrace, CMControlVerbose, CMConnectionVerbose, CMLowLevelVerbose, CMDataVerbose, CMTransportVerbose, CMFormatVerbose, CMFreeVerbose, CMAttrVerbose, EVerbose, EVWarning, CMIBTransportVerbose,
     CMLastTraceType /* add before this one */
 } CMTraceType;
 
