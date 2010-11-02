@@ -44,6 +44,7 @@ extern EVdfg_stone EVdfg_create_sink_stone(EVdfg dfg, char *handler_name);
 
 extern void EVdfg_link_port(EVdfg_stone source, int source_port, 
 			    EVdfg_stone destination);
+extern void EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs);
 
 extern void EVdfg_assign_node(EVdfg_stone stone, char *node);
 extern void EVdfg_register_node_list(EVdfg dfg, char** list);

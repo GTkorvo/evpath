@@ -25,6 +25,7 @@ struct _EVdfg_stone {
     int node;
     int bridge_stone;
     int stone_id;
+    attr_list attrs;
     int out_count;
     EVdfg_stone *out_links;
     int action_count;
@@ -83,6 +84,8 @@ EVdfg_create_stone(EVdfg dfg, char *action)
     stone->dfg = dfg;
     stone->node = -1;
     stone->bridge_stone = 0;
+    stone->stone_id = -1;
+    stone->attrs = NULL;
     stone->out_count = 0;
     stone->out_links = NULL;
     stone->action_count = 1;
@@ -116,6 +119,16 @@ EVdfg_link_port(EVdfg_stone src, int port, EVdfg_stone dest)
     src->out_links[port] = dest;
 }
 	
+extern void
+EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs)
+{
+    if (stone->attrs != NULL) {
+	fprintf(stderr, "Warning, attributes for stone %p previously set, overwriting\n", stone);
+    }
+    add_ref_attr_list(attrs);
+    stone->attrs = attrs;
+}
+
 typedef struct _EVregister_msg {
     char *node_name;
     char *contact_string;
@@ -162,6 +175,7 @@ FMStructDescRec EVdfg_shutdown_format_list[] = {
 
 typedef struct _EVdeploy_msg_stone {
     int global_stone_id;
+    char *attrs;
     int out_count;
     int *out_links;
     char *action;
@@ -172,6 +186,8 @@ typedef struct _EVdeploy_msg_stone {
 FMField EVdeploy_stone_flds[] = {
     {"global_stone_id", "integer", sizeof(int), 
      FMOffset(deploy_msg_stone, global_stone_id)},
+    {"attrs", "string", sizeof(char*), 
+     FMOffset(deploy_msg_stone, attrs)},
     {"out_count", "integer", sizeof(int), 
      FMOffset(deploy_msg_stone, out_count)},
     {"out_links", "integer[out_count]", sizeof(int), 
@@ -303,6 +319,11 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
 	int local_stone = evp->stone_lookup_table[base + i].local_id;
 	int local_list[1024]; /* better be enough */
 	int j;
+	if (msg->stone_list[i].attrs != NULL) {
+	    attr_list tmp_attrs = attr_list_from_string(msg->stone_list[i].attrs);
+	    INT_EVset_attr_list(cm, local_stone, tmp_attrs);
+	    free_attr_list(tmp_attrs);
+	}
 	for (j=0; j < msg->stone_list[i].out_count; j++) {
 	    if (msg->stone_list[i].out_links[j] != -1) {
 		local_list[j] = lookup_local_stone(evp, msg->stone_list[i].out_links[j]);
@@ -648,6 +669,10 @@ deploy_to_node(EVdfg dfg, int node)
 	    EVdfg_stone dstone = dfg->stones[i];
 	    int k;
 	    mstone->global_stone_id = dstone->stone_id;
+	    mstone->attrs = NULL;
+	    if (dstone->attrs != NULL) {
+		mstone->attrs = attr_list_to_string(dstone->attrs);
+	    }
 	    mstone->out_count = dstone->out_count;
 	    mstone->out_links = malloc(sizeof(mstone->out_links[0])*mstone->out_count);
 	    for (k=0; k< dstone->out_count; k++) {
@@ -670,6 +695,7 @@ deploy_to_node(EVdfg dfg, int node)
     }
     for(i=0 ; i < msg.stone_count; i++) {
 	free(msg.stone_list[i].out_links);
+	if (msg.stone_list[i].attrs) free(msg.stone_list[i].attrs);
     }
     free(msg.stone_list);
 }
