@@ -312,7 +312,6 @@ node_register_handler(CManager cm, CMConnection conn, void *vmsg,
 	dfg->nodes[node].str_contact_list = strdup(msg->contact_string);
 	dfg->nodes[node].contact_list = attr_list_from_string(dfg->nodes[node].str_contact_list);
 	new_node = node;
-	printf("Master, client %s on conn %p\n", msg->node_name, conn);
     }
     CMtrace_out(cm, EVerbose, "Client \"%s\" has joined DFG, contact %s\n", msg->node_name, dfg->nodes[new_node].str_contact_list);
     check_all_nodes_registered(dfg);
