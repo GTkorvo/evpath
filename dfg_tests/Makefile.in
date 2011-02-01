@@ -35,7 +35,8 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 TESTS = evtest$(EXEEXT) rawtest$(EXEEXT) chain_test$(EXEEXT) \
-	filter_test$(EXEEXT) tree_test$(EXEEXT) multi_test$(EXEEXT)
+	filter_test$(EXEEXT) tree_test$(EXEEXT) multi_test$(EXEEXT) \
+	dchain_test$(EXEEXT)
 noinst_PROGRAMS = $(am__EXEEXT_1)
 subdir = dfg_tests
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
@@ -56,12 +57,17 @@ CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__EXEEXT_1 = evtest$(EXEEXT) rawtest$(EXEEXT) chain_test$(EXEEXT) \
-	filter_test$(EXEEXT) tree_test$(EXEEXT) multi_test$(EXEEXT)
+	filter_test$(EXEEXT) tree_test$(EXEEXT) multi_test$(EXEEXT) \
+	dchain_test$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
 am_chain_test_OBJECTS = chain_test.$(OBJEXT) test_support.$(OBJEXT)
 chain_test_OBJECTS = $(am_chain_test_OBJECTS)
 chain_test_LDADD = $(LDADD)
 chain_test_DEPENDENCIES = ../libevpath.la
+am_dchain_test_OBJECTS = dchain_test.$(OBJEXT) test_support.$(OBJEXT)
+dchain_test_OBJECTS = $(am_dchain_test_OBJECTS)
+dchain_test_LDADD = $(LDADD)
+dchain_test_DEPENDENCIES = ../libevpath.la
 am_evtest_OBJECTS = evtest.$(OBJEXT) test_support.$(OBJEXT)
 evtest_OBJECTS = $(am_evtest_OBJECTS)
 evtest_LDADD = $(LDADD)
@@ -94,11 +100,11 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(chain_test_SOURCES) $(evtest_SOURCES) \
-	$(filter_test_SOURCES) $(multi_test_SOURCES) \
+SOURCES = $(chain_test_SOURCES) $(dchain_test_SOURCES) \
+	$(evtest_SOURCES) $(filter_test_SOURCES) $(multi_test_SOURCES) \
 	$(rawtest_SOURCES) $(tree_test_SOURCES)
-DIST_SOURCES = $(chain_test_SOURCES) $(evtest_SOURCES) \
-	$(filter_test_SOURCES) $(multi_test_SOURCES) \
+DIST_SOURCES = $(chain_test_SOURCES) $(dchain_test_SOURCES) \
+	$(evtest_SOURCES) $(filter_test_SOURCES) $(multi_test_SOURCES) \
 	$(rawtest_SOURCES) $(tree_test_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive dvi-recursive \
 	html-recursive info-recursive install-data-recursive \
@@ -295,6 +301,7 @@ chain_test_SOURCES = chain_test.c test_support.c
 filter_test_SOURCES = filter_test.c test_support.c
 tree_test_SOURCES = tree_test.c test_support.c
 multi_test_SOURCES = multi_test.c test_support.c
+dchain_test_SOURCES = dchain_test.c test_support.c
 LDADD = ../libevpath.la 
 all: all-recursive
 
@@ -342,6 +349,9 @@ clean-noinstPROGRAMS:
 chain_test$(EXEEXT): $(chain_test_OBJECTS) $(chain_test_DEPENDENCIES) 
 	@rm -f chain_test$(EXEEXT)
 	$(LINK) $(chain_test_OBJECTS) $(chain_test_LDADD) $(LIBS)
+dchain_test$(EXEEXT): $(dchain_test_OBJECTS) $(dchain_test_DEPENDENCIES) 
+	@rm -f dchain_test$(EXEEXT)
+	$(LINK) $(dchain_test_OBJECTS) $(dchain_test_LDADD) $(LIBS)
 evtest$(EXEEXT): $(evtest_OBJECTS) $(evtest_DEPENDENCIES) 
 	@rm -f evtest$(EXEEXT)
 	$(LINK) $(evtest_OBJECTS) $(evtest_LDADD) $(LIBS)
