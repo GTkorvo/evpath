@@ -48,6 +48,9 @@ extern void EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs);
 
 extern void EVdfg_assign_node(EVdfg_stone stone, char *node);
 extern void EVdfg_register_node_list(EVdfg dfg, char** list);
+extern void EVdfg_assign_canonical_name(EVdfg dfg, char *given_name, char *canonical_name);
+    typedef int (*EVdfgJoinHandlerFunc) ARGS((EVdfg dfg, char *identifier, void* available_sources, void *available_sinks));
+extern void EVdfg_node_join_handler ARGS((EVdfg dfg, EVdfgJoinHandlerFunc func));
 
 extern int EVdfg_realize(EVdfg dfg);
 extern int EVdfg_ready_wait(EVdfg dfg);

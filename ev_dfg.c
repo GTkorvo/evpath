@@ -35,6 +35,7 @@ struct _EVdfg_stone {
 
 typedef struct _EVint_node_rec {
     char *name;
+    char *canonical_name;
     attr_list contact_list;
     char *str_contact_list;
     CMConnection conn;
@@ -54,7 +55,9 @@ struct _EVdfg {
     EVdfg_stone *stones;
     int node_count;
     EVint_node_list nodes;
+    EVdfgJoinHandlerFunc node_join_handler;
     int my_node_id;
+    int realized;
     int already_shutdown;
     int active_sink_count;
 };
@@ -259,6 +262,17 @@ dfg_shutdown_handler(CManager cm, CMConnection conn, void *vmsg,
     }
 }
 
+extern void
+EVdfg_assign_canonical_name(EVdfg dfg, char *given_name, char *canonical_name)
+{
+    int node;
+    for (node = 0; node < dfg->node_count; node++) {
+	if (dfg->nodes[node].name == given_name) {
+	    dfg->nodes[node].canonical_name = strdup(canonical_name);
+	}
+    }
+}
+
 static void
 node_register_handler(CManager cm, CMConnection conn, void *vmsg, 
 		      void *client_data, attr_list attrs)
@@ -270,19 +284,35 @@ node_register_handler(CManager cm, CMConnection conn, void *vmsg,
     (void)cm;
     (void)conn;
     (void)attrs;
-    for (node = 0; node < dfg->node_count; node++) {
-	if (strcmp(dfg->nodes[node].name, msg->node_name) == 0) {
-	    dfg->nodes[node].conn = conn;
-	    dfg->nodes[node].str_contact_list = strdup(msg->contact_string);
-	    dfg->nodes[node].contact_list = attr_list_from_string(dfg->nodes[node].str_contact_list);
-	    new_node = node;
-	    break;
+    if (dfg->node_join_handler == NULL) {
+	/* static node list */
+	for (node = 0; node < dfg->node_count; node++) {
+	    if (strcmp(dfg->nodes[node].name, msg->node_name) == 0) {
+		dfg->nodes[node].conn = conn;
+		dfg->nodes[node].str_contact_list = strdup(msg->contact_string);
+		dfg->nodes[node].contact_list = attr_list_from_string(dfg->nodes[node].str_contact_list);
+		new_node = node;
+		break;
+	    }
 	}
-    }
-    if (new_node == -1) {
-	printf("Registering node \"%s\" not found in node list\n", 
-	       msg->node_name);
-	return;
+	if (new_node == -1) {
+	    printf("Registering node \"%s\" not found in node list\n", 
+		   msg->node_name);
+	    return;
+	}
+    } else {
+	int node = dfg->node_count++;
+	dfg->nodes = realloc(dfg->nodes, (sizeof(dfg->nodes[0])*dfg->node_count));
+	memset(&dfg->nodes[node], 0, sizeof(dfg->nodes[0]));
+	dfg->nodes[node].name = strdup(msg->node_name);
+	dfg->nodes[node].canonical_name = NULL;
+	dfg->nodes[node].shutdown_status_contribution = STATUS_UNDETERMINED;
+	dfg->nodes[node].self = 0;
+	dfg->nodes[node].conn = conn;
+	dfg->nodes[node].str_contact_list = strdup(msg->contact_string);
+	dfg->nodes[node].contact_list = attr_list_from_string(dfg->nodes[node].str_contact_list);
+	new_node = node;
+	printf("Master, client %s on conn %p\n", msg->node_name, conn);
     }
     CMtrace_out(cm, EVerbose, "Client \"%s\" has joined DFG, contact %s\n", msg->node_name, dfg->nodes[new_node].str_contact_list);
     check_all_nodes_registered(dfg);
@@ -396,7 +426,7 @@ EVdfg_realize(EVdfg dfg)
 {
     check_connectivity(dfg);
 //    check_types(dfg);
-    (void) dfg;
+    dfg->realized = 1;
     return 1;
 }
 
@@ -410,6 +440,7 @@ EVdfg_register_node_list(EVdfg dfg, char **nodes)
     memset(dfg->nodes, 0, sizeof(dfg->nodes[0]) * count);
     for (i = 0; i < dfg->node_count; i++) {
 	dfg->nodes[i].name = strdup(nodes[i]);
+	dfg->nodes[i].canonical_name = strdup(nodes[i]);
 	dfg->nodes[i].shutdown_status_contribution = STATUS_UNDETERMINED;
     }
 }
@@ -420,9 +451,13 @@ EVdfg_assign_node(EVdfg_stone stone, char *node_name)
     EVdfg dfg = stone->dfg;
     int i, node = -1;
     for (i = 0; i < dfg->node_count; i++) {
-	if (strcmp(dfg->nodes[i].name, node_name) == 0) {
+	EVint_node_list n = &dfg->nodes[i];
+	if (n->canonical_name && (strcmp(n->canonical_name, node_name) == 0)) {
+	    node = i;
+	} else 	if (n->name && (strcmp(n->name, node_name) == 0)) {
 	    node = i;
 	}
+
     }
     if (node == -1) {
 	printf("Node \"%s\" not found in node list\n", node_name);
@@ -568,16 +603,28 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
     if (CMcontact_self_check(cm, master_attrs) == 1) {
 	/* we are the master */
 	int node=0;
-	for (node = 0; node < dfg->node_count; node++) {
-	    if (strcmp(dfg->nodes[node].name, node_name) == 0) {
-		dfg->nodes[node].self = 1;
-		dfg->my_node_id = node;
-		break;
+	if (dfg->node_join_handler == NULL) {
+	    /* static node list */
+	    for (node = 0; node < dfg->node_count; node++) {
+		if (strcmp(dfg->nodes[node].name, node_name) == 0) {
+		    dfg->nodes[node].self = 1;
+		    dfg->my_node_id = node;
+		    break;
+		}
 	    }
-	}
-	if (node == dfg->node_count) {
-	    printf("Node \"%s\" not found in node list\n", node_name);
-	    exit(1);
+	    if (node == dfg->node_count) {
+		printf("Node \"%s\" not found in node list\n", node_name);
+		exit(1);
+	    }
+	} else {
+	    dfg->node_count = 1;
+	    dfg->nodes = malloc(sizeof(dfg->nodes[0]));
+	    memset(dfg->nodes, 0, sizeof(dfg->nodes[0]));
+	    dfg->nodes[0].name = strdup(node_name);
+	    dfg->nodes[0].canonical_name = NULL;
+	    dfg->nodes[0].shutdown_status_contribution = STATUS_UNDETERMINED;
+	    dfg->nodes[0].self = 1;
+	    dfg->my_node_id = 0;
 	}
 	dfg->ready_condition = CMCondition_get(cm, NULL);
 	check_all_nodes_registered(dfg);
@@ -802,13 +849,25 @@ possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn)
     CMtrace_out(cm, EVerbose, "Master DFG shutdown\n");
 }
 
+extern void EVdfg_node_join_handler(EVdfg dfg, EVdfgJoinHandlerFunc func)
+{
+    dfg->node_join_handler = func;
+}
+
 static void
 check_all_nodes_registered(EVdfg dfg)
 {
     int i;
-    for(i=0; i<dfg->node_count; i++) {
-	if (!dfg->nodes[i].self && (dfg->nodes[i].conn == NULL)) {
-	    return;
+    if (dfg->node_join_handler != NULL) {
+	EVint_node_list node = &dfg->nodes[dfg->node_count-1];
+	(dfg->node_join_handler)(dfg, node->name, NULL, NULL);
+	if (dfg->realized == 0) return;
+    } else {
+	/* must be static node list */
+	for(i=0; i<dfg->node_count; i++) {
+	    if (!dfg->nodes[i].self && (dfg->nodes[i].conn == NULL)) {
+		return;
+	    }
 	}
     }
     perform_deployment(dfg);
