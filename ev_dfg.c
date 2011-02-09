@@ -132,19 +132,40 @@ EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs)
     stone->attrs = attrs;
 }
 
+typedef struct _leaf_element {
+    char *name;
+    char *FMtype;
+} leaf_element, leaf_elemp;
+
 typedef struct _EVregister_msg {
     char *node_name;
     char *contact_string;
+    int source_count;
+    int sink_count;
+    leaf_element *sinks;
+    leaf_element *sources;
 } EVregister_msg, *EVregister_ptr;
+
+FMField EVleaf_element_flds[] = {
+    {"name", "string", sizeof(char*), FMOffset(leaf_element*, name)},
+    {"FMtype", "string", sizeof(char*), FMOffset(leaf_element*, FMtype)},
+    {NULL, NULL, 0, 0}
+};
 
 FMField EVregister_msg_flds[] = {
     {"node_name", "string", sizeof(char*), FMOffset(EVregister_ptr, node_name)},
     {"contact_string", "string", sizeof(char*), FMOffset(EVregister_ptr, contact_string)},
+    {"source_count", "integer", sizeof(int), FMOffset(EVregister_ptr, source_count)},
+    {"sink_count", "integer", sizeof(int), FMOffset(EVregister_ptr, sink_count)},
+    {"sources", "source_element[source_count]", sizeof(leaf_element), FMOffset(EVregister_ptr, sources)},
+    {"sinks", "sink_element[sink_count]", sizeof(leaf_element), FMOffset(EVregister_ptr, sinks)},
     {NULL, NULL, 0, 0}
 };
 
-FMStructDescRec EVdeploy_register_format_list[] = {
-    {"EVdeploy_register", EVregister_msg_flds, sizeof(EVregister_msg), NULL},
+FMStructDescRec EVdfg_register_format_list[] = {
+    {"EVdfg_register", EVregister_msg_flds, sizeof(EVregister_msg), NULL},
+    {"sink_element", EVleaf_element_flds, sizeof(leaf_element), NULL},
+    {"source_element", EVleaf_element_flds, sizeof(leaf_element), NULL},
     {NULL, NULL, 0, NULL}
 };
 
@@ -176,7 +197,7 @@ FMStructDescRec EVdfg_shutdown_format_list[] = {
     {NULL, NULL, 0, NULL}
 };
 
-typedef struct _EVdeploy_msg_stone {
+typedef struct _EVdfg_msg_stone {
     int global_stone_id;
     char *attrs;
     int out_count;
@@ -186,7 +207,7 @@ typedef struct _EVdeploy_msg_stone {
     char **xactions;
 } *deploy_msg_stone;
 
-FMField EVdeploy_stone_flds[] = {
+FMField EVdfg_stone_flds[] = {
     {"global_stone_id", "integer", sizeof(int), 
      FMOffset(deploy_msg_stone, global_stone_id)},
     {"attrs", "string", sizeof(char*), 
@@ -203,21 +224,24 @@ FMField EVdeploy_stone_flds[] = {
      FMOffset(deploy_msg_stone, xactions)},
     {NULL, NULL, 0, 0}
 };
-typedef struct _EVdeploy_stones_msg {
+typedef struct _EVdfg_stones_msg {
+    char *canonical_name;
     int stone_count;
     deploy_msg_stone stone_list;
-} EVdeploy_stones_msg, *EVdeploy_stones_ptr;
+} EVdfg_stones_msg, *EVdfg_stones_ptr;
 
-FMField EVdeploy_msg_flds[] = {
+FMField EVdfg_msg_flds[] = {
+    {"canonical_name", "string", sizeof(char*),
+     FMOffset(EVdfg_stones_ptr, canonical_name)},
     {"stone_count", "integer", sizeof(int),
-     FMOffset(EVdeploy_stones_ptr, stone_count)},
-    {"stone_list", "EVdfg_deploy_stone[stone_count]", sizeof(struct _EVdeploy_msg_stone), FMOffset(EVdeploy_stones_ptr, stone_list)},
+     FMOffset(EVdfg_stones_ptr, stone_count)},
+    {"stone_list", "EVdfg_deploy_stone[stone_count]", sizeof(struct _EVdfg_msg_stone), FMOffset(EVdfg_stones_ptr, stone_list)},
     {NULL, NULL, 0, 0}
 };
 
 FMStructDescRec EVdfg_deploy_format_list[] = {
-    {"EVdfg_deploy", EVdeploy_msg_flds, sizeof(EVdeploy_stones_msg), NULL},
-    {"EVdfg_deploy_stone", EVdeploy_stone_flds, sizeof(struct _EVdeploy_msg_stone), NULL},
+    {"EVdfg_deploy", EVdfg_msg_flds, sizeof(EVdfg_stones_msg), NULL},
+    {"EVdfg_deploy_stone", EVdfg_stone_flds, sizeof(struct _EVdfg_msg_stone), NULL},
     {NULL, NULL, 0, NULL}
 };
 
@@ -291,6 +315,7 @@ node_register_handler(CManager cm, CMConnection conn, void *vmsg,
 		dfg->nodes[node].conn = conn;
 		dfg->nodes[node].str_contact_list = strdup(msg->contact_string);
 		dfg->nodes[node].contact_list = attr_list_from_string(dfg->nodes[node].str_contact_list);
+		dfg->nodes[node].shutdown_status_contribution = STATUS_UNDETERMINED;
 		new_node = node;
 		break;
 	    }
@@ -301,17 +326,17 @@ node_register_handler(CManager cm, CMConnection conn, void *vmsg,
 	    return;
 	}
     } else {
-	int node = dfg->node_count++;
+	int n = dfg->node_count++;
 	dfg->nodes = realloc(dfg->nodes, (sizeof(dfg->nodes[0])*dfg->node_count));
-	memset(&dfg->nodes[node], 0, sizeof(dfg->nodes[0]));
-	dfg->nodes[node].name = strdup(msg->node_name);
-	dfg->nodes[node].canonical_name = NULL;
-	dfg->nodes[node].shutdown_status_contribution = STATUS_UNDETERMINED;
-	dfg->nodes[node].self = 0;
-	dfg->nodes[node].conn = conn;
-	dfg->nodes[node].str_contact_list = strdup(msg->contact_string);
-	dfg->nodes[node].contact_list = attr_list_from_string(dfg->nodes[node].str_contact_list);
-	new_node = node;
+	memset(&dfg->nodes[n], 0, sizeof(dfg->nodes[0]));
+	dfg->nodes[n].name = strdup(msg->node_name);
+	dfg->nodes[n].canonical_name = NULL;
+	dfg->nodes[n].shutdown_status_contribution = STATUS_UNDETERMINED;
+	dfg->nodes[n].self = 0;
+	dfg->nodes[n].conn = conn;
+	dfg->nodes[n].str_contact_list = strdup(msg->contact_string);
+	dfg->nodes[n].contact_list = attr_list_from_string(dfg->nodes[n].str_contact_list);
+	new_node = n;
     }
     CMtrace_out(cm, EVerbose, "Client \"%s\" has joined DFG, contact %s\n", msg->node_name, dfg->nodes[new_node].str_contact_list);
     check_all_nodes_registered(dfg);
@@ -326,7 +351,7 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
     (void) dfg;
     (void) conn;
     (void) attrs;
-    EVdeploy_stones_ptr msg =  vmsg;
+    EVdfg_stones_ptr msg =  vmsg;
     int i, base = evp->stone_lookup_table_size;
 
     CManager_lock(cm);
@@ -385,7 +410,7 @@ EVdfg_create(CManager cm)
     contact_list = CMget_contact_list(cm);
     dfg->master_contact_str = attr_list_to_string(contact_list);
     free_attr_list(contact_list);
-    CMregister_handler(CMregister_format(cm, EVdeploy_register_format_list),
+    CMregister_handler(CMregister_format(cm, EVdfg_register_format_list),
 		       node_register_handler, dfg);
     CMregister_handler(CMregister_format(cm, EVdfg_ready_format_list),
 		       dfg_ready_handler, dfg);
@@ -597,6 +622,7 @@ extern void
 EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 {
     CManager cm = dfg->cm;
+    event_path_data evp = cm->evp;
     attr_list master_attrs = attr_list_from_string(master_contact);
     dfg->master_contact_str = strdup(master_contact);
     if (CMcontact_self_check(cm, master_attrs) == 1) {
@@ -629,10 +655,11 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	check_all_nodes_registered(dfg);
     } else {
 	CMConnection conn = CMget_conn(cm, master_attrs);
-	CMFormat register_msg = CMlookup_format(cm, EVdeploy_register_format_list);
+	CMFormat register_msg = CMlookup_format(cm, EVdfg_register_format_list);
 	EVregister_msg msg;
 	attr_list contact_list = CMget_contact_list(cm);
 	char *my_contact_str;
+	int i;
 	if (contact_list == NULL) {
 	    CMlisten(cm);
 	    contact_list = CMget_contact_list(cm);
@@ -644,6 +671,19 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	dfg->ready_condition = CMCondition_get(cm, conn);
 	msg.node_name = node_name;
 	msg.contact_string = my_contact_str;
+	msg.source_count = evp->source_count;
+	msg.sources = malloc(msg.source_count * sizeof(msg.sources[0]));
+	for (i=0; i < evp->source_count; i++) {
+	    msg.sources[i].name = evp->sources[i].name;
+	    msg.sources[i].FMtype = NULL;
+	}
+	msg.sink_count = evp->sink_handler_count;
+	msg.sinks = malloc(msg.sink_count * sizeof(msg.sinks[0]));
+	for (i=0; i < evp->sink_handler_count; i++) {
+	    msg.sinks[i].name = evp->sink_handlers[i].name;
+	    msg.sinks[i].FMtype = NULL;
+	}
+	
 	CMwrite(conn, register_msg, &msg);
 	free(my_contact_str);
 	dfg->master_connection = conn;
@@ -697,7 +737,7 @@ deploy_to_node(EVdfg dfg, int node)
 {
     int i, j;
     int stone_count = 0;
-    EVdeploy_stones_msg msg;
+    EVdfg_stones_msg msg;
     CMFormat deploy_msg = CMlookup_format(dfg->cm, EVdfg_deploy_format_list);
 
     for (i=0; i< dfg->stone_count; i++) {
@@ -706,6 +746,7 @@ deploy_to_node(EVdfg dfg, int node)
 	}
     }
     if (stone_count == 0) return;
+    msg.canonical_name = dfg->nodes[node].canonical_name;
     msg.stone_count = stone_count;
     msg.stone_list = malloc(stone_count * sizeof(msg.stone_list[0]));
     j = 0;
