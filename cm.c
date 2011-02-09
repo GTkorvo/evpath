@@ -744,6 +744,7 @@ remove_conn_from_CM(CManager cm, CMConnection conn)
 	fprintf(stderr, "Internal error, remove_conn_from_CM.  Not found\n");
     } else {
 	cm->connection_count--;
+	cm->abort_read_ahead = 1;
     }
 }
 
@@ -1619,7 +1620,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	/*  lookup registered message prefixes and try to find handler */
 	/*  otherwise give up */
 	if (CMdo_non_CM_handler(conn, *(int*)buffer, buffer, length) == 0) {
-	    printf("Unknown message on connection %lx, %x\n", (long) conn, *(int*)buffer);
+	    printf("Unknown message on connection %lx, failed %d, closed %d, %x\n", (long) conn, conn->failed, conn->closed, *(int*)buffer);
 	    CMConnection_failed(conn);
 	}	    
 	return 0;
