@@ -1160,13 +1160,14 @@ attr_list listen_info;
 	    return NULL;
 	}
     } else {
+	long seedval = time(NULL) + getpid();
 	/* port num is free.  Constrain to range 26000 : 26100 */
-	srand48(time(NULL));
 	int low_bound = 26000;
 	int high_bound = 26100;
 	int size = high_bound - low_bound;
 	int tries = 10;
 	int result = SOCKET_ERROR;
+	srand48(seedval);
 	while (tries > 0) {
 	    int target = low_bound + size * drand48();
 	    sock_addr.sin_port = htons(target);
@@ -1175,6 +1176,10 @@ attr_list listen_info;
 			  sizeof sock_addr);
 	    tries--;
 	    if (result != SOCKET_ERROR) tries = 0;
+	    if (tries == 5) {
+		/* try reseeding in case we're in sync with another process */
+		srand48(time(NULL) + getpid());
+	    }
 	}
 	if (result == SOCKET_ERROR) {
 	    fprintf(stderr, "Cannot bind INET socket\n");
