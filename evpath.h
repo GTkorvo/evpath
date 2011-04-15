@@ -1460,6 +1460,34 @@ EVaction_remove_split_target(CManager cm, EVstone stone, EVaction action,
 			  EVstone target_stone);
 
 /*!
+ * Add a particular target to any split action associated with a stone.
+ *
+ * This call adds a target stone to the list of stones to which a split
+ * action will replicate data.
+ *
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The split stone.
+ * \param target_stone The target stone to add to the list.
+ */
+/*REMOTE*/
+extern void
+EVstone_add_split_target(CManager cm, EVstone stone, EVstone target_stone);
+
+/*!
+ * Remove a particular target from any split action associated with a stone.
+ *
+ * This call removes a target stone from the list of stones to which a split
+ * action will replicate data.
+ *
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The split stone.
+ * \param target_stone The target stone to remove from the list.
+ */
+/*REMOTE*/
+extern void
+EVstone_remove_split_target(CManager cm, EVstone stone, EVstone target_stone);
+
+/*!
  * Associate a congestion-event action with an output stone.
  *
  * EVassoc_congestion_action() can be used to install a handler which

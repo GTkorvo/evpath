@@ -2128,6 +2128,35 @@ INT_EVaction_add_split_target(CManager cm, EVstone stone_num,
     return 1;
 }
 
+extern int
+INT_EVstone_add_split_target(CManager cm, EVstone stone_num, EVstone new_stone_target)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone;
+    int action_num = 0;
+
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return -1;
+
+    for (action_num = 0; action_num < stone->proto_action_count; action_num ++) {
+	if (stone->proto_actions[action_num].action_type == Action_Split ) {
+	    EVstone *target_stone_list;
+	    int target_count = 0;
+
+	    target_stone_list = stone->proto_actions[action_num].o.split_stone_targets;
+	    while (target_stone_list && (target_stone_list[target_count] != -1)) {
+		target_count++;
+	    }
+	    target_stone_list = realloc(target_stone_list, 
+					(target_count + 2) * sizeof(EVstone));
+	    target_stone_list[target_count] = new_stone_target;
+	    target_stone_list[target_count+1] = -1;
+	    stone->proto_actions[action_num].o.split_stone_targets = target_stone_list;
+	}
+    }
+    return 1;
+}
+
 extern void
 INT_EVaction_remove_split_target(CManager cm, EVstone stone_num, 
 			  EVaction action_num, EVstone stone_target)
@@ -2154,6 +2183,36 @@ INT_EVaction_remove_split_target(CManager cm, EVstone stone_num,
 	target_count++;
     }
     target_stone_list[target_count] = -1;
+}
+
+extern void
+INT_EVstone_remove_split_target(CManager cm, EVstone stone_num, EVstone stone_target)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone;
+    int action_num = 0;
+
+    stone = stone_struct(evp, stone_num);
+    if (!stone) return;
+
+    for (action_num = 0; action_num < stone->proto_action_count; action_num ++) {
+	if (stone->proto_actions[action_num].action_type != Action_Split ) {
+	    EVstone *target_stone_list;
+	    int target_count = 0;
+
+	    target_stone_list = stone->proto_actions[action_num].o.split_stone_targets;
+	    if (!target_stone_list) return;
+	    while (target_stone_list[target_count] != stone_target) {
+		target_count++;
+	    }
+	    while (target_stone_list[target_count+1] != -1 ) {
+		/* move them down, overwriting target */
+		target_stone_list[target_count] = target_stone_list[target_count+1];
+		target_count++;
+	    }
+	    target_stone_list[target_count] = -1;
+	}
+    }
 }
 
 void

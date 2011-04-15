@@ -324,6 +324,11 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone, FMStructDescList format_
 extern int
 INT_EVaction_add_split_target(CManager cm, EVstone stone, EVaction action,
 			  EVstone target_stone);
+extern int
+INT_EVstone_add_split_target(CManager cm, EVstone stone, EVstone target_stone);
+
+extern void
+INT_EVstone_remove_split_target(CManager cm, EVstone stone, EVstone target_stone);
 
 extern int
 INT_EVaction_set_output(CManager cm, EVstone stone, EVaction action, 
