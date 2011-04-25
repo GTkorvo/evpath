@@ -3122,6 +3122,31 @@ INT_EVextract_stone_events(CManager cm, EVstone stone_id)
     return list;
 }
 
+extern int
+INT_EVtransfer_events(CManager cm, EVstone src_stone_id, EVstone dest_stone_id)
+{
+    event_path_data evp = cm->evp;
+    stone_type src_stone, dest_stone;
+    int count = 0;
+    queue_item * item;
+    event_item * event;
+
+    src_stone = stone_struct(evp, src_stone_id);
+    if (!src_stone) return -1;
+    dest_stone = stone_struct(evp, dest_stone_id);
+    if (!dest_stone) return -1;
+    item = src_stone->queue->queue_head;
+    while (item != NULL) {
+	queue_item *next = item->next;
+	event = dequeue_item(cm, src_stone, item);
+	internal_path_submit(cm, dest_stone_id, event);
+	return_event(evp, event);
+	count++;
+	item = next;
+    }
+    return count;
+}
+
 extern attr_list
 INT_EVextract_attr_list(CManager cm, EVstone stone_id)
 {

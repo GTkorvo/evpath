@@ -372,6 +372,7 @@ extern int INT_EVfreeze_stone(CManager cm, EVstone stone_id);
 extern int INT_EVunfreeze_stone(CManager cm, EVstone stone_id);
 extern int INT_EVdrain_stone(CManager cm, EVstone stone_id);
 extern EVevent_list INT_EVextract_stone_events(CManager cm, EVstone stone_id);
+extern int INT_EVtransfer_events(CManager cm, EVstone src_stone, EVstone dest_stone);
 extern attr_list INT_EVextract_attr_list(CManager cm, EVstone stone_id);
 extern void INT_EVset_attr_list(CManager cm, EVstone stone_id, attr_list list);
 extern void INT_EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num, int store_limit);

@@ -1,7 +1,7 @@
 
 AUTOMAKE_OPTIONS = no-dependencies foreign
 
-TESTS = evtest remote_terminal_test
+TESTS = evtest remote_terminal_test extract_test
 
 INCLUDES = -I$(srcdir)/.. -I..
 

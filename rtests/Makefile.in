@@ -34,7 +34,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-TESTS = evtest$(EXEEXT) remote_terminal_test$(EXEEXT)
+TESTS = evtest$(EXEEXT) remote_terminal_test$(EXEEXT) \
+	extract_test$(EXEEXT)
 noinst_PROGRAMS = $(am__EXEEXT_1)
 subdir = rtests
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
@@ -54,12 +55,17 @@ mkinstalldirs = $(install_sh) -d
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
-am__EXEEXT_1 = evtest$(EXEEXT) remote_terminal_test$(EXEEXT)
+am__EXEEXT_1 = evtest$(EXEEXT) remote_terminal_test$(EXEEXT) \
+	extract_test$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
 evtest_SOURCES = evtest.c
 evtest_OBJECTS = evtest.$(OBJEXT)
 evtest_LDADD = $(LDADD)
 evtest_DEPENDENCIES = ../libevpath.la
+extract_test_SOURCES = extract_test.c
+extract_test_OBJECTS = extract_test.$(OBJEXT)
+extract_test_LDADD = $(LDADD)
+extract_test_DEPENDENCIES = ../libevpath.la
 remote_terminal_test_SOURCES = remote_terminal_test.c
 remote_terminal_test_OBJECTS = remote_terminal_test.$(OBJEXT)
 remote_terminal_test_LDADD = $(LDADD)
@@ -76,8 +82,8 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = evtest.c remote_terminal_test.c
-DIST_SOURCES = evtest.c remote_terminal_test.c
+SOURCES = evtest.c extract_test.c remote_terminal_test.c
+DIST_SOURCES = evtest.c extract_test.c remote_terminal_test.c
 ETAGS = etags
 CTAGS = ctags
 am__tty_colors = \
@@ -110,7 +116,7 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EVDIR = @EVDIR@
 EXEEXT = @EXEEXT@
-FFSDIR = @FFSDIR@
+FFSLINKARG = @FFSLINKARG@
 FGREP = @FGREP@
 GREP = @GREP@
 INCLTDL = @INCLTDL@
@@ -275,6 +281,9 @@ clean-noinstPROGRAMS:
 evtest$(EXEEXT): $(evtest_OBJECTS) $(evtest_DEPENDENCIES) 
 	@rm -f evtest$(EXEEXT)
 	$(LINK) $(evtest_OBJECTS) $(evtest_LDADD) $(LIBS)
+extract_test$(EXEEXT): $(extract_test_OBJECTS) $(extract_test_DEPENDENCIES) 
+	@rm -f extract_test$(EXEEXT)
+	$(LINK) $(extract_test_OBJECTS) $(extract_test_LDADD) $(LIBS)
 remote_terminal_test$(EXEEXT): $(remote_terminal_test_OBJECTS) $(remote_terminal_test_DEPENDENCIES) 
 	@rm -f remote_terminal_test$(EXEEXT)
 	$(LINK) $(remote_terminal_test_OBJECTS) $(remote_terminal_test_LDADD) $(LIBS)

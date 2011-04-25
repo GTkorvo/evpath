@@ -1758,10 +1758,24 @@ EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
  * \param attrs The attribute list to be submitted with the data.
  *
  */
-/*REMOTE*/
 extern void
 EVsubmit_encoded(CManager cm, EVstone stone, void *data, int data_len,
 		 attr_list attrs);
+
+/*!
+ * Submit a pre-encoded event for processing by EVPath.
+ *
+ * EVtransfer_events will dequeue events in the incoming data queue 
+ * associated with the \b src_stone parameter and re-enqueue them on
+ * the dest_stone.
+ * \param cm The CManager associated with the stone.
+ * \param src_stone The stone from which events are to be removed
+ * \param dest_stone The stone to which events are to transfered
+ * \return -1 on error, otherwise count of events transferred on success;
+ */
+/*REMOTE*/
+extern int
+EVtransfer_events(CManager cm, EVstone src_stone, EVstone dest_stone);
 
 /*!
  * Assume control over a incoming buffer of data.
@@ -1801,7 +1815,7 @@ EVreturn_event_buffer ARGS((CManager cm, void *event));
  *
  * Some middleware may find it useful to access the FMFormat that is
  * produced when the FMStructDescList associated with a source is registered
- * with PBIO.  This call merely gives access to that information to save a
+ * with FFS.  This call merely gives access to that information to save a
  * reregistration step.
  * \param source The EVsource value for which to retrieve the associated
  * FMFormat.
@@ -1959,7 +1973,6 @@ EVdrain_stone(CManager cm, EVstone stone_id);
  * \return  Returns an array of structures (EVevent_list) containing the
  * lengths of events and pointers to the encoded versions of events
  */
-/*REMOTE*/
 extern EVevent_list
 EVextract_stone_events(CManager cm, EVstone stone_id);
 
