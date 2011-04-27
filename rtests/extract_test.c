@@ -87,7 +87,7 @@ typedef struct _client_rec {
     int *message_count;
 } *client_data_ptr;
 
-int
+static int
 simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     simple_rec_ptr event = vevent;
@@ -345,6 +345,9 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
 	CMsleep(cm, 7);
 	REVfreeze_stone(conn, bridge1);
 	count = REVtransfer_events(conn, bridge1, bridge2);
+	if (quiet <= 0) {
+	    printf("Events transfered : %d\n", count);
+	}
 	REVdrain_stone(conn, bridge2);
 }
 
