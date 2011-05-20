@@ -60,7 +60,7 @@ load_transport(CManager cm, const char *trans_name)
 	    transport_entry trans = add_transport_to_cm(cm, *trans_list);
 	    if (trans->transport_init) {
 		trans->trans_data = 
-		    trans->transport_init(cm, &CMstatic_trans_svcs);
+		    trans->transport_init(cm, &CMstatic_trans_svcs, trans);
 	    }
 	    return 1;
 	}
@@ -139,7 +139,7 @@ load_transport(CManager cm, const char *trans_name)
     CMtrace_out(cm, CMTransportVerbose, "Listen is %p\n", transport->listen);
     if (transport->transport_init) {
 	transport->trans_data = 
-	    transport->transport_init(cm, &CMstatic_trans_svcs);
+	    transport->transport_init(cm, &CMstatic_trans_svcs, transport);
     }
     transport = add_transport_to_cm(cm, transport);
 #else
@@ -166,7 +166,7 @@ load_transport(CManager cm, const char *trans_name)
     CMtrace_out(cm, CMTransportVerbose, "Listen is %lx\n", transport->listen);
     if (transport->transport_init) {
 	transport->trans_data = 
-	    transport->transport_init(cm, &CMstatic_trans_svcs);
+	    transport->transport_init(cm, &CMstatic_trans_svcs, transport);
     }
     transport = add_transport_to_cm(cm, transport);
 

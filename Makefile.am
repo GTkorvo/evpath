@@ -16,10 +16,16 @@ else
 LIB_IB =
 endif
 
+if BUILD_ENET
+LIB_ENET = libcmenet.la 
+else
+LIB_ENET =
+endif
+
 if CNL
 lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la 
 else
-lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la libcmsockets.la libcmselect.la $(LIB_IB)
+lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la libcmsockets.la libcmselect.la $(LIB_IB) $(LIB_ENET)
 endif 
 EXTRA_LTLIBRARIES = 
 
@@ -67,6 +73,12 @@ libcmsockets_la_LDFLAGS = -module -export-symbols-regex "libcmsockets.*"
 libcmselect_la_SOURCES = cmselect.c
 libcmselect_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@
 libcmselect_la_LDFLAGS = -module -export-symbols-regex "libcmselect.*" -lgen_thread
+endif
+
+if BUILD_ENET
+libcmenet_la_SOURCES = cmenet.c
+libcmenet_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env
+libcmenet_la_LDFLAGS = -module -export-symbols-regex "libcmenet.*"
 endif
 
 libcmmulticast_la_SOURCES = cmmulticast.c

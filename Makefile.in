@@ -89,6 +89,15 @@ am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)" \
 	"$(DESTDIR)$(pkgconfigdir)" "$(DESTDIR)$(includedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
+@BUILD_ENET_TRUE@libcmenet_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+@BUILD_ENET_TRUE@	$(am__DEPENDENCIES_1)
+am__libcmenet_la_SOURCES_DIST = cmenet.c
+@BUILD_ENET_TRUE@am_libcmenet_la_OBJECTS = cmenet.lo
+libcmenet_la_OBJECTS = $(am_libcmenet_la_OBJECTS)
+libcmenet_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libcmenet_la_LDFLAGS) $(LDFLAGS) -o $@
+@BUILD_ENET_TRUE@@CNL_FALSE@am_libcmenet_la_rpath = -rpath $(libdir)
 @BUILD_IB_TRUE@libcmib_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 @BUILD_IB_TRUE@	$(am__DEPENDENCIES_1)
 am__libcmib_la_SOURCES_DIST = cmib.c
@@ -164,11 +173,12 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
-SOURCES = $(libcmib_la_SOURCES) $(libcmmulticast_la_SOURCES) \
-	$(libcmselect_la_SOURCES) $(libcmsockets_la_SOURCES) \
-	$(libcmudp_la_SOURCES) $(libevpath_la_SOURCES)
-DIST_SOURCES = $(am__libcmib_la_SOURCES_DIST) \
-	$(libcmmulticast_la_SOURCES) \
+SOURCES = $(libcmenet_la_SOURCES) $(libcmib_la_SOURCES) \
+	$(libcmmulticast_la_SOURCES) $(libcmselect_la_SOURCES) \
+	$(libcmsockets_la_SOURCES) $(libcmudp_la_SOURCES) \
+	$(libevpath_la_SOURCES)
+DIST_SOURCES = $(am__libcmenet_la_SOURCES_DIST) \
+	$(am__libcmib_la_SOURCES_DIST) $(libcmmulticast_la_SOURCES) \
 	$(am__libcmselect_la_SOURCES_DIST) \
 	$(am__libcmsockets_la_SOURCES_DIST) $(libcmudp_la_SOURCES) \
 	$(am__libevpath_la_SOURCES_DIST)
@@ -253,7 +263,7 @@ ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EVDIR = @EVDIR@
 EXEEXT = @EXEEXT@
-FFSDIR = @FFSDIR@
+FFSLINKARG = @FFSLINKARG@
 FGREP = @FGREP@
 GREP = @GREP@
 INCLTDL = @INCLTDL@
@@ -376,7 +386,9 @@ INCLUDES = $(INCLTDL)
 EXTRA_DIST = 
 @BUILD_IB_FALSE@LIB_IB = 
 @BUILD_IB_TRUE@LIB_IB = libcmib.la 
-@CNL_FALSE@lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la libcmsockets.la libcmselect.la $(LIB_IB)
+@BUILD_ENET_FALSE@LIB_ENET = 
+@BUILD_ENET_TRUE@LIB_ENET = libcmenet.la 
+@CNL_FALSE@lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la libcmsockets.la libcmselect.la $(LIB_IB) $(LIB_ENET)
 @CNL_TRUE@lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la 
 EXTRA_LTLIBRARIES = 
 pkgconfigdir = $(libdir)/pkgconfig
@@ -401,6 +413,9 @@ noinst_HEADERS = cm_internal.h  ev_internal.h
 @CNL_FALSE@libcmselect_la_SOURCES = cmselect.c
 @CNL_FALSE@libcmselect_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@
 @CNL_FALSE@libcmselect_la_LDFLAGS = -module -export-symbols-regex "libcmselect.*" -lgen_thread
+@BUILD_ENET_TRUE@libcmenet_la_SOURCES = cmenet.c
+@BUILD_ENET_TRUE@libcmenet_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env
+@BUILD_ENET_TRUE@libcmenet_la_LDFLAGS = -module -export-symbols-regex "libcmenet.*"
 libcmmulticast_la_SOURCES = cmmulticast.c
 libcmmulticast_la_LIBADD = $(LTLIBS) $(LIBS)
 libcmmulticast_la_LDFLAGS = -module -export-symbols-regex "libcmmulticast.*"
@@ -497,6 +512,8 @@ clean-libLTLIBRARIES:
 	  echo "rm -f \"$${dir}/so_locations\""; \
 	  rm -f "$${dir}/so_locations"; \
 	done
+libcmenet.la: $(libcmenet_la_OBJECTS) $(libcmenet_la_DEPENDENCIES) 
+	$(libcmenet_la_LINK) $(am_libcmenet_la_rpath) $(libcmenet_la_OBJECTS) $(libcmenet_la_LIBADD) $(LIBS)
 libcmib.la: $(libcmib_la_OBJECTS) $(libcmib_la_DEPENDENCIES) 
 	$(libcmib_la_LINK) $(am_libcmib_la_rpath) $(libcmib_la_OBJECTS) $(libcmib_la_LIBADD) $(LIBS)
 libcmmulticast.la: $(libcmmulticast_la_OBJECTS) $(libcmmulticast_la_DEPENDENCIES) 
@@ -578,6 +595,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_threadio.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_transport.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_util.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmenet.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmmulticast.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmselect.Plo@am__quote@
@@ -631,8 +649,8 @@ install-pkgconfigDATA: $(pkgconfig_DATA)
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo " cmp -s '$$files' '$(DESTDIR)$(pkgconfigdir)/$xfiles' || $(INSTALL_DATA) $$files '$(DESTDIR)$(pkgconfigdir)'"; \
-	  cmp -s '$$files' '$(DESTDIR)$(pkgconfigdir)/$xfiles' || $(INSTALL_DATA) $$files "$(DESTDIR)$(pkgconfigdir)" || exit $$?; \
+	  echo "$(INSTALL_DATA) $$files '$(DESTDIR)$(pkgconfigdir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(pkgconfigdir)" || exit $$?; \
 	done
 
 uninstall-pkgconfigDATA:
@@ -651,8 +669,8 @@ install-includeHEADERS: $(include_HEADERS)
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo " cmp -s '$$files' '$(DESTDIR)$(includedir)/$xfiles' || $(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
-	  cmp -s '$$files' '$(DESTDIR)$(includedir)/$xfiles' || $(INSTALL_HEADER) $$files "$(DESTDIR)$(includedir)" || exit $$?; \
+	  echo "$(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
+	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(includedir)" || exit $$?; \
 	done
 
 uninstall-includeHEADERS:

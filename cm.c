@@ -73,10 +73,12 @@ struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, IN
 					       CMtransport_trace,
 					       CMConnection_create,
 					       INT_CMadd_shutdown_task,
+					       INT_CMadd_periodic_task,
 					       cm_get_data_buf,
 					       cm_return_data_buf,
 					       INT_CMConnection_close,
 					       cm_create_transport_buffer,
+					       cm_create_transport_and_link_buffer,
 					       INT_CMget_transport_data};
 static void CMControlList_close ARGS((CMControlList cl));
 static int CMcontrol_list_poll ARGS((CMControlList cl));
@@ -1294,6 +1296,20 @@ cm_create_transport_buffer(CManager cm, void *buffer, int length)
 //   This should just return the buffer... not update the link list.  That's handled in the calling routine.
 //    tmp->next = cm->cm_buffer_list;
 //    cm->cm_buffer_list = tmp;
+    return tmp;
+}
+
+extern CMbuffer
+cm_create_transport_and_link_buffer(CManager cm, void *buffer, int length)
+{
+    CMbuffer tmp;
+    tmp = INT_CMmalloc(sizeof(*tmp));
+    memset(tmp, 0, sizeof(*tmp));
+    tmp->buffer = buffer;
+    tmp->size = length;
+    tmp->in_use_by_cm = 1;
+    tmp->next = cm->cm_buffer_list;
+    cm->cm_buffer_list = tmp;
     return tmp;
 }
 
