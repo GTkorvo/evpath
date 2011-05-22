@@ -23,5 +23,5 @@ LDADD = ../libevpath.la
 
 LDFLAGS = -static
 
-thin_client_LDADD = -L@FFSDIR@ -lffs
+thin_client_LDADD = @FFSLINKARG@ -lffs
 thin_test_DEPENDENCIES = ../libevpath.la thin_client
