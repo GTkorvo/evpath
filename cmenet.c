@@ -78,6 +78,8 @@ void *sin_addr;
     }
     return 1;
 #endif
+    printf("Check host called, unimplemented\n");
+    return 0;
 }
 
 static enet_conn_data_ptr 
@@ -140,13 +142,15 @@ enet_service_network(CManager cm, void *void_trans)
 
             break;
 	}           
-        case ENET_EVENT_TYPE_DISCONNECT:
-            printf ("%s disconected.\n", (char*)event.peer -> data);
+        case ENET_EVENT_TYPE_DISCONNECT: {
+	    enet_conn_data_ptr enet_conn_data = event.peer -> data;
+	    svc->trace_out(NULL, "Got a disconnect on connection %p\n",
+		event.peer -> data);
 
-            /* Reset the peer's client information. */
-
-            event.peer -> data = NULL;
+            enet_conn_data = event.peer -> data;
+	    enet_conn_data->read_buffer_len = -1;
         }
+	}
     }
 }
 
@@ -209,7 +213,7 @@ enet_accept_conn(enet_client_data_ptr sd, transport_entry trans,
     conn = svc->connection_create(trans, enet_conn_data, conn_attr_list);
     enet_conn_data->conn = conn;
 
-    add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4, (void*)address->host);
+    add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4, (void*)(long)address->host);
     enet_conn_data->remote_IP = address->host;
     enet_conn_data->remote_contact_port = address->port;
 
@@ -238,24 +242,6 @@ enet_conn_data_ptr scd;
 
 
 static int
-is_private_192(int IP)
-{
-    return ((IP & 0xffff0000) == 0xC0A80000);	/* equal 192.168.x.x */
-}
-
-static int
-is_private_182(int IP)
-{
-    return ((IP & 0xffff0000) == 0xB6100000);	/* equal 182.16.x.x */
-}
-
-static int
-is_private_10(int IP)
-{
-    return ((IP & 0xff000000) == 0x0A000000);	/* equal 10.x.x.x */
-}
-
-static int
 initiate_conn(cm, svc, trans, attrs, enet_conn_data, conn_attr_list, no_more_redirect)
 CManager cm;
 CMtrans_services svc;
@@ -265,11 +251,6 @@ enet_conn_data_ptr enet_conn_data;
 attr_list conn_attr_list;
 int no_more_redirect;
 {
-    int sock;
-
-#ifdef TCP_NODELAY
-    int delay_value = 1;
-#endif
     int int_port_num;
     enet_client_data_ptr sd = (enet_client_data_ptr) trans->trans_data;
     char *host_name;
@@ -292,12 +273,12 @@ int no_more_redirect;
         svc->trace_out(cm, "CMEnet transport connect to host_IP %lx", host_ip);
     }
     if ((host_name == NULL) && (host_ip == 0))
-	return -1;
+	return 0;
 
     if (!query_attr(attrs, CM_ENET_PORT, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & int_port_num)) {
 	svc->trace_out(cm, "CMEnet transport found no CM_ENET_PORT attribute");
-	return -1;
+	return 0;
     } else {
         svc->trace_out(cm, "CMEnet transport connect to port %d", int_port_num);
     }
@@ -352,7 +333,7 @@ int no_more_redirect;
         enet_peer_reset (peer);
 
         printf ("Connection to %s:%d failed.", inet_ntoa(sin_addr), address.port);
-	return -1;
+	return 0;
     }
 
     svc->trace_out(cm, "--> Connection established");
@@ -362,7 +343,7 @@ int no_more_redirect;
     enet_conn_data->sd = sd;
     enet_conn_data->peer = peer;
     peer->data = enet_conn_data;
-    return sock;
+    return 1;
 }
 
 /* 
@@ -378,9 +359,8 @@ attr_list attrs;
     enet_conn_data_ptr enet_conn_data = create_enet_conn_data(svc);
     attr_list conn_attr_list = create_attr_list();
     CMConnection conn;
-    int sock;
 
-    if ((sock = initiate_conn(cm, svc, trans, attrs, enet_conn_data, conn_attr_list, 0)) < 0)
+    if (!initiate_conn(cm, svc, trans, attrs, enet_conn_data, conn_attr_list, 0))
 	return NULL;
 
     add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
@@ -388,7 +368,6 @@ attr_list attrs;
     conn = svc->connection_create(trans, enet_conn_data, conn_attr_list);
     enet_conn_data->conn = conn;
 
-/* dump_sockinfo("initiate ", sock); */
     return conn;
 }
 
@@ -666,7 +645,11 @@ CMtrans_services svc;
 enet_conn_data_ptr conn_data;
 int *actual_len;
 {
-    CMbuffer cb = svc->create_data_and_link_buffer(conn_data->sd->cm, conn_data->read_buffer, 
+    CMbuffer cb;
+
+    if (conn_data->read_buffer_len == -1) return NULL;
+
+    cb = svc->create_data_and_link_buffer(conn_data->sd->cm, conn_data->read_buffer, 
 					  conn_data->read_buffer_len);
     *actual_len = conn_data->read_buffer_len;
     conn_data->read_buffer_len = 0;

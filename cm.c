@@ -1534,6 +1534,13 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	    conn->buffer_data_end = length;
 	    cm->abort_read_ahead = 1;
 
+	    if (length == -1) {
+		CMtrace_out(cm, CMLowLevelVerbose, 
+			    "CMdata read failed, actual %d, failing connection %p\n", length, conn);
+		CMConnection_failed(conn);
+		CManager_unlock(cm);
+		return;
+	    }
 	    if (length == 0) {
 		CManager_unlock(cm);
 		return;
