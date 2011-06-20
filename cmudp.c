@@ -394,7 +394,7 @@ libcmudp_data_available(void *vtrans, void *vinput)
     ucd->read_buf_len = nbytes;
     /* kick this upstairs */
     trans->data_available(vtrans, ucd->conn);
-    utd->svc->return_data_buffer(ucd->read_buffer);
+    utd->svc->return_data_buffer(trans->cm, ucd->read_buffer);
 }
 
 /* 

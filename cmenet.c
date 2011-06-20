@@ -531,6 +531,7 @@ attr_list listen_info;
 		     "An error occurred while trying to create an ENet server host.\n");
 	    return NULL;
 	}
+	sd->server = server;
     } else {
 	long seedval = time(NULL) + getpid();
 	/* port num is free.  Constrain to range 26000 : 26100 */
@@ -560,17 +561,8 @@ attr_list listen_info;
 	    fprintf(stderr, "Failed after 5 attempts to bind to a random port.  Lots of undead servers on this host?\n");
 	    return NULL;
 	}
+	sd->server = server;
     }
-//    svc->trace_out(cm, "CMSockets Adding socket_accept_conn as action on fd %d", conn_sock);
-
-    /* in the event the DE is shut down, close the socket */
-    /* 
-     *  -- Don't do this...  Close() seems to hang on sockets after 
-     *  listen() for some reason.  I haven't found anywhere that defines 
-     *  this behavior, but it seems relatively uniform. 
-     */
-    /* DExchange_add_close(de, close_socket_fd, (void*)conn_sock, NULL); */
-
     {
 	char host_name[256];
 	int int_port_num = address.port;
@@ -616,7 +608,6 @@ attr_list listen_info;
 
 	add_attr(ret_list, CM_TRANSPORT, Attr_String,
 		 (attr_value) strdup("enet"));
-	sd->server = server;
 	return ret_list;
     }
 }
@@ -709,6 +700,7 @@ int iovcnt;
 
     /* Send the packet to the peer over channel id 0. */
     if (enet_peer_send (ecd->peer, 0, packet) == -1) return -1;
+    enet_host_flush(ecd->sd->server);
     return iovcnt;
 }
 
@@ -723,6 +715,11 @@ free_enet_data(CManager cm, void *sdv)
     if (sd->hostname != NULL)
 	svc->free_func(sd->hostname);
 /*    svc->free_func(sd);*/
+    if (sd->server != NULL) {
+	ENetHost * server = sd->server;
+	sd->server = NULL;
+	enet_host_destroy(server);
+    }
 }
 
 extern void *

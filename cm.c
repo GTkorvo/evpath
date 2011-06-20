@@ -165,6 +165,8 @@ INT_CMfork_comm_thread(CManager cm)
 		cm->control_list->server_thread = server_thread;
 		cm->control_list->has_thread = 1;
 		cm->reference_count++;
+		CMtrace_out(cm, CMFreeVerbose, "Forked - CManager %lx ref count now %d\n", 
+			    (long) cm, cm->reference_count);
 		cm->control_list->reference_count++;
 		cm->control_list->free_reference_count++;
 	    } else {
@@ -221,6 +223,8 @@ CMControlList_set_blocking_func(CMControlList cl, CManager cm,
 	cm->control_list->free_reference_count++;
 	cl->has_thread = 1;
 	cm->reference_count++;
+	CMtrace_out(cm, CMFreeVerbose, "Forked - CManager %lx ref count now %d\n", 
+		    (long) cm, cm->reference_count);
     }
 }
 
@@ -1357,11 +1361,30 @@ cm_extend_data_buf(CManager cm, CMbuffer tmp, int length)
 
 /* CM says that it is done with temporary buffer */
 extern void
-cm_return_data_buf(CMbuffer cmb)
+cm_return_data_buf(CManager cm, CMbuffer cmb)
 {
     if (cmb) cmb->in_use_by_cm = 0;
     if (cmb && cmb->return_callback != NULL) {
+	CMbuffer last = NULL, tmp = cm->cm_buffer_list;
 	(cmb->return_callback)(cmb->return_callback_data);
+	/* UNLINK */
+	while (tmp != NULL) {
+	    if (tmp != cmb) {
+		tmp = tmp->next;
+		continue;
+	    }
+	    /* remove the buffer from CM's list */
+	    if (last == NULL) {
+		cm->cm_buffer_list = tmp->next;
+	    } else {
+		last->next = tmp->next;
+	    }
+	    last = tmp;
+	    tmp = tmp->next;
+	    
+	}
+	cmb->buffer = NULL;
+	cmb->size = 0;
     }
 }
 
@@ -1568,7 +1591,7 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
     read_byte_count += length;
 
     if (conn->partial_buffer) {
-	cm_return_data_buf(conn->partial_buffer);
+	cm_return_data_buf(cm, conn->partial_buffer);
 	conn->partial_buffer = NULL;
     }
     /* try read-ahead */
@@ -1746,7 +1769,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	internal_cm_network_submit(cm, cm_data_buf, attrs, conn, data_buffer,
 				   data_length, stone_id);
 #endif
-	cm_return_data_buf(cm_data_buf);
+	cm_return_data_buf(cm, cm_data_buf);
 	return 0;
     }
     for (i = 0; i < cm->reg_format_count; i++) {
@@ -1790,7 +1813,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	cm_decode_buf = cm_get_data_buf(cm, decoded_length);
 	decode_buffer = cm_decode_buf->buffer;
 	FFSdecode_to_buffer(cm->FFScontext, data_buffer, decode_buffer);
-	cm_return_data_buf(conn->partial_buffer);
+	cm_return_data_buf(cm, conn->partial_buffer);
 	conn->partial_buffer = NULL;
     }
     if(cm_format->older_format) {
@@ -1842,10 +1865,10 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     CManager_lock(cm);
     INT_CMConnection_dereference(conn);
     if (cm_data_buf) {
-	cm_return_data_buf(cm_data_buf);
+	cm_return_data_buf(cm, cm_data_buf);
     }
     if (cm_decode_buf) {
-	cm_return_data_buf(cm_decode_buf);
+	cm_return_data_buf(cm, cm_decode_buf);
 	cm_decode_buf = NULL;
     }
     if (attrs) {

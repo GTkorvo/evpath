@@ -317,7 +317,7 @@ extern void CMformat_preload ARGS((CMConnection conn, CMFormat format));
 extern void CMinit_local_formats ARGS((CManager cm));
 
 extern CMbuffer cm_get_data_buf ARGS((CManager cm, int length));
-extern void cm_return_data_buf ARGS((CMbuffer cmb));
+extern void cm_return_data_buf ARGS((CManager cm, CMbuffer cmb));
 extern CMbuffer cm_create_transport_buffer ARGS((CManager cmb, void* buffer, int length));
 extern CMbuffer cm_create_transport_and_link_buffer ARGS((CManager cmb, void* buffer, int length));
 

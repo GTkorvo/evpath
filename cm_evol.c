@@ -147,11 +147,11 @@ process_old_format_data(CManager cm, CMincoming_format_list cm_format,
 	 * segment faults */
 	// IOfree_var_rec_elements((IOFile)local_iocontext, f1_format,
 	// f1_buffer);
-	cm_return_data_buf(cm_f1_buf);
+	cm_return_data_buf(cm, cm_f1_buf);
 	cm_f1_buf = NULL;
     }
     if (cm_decode_buf) {
-	cm_return_data_buf(cm_decode_buf);
+	cm_return_data_buf(cm, cm_decode_buf);
 	cm_decode_buf = NULL;
     }
     if (decode_in_place_possible(f1_format)) {

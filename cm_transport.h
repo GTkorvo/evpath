@@ -42,7 +42,7 @@ typedef void (*CMTransport_add_period_task) ARGS((CManager cm,
 						  CMPollFunc func,
 						  void *client_data));
 typedef CMbuffer (*CMTransport_get_data_buffer) ARGS((CManager cm, int length));
-typedef void (*CMTransport_return_data_buffer) ARGS((CMbuffer cmb));
+typedef void (*CMTransport_return_data_buffer) ARGS((CManager cm, CMbuffer cmb));
 typedef void (*CMTransport_connection_close) ARGS((CMConnection conn));
 typedef void *(*CMTransport_get_transport_data) ARGS((CMConnection conn));
 typedef CMbuffer (*CMTransport_create_data_buffer) ARGS((CManager cm, void *buffer, int length));
