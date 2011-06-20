@@ -2800,12 +2800,16 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     event_item *event = get_free_event(evp);
     stone_type stone;
     (void)cm_data_buf;
+    FFSTypeHandle ffsh = FFSTypeHandle_from_encode(evp->ffsc, buffer);
+    if (ffsh == NULL) {
+	printf("FFS failure, incoming data incomprehensible, ignored\n");
+	return;
+    }
     event->contents = Event_CM_Owned;
     event->event_encoded = 1;
     event->event_len = length;
     event->encoded_event = buffer;
-    event->reference_format = FMFormat_of_original(FFSTypeHandle_from_encode(evp->ffsc, 
-							buffer));
+    event->reference_format = FMFormat_of_original(ffsh);
     event->attrs = CMadd_ref_attr_list(cm, attrs);
     event->format = NULL;
     CMtrace_out(cm, EVerbose, "Event coming in from network to stone %d\n", 
