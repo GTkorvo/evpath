@@ -323,7 +323,7 @@ static void
 fail_and_die(int signal)
 {
     (void)signal;
-    fprintf(stderr, "EVtest failed to complete in reasonable time\n");
+    fprintf(stderr, "submit_test failed to complete in reasonable time\n");
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
     }
