@@ -36,7 +36,7 @@ typedef CMConnection (*CMTransport_conn_create) ARGS((transport_entry trans,
 						      attr_list conn_attrs));
 typedef void (*CMTransport_add_shut_task) ARGS((CManager cm, CMPollFunc func,
 						void *client_data));
-typedef void (*CMTransport_add_period_task) ARGS((CManager cm, 
+typedef CMTaskHandle (*CMTransport_add_period_task) ARGS((CManager cm, 
 						  int period_sec,
 						  int period_usec,
 						  CMPollFunc func,

@@ -1292,6 +1292,7 @@ extern CMbuffer
 cm_create_transport_buffer(CManager cm, void *buffer, int length)
 {
     CMbuffer tmp;
+    (void)cm;
     tmp = INT_CMmalloc(sizeof(*tmp));
     memset(tmp, 0, sizeof(*tmp));
     tmp->buffer = buffer;

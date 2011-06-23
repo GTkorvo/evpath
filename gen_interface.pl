@@ -600,13 +600,13 @@ REVPlookup_handler(char *name)
 	    dh = dlopen(NULL, 0);
 	}
 	printf("Querying dlopen()\\n");
-	f = dlsym(dh, name);
+	f = (EVSimpleHandlerFunc)dlsym(dh, name);
     }
     if (f == NULL) {
 	if (dh == NULL) {
 	    dh = dlopen(NULL, RTLD_GLOBAL|RTLD_LAZY);
 	}
-	f = dlsym(dh, name);
+	f = (EVSimpleHandlerFunc)dlsym(dh, name);
     }
     if (f == NULL) {
 	printf("Dynamic symbol lookup for \\"%s\\" failed.\\n\\tEither the symbol is invalid, or symbol lookup is not enabled.\\n", name);

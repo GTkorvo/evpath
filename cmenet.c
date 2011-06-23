@@ -1,5 +1,8 @@
 /***** Includes *****/
 #include "config.h"
+#if defined (__INTEL_COMPILER)
+#  pragma warning (disable: 1418)
+#endif
 
 #include <assert.h>
 #include <stdlib.h>
@@ -9,6 +12,7 @@
 
 #include <enet/enet.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 #include <atl.h>
 #include <cercs_env.h>
@@ -42,11 +46,7 @@ typedef struct enet_connection_data {
     CMConnection conn;
 } *enet_conn_data_ptr;
 
-static atom_t CM_FD = -1;
-static atom_t CM_THIS_CONN_PORT = -1;
-static atom_t CM_PEER_CONN_PORT = -1;
 static atom_t CM_PEER_IP = -1;
-static atom_t CM_PEER_HOSTNAME = -1;
 static atom_t CM_PEER_LISTEN_PORT = -1;
 static atom_t CM_NETWORK_POSTFIX = -1;
 static atom_t CM_ENET_PORT = -1;
@@ -55,10 +55,9 @@ static atom_t CM_ENET_ADDR = -1;
 static atom_t CM_TRANSPORT = -1;
 
 static int
-check_host(hostname, sin_addr)
-char *hostname;
-void *sin_addr;
+check_host(char *hostname, void *sin_addr)
 {
+    (void)hostname; (void)sin_addr;
 #ifdef HAS_STRUCT_HOSTEN
     struct hostent *host_addr;
     host_addr = gethostbyname(hostname);
@@ -83,8 +82,7 @@ void *sin_addr;
 }
 
 static enet_conn_data_ptr 
-create_enet_conn_data(svc)
-CMtrans_services svc;
+create_enet_conn_data(CMtrans_services svc)
 {
     enet_conn_data_ptr enet_conn_data =
     svc->malloc_func(sizeof(struct enet_connection_data));
@@ -128,17 +126,17 @@ enet_service_network(CManager cm, void *void_trans)
             break;
 	}
         case ENET_EVENT_TYPE_RECEIVE: {
-	    enet_conn_data_ptr ecd = event.peer->data;
+	    enet_conn_data_ptr econn_d = event.peer->data;
 	    svc->trace_out(cm, "A packet of length %u containing %s was received on channel %u.\n",
                     (unsigned int) event.packet -> dataLength,
                     event.packet -> data,
                     (unsigned int) event.channelID);
-	    ecd->read_buffer_len = event.packet -> dataLength;
-	    ecd->read_buffer = event.packet->data;
-	    ecd->packet = event.packet;
+	    econn_d->read_buffer_len = event.packet -> dataLength;
+	    econn_d->read_buffer = event.packet->data;
+	    econn_d->packet = event.packet;
 
 	    /* kick this upstairs */
-	    trans->data_available(trans, ecd->conn);
+	    trans->data_available(trans, econn_d->conn);
 
             break;
 	}           
@@ -232,30 +230,25 @@ enet_accept_conn(enet_client_data_ptr sd, transport_entry trans,
 }
 
 extern void
-libcmenet_LTX_shutdown_conn(svc, scd)
-CMtrans_services svc;
-enet_conn_data_ptr scd;
+libcmenet_LTX_shutdown_conn(CMtrans_services svc, enet_conn_data_ptr scd)
 {
+    (void) svc;
     if (scd->remote_host) free(scd->remote_host);
     free(scd);
 }
 
 
 static int
-initiate_conn(cm, svc, trans, attrs, enet_conn_data, conn_attr_list, no_more_redirect)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
-enet_conn_data_ptr enet_conn_data;
-attr_list conn_attr_list;
-int no_more_redirect;
+initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
+	      attr_list attrs, enet_conn_data_ptr enet_conn_data,
+	      attr_list conn_attr_list)
 {
     int int_port_num;
     enet_client_data_ptr sd = (enet_client_data_ptr) trans->trans_data;
     char *host_name;
     static int host_ip = 0;
     struct in_addr sin_addr;
+    (void)conn_attr_list;
 
     if (!query_attr(attrs, CM_ENET_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
@@ -298,7 +291,7 @@ int no_more_redirect;
     } else {
 	address.host = host_ip;
     }
-    address.port = int_port_num;
+    address.port = (unsigned short) int_port_num;
 
     if (sd->server == NULL) {
 	sd->server = enet_host_create (NULL /* the address to bind the server host to */, 
@@ -350,17 +343,14 @@ int no_more_redirect;
  * Initiate a ENET RUDP connection with another CM.
  */
 extern CMConnection
-libcmenet_LTX_initiate_conn(cm, svc, trans, attrs)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
+libcmenet_LTX_initiate_conn(CManager cm, CMtrans_services svc,
+			    transport_entry trans, attr_list attrs)
 {
     enet_conn_data_ptr enet_conn_data = create_enet_conn_data(svc);
     attr_list conn_attr_list = create_attr_list();
     CMConnection conn;
 
-    if (!initiate_conn(cm, svc, trans, attrs, enet_conn_data, conn_attr_list, 0))
+    if (!initiate_conn(cm, svc, trans, attrs, enet_conn_data, conn_attr_list))
 	return NULL;
 
     add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
@@ -378,11 +368,8 @@ attr_list attrs;
  * same as ours and if the CM_ENET_PORT matches the one we are listening on.
  */
 extern int
-libcmenet_LTX_self_check(cm, svc, trans, attrs)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
+libcmenet_LTX_self_check(CManager cm, CMtrans_services svc, 
+			 transport_entry trans, attr_list attrs)
 {
 
     enet_client_data_ptr sd = trans->trans_data;
@@ -430,18 +417,16 @@ attr_list attrs;
 }
 
 extern int
-libcmenet_LTX_connection_eq(cm, svc, trans, attrs, scd)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
-enet_conn_data_ptr scd;
+libcmenet_LTX_connection_eq(CManager cm, CMtrans_services svc,
+			    transport_entry trans, attr_list attrs,
+			    enet_conn_data_ptr scd)
 {
 
     int int_port_num;
     int requested_IP = -1;
     char *host_name = NULL;
 
+    (void) trans;
     if (!query_attr(attrs, CM_ENET_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
 	svc->trace_out(cm, "CMEnet transport found no CM_ENET_HOST attribute");
@@ -479,11 +464,8 @@ enet_conn_data_ptr scd;
  * Create an IP socket for connection from other CMs
  */
 extern attr_list
-libcmenet_LTX_non_blocking_listen(cm, svc, trans, listen_info)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list listen_info;
+libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
+				  transport_entry trans, attr_list listen_info)
 {
     enet_client_data_ptr sd = trans->trans_data;
     ENetAddress address;
@@ -631,10 +613,8 @@ static void free_func(void *packet)
 }
 
 extern void *
-libcmenet_LTX_read_block_func(svc, conn_data, actual_len)
-CMtrans_services svc;
-enet_conn_data_ptr conn_data;
-int *actual_len;
+libcmenet_LTX_read_block_func(CMtrans_services svc,
+			      enet_conn_data_ptr conn_data, int *actual_len)
 {
     CMbuffer cb;
 
@@ -651,11 +631,8 @@ int *actual_len;
 }
 
 extern int
-libcmenet_LTX_write_func(svc, scd, buffer, length)
-CMtrans_services svc;
-enet_conn_data_ptr scd;
-void *buffer;
-int length;
+libcmenet_LTX_write_func(CMtrans_services svc, enet_conn_data_ptr scd,
+			 void *buffer, int length)
 {
     svc->trace_out(scd->sd->cm, "CMENET write of %d bytes on peer %p",
 		   length, scd->peer);
@@ -672,11 +649,8 @@ int length;
 
 
 extern int
-libcmenet_LTX_writev_func(svc, ecd, iov, iovcnt)
-CMtrans_services svc;
-enet_conn_data_ptr ecd;
-struct iovec *iov;
-int iovcnt;
+libcmenet_LTX_writev_func(CMtrans_services svc, enet_conn_data_ptr ecd,
+			  struct iovec *iov, int iovcnt)
 {
     int i;
     int length = 0;
@@ -712,6 +686,7 @@ free_enet_data(CManager cm, void *sdv)
 {
     enet_client_data_ptr sd = (enet_client_data_ptr) sdv;
     CMtrans_services svc = sd->svc;
+    (void)cm;
     if (sd->hostname != NULL)
 	svc->free_func(sd->hostname);
 /*    svc->free_func(sd);*/
@@ -723,15 +698,13 @@ free_enet_data(CManager cm, void *sdv)
 }
 
 extern void *
-libcmenet_LTX_initialize(cm, svc, trans, attrs)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
+libcmenet_LTX_initialize(CManager cm, CMtrans_services svc,
+			 transport_entry trans, attr_list attrs)
 {
     static int atom_init = 0;
 
     enet_client_data_ptr enet_data;
+    (void)attrs;
     svc->trace_out(cm, "Initialize ENET reliable UDP transport built in %s",
 		   EVPATH_LIBRARY_BUILD_DIR);
     if (socket_global_init == 0) {
@@ -755,11 +728,7 @@ attr_list attrs;
 	CM_ENET_PORT = attr_atom_from_string("CM_ENET_PORT");
 	CM_ENET_ADDR = attr_atom_from_string("CM_ENET_ADDR");
 	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
-	CM_FD = attr_atom_from_string("CONNECTION_FILE_DESCRIPTOR");
-	CM_THIS_CONN_PORT = attr_atom_from_string("THIS_CONN_PORT");
-	CM_PEER_CONN_PORT = attr_atom_from_string("PEER_CONN_PORT");
 	CM_PEER_IP = attr_atom_from_string("PEER_IP");
-	CM_PEER_HOSTNAME = attr_atom_from_string("PEER_HOSTNAME");
 	CM_PEER_LISTEN_PORT = attr_atom_from_string("PEER_LISTEN_PORT");
 	CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
 	atom_init++;
