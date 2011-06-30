@@ -26,6 +26,8 @@ struct _EVdfg_stone {
     int bridge_stone;
     int stone_id;
     attr_list attrs;
+    int period_secs;
+    int period_usecs;
     int out_count;
     EVdfg_stone *out_links;
     int action_count;
@@ -89,6 +91,8 @@ EVdfg_create_stone(EVdfg dfg, char *action)
     stone->bridge_stone = 0;
     stone->stone_id = -1;
     stone->attrs = NULL;
+    stone->period_secs = -1;
+    stone->period_usecs = -1;
     stone->out_count = 0;
     stone->out_links = NULL;
     stone->action_count = 1;
@@ -103,6 +107,14 @@ EVdfg_create_stone(EVdfg dfg, char *action)
     stone->stone_id = 0x80000000 | dfg->stone_count;
     dfg->stones[dfg->stone_count++] = stone;
     return stone;
+}
+
+void
+extern EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec, 
+			       int period_usec)
+{
+    stone->period_secs = period_sec;
+    stone->period_usecs = period_usec;
 }
 
 extern void
@@ -200,6 +212,8 @@ FMStructDescRec EVdfg_shutdown_format_list[] = {
 typedef struct _EVdfg_msg_stone {
     int global_stone_id;
     char *attrs;
+    int period_secs;
+    int period_usecs;
     int out_count;
     int *out_links;
     char *action;
@@ -212,6 +226,10 @@ FMField EVdfg_stone_flds[] = {
      FMOffset(deploy_msg_stone, global_stone_id)},
     {"attrs", "string", sizeof(char*), 
      FMOffset(deploy_msg_stone, attrs)},
+    {"period_secs", "integer", sizeof(int),
+     FMOffset(deploy_msg_stone, period_secs)},
+    {"period_usecs", "integer", sizeof(int),
+     FMOffset(deploy_msg_stone, period_usecs)},
     {"out_count", "integer", sizeof(int), 
      FMOffset(deploy_msg_stone, out_count)},
     {"out_links", "integer[out_count]", sizeof(int), 
@@ -391,6 +409,9 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
 	local_list[msg->stone_list[i].out_count] = -1;
 	INT_EVassoc_general_action(cm, local_stone, msg->stone_list[i].action, 
 	    &local_list[0]);
+	if (msg->stone_list[i].period_secs != -1) {
+	    INT_EVenable_auto_stone(cm, local_stone, msg->stone_list[i].period_secs, msg->stone_list[i].period_usecs);
+	}
 	if (action_type(msg->stone_list[i].action) == Action_Terminal) {
 	    dfg->active_sink_count++;
 	}
@@ -760,6 +781,8 @@ deploy_to_node(EVdfg dfg, int node)
 	    if (dstone->attrs != NULL) {
 		mstone->attrs = attr_list_to_string(dstone->attrs);
 	    }
+	    mstone->period_secs = dstone->period_secs;
+	    mstone->period_usecs = dstone->period_usecs;
 	    mstone->out_count = dstone->out_count;
 	    mstone->out_links = malloc(sizeof(mstone->out_links[0])*mstone->out_count);
 	    for (k=0; k< dstone->out_count; k++) {

@@ -41,6 +41,8 @@ extern EVdfg_stone EVdfg_create_stone(EVdfg dfg, char *action_spec);
 extern void EVdfg_add_action (EVdfg_stone stone, char *action_spec);
 extern EVdfg_stone EVdfg_create_source_stone(EVdfg, char *source_name);
 extern EVdfg_stone EVdfg_create_sink_stone(EVdfg dfg, char *handler_name);
+extern void EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec, 
+				    int period_usec);
 
 extern void EVdfg_link_port(EVdfg_stone source, int source_port, 
 			    EVdfg_stone destination);
