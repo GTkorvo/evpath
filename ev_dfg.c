@@ -109,9 +109,9 @@ EVdfg_create_stone(EVdfg dfg, char *action)
     return stone;
 }
 
-void
-extern EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec, 
-			       int period_usec)
+extern void 
+EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec, 
+			int period_usec)
 {
     stone->period_secs = period_sec;
     stone->period_usecs = period_usec;
