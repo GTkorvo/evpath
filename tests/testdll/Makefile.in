@@ -39,6 +39,7 @@ DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/config/argz.m4 \
 	$(top_srcdir)/config/cercs.m4 \
+	$(top_srcdir)/config/cercs_check_metrics.m4 \
 	$(top_srcdir)/config/definitions.m4 \
 	$(top_srcdir)/config/libtool.m4 $(top_srcdir)/config/ltdl.m4 \
 	$(top_srcdir)/config/ltoptions.m4 \

@@ -1,4 +1,5 @@
 #include "config.h"
+#ifndef TARGET_CNL
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +12,19 @@
 #include <sys/stat.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+
+#ifdef HAVE_SYSINFO
+#include <sys/sysinfo.h>
+#endif
+
+#ifdef HAVE_MAC_SYSCTL
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#endif
+
+#ifdef HAVE_UNAME
+#include <sys/utsname.h>
 #endif
 
 #include "evpath.h"
@@ -264,190 +278,459 @@ double cpu_idle_func ( void )
     last_total_jiffies = total_jiffies;
     return val; 
 }
+/**************TIMING FUNCTIONS**************/
 
-double load_one_func ( void )
+double dgettimeofday( void )
 {
-    double val;
-	sensor_slurp proc_loadavg = { "/proc/loadavg" };
-    val = strtod( update_file(&proc_loadavg), (char **)NULL);
+#ifdef HAVE_GETTIMEOFDAY
+    double timestamp;
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    timestamp = now.tv_sec + now.tv_usec* 1.0e-6 ;
+    return timestamp;
+#else
+    return -1;
+#endif
+}
+
+/**************OS FUNCTIONS**************/
+char*  os_type() {
+  char* val=NULL;
+  struct utsname output;
+  if (!val)
+    uname(&output);
+  val = strdup(output.sysname);
+  return val;
+}
+
+char*  os_release() {
+  char* val=NULL;
+  struct utsname output;
+  if (!val)
+    uname(&output);
+  val = strdup(output.release);
+  return val;
+}
+
+/**************Stat FUNCTIONS**************/
+double  stat_uptime() {
+  double val=0;
+#ifdef HAVE_SYSINFO
+  struct sysinfo info;
+  sysinfo(&info);
+  val = (double) info.uptime;
+#else
+#ifdef HAVE_MAC_SYSCTL
+  static int mib[4];
+  struct timeval boottime;
+  size_t mlen,vlen;
+  mlen = 2;
+  mib[0] = CTL_KERN;
+  mib[1] = KERN_BOOTTIME;
+  vlen = sizeof(struct timeval);
+  sysctl(mib,mlen,&boottime,&vlen,NULL,0);  
+  val =  dgettimeofday() - (double) boottime.tv_sec - boottime.tv_usec* 1.0e-6;
+
+#endif // end HAVE_MAC_SYSCTL
+#endif // end HAVE_SYSINFO
+
+  return val;
+ 
+}
+
+/* double stat_cpu_user() { */
+/* } */
+
+/* double stat_cpu_system() { */
+/* } */
+
+double stat_loadavg_one ( void )
+{
+  double val;
+#ifdef HAVE_GETLOADAVG
+  double loadavg[3];
+  getloadavg(loadavg,3);
+  val = loadavg[0];
+  
+#else      
+  sensor_slurp proc_loadavg = { "/proc/loadavg" };
+  val = strtod( update_file(&proc_loadavg), (char **)NULL);
+#endif //end HAVE_GETLOADAVG
     return val;
 }
 
-double load_five_func ( void )
+double stat_loadavg_five ( void )
 {
+  double val;
+#ifdef HAVE_GETLOADAVG
+  double loadavg[3];
+  getloadavg(loadavg,3);
+  val = loadavg[1];
+  
+#else      
     char *p;
-    double val;
-
+ 
 	sensor_slurp proc_loadavg = { "/proc/loadavg" };
     p = update_file(&proc_loadavg);
     p = skip_token(p);
     val = strtod( p, (char **)NULL);
-
+#endif //end HAVE_GETLOADAVG
     return val;
 }
 
-double load_fifteen_func ( void )
+double stat_loadavg_fifteen ( void )
 {
-    char *p;
-    double val;
+  double val;  
+#ifdef HAVE_GETLOADAVG
+  double loadavg[3];
+  getloadavg(loadavg,3);
+  val = loadavg[2];
+  
+#else    
+  char *p;
+  sensor_slurp proc_loadavg = { "/proc/loadavg" };
+  p = update_file(&proc_loadavg);
+  
+  p = skip_token(p);
+  p = skip_token(p);
+  val = strtod( p, (char **)NULL);
+#endif //end HAVE_GETLOADAVG
+  return val;
+}
 
-	sensor_slurp proc_loadavg = { "/proc/loadavg" };
-    p = update_file(&proc_loadavg);
+/**************MEMORY FUNCTIONS**************/
 
+unsigned long vm_mem_total() {
+  unsigned long val = 0;
+#ifdef HAVE_MAC_SYSCTL
+  /* static int flag=0; */
+  static int mib[4];
+  size_t mlen,vlen;
+  mib[0] = CTL_HW;
+  mib[1] = HW_MEMSIZE;
+  mlen = 2;
+  /* if (flag == 0) { */
+  /*   sysctlnametomib("hw.memsize",mib,&mlen); */
+  /*   flag=1; */
+  /* } */
+  vlen = sizeof(unsigned long);
+  sysctl(mib,mlen,&val,&vlen,NULL,0);
+  
+#else
+  char *p;
+  
+  sensor_slurp proc_meminfo = { "/proc/meminfo" };
+  p = strstr( update_file(&proc_meminfo), "MemTotal:" );
+  if(p) {
     p = skip_token(p);
-    p = skip_token(p);
-    val = strtod( p, (char **)NULL);
-
-    return val;
+    val = strtoul( p, NULL, 10 );
+  } else {
+    val = 0;
+  }
+#endif //end of HAVE_MAC_SYSCTL  
+  return val;
 }
 
-double mem_buffers_func ( void )
-{
+
+unsigned long vm_mem_free() {
+  unsigned long val = 0;
+#ifdef HAVE_MAC_SYSCTL
+  /* static int flag=0; */
+  static int mib[2] = {CTL_VM, VM_SWAPUSAGE};
+  struct xsw_usage swapval;
+  size_t vlen;
+  /* mlen = 4; */
+  /* if (flag == 0) { */
+  /*   sysctlnametomib("vm.swapusage",mib,&mlen); */
+  /*   flag=1; */
+  /* } */
+  vlen = sizeof(struct xsw_usage);
+  sysctl(mib,2,&swapval,&vlen,NULL,0);
+  val = (unsigned long) swapval.xsu_avail;
+  
+#else
     char *p;
-    double val;
 
-	sensor_slurp proc_meminfo = { "/proc/meminfo" };
-    p = strstr( update_file(&proc_meminfo), "Buffers:" );
-    if(p) {
-	p = skip_token(p);
-	val = atof( p ); 
-    } else {
-	val = 0;
-    }
-
-    return val;
-}
-
-double mem_free_func ( void )
-{
-    char *p;
-    double val;
-
-	sensor_slurp proc_meminfo = { "/proc/meminfo" };
+    sensor_slurp proc_meminfo = { "/proc/meminfo" };
     p = strstr( update_file(&proc_meminfo), "MemFree:" );
     if(p) {
 	p = skip_token(p);
-	val = atof( p );
+	val = strtoul( p, NULL, 10 );
     } else {
 	val = 0;
     }
+#endif //end of HAVE_MAC_SYSCTL
     
     return val;
 }
 
-double mem_cached_func ( void )
-{
-    char *p;
-    double val;
 
-	sensor_slurp proc_meminfo = { "/proc/meminfo" };
-    p = strstr( update_file(&proc_meminfo), "Cached:");
-    if(p) {
-	p = skip_token(p);
-	val = atof( p );
-    } else {
-	val = 0;
-    }
-   return val;
+unsigned long vm_swap_total ( void )
+{
+  unsigned long val = 0;
+#ifdef HAVE_MAC_SYSCTL
+  static int mib[2] = {CTL_VM, VM_SWAPUSAGE};
+  struct xsw_usage swapval;
+  size_t vlen;
+  vlen = sizeof(struct xsw_usage);
+  sysctl(mib,2,&swapval,&vlen,NULL,0);
+  val = (unsigned long) swapval.xsu_total;
+  
+#else
+  char *p;
+   
+  sensor_slurp proc_meminfo = { "/proc/meminfo" };
+  p = strstr( update_file(&proc_meminfo), "SwapFree:" );
+  if(p) {
+    p = skip_token(p);
+    val =  strtoul( p, NULL, 10 ); 
+  } else {
+    val = 0;
+  }
+#endif //end HAVE_MAC_SYSCTL
+  return val;
 }
 
-double swap_free_func ( void )
+unsigned long vm_swap_free ( void )
 {
+  unsigned long val = 0;
+#ifdef HAVE_MAC_SYSCTL
+  static int mib[2] = {CTL_VM, VM_SWAPUSAGE};
+  struct xsw_usage swapval;
+  size_t vlen;
+  vlen = sizeof(struct xsw_usage);
+  sysctl(mib,2,&swapval,&vlen,NULL,0);
+  val = (unsigned long) swapval.xsu_avail;
+  
+#else
     char *p;
-    double val;
    
 	sensor_slurp proc_meminfo = { "/proc/meminfo" };
     p = strstr( update_file(&proc_meminfo), "SwapFree:" );
     if(p) {
 	p = skip_token(p);
-	val = atof( p ); 
+	val = strtoul( p, NULL, 10 ); 
     } else {
 	val = 0;
     }
-
+#endif //end HAVE_MAC_SYSCTL
     return val;
 }
 
-double gettimeofday_func( void )
-{
-    double timestamp;
-    struct timeval now;
-    gettimeofday(&now, NULL);
-    timestamp = now.tv_sec * 1.0e6 + now.tv_usec;
-    return timestamp;
+/**************HARDWARE FUNCTIONS**************/
+int hw_cpus () {
+  long val = -1;
+#ifdef HAVE_MAC_SYSCTL
+  static int mib[2] = {CTL_HW, HW_NCPU};
+  size_t vlen;
+  vlen = sizeof(long);
+  sysctl(mib,2,&val,&vlen,NULL,0);
+#else
+#if defined(HAVE_SYSCONF)
+  val = (long) sysconf(_SC_NPROCESSORS_ONLN);
+#else
+  val = 1; // if we don't know any better...
+#endif // end HAVE_SYSCONFIG
+#endif //end of HAVE_MAC_SYSCTL
+  return (int) val;
+  
 }
 
-int cpu_max_freq_func( void )
-{
-    char *p;
-    int val = -1;
 
-	struct stat struct_stat;
-	char sys_devices_system_cpu[32];
-	const char *CPU_FREQ_SCALING_MAX_FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq";
-    if ( stat(CPU_FREQ_SCALING_MAX_FREQ, &struct_stat) == 0 ) {
-		if(slurpfile(CPU_FREQ_SCALING_MAX_FREQ, sys_devices_system_cpu, 32)) {
-			p = sys_devices_system_cpu;
-			val = (strtol( p, (char **)NULL , 10 ) / 1000 );
-		}
+long hw_cpu_max_freq( void )
+{
+  long val = 0;
+#ifdef HAVE_MAC_SYSCTL
+  size_t vlen;
+  vlen = sizeof(long);
+  sysctlbyname("hw.cpufrequency_max",&val,&vlen,NULL,0);
+  val = val/1e6;
+#else
+  char *p;
+  
+  struct stat struct_stat;
+  char sys_devices_system_cpu[32];
+  const char *CPU_FREQ_SCALING_MAX_FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq";
+  if ( stat(CPU_FREQ_SCALING_MAX_FREQ, &struct_stat) == 0 ) {
+    if(slurpfile(CPU_FREQ_SCALING_MAX_FREQ, sys_devices_system_cpu, 32)) {
+      p = sys_devices_system_cpu;
+      val = (strtol( p, (char **)NULL , 10 ) / 1000 );
     }
-    return val;
+  }
+#endif // end HAVE_MAC_SYSCTL
+  return val;
 }
 
-int cpu_min_freq_func( void )
+long hw_cpu_min_freq( void )
 {
-    char *p;
-    int val = -1;
+  long val = -1;
+#ifdef HAVE_MAC_SYSCTL
+  size_t vlen;
+  vlen = sizeof(long);
+  sysctlbyname("hw.cpufrequency_min",&val,&vlen,NULL,0);
+  val = val/1e6;
 
-	struct stat struct_stat;
-	char sys_devices_system_cpu[32];
-	const char *CPU_FREQ_SCALING_MIN_FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq";
-    if ( stat(CPU_FREQ_SCALING_MIN_FREQ, &struct_stat) == 0 ) {
-		if(slurpfile(CPU_FREQ_SCALING_MIN_FREQ, sys_devices_system_cpu, 32)) {
-			p = sys_devices_system_cpu;
-			val = (strtol( p, (char **)NULL , 10 ) / 1000 );
-		}
+#else
+  char *p;
+
+  struct stat struct_stat;
+  char sys_devices_system_cpu[32];
+  const char *CPU_FREQ_SCALING_MIN_FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq";
+  if ( stat(CPU_FREQ_SCALING_MIN_FREQ, &struct_stat) == 0 ) {
+    if(slurpfile(CPU_FREQ_SCALING_MIN_FREQ, sys_devices_system_cpu, 32)) {
+      p = sys_devices_system_cpu;
+      val = (strtol( p, (char **)NULL , 10 ) / 1000 );
     }
-    return val;
+  }
+#endif //end HAVE_MAC_SYSCTL
+  return val;
 }
 
-int cpu_cur_freq_func( void )
+long hw_cpu_curr_freq( void )
 {
-    char *p;
-    int val = -1;
-    
-	struct stat struct_stat;
-	char sys_devices_system_cpu[32];
-	const char *CPU_FREQ_SCALING_CUR_FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq";
-    if ( stat(CPU_FREQ_SCALING_CUR_FREQ, &struct_stat) == 0 ) {
-		if(slurpfile(CPU_FREQ_SCALING_CUR_FREQ, sys_devices_system_cpu, 32)) {
-			p = sys_devices_system_cpu;
-			val = (strtol( p, (char **)NULL , 10 ) / 1000 );
-		}
+  long val = 0;
+#ifdef HAVE_MAC_SYSCTL
+  /* static int flag=0; */
+  static int mib[2] = {CTL_HW, HW_CPU_FREQ};
+  size_t vlen;
+  /* if (flag == 0) { */
+  /*   sysctlnametomib("hw.cpufrequency",mib,&mlen); */
+  /*   printf("\nmib = { %i, %i, %i, %i};\n",mib[0],mib[1],mib[2],mib[3]); */
+  /*   flag=1; */
+  /* } */
+  vlen = sizeof(long);
+  sysctl(mib,2,&val,&vlen,NULL,0);
+  val = val/1e6;
+  
+#else
+  char *p;
+  
+  struct stat struct_stat;
+  char sys_devices_system_cpu[32];
+  const char *CPU_FREQ_SCALING_CUR_FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq";
+  if ( stat(CPU_FREQ_SCALING_CUR_FREQ, &struct_stat) == 0 ) {
+    if(slurpfile(CPU_FREQ_SCALING_CUR_FREQ, sys_devices_system_cpu, 32)) {
+      p = sys_devices_system_cpu;
+      val = (unsigned int) (strtoul( p, (char **)NULL , 10 ) / 1000 );
     }
-    return val;
+  }
+#endif //end HAVE_MAC_SYSCTL
+  return val;
 }
 
-int *cpu_available_freq_func( void )
+
+void
+add_metrics_routines(stone_type stone, cod_parse_context context)
 {
-    char *p;
-    static int val[3];
+    static char extern_string[] = "\
+       double    dgettimeofday();         \n	\
+/* number of cpus */  \n				\
+       int           hw_cpus();           \n		\
+/* minimum allowed frequency in MHz */ \n	\
+       long           hw_cpu_min_freq();    \n \
+/* maximum allowed frequency in MHz  */ \n	\
+       long           hw_cpu_max_freq();   \n	\
+/* current frequency  in Mhz */ \n	\
+       long           hw_cpu_curr_freq();  \n	\
+/* a string to identify the local OS type -- ie Linux  */ \n 	\
+       char*       os_type();              \n	\
+/* a string to identify the current release -- ie FC14 */  \n	\
+       char*       os_release();          \n\
+/* time in seconds that the computer has been up  */  \n	\
+       double    stat_uptime();           \n\
+/* load average over the last one minute  */ \n	\
+       double    stat_loadavg_one();       \n	\
+/* load average over the last five minutes  */ \n	\
+       double    stat_loadavg_five();      \n	\
+/* load average over the last fifteen minute  */ \n	\
+       double    stat_loadavg_fifteen();   \n	\
+/* total physical memory  */  \n	\
+       unsigned long    vm_mem_total();   \n	\
+/* free physical memory   */ \n	\
+       unsigned long    vm_mem_free();    \n	\
+/* total swap available */  \n	\
+       unsigned long    vm_swap_total();   \n	\
+/* free swap  */  \n	\
+       unsigned long    vm_swap_free();     \n";
 
-	struct stat struct_stat;
-	char sys_devices_system_cpu_available[128];
-	const char *CPU_FREQ_SCALING_AVAILABLE_FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies";
-    if ( stat(CPU_FREQ_SCALING_AVAILABLE_FREQ, &struct_stat) == 0 ) {
-		if(slurpfile(CPU_FREQ_SCALING_AVAILABLE_FREQ, sys_devices_system_cpu_available, 128)) {
-			p = sys_devices_system_cpu_available;
-			val[0] = (strtol( p, (char **)NULL , 10 ) / 1000 );
-			p = skip_token(p);
-			val[1] = (strtol( p, (char **)NULL , 10 ) / 1000 );
-			p = skip_token(p);
-			val[2] = (strtol( p, (char **)NULL , 10 ) / 1000 );
-		}
-    }
-    return val;
+    static cod_extern_entry externs[] = {
+        {"dgettimeofday", (void *) 0},	        // 0
+	{"hw_cpus", (void *) 0},		// 1
+	{"hw_cpu_min_freq", (void *) 0},	// 2
+	{"hw_cpu_max_freq", (void *) 0},	// 3
+	{"hw_cpu_curr_freq", (void *) 0},	// 4
+	{"os_type", (void *) 0},		// 5
+	{"os_release", (void *) 0},		// 6
+	{"stat_uptime", (void *) 0},		// 7
+	{"stat_loadavg_one", (void *) 0},	// 8
+	{"stat_loadavg_five", (void *) 0},	// 9
+	{"stat_loadavg_fifteen", (void *) 0},	// 10
+	{"vm_mem_total", (void *) 0},		// 11
+	{"vm_mem_free", (void *) 0},		// 12
+	{"vm_swap_total", (void *) 0},		// 13
+	{"vm_swap_free", (void*) 0},		// 14
+	{(void *) 0, (void *) 0}
+    };
+
+    (void) stone;
+    /*
+     * some compilers think it isn't a static initialization to put this
+     * in the structure above, so do it explicitly.
+     */
+    externs[0].extern_value = (void *) (long) dgettimeofday;
+    externs[1].extern_value = (void *) (long) hw_cpus;
+    externs[2].extern_value = (void *) (long) hw_cpu_min_freq;
+    externs[3].extern_value = (void *) (long) hw_cpu_max_freq;
+    externs[4].extern_value = (void *) (long) hw_cpu_curr_freq;
+    externs[5].extern_value = (void *) (long) os_type;
+    externs[6].extern_value = (void *) (long) os_release;
+    externs[7].extern_value = (void *) (long) stat_uptime;
+    externs[8].extern_value = (void *) (long) stat_loadavg_one;
+    externs[9].extern_value = (void *) (long) stat_loadavg_five;
+    externs[10].extern_value = (void *) (long) stat_loadavg_fifteen;
+    externs[11].extern_value = (void *) (long) vm_mem_total;
+    externs[12].extern_value = (void *) (long) vm_mem_free;
+    externs[13].extern_value = (void *) (long) vm_swap_total;
+    externs[14].extern_value = (void *) (long) vm_swap_free;
+
+    cod_assoc_externs(context, externs);
+    cod_parse_for_context(extern_string, context);
 }
+
+#endif //End of !TARGET_CNL
+
+/*int main(int argc, char **argv) {
+	//num_cpustates_func();
+	printf (" CPU USER %  :  %lf \n", cpu_user_func());
+	printf (" CPU NICE %  :  %lf \n", cpu_nice_func());
+	printf (" CPU SYSTEM %  :  %lf \n", cpu_system_func());
+	printf (" CPU IDLE %  :  %lf \n", cpu_idle_func());
+	
+	printf (" LOAD 1 %  :  %lf \n", load_one_func());
+	printf (" LOAD 5 %  :  %lf \n", load_five_func());
+	printf (" LOAD 15 %  :  %lf \n", load_fifteen_func());
+
+	printf (" MEM FREE %  :  %lf \n", mem_free_func());
+	printf (" MEM BUFF %  :  %lf \n", mem_buffers_func());
+	printf (" MEM CACHE %  :  %lf \n", mem_cached_func());
+
+	printf (" SWAP FREE %  :  %lf \n", swap_free_func());
+	printf (" GET TIMESTAMP %  :  %lf \n", gettimeofday_func());
+
+	printf (" CPU_MAX_FREQ %  :  %d \n", cpu_max_freq_func());
+	printf (" CPU_MIN_FREQ %  :  %d \n", cpu_min_freq_func());
+	printf (" CPU_CUR_FREQ %  :  %d \n", cpu_cur_freq_func());
+	int *val;
+	val = cpu_available_freq_func();
+	printf (" CPU_AVAILABLE_FREQ %  :  %d , %d , %d \n", val[0], val[1], val[2]);
+
+	printf (" CPU_FREQ_GOVERNOR %  :  %s \n", cpu_scaling_governor_func());
+	char **avail;
+	avail = cpu_scaling_available_governors_func();
+	printf (" CPU_FREQ_AVAILABLE_GOVERNORS %  :  %s , %s , %s \n", avail[0], avail[1], avail[2]);
+}*/
+
+/* Dead functions.
 
 char *cpu_scaling_governor_func( void )
 {
@@ -482,113 +765,58 @@ char **cpu_scaling_available_governors_func( void )
     return val;
 }
 
-
-void
-add_metrics_routines(stone_type stone, cod_parse_context context)
+int *cpu_available_freq_func( void )
 {
-    static char extern_string[] = "\
-		char **cpu_scaling_available_governors_func();\n\
-		char *cpu_scaling_governor_func();\n\
-		int *cpu_available_freq_func();\n\
-		int cpu_cur_freq_func();\n\
-		int cpu_min_freq_func();\n\
-		int cpu_max_freq_func();\n\
-		double gettimeofday_func();\n\
-		double swap_free_func();\n\
-		double mem_cached_func();\n\
-		double mem_free_func();\n\
-		double mem_buffers_func();\n\
-		double load_fifteen_func();\n\
-		double load_five_func();\n\
-		double load_one_func();\n\
-		double cpu_idle_func();\n\
-		double cpu_system_func();\n\
-		double cpu_nice_func();\n\
-		double cpu_user_func();\n\
-		long total_jiffies_func();\n\
-		int num_cpustates_func();\n";
+    char *p;
+    static int val[3];
 
-    static cod_extern_entry externs[] = {
-	{"cpu_scaling_available_governors_func", (void *) 0},	// 0
-	{"cpu_scaling_governor_func", (void *) 0},		// 1
-	{"cpu_available_freq_func", (void *) 0},		// 2
-	{"cpu_cur_freq_func", (void *) 0},			// 3
-	{"cpu_min_freq_func", (void *) 0},			// 4
-	{"cpu_max_freq_func", (void *) 0},			// 5
-	{"gettimeofday_func", (void *) 0},			// 6
-	{"swap_free_func", (void *) 0},				// 7
-	{"mem_cached_func", (void *) 0},			// 8
-	{"mem_free_func", (void *) 0},				// 9
-	{"mem_buffers_func", (void *) 0},			// 10
-	{"load_fifteen_func", (void *) 0},			// 11
-	{"load_five_func", (void *) 0},				// 12
-	{"load_one_func", (void *) 0},				// 13
-	{"cpu_idle_func", (void *) 0},				// 14
-	{"cpu_system_func", (void *) 0},			// 15
-	{"cpu_nice_func", (void *) 0},				// 16
-	{"cpu_user_func", (void *) 0},				// 17
-	{"total_jiffies_func", (void *) 0},			// 18
-	{"num_cpustates_func", (void*) 0},			// 19
-	{(void *) 0, (void *) 0}
-    };
-
-    (void) stone;
-    /*
-     * some compilers think it isn't a static initialization to put this
-     * in the structure above, so do it explicitly.
-     */
-    externs[0].extern_value = (void *) (long) cpu_scaling_available_governors_func;
-    externs[1].extern_value = (void *) (long) cpu_scaling_governor_func;
-    externs[2].extern_value = (void *) (long) cpu_available_freq_func;
-    externs[3].extern_value = (void *) (long) cpu_cur_freq_func;
-    externs[4].extern_value = (void *) (long) cpu_min_freq_func;
-    externs[5].extern_value = (void *) (long) cpu_max_freq_func;
-    externs[6].extern_value = (void *) (long) gettimeofday_func;
-    externs[7].extern_value = (void *) (long) swap_free_func;
-    externs[8].extern_value = (void *) (long) mem_cached_func;
-    externs[9].extern_value = (void *) (long) mem_free_func;
-    externs[10].extern_value = (void *) (long) mem_buffers_func;
-    externs[11].extern_value = (void *) (long) load_fifteen_func;
-    externs[12].extern_value = (void *) (long) load_five_func;
-    externs[13].extern_value = (void *) (long) load_one_func;
-    externs[14].extern_value = (void *) (long) cpu_idle_func;
-    externs[15].extern_value = (void *) (long) cpu_system_func;
-    externs[16].extern_value = (void *) (long) cpu_nice_func;
-    externs[17].extern_value = (void *) (long) cpu_user_func;
-    externs[18].extern_value = (void *) (long) total_jiffies_func;
-    externs[19].extern_value = (void *) (long) num_cpustates_func;
-
-    cod_assoc_externs(context, externs);
-    cod_parse_for_context(extern_string, context);
+	struct stat struct_stat;
+	char sys_devices_system_cpu_available[128];
+	const char *CPU_FREQ_SCALING_AVAILABLE_FREQ = "/sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies";
+    if ( stat(CPU_FREQ_SCALING_AVAILABLE_FREQ, &struct_stat) == 0 ) {
+		if(slurpfile(CPU_FREQ_SCALING_AVAILABLE_FREQ, sys_devices_system_cpu_available, 128)) {
+			p = sys_devices_system_cpu_available;
+			val[0] = (strtol( p, (char **)NULL , 10 ) / 1000 );
+			p = skip_token(p);
+			val[1] = (strtol( p, (char **)NULL , 10 ) / 1000 );
+			p = skip_token(p);
+			val[2] = (strtol( p, (char **)NULL , 10 ) / 1000 );
+		}
+    }
+    return val;
 }
 
-/*int main(int argc, char **argv) {
-	//num_cpustates_func();
-	printf (" CPU USER %  :  %lf \n", cpu_user_func());
-	printf (" CPU NICE %  :  %lf \n", cpu_nice_func());
-	printf (" CPU SYSTEM %  :  %lf \n", cpu_system_func());
-	printf (" CPU IDLE %  :  %lf \n", cpu_idle_func());
-	
-	printf (" LOAD 1 %  :  %lf \n", load_one_func());
-	printf (" LOAD 5 %  :  %lf \n", load_five_func());
-	printf (" LOAD 15 %  :  %lf \n", load_fifteen_func());
+double mem_cached_func ( void )
+{
+    char *p;
+    double val;
 
-	printf (" MEM FREE %  :  %lf \n", mem_free_func());
-	printf (" MEM BUFF %  :  %lf \n", mem_buffers_func());
-	printf (" MEM CACHE %  :  %lf \n", mem_cached_func());
+	sensor_slurp proc_meminfo = { "/proc/meminfo" };
+    p = strstr( update_file(&proc_meminfo), "Cached:");
+    if(p) {
+	p = skip_token(p);
+	val = atof( p );
+    } else {
+	val = 0;
+    }
+   return val;
+}
 
-	printf (" SWAP FREE %  :  %lf \n", swap_free_func());
-	printf (" GET TIMESTAMP %  :  %lf \n", gettimeofday_func());
+double mem_buffers_func ( void )
+{
+    char *p;
+    double val;
 
-	printf (" CPU_MAX_FREQ %  :  %d \n", cpu_max_freq_func());
-	printf (" CPU_MIN_FREQ %  :  %d \n", cpu_min_freq_func());
-	printf (" CPU_CUR_FREQ %  :  %d \n", cpu_cur_freq_func());
-	int *val;
-	val = cpu_available_freq_func();
-	printf (" CPU_AVAILABLE_FREQ %  :  %d , %d , %d \n", val[0], val[1], val[2]);
+	sensor_slurp proc_meminfo = { "/proc/meminfo" };
+    p = strstr( update_file(&proc_meminfo), "Buffers:" );
+    if(p) {
+	p = skip_token(p);
+	val = atof( p ); 
+    } else {
+	val = 0;
+    }
 
-	printf (" CPU_FREQ_GOVERNOR %  :  %s \n", cpu_scaling_governor_func());
-	char **avail;
-	avail = cpu_scaling_available_governors_func();
-	printf (" CPU_FREQ_AVAILABLE_GOVERNORS %  :  %s , %s , %s \n", avail[0], avail[1], avail[2]);
-}*/
+    return val;
+}
+
+*/

@@ -104,6 +104,10 @@ AC_ARG_ENABLE(CNL, [  --enable-CNL Enable a restricted socket only transport bui
 		do_dyn_linking=0
 		computenode=disable
 	fi])
+if test x$computenode = xenable
+   then
+   AC_DEFINE([TARGET_CNL],[1],[The target platform is Cray Compute Node Linux (CNL).])
+fi
 AC_DEFINE_UNQUOTED([NO_DYNAMIC_LINKING], [$do_dyn_linking], [Build with dynamic linking])
 AM_CONDITIONAL([CNL], [test x$computenode = xenable])
 AM_CONDITIONAL([BUILD_IB], [test x$build_ib = xenable])
@@ -123,6 +127,10 @@ tests])
 USE_PTHREADS="yes"
 ],,)
 fi
+
+dnl Attempt to get the right tests in place for sysinfo and sysctl.  
+CERCS_CHECK_SYSCTL_STYLE
+AC_CHECK_FUNCS([gettimeofday uname sysinfo sysconf getloadavg])
 
 dnl Output the makefile
 AC_CONFIG_FILES([Makefile evpath-3.0.pc mtests/Makefile tests/Makefile tests/testdll/Makefile rtests/Makefile examples/Makefile old_tests/Makefile dfg_tests/Makefile])

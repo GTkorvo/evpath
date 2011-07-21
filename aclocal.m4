@@ -991,6 +991,7 @@ AC_SUBST([am__untar])
 
 m4_include([config/argz.m4])
 m4_include([config/cercs.m4])
+m4_include([config/cercs_check_metrics.m4])
 m4_include([config/definitions.m4])
 m4_include([config/libtool.m4])
 m4_include([config/ltdl.m4])

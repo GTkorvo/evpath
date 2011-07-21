@@ -49,6 +49,7 @@ DIST_COMMON = $(am__configure_deps) $(include_HEADERS) \
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/config/argz.m4 \
 	$(top_srcdir)/config/cercs.m4 \
+	$(top_srcdir)/config/cercs_check_metrics.m4 \
 	$(top_srcdir)/config/definitions.m4 \
 	$(top_srcdir)/config/libtool.m4 $(top_srcdir)/config/ltdl.m4 \
 	$(top_srcdir)/config/ltoptions.m4 \
@@ -649,7 +650,7 @@ install-pkgconfigDATA: $(pkgconfig_DATA)
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo "$(INSTALL_DATA) $$files '$(DESTDIR)$(pkgconfigdir)'"; \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(pkgconfigdir)'"; \
 	  $(INSTALL_DATA) $$files "$(DESTDIR)$(pkgconfigdir)" || exit $$?; \
 	done
 
@@ -669,7 +670,7 @@ install-includeHEADERS: $(include_HEADERS)
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo "$(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
+	  echo " $(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
 	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(includedir)" || exit $$?; \
 	done
 
