@@ -184,6 +184,28 @@ test_fork_children(char **list, char *master_contact)
     }
 }
 
+typedef struct _delay_struct {
+    char **list;
+    char *master_contact;
+} delay_struct;
+
+static void
+delay_fork_wrapper(CManager cm, void *client_data)
+{
+    delay_struct *str = (delay_struct*)client_data;
+    test_fork_children(str->list, str->master_contact);
+    free(str);
+}
+
+extern void
+delayed_fork_children(CManager cm, char **list, char *master_contact, int delay_seconds)
+{
+    delay_struct *str = malloc(sizeof(delay_struct));
+    str->list = list;
+    str->master_contact = master_contact;
+    CMadd_delayed_task(cm, delay_seconds, 0, delay_fork_wrapper, (void*) str);
+}
+
 int wait_for_children(char **list)
 {
     (void)list;
