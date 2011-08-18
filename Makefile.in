@@ -56,7 +56,7 @@ am__aclocal_m4_deps = $(top_srcdir)/config/argz.m4 \
 	$(top_srcdir)/config/ltsugar.m4 \
 	$(top_srcdir)/config/ltversion.m4 \
 	$(top_srcdir)/config/lt~obsolete.m4 $(top_srcdir)/acinclude.m4 \
-	$(top_srcdir)/configure.in
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
@@ -415,7 +415,7 @@ noinst_HEADERS = cm_internal.h  ev_internal.h
 @CNL_FALSE@libcmselect_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@
 @CNL_FALSE@libcmselect_la_LDFLAGS = -module -export-symbols-regex "libcmselect.*" -lgen_thread
 @BUILD_ENET_TRUE@libcmenet_la_SOURCES = cmenet.c
-@BUILD_ENET_TRUE@libcmenet_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env
+@BUILD_ENET_TRUE@libcmenet_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env -lenet
 @BUILD_ENET_TRUE@libcmenet_la_LDFLAGS = -module -export-symbols-regex "libcmenet.*"
 libcmmulticast_la_SOURCES = cmmulticast.c
 libcmmulticast_la_LIBADD = $(LTLIBS) $(LIBS)

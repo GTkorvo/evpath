@@ -59,7 +59,7 @@ am__aclocal_m4_deps = $(top_srcdir)/config/argz.m4 \
 	$(top_srcdir)/config/ltsugar.m4 \
 	$(top_srcdir)/config/ltversion.m4 \
 	$(top_srcdir)/config/lt~obsolete.m4 $(top_srcdir)/acinclude.m4 \
-	$(top_srcdir)/configure.in
+	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 mkinstalldirs = $(install_sh) -d
@@ -928,13 +928,22 @@ uninstall-am:
 	tags tags-recursive uninstall uninstall-am
 
 
-check-local: block_test evtest
+check-local: block_test evtest check-enet
 	@if CMTransport=udp ./evtest$(EXEEXT) ; then\
 	 echo "PASS: evtest(udp)";\
 	else echo "FAIL: evtest(udp)"; fi
 	@if CMNonBlockWrite=1 CMReadAheadMsgLimit=1 ./block_test$(EXEEXT) ; then\
 	 echo "PASS: block_test";\
 	else echo "FAIL: block_test"; fi
+
+@BUILD_ENET_TRUE@check-enet: evtest bulktest
+@BUILD_ENET_TRUE@	@if CMTransport=enet ./evtest$(EXEEXT) ; then\
+@BUILD_ENET_TRUE@	 echo "PASS: evtest(enet)";\
+@BUILD_ENET_TRUE@	else echo "FAIL: evtest(enet)"; fi
+@BUILD_ENET_TRUE@	@if CMTransport=enet ./bulktest$(EXEEXT) ; then\
+@BUILD_ENET_TRUE@	 echo "PASS: bulktest(enet)";\
+@BUILD_ENET_TRUE@	else echo "FAIL: bulktest(enet)"; fi
+@BUILD_ENET_FALSE@check-enet:
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

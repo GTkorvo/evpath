@@ -31,6 +31,7 @@ dnl Enable building of the convenience library
 dnl and set LIBLTDL accordingly
 LT_CONFIG_LTDL_DIR([libltdl])
 LT_INIT([dlopen])
+LT_WITH_LTDL
 LTDL_INIT([convenience])
 test -n "$LIBTOOL" && LIBTOOL="$LIBTOOL --silent"
 AC_SUBST(LIBTOOL_DEPS)
@@ -133,5 +134,5 @@ CERCS_CHECK_SYSCTL_STYLE
 AC_CHECK_FUNCS([gettimeofday uname sysinfo sysconf getloadavg])
 
 dnl Output the makefile
-AC_CONFIG_FILES([Makefile evpath-3.0.pc mtests/Makefile tests/Makefile tests/testdll/Makefile rtests/Makefile examples/Makefile old_tests/Makefile dfg_tests/Makefile])
+AC_CONFIG_FILES([Makefile evpath-3.0.pc mtests/Makefile tests/Makefile tests/testdll/Makefile rtests/Makefile examples/Makefile old_tests/Makefile dfg_tests/Makefile libltdl/Makefile])
 AC_OUTPUT

@@ -1,4 +1,4 @@
-/* config.h.in.  Generated from configure.in by autoheader.  */
+/* config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* Place where evpath transport libraries are built */
 #undef EVPATH_LIBRARY_BUILD_DIR
@@ -215,6 +215,9 @@
 /* Define to the sub-directory in which libtool stores uninstalled libraries.
    */
 #undef LT_OBJDIR
+
+/* Define to the shared library suffix, say, ".dylib". */
+#undef LT_SHARED_EXT
 
 /* Define if dlsym() requires a leading underscore in symbol names. */
 #undef NEED_USCORE

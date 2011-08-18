@@ -2,7 +2,7 @@
 
 AUTOMAKE_OPTIONS = foreign
 ACLOCAL_AMFLAGS="-Iconfig"
-ACLOCAL_AMFLAGS+="-I libltdl/m4"
+ACLOCAL_AMFLAGS += "-I libltdl/m4"
 
 SUBDIRS = libltdl . tests dfg_tests mtests rtests old_tests
 
@@ -77,7 +77,7 @@ endif
 
 if BUILD_ENET
 libcmenet_la_SOURCES = cmenet.c
-libcmenet_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env
+libcmenet_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env -lenet
 libcmenet_la_LDFLAGS = -module -export-symbols-regex "libcmenet.*"
 endif
 
