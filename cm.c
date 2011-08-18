@@ -285,6 +285,7 @@ INT_CMget_specific_contact_list(CManager cm, attr_list attrs)
 	return cm->contact_lists[0];
     }
     /* specific transport chosen */
+    i = 0;
     while (cm->contact_lists && (cm->contact_lists[i] != NULL)) {
 	char *this_transport = NULL, *this_postfix = NULL;
 
@@ -314,6 +315,7 @@ INT_CMget_specific_contact_list(CManager cm, attr_list attrs)
     /* chosen transport not listened? */
     INT_CMlisten_specific(cm, attrs);
     /* try again */
+    i = 0;
     while (cm->contact_lists && (cm->contact_lists[i] != NULL)) {
 	char *this_transport = NULL, *this_postfix = NULL;
 
