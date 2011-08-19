@@ -37,6 +37,7 @@ typedef struct _EVdfg_stone *EVdfg_stone;
 **  These calls happen in the master/distinguished node.
 */
 extern EVdfg EVdfg_create(CManager cm);
+extern char *EVdfg_get_contact_list(EVdfg dfg);
 extern EVdfg_stone EVdfg_create_stone(EVdfg dfg, char *action_spec);
 extern void EVdfg_add_action (EVdfg_stone stone, char *action_spec);
 extern EVdfg_stone EVdfg_create_source_stone(EVdfg, char *source_name);

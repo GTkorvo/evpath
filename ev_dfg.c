@@ -423,12 +423,20 @@ extern EVdfg
 EVdfg_create(CManager cm)
 {
     EVdfg dfg = malloc(sizeof(struct _EVdfg));
-    attr_list contact_list;
+    attr_list contact_list, listen_list;
+    atom_t CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
 
     memset(dfg, 0, sizeof(struct _EVdfg));
     dfg->cm = cm;
     
-    contact_list = CMget_contact_list(cm);
+    /* use enet transport if available */
+    listen_list = create_attr_list();
+    add_string_attr(listen_list, CM_TRANSPORT, strdup("enet"));
+    contact_list = CMget_specific_contact_list(cm, listen_list);
+    if (contact_list == NULL) {
+	CMlisten(cm);
+	contact_list = CMget_contact_list(cm);
+    }
     dfg->master_contact_str = attr_list_to_string(contact_list);
     free_attr_list(contact_list);
     CMregister_handler(CMregister_format(cm, EVdfg_register_format_list),
@@ -440,6 +448,11 @@ EVdfg_create(CManager cm)
     CMregister_handler(CMregister_format(cm, EVdfg_shutdown_format_list),
 		       dfg_shutdown_handler, dfg);
     return dfg;
+}
+
+extern char *EVdfg_get_contact_list(EVdfg dfg)
+{
+    return dfg->master_contact_str;
 }
 
 static void
@@ -681,6 +694,11 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	attr_list contact_list = CMget_contact_list(cm);
 	char *my_contact_str;
 	int i;
+	if (conn == NULL) {
+	    fprintf(stderr, "failed to contact Master at %s\n", attr_list_to_string(master_attrs));
+	    fprintf(stderr, "Join DFG failed\n");
+	    return;
+	}
 	if (contact_list == NULL) {
 	    CMlisten(cm);
 	    contact_list = CMget_contact_list(cm);
