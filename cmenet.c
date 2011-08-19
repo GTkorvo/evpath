@@ -122,6 +122,7 @@ enet_service_network(CManager cm, void *void_trans)
 
             /* Store any relevant client information here. */
             event.peer -> data = enet_connection_data;
+	    ((enet_conn_data_ptr)enet_connection_data)->peer = event.peer;
 
             break;
 	}
@@ -361,6 +362,8 @@ libcmenet_LTX_initiate_conn(CManager cm, CMtrans_services svc,
     return conn;
 }
 
+#include "qual_hostname.c"
+
 /* 
  * Check to see that if we were to attempt to initiate a connection as
  * indicated by the attribute list, would we be connecting to ourselves?
@@ -380,7 +383,7 @@ libcmenet_LTX_self_check(CManager cm, CMtrans_services svc,
     static int IP = 0;
 
     if (IP == 0) {
-	//IP = get_self_ip_addr(svc);
+	IP = ntohl(get_self_ip_addr(svc));
     }
     if (!query_attr(attrs, CM_ENET_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
@@ -458,8 +461,6 @@ libcmenet_LTX_connection_eq(CManager cm, CMtrans_services svc,
     return 0;
 }
 
-#include "qual_hostname.c"
-
 /* 
  * Create an IP socket for connection from other CMs
  */
@@ -528,7 +529,7 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 	    svc->trace_out(cm, "CMEnet trying to bind port %d", target);
 
 	    server = enet_host_create (& address /* the address to bind the server host to */, 
-				       4095      /* allow up to 4095 clients and/or outgoing connections */,  /* MAX!  GSE */
+				       40,// 4095      /* allow up to 4095 clients and/or outgoing connections */,  /* MAX!  GSE */
 				       1      /* allow up to 2 channels to be used, 0 and 1 */,
 				       0      /* assume any amount of incoming bandwidth */,
 				       0      /* assume any amount of outgoing bandwidth */);
