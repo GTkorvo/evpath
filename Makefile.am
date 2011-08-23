@@ -4,7 +4,7 @@ AUTOMAKE_OPTIONS = foreign
 ACLOCAL_AMFLAGS="-Iconfig"
 ACLOCAL_AMFLAGS += "-I libltdl/m4"
 
-SUBDIRS = libltdl . tests dfg_tests mtests rtests old_tests
+SUBDIRS = libltdl . tests dfg_tests mtests rtests
 
 INCLUDES = $(INCLTDL)
 
