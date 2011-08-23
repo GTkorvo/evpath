@@ -49,6 +49,7 @@ typedef struct _EVint_node_rec {
 struct _EVdfg {
     CManager cm;
     char *master_contact_str;
+    char *master_command_contact_str;
     CMConnection master_connection;
     int shutdown_value;
     int ready_condition;
@@ -423,20 +424,12 @@ extern EVdfg
 EVdfg_create(CManager cm)
 {
     EVdfg dfg = malloc(sizeof(struct _EVdfg));
-    attr_list contact_list, listen_list;
-    atom_t CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
+    attr_list contact_list;
 
     memset(dfg, 0, sizeof(struct _EVdfg));
     dfg->cm = cm;
     
-    /* use enet transport if available */
-    listen_list = create_attr_list();
-    add_string_attr(listen_list, CM_TRANSPORT, strdup("enet"));
-    contact_list = CMget_specific_contact_list(cm, listen_list);
-    if (contact_list == NULL) {
-	CMlisten(cm);
-	contact_list = CMget_contact_list(cm);
-    }
+    contact_list = CMget_contact_list(cm);
     dfg->master_contact_str = attr_list_to_string(contact_list);
     free_attr_list(contact_list);
     CMregister_handler(CMregister_format(cm, EVdfg_register_format_list),
@@ -452,7 +445,22 @@ EVdfg_create(CManager cm)
 
 extern char *EVdfg_get_contact_list(EVdfg dfg)
 {
-    return dfg->master_contact_str;
+    attr_list listen_list, contact_list = NULL;
+    atom_t CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
+    CManager cm = dfg->cm;
+
+    /* use enet transport if available */
+    if (cercs_getenv("ENABLE_ENET")) {
+      listen_list = create_attr_list();
+      add_string_attr(listen_list, CM_TRANSPORT, strdup("enet"));
+      contact_list = CMget_specific_contact_list(cm, listen_list);
+    }
+    if (contact_list == NULL) {
+	CMlisten(cm);
+	contact_list = CMget_contact_list(cm);
+    }
+    dfg->master_command_contact_str = attr_list_to_string(contact_list);
+    return dfg->master_command_contact_str;
 }
 
 static void
