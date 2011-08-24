@@ -71,7 +71,6 @@ be_test_master(int argc, char **argv)
 {
     char **nodes;
     CManager cm;
-    attr_list contact_list;
     char *str_contact;
     EVsource source_handle;
     int i;
@@ -82,8 +81,6 @@ be_test_master(int argc, char **argv)
 
     cm = CManager_create();
     CMlisten(cm);
-    contact_list = CMget_contact_list(cm);
-    str_contact = attr_list_to_string(contact_list);
 
 /*
 **  LOCAL DFG SUPPORT   Sources and sinks that might or might not be utilized.
@@ -98,6 +95,7 @@ be_test_master(int argc, char **argv)
 **  DFG CREATION
 */
     test_dfg = EVdfg_create(cm);
+    str_contact = EVdfg_get_contact_list(test_dfg);
     EVdfg_node_join_handler(test_dfg, join_handler);
     src = EVdfg_create_source_stone(test_dfg, "master_source");
 

@@ -29,7 +29,6 @@ be_test_master(int argc, char **argv)
 {
     char **nodes;
     CManager cm;
-    attr_list contact_list;
     char *str_contact;
     char *chandle;
     EVdfg_stone *last, *tmp;
@@ -54,8 +53,6 @@ be_test_master(int argc, char **argv)
     nodes[node_count] = NULL;
     cm = CManager_create();
     CMlisten(cm);
-    contact_list = CMget_contact_list(cm);
-    str_contact = attr_list_to_string(contact_list);
 
 /*
 **  LOCAL DFG SUPPORT   Sources and sinks that might or might not be utilized.
@@ -73,6 +70,7 @@ be_test_master(int argc, char **argv)
 **  DFG CREATION
 */
     test_dfg = EVdfg_create(cm);
+    str_contact = EVdfg_get_contact_list(test_dfg);
     EVdfg_register_node_list(test_dfg, &nodes[0]);
     if (fanout) {
 
