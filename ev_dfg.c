@@ -456,8 +456,11 @@ extern char *EVdfg_get_contact_list(EVdfg dfg)
       contact_list = CMget_specific_contact_list(cm, listen_list);
     }
     if (contact_list == NULL) {
-	CMlisten(cm);
 	contact_list = CMget_contact_list(cm);
+	if (contact_list == NULL) {
+	    CMlisten(cm);
+	    contact_list = CMget_contact_list(cm);
+	}
     }
     dfg->master_command_contact_str = attr_list_to_string(contact_list);
     return dfg->master_command_contact_str;
