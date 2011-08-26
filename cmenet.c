@@ -54,6 +54,10 @@ static atom_t CM_ENET_HOSTNAME = -1;
 static atom_t CM_ENET_ADDR = -1;
 static atom_t CM_TRANSPORT = -1;
 
+extern attr_list
+libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
+				  transport_entry trans, attr_list listen_info);
+
 static int
 check_host(char *hostname, void *sin_addr)
 {
@@ -295,11 +299,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
     address.port = (unsigned short) int_port_num;
 
     if (sd->server == NULL) {
-	sd->server = enet_host_create (NULL /* the address to bind the server host to */, 
-				   4095      /* allow up to 4095 clients and/or outgoing connections */,  /* MAX!  GSE */
-				   1      /* allow up to 2 channels to be used, 0 and 1 */,
-				   0      /* assume any amount of incoming bandwidth */,
-				   0      /* assume any amount of outgoing bandwidth */);
+	libcmenet_LTX_non_blocking_listen(cm, svc, trans, NULL);
     }
 
     /* Initiate the connection, allocating the two channels 0 and 1. */
@@ -461,6 +461,59 @@ libcmenet_LTX_connection_eq(CManager cm, CMtrans_services svc,
     return 0;
 }
 
+static attr_list
+build_listen_attrs(CManager cm, CMtrans_services svc, enet_client_data_ptr sd,
+		   attr_list listen_info, int int_port_num)
+{
+    char host_name[256];
+    attr_list ret_list;
+    int IP = ntohl(get_self_ip_addr(svc));
+    int network_added = 0;
+    char *network_string;
+    
+    svc->trace_out(cm, "CMEnet listen succeeded on port %d",
+		       int_port_num);
+    ret_list = create_attr_list();
+#if !NO_DYNAMIC_LINKING
+    get_qual_hostname(host_name, sizeof(host_name), svc, listen_info, 
+		      &network_added);
+#endif 
+
+    if (sd) {
+	sd->hostname = strdup(host_name);
+	sd->listen_port = int_port_num;
+    }
+    if ((IP != 0) && (cercs_getenv("CM_NETWORK") == NULL) &&
+	(!query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
+		     (attr_value *) (long)& network_string))) {
+	add_attr(ret_list, CM_ENET_ADDR, Attr_Int4,
+		 (attr_value) (long)IP);
+    }
+    if ((cercs_getenv("CMEnetsUseHostname") != NULL) || 
+	(cercs_getenv("CM_NETWORK") != NULL) ||
+	(query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
+		    (attr_value *) (long)& network_string))) {
+	add_attr(ret_list, CM_ENET_HOSTNAME, Attr_String,
+		 (attr_value) strdup(host_name));
+	if (network_added) {
+	    if (query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
+			   (attr_value *) (long)& network_string)) {
+	      add_attr(ret_list, CM_NETWORK_POSTFIX, Attr_String,
+		       (attr_value) strdup(network_string));
+	    }
+	}
+    } else if (IP == 0) {
+        add_attr(ret_list, CM_ENET_ADDR, Attr_Int4, 
+		 (attr_value)htonl(INADDR_LOOPBACK));
+    }
+    add_attr(ret_list, CM_ENET_PORT, Attr_Int4,
+	     (attr_value) (long)int_port_num);
+    
+    add_attr(ret_list, CM_TRANSPORT, Attr_String,
+	     (attr_value) strdup("enet"));
+    return ret_list;
+}
+
 /* 
  * Create an IP socket for connection from other CMs
  */
@@ -475,7 +528,6 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 
     int attr_port_num = 0;
     u_short port_num = 0;
-    char *network_string;
 
     /* 
      *  Check to see if a bind to a specific port was requested
@@ -496,6 +548,16 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 
     address.host = ENET_HOST_ANY;
 
+    if (sd->server != NULL) {
+	/* we're already listening */
+        if (port_num == 0) {
+	    /* not requesting a specific port, return what we have */
+	    return build_listen_attrs(cm, svc, NULL, listen_info, address.port);
+	} else {
+	    printf("CMlisten_specific() requesting a specific port follows other Enet operation which initiated listen at another port.  Only one listen allowed, second listen fails.\n");
+	    return NULL;
+	}
+    }
     if (port_num != 0) {
 	/* Bind the server to the default localhost.     */
 	/* A specific host address can be specified by   */
@@ -546,53 +608,9 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 	}
 	sd->server = server;
     }
-    {
-	char host_name[256];
-	int int_port_num = address.port;
-	attr_list ret_list;
-	int IP = ntohl(get_self_ip_addr(svc));
-	int network_added = 0;
-
-	svc->trace_out(cm, "CMEnet listen succeeded on port %d",
-		       int_port_num);
-	ret_list = create_attr_list();
-#if !NO_DYNAMIC_LINKING
-	get_qual_hostname(host_name, sizeof(host_name), svc, listen_info, 
-			  &network_added);
-#endif 
-
-	sd->hostname = strdup(host_name);
-	sd->listen_port = int_port_num;
-	if ((IP != 0) && (cercs_getenv("CM_NETWORK") == NULL) &&
-	    (!query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
-			 (attr_value *) (long)& network_string))) {
-	    add_attr(ret_list, CM_ENET_ADDR, Attr_Int4,
-		     (attr_value) (long)IP);
-	}
-	if ((cercs_getenv("CMEnetsUseHostname") != NULL) || 
-	    (cercs_getenv("CM_NETWORK") != NULL) ||
-	    (query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
-			 (attr_value *) (long)& network_string))) {
-	    add_attr(ret_list, CM_ENET_HOSTNAME, Attr_String,
-		     (attr_value) strdup(host_name));
-	    if (network_added) {
-		if (query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
-			       (attr_value *) (long)& network_string)) {
-		    add_attr(ret_list, CM_NETWORK_POSTFIX, Attr_String,
-			     (attr_value) strdup(network_string));
-		}
-	    }
-	} else if (IP == 0) {
-	    add_attr(ret_list, CM_ENET_ADDR, Attr_Int4, 
-		     (attr_value)INADDR_LOOPBACK);
-	}
-	add_attr(ret_list, CM_ENET_PORT, Attr_Int4,
-		 (attr_value) (long)int_port_num);
-
-	add_attr(ret_list, CM_TRANSPORT, Attr_String,
-		 (attr_value) strdup("enet"));
-	return ret_list;
-    }
+    svc->fd_add_select(cm, enet_host_get_sock_fd (server), 
+		       enet_service_network, (void*)cm, (void*)trans);
+    return build_listen_attrs(cm, svc, sd, listen_info, address.port);
 }
 
 #if defined(HAVE_WINDOWS_H) && !defined(NEED_IOVEC_DEFINE)
@@ -693,6 +711,7 @@ free_enet_data(CManager cm, void *sdv)
 /*    svc->free_func(sd);*/
     if (sd->server != NULL) {
 	ENetHost * server = sd->server;
+	svc->fd_remove_select(cm, enet_host_get_sock_fd (server));
 	sd->server = NULL;
 	enet_host_destroy(server);
     }
@@ -742,6 +761,6 @@ libcmenet_LTX_initialize(CManager cm, CMtrans_services svc,
     enet_data->server = NULL;
 
     svc->add_shutdown_task(cm, free_enet_data, (void *) enet_data);
-    svc->add_periodic_task(cm, 0, 100000, enet_service_network, (void*)trans);
+    svc->add_periodic_task(cm, 1, 0, enet_service_network, (void*)trans);
     return (void *) enet_data;
 }
