@@ -59,10 +59,13 @@ struct _EVdfg {
     int node_count;
     EVint_node_list nodes;
     EVdfgJoinHandlerFunc node_join_handler;
+    EVdfgFailHandlerFunc node_fail_handler;
     int my_node_id;
     int realized;
     int already_shutdown;
     int active_sink_count;
+    int deploy_ack_count;
+    int startup_ack_condition;
 };
 
 EVdfg_stone
@@ -196,6 +199,20 @@ FMStructDescRec EVdfg_ready_format_list[] = {
     {NULL, NULL, 0, NULL}
 };
 
+typedef struct _EVstartup_ack_msg {
+    char *node_id;
+} EVstartup_ack_msg, *EVstartup_ack_ptr;
+
+FMField EVstartup_ack_msg_flds[] = {
+    {"node_id", "string", sizeof(char*), FMOffset(EVstartup_ack_ptr, node_id)},
+    {NULL, NULL, 0, 0}
+};
+
+FMStructDescRec EVdfg_startup_ack_format_list[] = {
+    {"EVdfg_startup_ack", EVstartup_ack_msg_flds, sizeof(EVstartup_ack_msg), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
 typedef struct _EVshutdown_msg {
     int value;
 } EVshutdown_msg, *EVshutdown_ptr;
@@ -207,6 +224,20 @@ FMField EVshutdown_msg_flds[] = {
 
 FMStructDescRec EVdfg_shutdown_format_list[] = {
     {"EVdfg_shutdown", EVshutdown_msg_flds, sizeof(EVshutdown_msg), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
+typedef struct _EVconn_shutdown_msg {
+    int stone;
+} EVconn_shutdown_msg, *EVconn_shutdown_ptr;
+
+FMField EVconn_shutdown_msg_flds[] = {
+    {"stone", "integer", sizeof(int), FMOffset(EVconn_shutdown_ptr, stone)},
+    {NULL, NULL, 0, 0}
+};
+
+FMStructDescRec EVdfg_conn_shutdown_format_list[] = {
+    {"EVdfg_conn_shutdown", EVconn_shutdown_msg_flds, sizeof(EVconn_shutdown_msg), NULL},
     {NULL, NULL, 0, NULL}
 };
 
@@ -269,6 +300,9 @@ static void possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn);
 static int new_shutdown_condition(EVdfg dfg, CMConnection conn);
 
 static void
+dfg_startup_ack_handler(CManager cm, CMConnection conn, void *vmsg, 
+			void *client_data, attr_list attrs);
+static void
 dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg, 
 		  void *client_data, attr_list attrs)
 {
@@ -279,6 +313,44 @@ dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg,
     CMtrace_out(cm, EVerbose, "Client DFG %p is ready, signaling %d\n", dfg, dfg->ready_condition);
     dfg->my_node_id = msg->node_id;
     CMCondition_signal(cm, dfg->ready_condition);
+}
+
+static void
+dfg_conn_shutdown_handler(CManager cm, CMConnection conn, void *vmsg, 
+			  void *client_data, attr_list attrs)
+{
+    EVdfg dfg = client_data;
+    EVconn_shutdown_msg *msg = (EVconn_shutdown_msg *)vmsg;
+    
+    CMtrace_out(cm, EVerbose, "The master knows about a stone %d failure\n", msg->stone);
+    if (dfg->node_fail_handler != NULL) {
+	int i;
+	int target_stone = -1;
+	char *failed_node = NULL;
+	char *contact_str = NULL;
+	for (i=0; i< dfg->stone_count; i++) {
+	    int j;
+	    for (j = 0; j < dfg->stones[i]->out_count; j++) {
+		if (dfg->stones[i]->out_links[j]->stone_id == msg->stone) {
+		    EVdfg_stone out_stone = dfg->stones[i]->out_links[j];
+		    printf("Found reporting stone as output %d of stone %d\n",
+			   j, i);
+		    parse_bridge_action_spec(out_stone->action, 
+					     &target_stone, &contact_str);
+		    printf("Dead stone is %d\n", target_stone);
+		}
+	    }
+	}
+	for (i=0; i< dfg->stone_count; i++) {
+	    if (dfg->stones[i]->stone_id == target_stone) {
+		int node = dfg->stones[i]->node;
+		printf("Dead node is %d, name %s\n", node,
+		       dfg->nodes[node].canonical_name);
+		failed_node = dfg->nodes[node].canonical_name;
+	    }
+	}
+	dfg->node_fail_handler(dfg, failed_node, target_stone);
+    }
 }
 
 static void
@@ -302,6 +374,40 @@ dfg_shutdown_handler(CManager cm, CMConnection conn, void *vmsg,
 	while (dfg->shutdown_conditions && (dfg->shutdown_conditions[i] != -1)){
 	    CMCondition_signal(dfg->cm, dfg->shutdown_conditions[i++]);
 	}
+    }
+}
+
+static void
+dfg_stone_close_handler(CManager cm, CMConnection conn, int stone, 
+		  void *client_data)
+{
+    EVdfg dfg = (EVdfg)client_data;
+    event_path_data evp = cm->evp;
+    int global_stone_id = -1;
+    (void)cm;
+    (void)conn;
+    /* first, freeze the stone so that we don't lose any more data */
+    INT_EVfreeze_stone(cm, stone);
+
+	int i;
+	for (i=0; i < evp->stone_lookup_table_size; i++ ) {
+	    if (stone == evp->stone_lookup_table[i].local_id) {
+	        global_stone_id = evp->stone_lookup_table[i].global_id;
+	    }
+	}
+	if (global_stone_id == -1) {
+	    printf("Bad mojo, failed to find global stone id after stone close\n");
+	}
+    if (dfg->master_connection != NULL) {
+	CMFormat conn_shutdown_msg = INT_CMlookup_format(dfg->cm, EVdfg_conn_shutdown_format_list);
+	EVconn_shutdown_msg msg;
+	msg.stone = global_stone_id;
+	INT_CMwrite(dfg->master_connection, conn_shutdown_msg, &msg);
+    } else {
+	EVconn_shutdown_msg msg;
+	msg.stone = global_stone_id;
+	/* the master is detecting a close situation */
+	dfg_conn_shutdown_handler(dfg->cm, NULL, &msg, dfg, NULL);
     }
 }
 
@@ -358,6 +464,7 @@ node_register_handler(CManager cm, CMConnection conn, void *vmsg,
 	new_node = n;
     }
     CMtrace_out(cm, EVerbose, "Client \"%s\" has joined DFG, contact %s\n", msg->node_name, dfg->nodes[new_node].str_contact_list);
+
     check_all_nodes_registered(dfg);
 }
 
@@ -417,6 +524,12 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
 	    dfg->active_sink_count++;
 	}
     }    
+    if (conn != NULL) {
+	CMFormat startup_ack_msg = INT_CMlookup_format(dfg->cm, EVdfg_startup_ack_format_list);
+	EVstartup_ack_msg response_msg;
+	response_msg.node_id = msg->canonical_name;
+	INT_CMwrite(dfg->master_connection, startup_ack_msg, &response_msg);
+    }
     CManager_unlock(cm);
 }
 
@@ -431,15 +544,21 @@ EVdfg_create(CManager cm)
     
     contact_list = CMget_contact_list(cm);
     dfg->master_contact_str = attr_list_to_string(contact_list);
+    dfg->startup_ack_condition = -1;
     free_attr_list(contact_list);
+    EVregister_close_handler(cm, dfg_stone_close_handler, (void*)dfg);
     CMregister_handler(CMregister_format(cm, EVdfg_register_format_list),
 		       node_register_handler, dfg);
     CMregister_handler(CMregister_format(cm, EVdfg_ready_format_list),
 		       dfg_ready_handler, dfg);
+    CMregister_handler(CMregister_format(cm, EVdfg_startup_ack_format_list),
+		       dfg_startup_ack_handler, dfg);
     CMregister_handler(CMregister_format(cm, EVdfg_deploy_format_list),
 		       dfg_deploy_handler, dfg);
     CMregister_handler(CMregister_format(cm, EVdfg_shutdown_format_list),
 		       dfg_shutdown_handler, dfg);
+    CMregister_handler(CMregister_format(cm, EVdfg_conn_shutdown_format_list),
+		       dfg_conn_shutdown_handler, dfg);
     return dfg;
 }
 
@@ -450,11 +569,10 @@ extern char *EVdfg_get_contact_list(EVdfg dfg)
     CManager cm = dfg->cm;
 
     /* use enet transport if available */
-    if (cercs_getenv("ENABLE_ENET")) {
-      listen_list = create_attr_list();
-      add_string_attr(listen_list, CM_TRANSPORT, strdup("enet"));
-      contact_list = CMget_specific_contact_list(cm, listen_list);
-    }
+    listen_list = create_attr_list();
+    add_string_attr(listen_list, CM_TRANSPORT, strdup("enet"));
+    contact_list = CMget_specific_contact_list(cm, listen_list);
+
     if (contact_list == NULL) {
 	contact_list = CMget_contact_list(cm);
 	if (contact_list == NULL) {
@@ -552,7 +670,7 @@ EVdfg_shutdown(EVdfg dfg, int result)
 	CMFormat shutdown_msg = CMlookup_format(dfg->cm, EVdfg_shutdown_format_list);
 	EVshutdown_msg msg;
 	msg.value = result;
-	CMwrite(dfg->master_connection, shutdown_msg, &msg);
+	INT_CMwrite(dfg->master_connection, shutdown_msg, &msg);
 	/* and wait until we hear back */
     } else {
 	possibly_signal_shutdown(dfg, result, NULL);
@@ -578,7 +696,7 @@ EVdfg_ready_for_shutdown(EVdfg dfg)
 	CMFormat shutdown_msg = CMlookup_format(dfg->cm, EVdfg_shutdown_format_list);
 	EVshutdown_msg msg;
 	msg.value = STATUS_NO_CONTRIBUTION;   /* no status contribution */
-	CMwrite(dfg->master_connection, shutdown_msg, &msg);
+	INT_CMwrite(dfg->master_connection, shutdown_msg, &msg);
     } else {
 	possibly_signal_shutdown(dfg, STATUS_NO_CONTRIBUTION, NULL);
     }
@@ -734,7 +852,7 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	    msg.sinks[i].FMtype = NULL;
 	}
 	
-	CMwrite(conn, register_msg, &msg);
+	INT_CMwrite(conn, register_msg, &msg);
 	free(my_contact_str);
 	dfg->master_connection = conn;
 	CMtrace_out(cm, EVerbose, "DFG %p node name %s\n", dfg, node_name);
@@ -828,7 +946,7 @@ deploy_to_node(EVdfg dfg, int node)
 	}
     }
     if (dfg->nodes[node].conn) {
-	CMwrite(dfg->nodes[node].conn, deploy_msg, &msg);
+	INT_CMwrite(dfg->nodes[node].conn, deploy_msg, &msg);
     } else {
 	dfg_deploy_handler(dfg->cm, NULL, &msg, dfg, NULL);
     }
@@ -840,13 +958,41 @@ deploy_to_node(EVdfg dfg, int node)
 }
 
 static void
+dfg_startup_ack_handler(CManager cm, CMConnection conn, void *vmsg, 
+		  void *client_data, attr_list attrs)
+{
+    EVdfg dfg = client_data;
+    EVstartup_ack_ptr msg =  vmsg;
+    (void) conn;
+    (void) attrs;
+    dfg->deploy_ack_count++;
+    CMtrace_out(cm, EVerbose, "Client %s reports deployed, count %d\n", msg->node_id, dfg->deploy_ack_count);
+    if (dfg->deploy_ack_count == dfg->node_count) {
+	CMtrace_out(cm, EVerbose, "That was the last one, Signalling %d\n", dfg->startup_ack_condition);
+	CMCondition_signal(cm, dfg->startup_ack_condition);
+    }
+}
+
+static void
 perform_deployment(EVdfg dfg)
 {
     int i;
     assign_stone_ids(dfg);
     add_bridge_stones(dfg);
+    dfg->deploy_ack_count = 1;  /* we are number 1 */
+    if (dfg->startup_ack_condition == -1) {
+	dfg->startup_ack_condition = INT_CMCondition_get(dfg->cm, NULL);
+    }
     for (i=0; i < dfg->node_count; i++) {
 	deploy_to_node(dfg, i);
+    }
+}
+
+static void
+wait_for_startup_acks(EVdfg dfg)
+{
+    if (dfg->deploy_ack_count != dfg->node_count) {
+	CMCondition_wait(dfg->cm, dfg->startup_ack_condition);
     }
 }
 
@@ -861,7 +1007,7 @@ signal_ready(EVdfg dfg)
     for (i=0; i < dfg->node_count; i++) {
 	if (dfg->nodes[i].conn != NULL) {
 	    msg.node_id = i;
-	    CMwrite(dfg->nodes[i].conn, ready_msg, &msg);
+	    INT_CMwrite(dfg->nodes[i].conn, ready_msg, &msg);
 	    CMtrace_out(cm, EVerbose, "Master - ready sent to node \"%s\"\n",
 			dfg->nodes[i].name);
 	} else {
@@ -923,7 +1069,7 @@ possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn)
     msg.value = status;
     for (i=0; i < dfg->node_count; i++) {
 	if (dfg->nodes[i].conn != NULL) {
-	    CMwrite(dfg->nodes[i].conn, shutdown_msg, &msg);
+	    INT_CMwrite(dfg->nodes[i].conn, shutdown_msg, &msg);
 	    CMtrace_out(cm, EVerbose, "DFG shutdown message sent to client \"%s\"\n", dfg->nodes[i].name);
 	} else {
 	    if (!dfg->nodes[i].self) {
@@ -946,6 +1092,11 @@ extern void EVdfg_node_join_handler(EVdfg dfg, EVdfgJoinHandlerFunc func)
     dfg->node_join_handler = func;
 }
 
+extern void EVdfg_node_fail_handler(EVdfg dfg, EVdfgFailHandlerFunc func)
+{
+    dfg->node_fail_handler = func;
+}
+
 static void
 check_all_nodes_registered(EVdfg dfg)
 {
@@ -963,6 +1114,7 @@ check_all_nodes_registered(EVdfg dfg)
 	}
     }
     perform_deployment(dfg);
+    wait_for_startup_acks(dfg);
     signal_ready(dfg);
 }
 

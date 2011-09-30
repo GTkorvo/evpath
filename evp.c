@@ -18,7 +18,7 @@ static void reference_event(event_item *event);
 static void dump_action(stone_type stone, response_cache_element *resp, 
 			int a, const char *indent);
 static void dump_stone(stone_type stone);
-static int is_output_stone(CManager cm, EVstone stone_num);
+static int is_bridge_stone(CManager cm, EVstone stone_num);
 
 static const char *action_str[] = { "Action_NoAction","Action_Bridge", "Action_Thread_Bridge", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Encode_to_Buffer", "Action_Split", "Action_Store", "Action_Congestion", "Action_Source"};
 
@@ -1439,11 +1439,11 @@ process_events_stone(CManager cm, int s, action_class c)
     if (c == Immediate_and_Multi && stone->pending_output) {
         more_pending += process_stone_pending_output(cm, s);
     }
-    if (is_output_stone(cm, s) && (c != Bridge) && (c != Congestion)) return 0;
+    if (is_bridge_stone(cm, s) && (c != Bridge) && (c != Congestion)) return 0;
     
     CMtrace_out(cm, EVerbose, "Process events stone %d\n", s);
     item = stone->queue->queue_head;
-    if (is_output_stone(cm, s) && (c == Bridge)) {
+    if (is_bridge_stone(cm, s) && (c == Bridge)) {
 	stone->is_processing = 1;
 	do_bridge_action(cm, s);
 	stone->is_processing = 0;
@@ -1646,7 +1646,7 @@ process_local_actions(CManager cm)
     event_path_data evp = cm->evp;
     action_state as = evp->as;
     int s, more_pending = 0;
-    CMtrace_out(cm, EVerbose, "Process local actions\n");
+/*    CMtrace_out(cm, EVerbose, "Process local actions\n");*/
     if (as == NULL) {
 	as = evp->as = malloc(sizeof(*as));
 	memset(as, 0, sizeof(*as));
@@ -1731,6 +1731,9 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
 		event_item *event = dequeue_event(cm, act->queue, &action_id);
 		return_event(evp, event);
 		}*/
+	    if (evp->app_stone_close_handler) {
+	        evp->app_stone_close_handler(cm, conn, s, evp->app_stone_close_data);
+	    }
 	}
     }
 }
@@ -1804,6 +1807,9 @@ do_bridge_action(CManager cm, int s)
 		ret = internal_write_event(act->o.bri.conn, event->format,
 					   &act->o.bri.remote_stone_id, 4, 
 					   event, event->attrs);
+		if (ret == 0) {
+		  printf("DETECTED FAILED EVENT WRITE\n");
+		}
 	    } else {
 		struct _CMFormat tmp_format;
 		if (event->reference_format == NULL) {
@@ -1955,7 +1961,7 @@ INT_EVcreate_thread_bridge_action(CManager cm, CManager target_cm,
 }
 
 static int
-is_output_stone(CManager cm, EVstone stone_num)
+is_bridge_stone(CManager cm, EVstone stone_num)
 {
     event_path_data evp = cm->evp;
     stone_type stone = stone_struct(evp, stone_num);
@@ -2675,7 +2681,7 @@ INT_EVhandle_control_message(CManager cm, CMConnection conn, unsigned char type,
             stone_type stone;
             for (s = evp->stone_base_num; s < evp->stone_count + evp->stone_base_num; ++s) {
                 stone = stone_struct(evp, s);
-                if (is_output_stone(cm, s) &&  stone->proto_actions[stone->default_action].o.bri.conn == conn
+                if (is_bridge_stone(cm, s) &&  stone->proto_actions[stone->default_action].o.bri.conn == conn
                         && stone->proto_actions[stone->default_action].o.bri.remote_stone_id == arg) {
                     backpressure_transition(cm, s, Stall_Squelch, type == CONTROL_SQUELCH);
                 }
@@ -2986,6 +2992,12 @@ EVPinit(CManager cm)
     REVPinit(cm);
 }
 
+extern void
+INT_EVregister_close_handler(CManager cm, EVStoneCloseHandlerFunc handler, void *client_data)
+{
+    cm->evp->app_stone_close_handler = handler;
+    cm->evp->app_stone_close_data = client_data;
+}
     
 extern int
 INT_EVtake_event_buffer(CManager cm, void *event)

@@ -1056,6 +1056,22 @@ typedef int (*EVSimpleHandlerFunc) ARGS((CManager cm,
 typedef int (*EVRawHandlerFunc) ARGS((CManager cm, void *message, 
 				      int msg_len, void *client_data,
 				      attr_list attrs));
+
+/*!
+ * The prototype for a EVPath bridge stone close handler.
+ *
+ * Functions matching of this prototype can be registered with
+ * EVregister_close_handler(). 
+ * \param cm The CManager with which this handler was registered.
+ * \param conn The CMConnection which is being closed.
+ * \param the stone ID of the bridge stone which has closed
+ * \param client_data This value is the same client_data value that was
+ * supplied in the EVregister_close_handler() call.  It is not interpreted 
+ * by CM, but instead can be used to maintain some application context.
+ */
+typedef void (*EVStoneCloseHandlerFunc) ARGS((CManager cm, CMConnection conn, 
+					      int stone, void *client_data));
+
 struct _event_item;
 
 /*!
@@ -2087,6 +2103,15 @@ extern void
 EVadd_standard_routines(CManager cm, char *extern_string, 
 			cod_extern_entry *externs);
 #endif
+
+/*!
+ * Register a handler to be called when a bridge stone is closed
+ *
+ * \param cm The CManager managing the bridge stones
+ * \param handler The routine to be called
+ */
+extern void
+EVregister_close_handler(CManager cm, EVStoneCloseHandlerFunc handler, void *client_data);
 
 /*!
  * Print a description of stone status to standard output.

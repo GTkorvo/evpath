@@ -51,6 +51,7 @@ typedef struct bridge_action_struct {
     int remote_path_len;
     char *remote_path;
     int conn_failed;
+    void *stone_close_client_value;
 } bridge_action_vals;
 
 typedef struct thread_bridge_action_struct {
@@ -243,6 +244,8 @@ typedef struct _event_path_data {
     thr_mutex_t lock;
     int use_backpressure;
     extern_routines externs;
+    EVStoneCloseHandlerFunc app_stone_close_handler;
+    void *app_stone_close_data;
 } *event_path_data;
 
 struct _EVSource {
