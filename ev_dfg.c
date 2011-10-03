@@ -479,6 +479,7 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
     (void) attrs;
     EVdfg_stones_ptr msg =  vmsg;
     int i, base = evp->stone_lookup_table_size;
+    CMtrace_out(cm, EVerbose, "Client %d getting Deploy message\n", dfg->my_node_id);
 
     CManager_lock(cm);
     /* add stones to local lookup table */
@@ -529,6 +530,9 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
 	EVstartup_ack_msg response_msg;
 	response_msg.node_id = msg->canonical_name;
 	INT_CMwrite(dfg->master_connection, startup_ack_msg, &response_msg);
+	CMtrace_out(cm, EVerbose, "Client %d wrote startup ack\n", dfg->my_node_id);
+    } else {
+      	CMtrace_out(cm, EVerbose, "Client %d no master conn\n", dfg->my_node_id);
     }
     CManager_unlock(cm);
 }
@@ -913,7 +917,10 @@ deploy_to_node(EVdfg dfg, int node)
 	    stone_count++;
 	}
     }
-    if (stone_count == 0) return;
+    if (stone_count == 0) {
+        dfg->deploy_ack_count++;
+      	return;
+    }
     msg.canonical_name = dfg->nodes[node].canonical_name;
     msg.stone_count = stone_count;
     msg.stone_list = malloc(stone_count * sizeof(msg.stone_list[0]));
