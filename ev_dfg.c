@@ -322,6 +322,9 @@ dfg_conn_shutdown_handler(CManager cm, CMConnection conn, void *vmsg,
     EVdfg dfg = client_data;
     EVconn_shutdown_msg *msg = (EVconn_shutdown_msg *)vmsg;
     
+    (void)cm;
+    (void)conn;
+    (void)attrs;
     CMtrace_out(cm, EVerbose, "The master knows about a stone %d failure\n", msg->stone);
     if (dfg->node_fail_handler != NULL) {
 	int i;
