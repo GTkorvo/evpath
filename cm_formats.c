@@ -100,7 +100,8 @@ IOContext context;
 CMFormat
 INT_CMregister_simple_format(CManager cm, char *format_name, FMFieldList field_list, int struct_size)
 {
-  FMStructDescRec format_list[2];
+  FMStructDescRec *format_list = malloc(sizeof(*format_list) * 2);
+  /* NOTE:  This is a memory leak as we do not, by design, deallocate the format_list */
   format_list[0].format_name = format_name;
   format_list[0].field_list = field_list;
   format_list[0].struct_size = struct_size;
