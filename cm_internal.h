@@ -384,6 +384,7 @@ extern void *INT_CMtake_buffer ARGS((CManager cm, void *data));
 extern void INT_CMreturn_buffer ARGS((CManager cm, void *data));
 extern CMConnection INT_CMget_conn ARGS((CManager cm, attr_list contact_list));
 extern CMFormat INT_CMregister_format ARGS((CManager cm, FMStructDescList format_list));
+extern CMFormat INT_CMregister_simple_format ARGS((CManager cm, char *format_name, FMFieldList field_list, int struct_size));
 extern void
 INT_EVforget_connection(CManager, CMConnection);
 extern void

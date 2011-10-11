@@ -377,6 +377,22 @@ CMget_indexed_conn ARGS((CManager cm, int i));
 extern CMFormat
 CMregister_format ARGS((CManager cm, FMStructDescList format_list));
 
+/*!
+ * register a simple (no internal structures) format with CM.
+ *
+ * \param cm  The CManager in which to register the format.
+ * \param format_name The name of the data/message structure being registered
+ * \param field_list The FM field list which describes the structure, listing all 
+ * structure fields (their names, data types, offsets and sizes).
+ * As with all FMFieldLists, the list is terminated with a <tt>{NULL, NULL, 0, 0}</tt> value.
+ *
+ * Registering a format is a precursor to sending a message or registering a
+ * handler for incoming messages.  This call is the equivalent to calling CMregister_format(), 
+ * specifying a single entry in the format_list parameter with the format_name, field_list and 
+ * struct_size and the opt_info specified as NULL.
+ */
+extern CMFormat
+CMregister_simple_format ARGS((CManager cm, char *format_name, FMFieldList field_list, int struct_size));
 
 /*!
  * lookup the CMFormat associated with a particular FMStructDescList

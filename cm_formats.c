@@ -98,6 +98,21 @@ IOContext context;
 #endif 
 
 CMFormat
+INT_CMregister_simple_format(CManager cm, char *format_name, FMFieldList field_list, int struct_size)
+{
+  FMStructDescRec format_list[2];
+  format_list[0].format_name = format_name;
+  format_list[0].field_list = field_list;
+  format_list[0].struct_size = struct_size;
+  format_list[0].opt_info = NULL;
+  format_list[1].format_name = NULL;
+  format_list[1].field_list = NULL;
+  format_list[1].struct_size = 0;
+  format_list[1].opt_info = NULL;
+  return INT_CMregister_format(cm, &format_list[0]);
+}
+
+CMFormat
 INT_CMregister_format(CManager cm, FMStructDescList format_list)
 {
     CMFormat format;
