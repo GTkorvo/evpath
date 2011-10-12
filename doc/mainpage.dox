@@ -103,7 +103,7 @@ When run, the program above should print "I got 217".
 
 The trival program in the previous example isn't very useful.  The next step
 is to split the sender and receiver and introduce network data transmission
-using output stones. 
+using bridge stones. 
 \subsubsection net_recv The Receiving Side
 \dontinclude net_recv.c
 This example will use the same data definitions and handler that were
@@ -140,8 +140,8 @@ first command line arguments to specify the contact information for the
 receiver, extracted to the variables \c remote_stone and \c contact_list.
 \skip this file is
 \until CMlisten
-The next step is to create a stone and associate an output action with it.
-The output action requires a CM-style contact list in attribute list form,
+The next step is to create a stone and associate an bridge action with it.
+The bridge action requires a CM-style contact list in attribute list form,
 so we must unstringify the \c string_list we extracted from the argument.
 \until EVassoc_bridge_action
 Finally, we create an event submission handle, initialize a record to send
@@ -168,9 +168,9 @@ subgraph cluster_net_send {
 	 node [style=filled,color=white];
 	 color=lightblue;
 	 style=filled;
-	 source -> output[style=bold];
-	 output[label = "output stone"];
-	 output[shape=box]
+	 source -> bridge[style=bold];
+	 bridge[label = "bridge stone"];
+	 bridge[shape=box]
 	 source[shape=circle]
 	 label = "NET_SEND";
 	}
@@ -181,7 +181,7 @@ subgraph cluster_net_recv {
 	 terminal[label = "terminal stone",shape=box];
 	 label = "NET_RECV";
 	}
-	output->terminal[style=bold,label="network data transmission"];
+	bridge->terminal[style=bold,label="network data transmission"];
 }
 \enddot
 \subsection multi_send Sending to multiple receivers
@@ -204,11 +204,11 @@ initial target list.  In this case, we'll add targets to the split stone as
 we parse the input arguments, so the initial target list is NULL.  For this
 program, we'll specify the multiple remote receivers by listing them
 separately on the program's command line, so we next parse the command line,
-create output stones for each receiver and add each output stone as a target
+create bridge stones for each receiver and add each bridge stone as a target
 for the split stone.
 \until EVaction_add_split_target
 \until }
-The call to EVaction_add_split_target() adds the newly-created output stone
+The call to EVaction_add_split_target() adds the newly-created bridge stone
 to the list of stones to which the split stone will replicate data.  Note
 that the EVaction_add_split_target() call requires specifying both the stone
 to which the split action was registered as well as the EVaction value that
@@ -229,15 +229,15 @@ subgraph cluster_net_send {
 	 color=lightblue;
 	 style=filled;
 	 source -> split[style=bold];
-	 split -> output1[style=bold];
-	 split -> output2[style=bold];
-	 split -> output3[style=bold];
-	 output1[label = "output stone"];
-	 output2[label = "output stone"];
-	 output3[label = "output stone"];
-	 output1[shape=box]
-	 output2[shape=box]
-	 output3[shape=box]
+	 split -> bridge1[style=bold];
+	 split -> bridge2[style=bold];
+	 split -> bridge3[style=bold];
+	 bridge1[label = "bridge stone"];
+	 bridge2[label = "bridge stone"];
+	 bridge3[label = "bridge stone"];
+	 bridge1[shape=box]
+	 bridge2[shape=box]
+	 bridge3[shape=box]
 	 source[shape=circle]
 	 label = "MULTI_SEND";
 	}
@@ -262,23 +262,23 @@ subgraph cluster_net_recv3 {
 	 terminal3[label = "terminal stone",shape=box];
 	 label = "NET_RECV";
 	}
-	output1->terminal1[style=bold,label="network data transmission"];
-	output2->terminal2[style=bold,label="network data transmission"];
-	output3->terminal3[style=bold,label="network data transmission"];
+	bridge1->terminal1[style=bold,label="network data transmission"];
+	bridge2->terminal2[style=bold,label="network data transmission"];
+	bridge3->terminal3[style=bold,label="network data transmission"];
 }
 \enddot
 
 Some further notes.  The text above uses the term "split stone" as a
-shorthand for "a stone with a split action associated with it".  "output
+shorthand for "a stone with a split action associated with it".  "bridge
 stone" is used similarly.  Actions which are not associated with a specific
 data format are installed as the default action on stones and are performed
 when there is no other action that more specifically matches the data format
 of the triggering event.  There is only one default action per stone, so
-registering a split action on top of an output action will overwrite the
+registering a split action on top of an bridge action will overwrite the
 former (and likely leak some memory).  Also, it's technically possible to
-register, for example, a terminal action and an output action on the same
+register, for example, a terminal action and an bridge action on the same
 stone.  In this case, the terminal action would be applied to incoming data
-of compatible formats, but the output action would be applied to other data
+of compatible formats, but the bridge action would be applied to other data
 (more about data compatability in Section \ref pbio).  At this point, I'm
 not sure if there are circumstances where this sort of flexibility is more
 useful than confusing.  But the implementation makes it easy, so for the
@@ -288,7 +288,7 @@ yourself in the foot.
 \subsection derived Specializing the event stream
 \subsubsection derived_recv The receiving side
 \dontinclude derived_recv.c
-With output stones and split stones we can build the sorts of overlay
+With bridge stones and split stones we can build the sorts of overlay
 networks described at the beginning of this description.  So we'll focus
 next on how clients can specialize the event stream that they receive.  In
 order to keep the example realistic, we'll assume that only the receiver
@@ -335,16 +335,16 @@ At the end of this section, the variable \b filter_spec is set to the the
 decoded filter specification, or NULL if no filter specification was
 included (I.E. if the argument was from a \b net_recv client.)
 
-Both cases require the creation of an appropriately-targetted output stone:
+Both cases require the creation of an appropriately-targetted bridge stone:
 \until EVassoc_bridge_action
 If we're dealing with an original non-filtered client, all we have to do is
-to add its output stone as a target of the split stone:
+to add its bridge stone as a target of the split stone:
 \until else
 For the filtered case it's a little more complicated.  In order to
 accomplish filtering, we create a new stone and use
 EVassoc_intermediate_action() to attach the filtering action to it.
 EVaction_set_output() is used to set the output of the filter stone to be
-the output stone.  Then the new filter stone is added as a target of the
+the bridge stone.  Then the new filter stone is added as a target of the
 split stone:
 \until }
 
@@ -381,9 +381,9 @@ subgraph cluster_net_send {
 	 split -> output2[style=bold];
 	 split -> filter3[style=bold];
 	 filter3 -> output3[style=bold];
-	 output1[label = "output stone"];
-	 output2[label = "output stone"];
-	 output3[label = "output stone"];
+	 output1[label = "bridge stone"];
+	 output2[label = "bridge stone"];
+	 output3[label = "bridge stone"];
 	 filter1[label = "filter stone"];
 	 filter3[label = "filter stone"];
 	 output1[shape=box]
