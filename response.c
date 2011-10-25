@@ -1464,7 +1464,7 @@ add_param(cod_parse_context parse_context, char *name, int param_num,
     while (list[i].format_name != NULL) {
 	FMFieldList fl = list[i].field_list;
 	/* step through input formats */
-	cod_add_struct_type(list[i].format_name, fl, parse_context);
+	cod_add_simple_struct_type(list[i].format_name, fl, parse_context);
 	i++;
     }
     type = cod_build_type_node(list[0].format_name, list[0].field_list);
@@ -1480,7 +1480,7 @@ add_type(cod_parse_context parse_context, FMFormat format)
 {
     FMStructDescList list = format_list_of_FMFormat(format);
     for (; list->format_name; ++list) {
-        cod_add_struct_type(list->format_name, list->field_list, parse_context);
+        cod_add_simple_struct_type(list->format_name, list->field_list, parse_context);
     }
 }
 
