@@ -375,7 +375,7 @@ CMpbio_send_format_request(char *format_ID, int format_ID_length,
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format request - total %d bytes in writev\n", (int)(format_ID_length + sizeof(msg)));
     actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
 				      conn->transport_data, 
-				      &vec[0], 2);
+				      &vec[0], 2, NULL);
     if (actual != 2) {
 	INT_CMConnection_close(conn);
 	return 0;
@@ -411,7 +411,7 @@ CMpbio_send_format_response(FMFormat ioformat, CMConnection conn,
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format response - total %ld bytes in writev\n", (long)(body_len + sizeof(msg)));
     actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
 				      conn->transport_data, 
-				      &vec[0], 2);
+				      &vec[0], 2, NULL);
     if (actual != 2) {
 	INT_CMConnection_close(conn);
 	return 0;
@@ -451,7 +451,7 @@ CMpbio_send_format_preload(FMFormat ioformat, CMConnection conn)
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CMpbio send format preload - total %ld bytes in writev\n", (long)(body_len + id_len + sizeof(msg)));
     actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
 				      conn->transport_data, 
-				      &vec[0], 3);
+				      &vec[0], 3, NULL);
     if (actual != 3) {
 	INT_CMConnection_close(conn);
 	return 0;

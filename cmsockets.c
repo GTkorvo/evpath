@@ -1414,42 +1414,6 @@ int non_blocking;
 }
 
 
-extern int
-libcmsockets_LTX_write_func(svc, scd, buffer, length)
-CMtrans_services svc;
-socket_conn_data_ptr scd;
-void *buffer;
-int length;
-{
-    int left = length;
-    int iget = 0;
-    int fd = scd->fd;
-
-    svc->trace_out(scd->sd->cm, "CMSocket write of %d bytes on fd %d",
-		   length, fd);
-    while (left > 0) {
-	iget = write(fd, (char *) buffer + length - left, left);
-	if (iget == -1) {
-	    int lerrno = errno;
-	    if ((lerrno != EWOULDBLOCK) &&
-		(lerrno != EAGAIN) &&
-		(lerrno != EINTR)) {
-		/* serious error */
-		return (length - left);
-	    } else {
-		if (lerrno == EWOULDBLOCK) {
-		    svc->trace_out(scd->sd->cm, "CMSocket write blocked - switch to blocking fd %d",
-				   scd->fd);
-		    set_block_state(svc, scd, Block);
-		}
-		iget = 0;
-	    }
-	}
-	left -= iget;
-    }
-    return length;
-}
-
 #ifndef IOV_MAX
 /* this is not defined in some places where it should be.  Conservative. */
 #define IOV_MAX 16
@@ -1495,7 +1459,7 @@ int iovcnt;
 #endif
 
 extern int
-libcmsockets_LTX_writev_attr_func(svc, scd, iovs, iovcnt, attrs)
+libcmsockets_LTX_writev_func(svc, scd, iovs, iovcnt, attrs)
 CMtrans_services svc;
 socket_conn_data_ptr scd;
 void *iovs;
@@ -1618,16 +1582,6 @@ attr_list attrs;
 	iovleft -= write_count;
     }
     return init_bytes - left;
-}
-
-extern int
-libcmsockets_LTX_writev_func(svc, scd, iov, iovcnt)
-CMtrans_services svc;
-socket_conn_data_ptr scd;
-void *iov;
-int iovcnt;
-{
-    return libcmsockets_LTX_writev_attr_func(svc, scd, iov, iovcnt, NULL);
 }
 
 int socket_global_init = 0;

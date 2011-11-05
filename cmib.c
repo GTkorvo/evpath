@@ -1425,7 +1425,7 @@ static double writev_t = 0;
 
 
 extern int
-libcmib_LTX_writev_attr_func(svc, scd, iovs, iovcnt, attrs)
+libcmib_LTX_writev_func(svc, scd, iovs, iovcnt, attrs)
 CMtrans_services svc;
 ib_conn_data_ptr scd;
 void *iovs;
@@ -1720,16 +1720,6 @@ attr_list attrs;
     
 }
 
-extern int
-libcmib_LTX_writev_func(svc, scd, iov, iovcnt)
-CMtrans_services svc;
-ib_conn_data_ptr scd;
-void *iov;
-int iovcnt;
-{
-    return libcmib_LTX_writev_attr_func(svc, scd, iov, iovcnt, NULL);
-}
-
 int socket_global_init = 0;
 
 #ifdef HAVE_WINDOWS_H
@@ -1748,23 +1738,6 @@ free_ib_data(CManager cm, void *sdv)
     svc->free_func(sd);
 }
 
-extern int
-libcmib_LTX_write_func(svc, scd, buffer, length)
-CMtrans_services svc;
-ib_conn_data_ptr scd;
-void *buffer;
-int length;
-{
-    struct iovec iov;
-    
-    iov.iov_base = buffer;
-    iov.iov_len = length;
-    
-    return libcmib_LTX_writev_attr_func(svc, scd, &iov, 1, NULL);
-}
-
-
-    
 extern void *
 libcmib_LTX_initialize(cm, svc)
 CManager cm;

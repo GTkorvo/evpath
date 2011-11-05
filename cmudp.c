@@ -635,48 +635,13 @@ int *actual_len;
     return ucd->read_buffer;
 }
 
-extern int
-libcmudp_LTX_write_func(svc, ucd, buffer, length)
-CMtrans_services svc;
-udp_conn_data_ptr ucd;
-void *buffer;
-int length;
-{
-    int fd;
-    struct sockaddr_in addr = ucd->dest_addr;
-
-    struct msghdr msg;
-    struct iovec msg_iov[1];
-    if (ucd->utd->socket_fd == -1) {
-	if ((ucd->utd->socket_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-	    perror("socket");
-	    exit(1);
-	}
-    }
-    fd = ucd->utd->socket_fd;
-    svc->trace_out(ucd->utd->cm, "CMUdp write of %d bytes on fd %d",
-		   length, fd);
-    memset(&msg, 0, sizeof(msg));
-    msg.msg_name = (void*)&addr;
-    msg.msg_namelen = sizeof(addr);
-    msg.msg_iov = &msg_iov[0];
-    msg.msg_iovlen = 1;
-    msg_iov[0].iov_base = buffer;
-    msg_iov[0].iov_len = length;
-    if (sendmsg(fd, &msg, 0) < 0) {
-	perror("write sendmsg");
-	exit(1);
-    }
-    return length;
-}
-
 #ifndef IOV_MAX
 /* this is not defined in some places where it should be.  Conservative. */
 #define IOV_MAX 16
 #endif
 
 extern int
-libcmudp_LTX_writev_attr_func(svc, ucd, iov, iovcnt, attrs)
+libcmudp_LTX_writev_func(svc, ucd, iov, iovcnt, attrs)
 CMtrans_services svc;
 udp_conn_data_ptr ucd;
 struct iovec *iov;
@@ -706,17 +671,6 @@ attr_list attrs;
     }
     return iovcnt;
 }
-
-extern int
-libcmudp_LTX_writev_func(svc, ucd, iov, iovcnt)
-CMtrans_services svc;
-udp_conn_data_ptr ucd;
-struct iovec *iov;
-int iovcnt;
-{
-    return libcmudp_LTX_writev_attr_func(svc, ucd, iov, iovcnt, NULL);
-}
-
 
 #ifdef HAVE_WINDOWS_H
 int socket_global_init = 0;

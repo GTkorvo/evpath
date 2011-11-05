@@ -81,9 +81,6 @@ typedef int (*CMTransport_read_to_buffer_func) ARGS((CMtrans_services svc,
 						     void *buffer,
 						     int len, int block_flag));
 typedef int (*CMTransport_writev_func) ARGS((CMtrans_services svc,
-					     void *transport_data,
-					     void *buffer, int len));
-typedef int (*CMTransport_writev_attr_func) ARGS((CMtrans_services svc,
 						  void *transport_data,
 						  void *buffer, int len,
 						  attr_list attrs));
@@ -127,8 +124,7 @@ struct _transport_item {
     CMTransport_read_to_buffer_func read_to_buffer_func;
     CMTransport_read_block_func read_block_func;
     CMTransport_writev_func writev_func;
-    CMTransport_writev_attr_func writev_attr_func;
-    CMTransport_writev_attr_func NBwritev_attr_func; /* non blocking */
+    CMTransport_writev_func NBwritev_attr_func; /* non blocking */
     CMTransport_set_write_notify_func set_write_notify;
     void *trans_data;
 };
@@ -161,13 +157,11 @@ extern int libcmsockets_LTX_read_to_buffer_func(CMtrans_services svc, struct soc
 						void *buffer, int requested_len, int non_blocking);
 
 
-extern int libcmsockets_LTX_writev_attr_func(CMtrans_services svc, struct socket_connection_data * scd, 
+extern int libcmsockets_LTX_writev_func(CMtrans_services svc, struct socket_connection_data * scd, 
 					     void *iov, int iovcnt, attr_list attrs);
 
 extern int libcmsockets_LTX_NBwritev_attr_func(CMtrans_services svc, struct socket_connection_data * scd, 
 					       void *iov, int iovcnt, attr_list attrs);
-extern int libcmsockets_LTX_writev_func(CMtrans_services svc, struct socket_connection_data * scd, 
-					void *iov, int iovcnt);
 
 
 extern void *

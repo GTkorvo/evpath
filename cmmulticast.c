@@ -422,51 +422,13 @@ int *actual_len;
     return ret;
 }
 
-extern int
-libcmmulticast_LTX_write_func(svc, mcd, buffer, length)
-CMtrans_services svc;
-mcast_conn_data_ptr mcd;
-void *buffer;
-int length;
-{
-    int fd = mcd->output_fd;
-    struct sockaddr_in addr = mcd->output_addr;
-
-    struct msghdr msg;
-    struct iovec msg_iov[1];
-    svc->trace_out(mcd->mtd->cm, "CMMulticast write of %d bytes on fd %d",
-		   length, fd);
-    memset(&msg, 0, sizeof(msg));
-    msg.msg_name = (void*)&addr;
-    msg.msg_namelen = sizeof(addr);
-    msg.msg_iov = &msg_iov[0];
-    msg.msg_iovlen = 1;
-    msg_iov[0].iov_base = buffer;
-    msg_iov[0].iov_len = length;
-    if (sendmsg(fd, &msg, 0) < 0) {
-	perror("write sendmsg");
-	exit(1);
-    }
-    if (mcd->my_addr.sin_port == 0) {
-	unsigned int nl;
-	int IP = get_self_ip_addr(svc);
-	nl = sizeof(struct sockaddr_in);
-	if (getsockname(fd, (struct sockaddr *) &mcd->my_addr, &nl) != 0)
-	    perror("getsockname");
-
-
-	mcd->my_addr.sin_addr.s_addr = htonl(IP);
-    }
-    return length;
-}
-
 #ifndef IOV_MAX
 /* this is not defined in some places where it should be.  Conservative. */
 #define IOV_MAX 16
 #endif
 
 extern int
-libcmmulticast_LTX_writev_attr_func(svc, mcd, iov, iovcnt, attrs)
+libcmmulticast_LTX_writev_func(svc, mcd, iov, iovcnt, attrs)
 CMtrans_services svc;
 mcast_conn_data_ptr mcd;
 struct iovec *iov;
@@ -499,17 +461,6 @@ attr_list attrs;
     }
     return iovcnt;
 }
-
-extern int
-libcmmulticast_LTX_writev_func(svc, mcd, iov, iovcnt)
-CMtrans_services svc;
-mcast_conn_data_ptr mcd;
-struct iovec *iov;
-int iovcnt;
-{
-    return libcmmulticast_LTX_writev_attr_func(svc, mcd, iov, iovcnt, NULL);
-}
-
 
 #ifdef HAVE_WINDOWS_H
 int socket_global_init = 0;

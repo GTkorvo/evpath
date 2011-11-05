@@ -650,29 +650,13 @@ libcmenet_LTX_read_block_func(CMtrans_services svc,
 }
 
 extern int
-libcmenet_LTX_write_func(CMtrans_services svc, enet_conn_data_ptr scd,
-			 void *buffer, int length)
-{
-    svc->trace_out(scd->sd->cm, "CMENET write of %d bytes on peer %p",
-		   length, scd->peer);
-
-   /* Create a reliable packet of size length containing "packet\0" */
-    ENetPacket * packet = enet_packet_create (buffer, length, 
-					      ENET_PACKET_FLAG_RELIABLE);
-
-    /* Send the packet to the peer over channel id 0. */
-
-    if (enet_peer_send (scd->peer, 0, packet) == -1) return -1;
-    return length;
-}
-
-
-extern int
 libcmenet_LTX_writev_func(CMtrans_services svc, enet_conn_data_ptr ecd,
-			  struct iovec *iov, int iovcnt)
+			  struct iovec *iov, int iovcnt, attr_list attrs)
 {
     int i;
     int length = 0;
+
+    (void) attrs;
     for (i = 0; i < iovcnt; i++) {
 	length += iov[i].iov_len;
     }
