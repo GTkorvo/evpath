@@ -2623,6 +2623,7 @@ CMdo_performance_response(CMConnection conn, int length, int func,
 	{
 	    int header[4];
 	    int actual;
+	    struct FFSEncodeVec tmp_vec[1];
 	    chr_timer_stop(&conn->bandwidth_start_time);
 
 	    header[0] = 0x434d5000;  /* CMP\0 */
@@ -2631,11 +2632,12 @@ CMdo_performance_response(CMConnection conn, int length, int func,
 	    header[3] = (int) 
 		chr_time_to_microsecs(&conn->bandwidth_start_time);
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completing bandwidth probe - %d microseconds to receive\n", header[2]);
-
-	    actual = conn->trans->write_func(&CMstatic_trans_svcs, 
-					     conn->transport_data, 
-					     &header, sizeof(header));
-	    if (actual != sizeof(header)) {
+	    tmp_vec[0].iov_base = &header;
+	    tmp_vec[0].iov_len = sizeof(header);
+	    actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
+					      conn->transport_data, 
+					      tmp_vec, 1);
+	    if (actual != 1) {
 		printf("perf write failed\n");
 	    }
 	}
@@ -2676,6 +2678,7 @@ CMdo_performance_response(CMConnection conn, int length, int func,
 	{
 	    int header[4];
 	    int actual;
+	    struct FFSEncodeVec tmp_vec[1];
 	    chr_timer_stop(&conn->regressive_bandwidth_start_time);
 
 	    header[0] = 0x434d5000;  /* CMP\0 */
@@ -2686,10 +2689,12 @@ CMdo_performance_response(CMConnection conn, int length, int func,
             CMtrace_out(conn->cm, CMConnectionVerbose, "CM - received CM bw measure end, condition %d\n", *(int*)buffer);
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completing bandwidth probe - %d microseconds to receive\n", header[2]);
 
-	    actual = conn->trans->write_func(&CMstatic_trans_svcs, 
-					     conn->transport_data, 
-					     &header, sizeof(header));
-	    if (actual != sizeof(header)) {
+	    tmp_vec[0].iov_base = &header;
+	    tmp_vec[0].iov_len = sizeof(header);
+	    actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
+					      conn->transport_data, 
+					      tmp_vec, 1);
+	    if (actual != 1) {
 		printf("perf write failed\n");
 	    }
 	}
@@ -2729,6 +2734,7 @@ do_single_probe(CMConnection conn, int size, attr_list attrs)
     static char *block = NULL;
     chr_time round_trip_time;
     int actual;
+    struct FFSEncodeVec tmp_vec[1];
 
     (void)attrs;
     cond = INT_CMCondition_get(conn->cm, conn);
@@ -2759,10 +2765,12 @@ do_single_probe(CMConnection conn, int size, attr_list attrs)
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Initiating latency probe of %d bytes\n", size);
     chr_timer_start(&round_trip_time);
 
-    actual = conn->trans->write_func(&CMstatic_trans_svcs, 
-				     conn->transport_data, 
-				     block, size);
-    if (actual != size) return -1;
+    tmp_vec[0].iov_base = &block[0];
+    tmp_vec[0].iov_len = size;
+    actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
+				      conn->transport_data, 
+				      tmp_vec, 1);
+    if (actual != 1) return -1;
 
     INT_CMCondition_wait(conn->cm, cond);
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completed latency probe - result %g microseconds\n", chr_time_to_microsecs(&round_trip_time));
@@ -2798,6 +2806,7 @@ INT_CMprobe_bandwidth(CMConnection conn, int size, attr_list attrs)
     int microsecs_to_receive;
     int actual;
     double bandwidth;
+    struct FFSEncodeVec tmp_vec[1];
 
     (void)attrs;
     cond = INT_CMCondition_get(conn->cm, conn);
@@ -2827,27 +2836,29 @@ INT_CMprobe_bandwidth(CMConnection conn, int size, attr_list attrs)
     INT_CMCondition_set_client_data( conn->cm, cond, &microsecs_to_receive);
 
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Initiating bandwidth probe of %d bytes, %d messages\n", size, repeat_count);
-    actual = conn->trans->write_func(&CMstatic_trans_svcs, 
+    tmp_vec[0].iov_base = &block[0];
+    tmp_vec[0].iov_len = size;
+    actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
 				     conn->transport_data, 
-				     block, size);
-    if (actual != size) { 
+				     tmp_vec, 1);
+    if (actual != 1) { 
 	return -1;
     }
 
     ((int*)block)[1] = size | (CMPerfBandwidthBody<<24);
     for (i=0; i <(repeat_count-1); i++) {
-	actual = conn->trans->write_func(&CMstatic_trans_svcs, 
-					 conn->transport_data, 
-					 block, size);
-	if (actual != size) {
+	actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
+					  conn->transport_data, 
+					  tmp_vec, 1);
+	if (actual != 1) {
 	    return -1;
 	}
     }
     ((int*)block)[1] = size | (CMPerfBandwidthEnd <<24);
-    actual = conn->trans->write_func(&CMstatic_trans_svcs, 
-				     conn->transport_data, 
-				     block, size);
-    if (actual != size) {
+    actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
+				      conn->transport_data, 
+				      tmp_vec, 1);
+    if (actual != 1) {
 	return -1;
     }
 
@@ -3057,7 +3068,7 @@ INT_CMregressive_probe_bandwidth(CMConnection conn, int size, attr_list attrs)
     double ave_size=0.0, var_size=0.0;
     double EXY=0.0;
     double covXY=0.0, cofXY=0.0;
-    
+    struct FFSEncodeVec tmp_vec[1];
 
     if (size < 16) size = 16;
 
@@ -3107,27 +3118,29 @@ INT_CMregressive_probe_bandwidth(CMConnection conn, int size, attr_list attrs)
 	((int*)block)[3] = size;
 
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Initiating bandwidth probe of %d bytes, %d messages\n", size, repeat_count);
-	actual = conn->trans->write_func(&CMstatic_trans_svcs, 
-					 conn->transport_data, 
-					 block, size);
-	if (actual != size) {
+	tmp_vec[0].iov_base = &block[0];
+	tmp_vec[0].iov_len = size;
+	actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
+					  conn->transport_data, 
+					  tmp_vec, 1);
+	if (actual != 1) {
 	    return -1;
 	}
 
 	((int*)block)[1] = size | (CMRegressivePerfBandwidthBody<<24);
 	for (j=0; j <(repeat_count-1); j++) {
-	    actual = conn->trans->write_func(&CMstatic_trans_svcs, 
-					     conn->transport_data, 
-					     block, size);
-	    if (actual != size) {
+	    actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
+					      conn->transport_data, 
+					      tmp_vec, 1);
+	    if (actual != 1) {
 		return -1;
 	    }
 	}
 	((int*)block)[1] = size | (CMRegressivePerfBandwidthEnd <<24);
-	actual = conn->trans->write_func(&CMstatic_trans_svcs, 
-					 conn->transport_data, 
-					 block, size);
-	if (actual != size) {
+	actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
+					  conn->transport_data, 
+					  tmp_vec, 1);
+	if (actual != 1) {
 	    return -1;
 	}
 

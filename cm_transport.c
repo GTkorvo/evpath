@@ -126,8 +126,6 @@ load_transport(CManager cm, const char *trans_name)
 	lt_dlsym(handle, "read_to_buffer_func");  
     transport->read_block_func = (CMTransport_read_block_func)
 	lt_dlsym(handle, "read_block_func");  
-    transport->write_func = (CMTransport_write_func)
-	lt_dlsym(handle, "write_func");  
     transport->writev_func = (CMTransport_writev_func)
 	lt_dlsym(handle, "writev_func");  
     transport->writev_attr_func = (CMTransport_writev_attr_func)
@@ -156,8 +154,6 @@ load_transport(CManager cm, const char *trans_name)
     transport->shutdown_conn = (CMTransport_shutdown_conn_func)libcmsockets_LTX_shutdown_conn;
     transport->read_to_buffer_func = (CMTransport_read_to_buffer_func)libcmsockets_LTX_read_to_buffer_func;
     transport->read_block_func = (CMTransport_read_block_func)NULL;
-    transport->write_func = (CMTransport_write_func)libcmsockets_LTX_write_func;
-    
     transport->writev_func = (CMTransport_writev_func)libcmsockets_LTX_writev_func;
     transport->writev_attr_func = (CMTransport_writev_attr_func)libcmsockets_LTX_writev_attr_func;
     transport->NBwritev_attr_func = (CMTransport_writev_attr_func)libcmsockets_LTX_NBwritev_attr_func;

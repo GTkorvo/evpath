@@ -74,15 +74,12 @@ typedef attr_list (*CMTransport_listen_func) ARGS((CManager cm,
 						   transport_entry trans,
                                                    attr_list listen_info));
 typedef void *(*CMTransport_read_block_func) ARGS((CMtrans_services svc,
-						   void *transport_data,
+						   void *conn_data,
 						   int *actual));
 typedef int (*CMTransport_read_to_buffer_func) ARGS((CMtrans_services svc,
-						     void *transport_data,
+						     void *conn_data,
 						     void *buffer,
 						     int len, int block_flag));
-typedef int (*CMTransport_write_func) ARGS((CMtrans_services svc,
-					    void *transport_data,
-					    void *buffer, int len));
 typedef int (*CMTransport_writev_func) ARGS((CMtrans_services svc,
 					     void *transport_data,
 					     void *buffer, int len));
@@ -110,7 +107,7 @@ typedef int (*CMTransport_connection_eq_func) ARGS((CManager cm,
 						    void *conn_data));
 
 typedef int (*CMTransport_set_write_notify_func) 
-    ARGS((transport_entry, CMtrans_services svc, void *transport_data, int enable));
+    ARGS((transport_entry, CMtrans_services svc, void *conn_data, int enable));
 
 
 typedef void (*DataAvailableCallback) ARGS((transport_entry trans, CMConnection conn));
@@ -129,7 +126,6 @@ struct _transport_item {
     CMTransport_shutdown_conn_func  shutdown_conn;
     CMTransport_read_to_buffer_func read_to_buffer_func;
     CMTransport_read_block_func read_block_func;
-    CMTransport_write_func write_func;
     CMTransport_writev_func writev_func;
     CMTransport_writev_attr_func writev_attr_func;
     CMTransport_writev_attr_func NBwritev_attr_func; /* non blocking */
@@ -165,10 +161,6 @@ extern int libcmsockets_LTX_read_to_buffer_func(CMtrans_services svc, struct soc
 						void *buffer, int requested_len, int non_blocking);
 
 
-extern int
-libcmsockets_LTX_write_func(CMtrans_services svc, struct socket_connection_data * scd, void *buffer, int length);
-
-
 extern int libcmsockets_LTX_writev_attr_func(CMtrans_services svc, struct socket_connection_data * scd, 
 					     void *iov, int iovcnt, attr_list attrs);
 
@@ -183,3 +175,162 @@ libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc);
 #endif
 
 #endif
+/*
+ *  Documentation on Transport interfaces.
+
+ *  There are two sets of interfaces, the set exported by the transport and 
+ *  the set of upcalls provided by CM for the transport to use.  (Upcalls are 
+ *  necessarily function pointers because DLLs can't resolve symbols
+ *  in the main program on many platforms).
+ *
+ *  Calls that can or should be exported by the transport:
+ *   (in the transport source, all calls must have names of the form
+ *   "libcm<transport>_LTX_<routine>" where <transport> is the name of
+ *   the transport and <routine> is the name of the subroutine.) 
+ *
+ *  - void *initialize(CManager cm, CMtrans_services svc, transport_entry trans);
+ *      The initialize routine will be called once only when the
+ *      transport is loaded.  It is passed in the cm value in use, a
+ *      pointer to the set of upcalls (CMtrans_services) and a link to
+ *      its own entry in the transport list.  The return value here is
+ *      a void* that should be a pointer to a structure of
+ *      transport-private data.  CM will not examine this pointer, but
+ *      will pass it back to later routines as "transport_data".
+ *      There are currently no provisions for unloading transports, so
+ *      there is no provision to free() the transport-private data.
+ *  - attr_list non_blocking_listen(CManager cm, CMtrans_services svc,
+ *                             transport_entry trans, attr_list listen_info);
+ *      This routine will be called in response to a CMlisten() or
+ *      CMlisten_specific() invocation.  It should cause the transport
+ *      to listen for future incoming connections (without blocking the
+ *      current thread).  The listen_info list, if non-NULL, contains
+ *      attributes which should specify what 'address' or 'port' (or
+ *      other transport-specific binding) should be listened on.  If
+ *      unspecified, the listen binding can be arbitrary.  The return
+ *      attr_list should contain sufficient information to initiate a
+ *      connection to this process when passed to the same transport
+ *      running in a different process/host.  The routine should also
+ *      perform whatever tasks are necessary to service the listen
+ *      'port', to respond appropriate to connection requests and to
+ *      establish the necessary CMConnections when connections are
+ *      successful. 
+ *  - CMConnection initiate_conn(CManager cm, CMtrans_services svc,
+ *                               transport_entry trans, attr_list attrs);
+ *      This routine should initiate a connection to the host/process
+ *      specified by the attrs parameters.  The return value is a
+ *      CMConnection whose private data will be specific to this
+ *      particular connection (which will be provided to routines
+ *      below as 'conn_data').  The routine should also perform
+ *      whatever tasks are necessary for servicing this connection
+ *      (e.g. adding the appropriate FD to the select() list,
+ *      establishing a periodic task that will check for data, etc.)
+ *      Generally, when data is available on a connection, a call to
+ *      trans->data_available() should be performed.
+ *  - int self_check(CManager cm, CMtrans_services svc,
+ *                   transport_entry trans, attr_list attrs);
+ *      Because only the individual CMtransports can fully interpret
+ *      the attribute lists that comprise connection information,
+ *      layers above sometimes don't know if a particular attribute
+ *      list is actually a reference to itself.  This routine asks
+ *      the question "Am I the host/process referenced by the contact
+ *      list 'attr'?".  Return value is 1 for true and 0 for false.
+ *  - int connection_eq(CManager cm, CMtrans_services svc,
+ *                      transport_entry trans, attr_list attrs,
+ *                      void *conn_data);
+ *      This routine is similar to self_check, but is used to avoid
+ *      creating duplicate connections between communicating
+ *      processes.  It asks the question "If I were to use 'attrs' to
+ *      initiate a connection, would I be connecting to a destination
+ *      already represented by this connection?"  Generally, CM tracks
+ *      what attribute lists had been used to create outbound
+ *      connections, so this routine is most necessary to identify
+ *      incoming connections that have been established passively.
+ *      (I.E. as the result of a listen/accept.)  (CM assumes that
+ *      CMConnections are bidirectional.)  Note that many transports
+ *      will require an exchange of contact information at the time
+ *      that a connection is initiated in order to support this call.
+ *  - void shutdown_conn(CMtrans_services svc, void *conn_data);
+ *      This routine should close the connection associated with the
+ *      transport-private data conn_data.  This includes removing it
+ *      from service and deallocating all resources associated with it
+ *      (including the conn_data structure).
+ *  - int read_to_buffer(CMtrans_services svc, void *conn_data, void *buffer, 
+ *                       int len, int block_flag);
+ *      There are two basic "read" calls that might be provided by a
+ *      transport, read_to_buffer() and read_block().
+ *      read_to_buffer() is designed for use by streaming transports
+ *      such as TCP which do not have transport-imposed message
+ *      boundaries.  In this case, CM will provide overall buffer
+ *      management (allocating, extending and managing the message
+ *      buffer), and the transport's responsibilities are simply to
+ *      drop a specified number of bytes at the address provided.
+ *      Reading a complete message often requires a number of calls to
+ *      read_to_buffer().  The block_flag parameter specifies whether
+ *      or not the call should block waiting on the specified amount
+ *      of data, and the return value indicates the number of bytes
+ *      actually read and placed in the buffer.  A return value of -1
+ *      indicates a fatal error and initiates a shutdown of the
+ *      connection.
+ *  - void *read_block(CMtrans_services svc, void *conn_data, int *actual);
+ *      This "read" call is designed for use by transports which have
+ *      a stronger sense of message boundaries and may need to manage
+ *      their own buffers.  Generally this is called by trans->
+ *      data_available(), returns a pointer to a transport-managed
+ *      memory region and sets the integer pointed to by actual to the
+ *      number of valid bytes in the message.  As with
+ *      read_to_buffer(), a length of -1 or a return value of NULL,
+ *      indicates a fatal error and connection shutdown is initated.
+ *      A length of 0 indicates that a complete message has not yet
+ *      been received.
+ *  -  int write(CMtrans_services svc, void *conn_data, void *buffer, 
+ *               int len);
+ *      There are currently four 'write' interfaces that can be
+ *      exported by a transport (we should consolidate).  The first,
+ *      write(), is now used only by embedded performance-measuring
+ *      calls in CM.  It should write the specified numbers of bytes
+ *      from the buffer and return the number actually written.  The
+ *      write is assumed to be blocking and if it doesn't write the
+ *      requested amount something bad will happen.
+ *  -  int writev(CMtrans_services svc, void *conn_data, void *iov, 
+ *                int iovcnt);
+ *      writev() is the basic vector write function (similar to Posix
+ *      writev()).  It takes a vector of buffers and a count of
+ *      vectors and is expected to transfer all across the
+ *      connection.  It is blocking and should write all data unless
+ *      there has been a fatal error.  This interface is currently
+ *      only used by embedded performance-measuring calls and
+ *      EVcontrol messages (used to squelch and unsquelch streams if
+ *      buffer control is enabled). 
+ *  -  int writev_attr(CMtrans_services svc, void *conn_data, void *iov, 
+ *                int iovcnt);
+ *      This is currently the most important of the write() calls that
+ *      a transport might implement.  It is like writev(), except that
+ *      it also takes an attr_list parameter.  This attr_list is
+ *      designed to specify characteristics of the transport of this
+ *      message (such as priority, reliability, etc.)  The parameter
+ *      may be NULL and may be ignored by transport that do not
+ *      support such characterstics.  This call is blocking and should
+ *      write all bytes and return the number of complete vectors
+ *      written.  Writing less than the requested number of vectors
+ *      indicates a fatal error and will likely initiate the shutdown
+ *      of the connection.
+ * - int NBwritev_attr(CMtrans_services svc, void *conn_data, void *iov, 
+ *                int iovcnt);
+ *      NBwritev_attr() is the non-blocking version of writev_attr().
+ *      CM's non-blocking write support is experimental, is not
+ *      currently well tested and is not enabled by default.  This
+ *      routine differs from writev_attr() in that its return value is
+ *      the number of bytes (not vectors) written, and that a return
+ *      of less than the requested count is not a fatal error.
+ *      Instead, the remaining bytes will be copied and queued for a
+ *      later write.
+ * - int set_write_notify(transport_entry trans, CMtrans_services svc,
+ *                        void *conn_data, int enable);
+ *      This routine is used if a non-blocking write fails to write
+ *      all of it's data and some is queued.  This routine should
+ *      enable notifications on the connection so that the routine
+ *      trans->write_possible() is called when more data can be
+ *      successfully written on the connection.  Both
+ *      set_write_notify() and NBwritev_attr() must be exported for
+ *      non-blocking writes to be possible with a given transport.
+ */
