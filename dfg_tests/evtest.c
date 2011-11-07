@@ -27,7 +27,6 @@ be_test_master(int argc, char **argv)
 {
     char *nodes[] = {"a", "b", NULL};
     CManager cm;
-    attr_list contact_list;
     char *str_contact;
     EVdfg_stone src, sink;
     EVsource source_handle;
