@@ -1708,7 +1708,7 @@ attr_list attrs;
 
 /* non blocking version */
 extern int
-libcmib_LTX_NBwritev_attr_func(svc, scd, iovs, iovcnt, attrs)
+libcmib_LTX_NBwritev_func(svc, scd, iovs, iovcnt, attrs)
 CMtrans_services svc;
 ib_conn_data_ptr scd;
 void *iovs;

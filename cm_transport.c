@@ -128,8 +128,8 @@ load_transport(CManager cm, const char *trans_name)
 	lt_dlsym(handle, "read_block_func");  
     transport->writev_func = (CMTransport_writev_func)
 	lt_dlsym(handle, "writev_func");  
-    transport->NBwritev_attr_func = (CMTransport_writev_func)
-	lt_dlsym(handle, "NBwritev_attr_func");  
+    transport->NBwritev_func = (CMTransport_writev_func)
+	lt_dlsym(handle, "NBwritev_func");  
     transport->set_write_notify = (CMTransport_set_write_notify_func)
 	lt_dlsym(handle, "set_write_notify");
     CMtrace_out(cm, CMTransportVerbose, "Listen is %p\n", transport->listen);
@@ -153,7 +153,7 @@ load_transport(CManager cm, const char *trans_name)
     transport->read_to_buffer_func = (CMTransport_read_to_buffer_func)libcmsockets_LTX_read_to_buffer_func;
     transport->read_block_func = (CMTransport_read_block_func)NULL;
     transport->writev_func = (CMTransport_writev_func)libcmsockets_LTX_writev_func;
-    transport->NBwritev_attr_func = (CMTransport_writev_attr_func)libcmsockets_LTX_NBwritev_attr_func;
+    transport->NBwritev_func = (CMTransport_writev_attr_func)libcmsockets_LTX_NBwritev_func;
     
     transport->set_write_notify = (CMTransport_set_write_notify_func)    libcmsockets_LTX_set_write_notify;
     CMtrace_out(cm, CMTransportVerbose, "Listen is %lx\n", transport->listen);

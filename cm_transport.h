@@ -124,7 +124,7 @@ struct _transport_item {
     CMTransport_read_to_buffer_func read_to_buffer_func;
     CMTransport_read_block_func read_block_func;
     CMTransport_writev_func writev_func;
-    CMTransport_writev_func NBwritev_attr_func; /* non blocking */
+    CMTransport_writev_func NBwritev_func; /* non blocking */
     CMTransport_set_write_notify_func set_write_notify;
     void *trans_data;
 };
@@ -158,10 +158,10 @@ extern int libcmsockets_LTX_read_to_buffer_func(CMtrans_services svc, struct soc
 
 
 extern int libcmsockets_LTX_writev_func(CMtrans_services svc, struct socket_connection_data * scd, 
-					     void *iov, int iovcnt, attr_list attrs);
+					void *iov, int iovcnt, attr_list attrs);
 
-extern int libcmsockets_LTX_NBwritev_attr_func(CMtrans_services svc, struct socket_connection_data * scd, 
-					       void *iov, int iovcnt, attr_list attrs);
+extern int libcmsockets_LTX_NBwritev_func(CMtrans_services svc, struct socket_connection_data * scd, 
+					  void *iov, int iovcnt, attr_list attrs);
 
 
 extern void *
@@ -276,44 +276,25 @@ libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc);
  *      indicates a fatal error and connection shutdown is initated.
  *      A length of 0 indicates that a complete message has not yet
  *      been received.
- *  -  int write(CMtrans_services svc, void *conn_data, void *buffer, 
- *               int len);
- *      There are currently four 'write' interfaces that can be
- *      exported by a transport (we should consolidate).  The first,
- *      write(), is now used only by embedded performance-measuring
- *      calls in CM.  It should write the specified numbers of bytes
- *      from the buffer and return the number actually written.  The
- *      write is assumed to be blocking and if it doesn't write the
- *      requested amount something bad will happen.
  *  -  int writev(CMtrans_services svc, void *conn_data, void *iov, 
- *                int iovcnt);
+ *                int iovcnt, attr_list attrs);
  *      writev() is the basic vector write function (similar to Posix
  *      writev()).  It takes a vector of buffers and a count of
  *      vectors and is expected to transfer all across the
- *      connection.  It is blocking and should write all data unless
- *      there has been a fatal error.  This interface is currently
- *      only used by embedded performance-measuring calls and
- *      EVcontrol messages (used to squelch and unsquelch streams if
- *      buffer control is enabled). 
- *  -  int writev_attr(CMtrans_services svc, void *conn_data, void *iov, 
- *                int iovcnt);
- *      This is currently the most important of the write() calls that
- *      a transport might implement.  It is like writev(), except that
- *      it also takes an attr_list parameter.  This attr_list is
- *      designed to specify characteristics of the transport of this
- *      message (such as priority, reliability, etc.)  The parameter
- *      may be NULL and may be ignored by transport that do not
- *      support such characterstics.  This call is blocking and should
- *      write all bytes and return the number of complete vectors
+ *      connection.  This attr_list is designed to specify characteristics
+ *      of the transport of this message (such as priority, reliability,
+ *      etc.)  The parameter may be NULL and may be ignored by transport
+ *      that do not support such characterstics.  This call is blocking and
+ *      should write all bytes and return the number of complete vectors
  *      written.  Writing less than the requested number of vectors
  *      indicates a fatal error and will likely initiate the shutdown
  *      of the connection.
- * - int NBwritev_attr(CMtrans_services svc, void *conn_data, void *iov, 
- *                int iovcnt);
- *      NBwritev_attr() is the non-blocking version of writev_attr().
+ * - int NBwritev(CMtrans_services svc, void *conn_data, void *iov, 
+ *                int iovcnt, attr_list attrs);
+ *      NBwritev() is the non-blocking version of writev().
  *      CM's non-blocking write support is experimental, is not
  *      currently well tested and is not enabled by default.  This
- *      routine differs from writev_attr() in that its return value is
+ *      routine differs from writev() in that its return value is
  *      the number of bytes (not vectors) written, and that a return
  *      of less than the requested count is not a fatal error.
  *      Instead, the remaining bytes will be copied and queued for a
@@ -325,6 +306,6 @@ libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc);
  *      enable notifications on the connection so that the routine
  *      trans->write_possible() is called when more data can be
  *      successfully written on the connection.  Both
- *      set_write_notify() and NBwritev_attr() must be exported for
+ *      set_write_notify() and NBwritev() must be exported for
  *      non-blocking writes to be possible with a given transport.
  */

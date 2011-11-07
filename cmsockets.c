@@ -1528,7 +1528,7 @@ attr_list attrs;
 
 /* non blocking version */
 extern int
-libcmsockets_LTX_NBwritev_attr_func(svc, scd, iovs, iovcnt, attrs)
+libcmsockets_LTX_NBwritev_func(svc, scd, iovs, iovcnt, attrs)
 CMtrans_services svc;
 socket_conn_data_ptr scd;
 void *iovs;

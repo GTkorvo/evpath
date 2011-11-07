@@ -1955,7 +1955,7 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 	int actual;
 	tmp_vec[0].iov_base = conn->queued_data.rem_header;
 	tmp_vec[0].iov_len = conn->queued_data.rem_header_len;
-	actual = trans->NBwritev_attr_func(&CMstatic_trans_svcs,
+	actual = trans->NBwritev_func(&CMstatic_trans_svcs,
 					   conn->transport_data,
 					   &tmp_vec[0], 1,
 					   attrs);
@@ -1975,7 +1975,7 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 	int actual;
 	tmp_vec[0].iov_base = conn->queued_data.rem_attr_base;
 	tmp_vec[0].iov_len = conn->queued_data.rem_attr_len;
-	actual = trans->NBwritev_attr_func(&CMstatic_trans_svcs,
+	actual = trans->NBwritev_func(&CMstatic_trans_svcs,
 					   conn->transport_data,
 					   &tmp_vec[0], 1,
 					   attrs);
@@ -1998,7 +1998,7 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 	    length += vec[vec_count].iov_len;
 	    vec_count++;
 	}
-	actual = trans->NBwritev_attr_func(&CMstatic_trans_svcs,
+	actual = trans->NBwritev_func(&CMstatic_trans_svcs,
 					   conn->transport_data,
 					   vec, vec_count,
 					   attrs);
@@ -2179,7 +2179,7 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
     if (conn->do_non_blocking_write == 1 && !nowp) {
         int actual_bytes;
         actual_bytes = 
-            conn->trans->NBwritev_attr_func(&CMstatic_trans_svcs, 
+            conn->trans->NBwritev_func(&CMstatic_trans_svcs, 
                                             conn->transport_data, 
                                             full_vec, vec_count, attrs);
         if (actual_bytes < byte_count) {
@@ -2515,7 +2515,7 @@ init_non_blocking_conn(CMConnection conn)
     /* default */
     conn->do_non_blocking_write = 0;
 
-    if (conn->trans->NBwritev_attr_func == NULL) return;
+    if (conn->trans->NBwritev_func == NULL) return;
     if (conn->trans->set_write_notify == NULL) return;
 
     /* only if we make it this far should we try non blocking writes */
