@@ -609,7 +609,7 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 	sd->server = server;
     }
     svc->fd_add_select(cm, enet_host_get_sock_fd (server), 
-		       enet_service_network, (void*)cm, (void*)trans);
+		       (select_list_func) enet_service_network, (void*)cm, (void*)trans);
     return build_listen_attrs(cm, svc, sd, listen_info, address.port);
 }
 

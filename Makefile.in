@@ -144,16 +144,16 @@ libcmudp_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 @CNL_FALSE@am_libcmudp_la_rpath = -rpath $(libdir)
 @CNL_TRUE@am_libcmudp_la_rpath = -rpath $(libdir)
 am__libevpath_la_SOURCES_DIST = cm.c cm_control.c cm_formats.c \
-	cm_util.c cm_transport.c cm_lock.c cm_pbio.c cm_interface.c \
-	version.c cm_threadio.c cm_evol.c evp.c response.c metrics.c \
-	revp.c evp_compat.c thin_server.c evp_threads.c ev_dfg.c \
-	cmsockets.c cmselect.c
+	cm_util.c cm_transport.c cm_lock.c cm_perf.c cm_pbio.c \
+	cm_interface.c version.c cm_threadio.c cm_evol.c evp.c \
+	response.c metrics.c revp.c evp_compat.c thin_server.c \
+	evp_threads.c ev_dfg.c cmsockets.c cmselect.c
 @CNL_TRUE@am__objects_1 = cmsockets.lo cmselect.lo
 am_libevpath_la_OBJECTS = cm.lo cm_control.lo cm_formats.lo cm_util.lo \
-	cm_transport.lo cm_lock.lo cm_pbio.lo cm_interface.lo \
-	version.lo cm_threadio.lo cm_evol.lo evp.lo response.lo \
-	metrics.lo revp.lo evp_compat.lo thin_server.lo evp_threads.lo \
-	ev_dfg.lo $(am__objects_1)
+	cm_transport.lo cm_lock.lo cm_perf.lo cm_pbio.lo \
+	cm_interface.lo version.lo cm_threadio.lo cm_evol.lo evp.lo \
+	response.lo metrics.lo revp.lo evp_compat.lo thin_server.lo \
+	evp_threads.lo ev_dfg.lo $(am__objects_1)
 libevpath_la_OBJECTS = $(am_libevpath_la_OBJECTS)
 libevpath_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
@@ -395,9 +395,9 @@ EXTRA_LTLIBRARIES =
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = evpath-3.0.pc
 libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c \
-	cm_transport.c cm_lock.c cm_pbio.c cm_interface.c version.c \
-	cm_threadio.c cm_evol.c evp.c response.c metrics.c revp.c \
-	evp_compat.c thin_server.c evp_threads.c ev_dfg.c \
+	cm_transport.c cm_lock.c cm_perf.c cm_pbio.c cm_interface.c \
+	version.c cm_threadio.c cm_evol.c evp.c response.c metrics.c \
+	revp.c evp_compat.c thin_server.c evp_threads.c ev_dfg.c \
 	$(am__append_1)
 libevpath_la_LDFLAGS = $(MATH_LIB) -version-info 1:0:0
 libevpath_la_LIBADD = $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lffs -lcod @SOCKET_LIBS@ 
@@ -593,6 +593,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_interface.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_lock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_pbio.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_perf.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_threadio.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_transport.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cm_util.Plo@am__quote@

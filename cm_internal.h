@@ -491,3 +491,8 @@ extern int CMtrace_val[];
 extern int CMtrace_init(CMTraceType t);
 #define CMtrace_on(cm, trace_type)  ((CMtrace_val[0] == -1) ? CMtrace_init(trace_type) : CMtrace_val[trace_type])
 #define CMtrace_out(cm, trace_type, ...) (CMtrace_on(cm,trace_type) ? (CMtrace_on(cm,CMLowLevelVerbose) ? printf("P%lxT%lx - ", (long) getpid(), (long)thr_thread_self()) : 0) , printf(__VA_ARGS__) : 0)
+extern void CMdo_performance_response(CMConnection conn, int length, int func,
+				      int byte_swap, char *buffer);
+extern int
+INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector data_vec,
+                int vec_count, int byte_count, attr_list attrs, int nowp, int data_vec_stack);
