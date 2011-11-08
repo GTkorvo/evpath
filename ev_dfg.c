@@ -299,6 +299,12 @@ static void check_all_nodes_registered(EVdfg dfg);
 static void possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn);
 static int new_shutdown_condition(EVdfg dfg, CMConnection conn);
 
+typedef struct {
+    int stone;
+    int period_secs;
+    int period_usecs;
+} auto_stone_list;
+
 static void
 dfg_startup_ack_handler(CManager cm, CMConnection conn, void *vmsg, 
 			void *client_data, attr_list attrs);
@@ -308,10 +314,20 @@ dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg,
 {
     EVdfg dfg = client_data;
     EVready_ptr msg =  vmsg;
+    auto_stone_list *auto_list;
+    int i = 0;
     (void) conn;
     (void) attrs;
-    CMtrace_out(cm, EVerbose, "Client DFG %p is ready, signaling %d\n", dfg, dfg->ready_condition);
     dfg->my_node_id = msg->node_id;
+    auto_list = (auto_stone_list *) INT_CMCondition_get_client_data(cm, dfg->ready_condition);
+    while (auto_list[i].period_secs != -1) {
+        /* everyone is ready, enable auto stones */
+	printf("Deploy handler activate %d, local %d, period_secs %d, period_usecs %d\n", i, auto_list[i].stone, auto_list[i].period_secs, auto_list[i].period_usecs);
+	INT_EVenable_auto_stone(cm, auto_list[i].stone, auto_list[i].period_secs, auto_list[i].period_usecs);
+	i++;
+    }
+    free(auto_list);
+    CMtrace_out(cm, EVerbose, "Client DFG %p is ready, signaling %d\n", dfg, dfg->ready_condition);
     CMCondition_signal(cm, dfg->ready_condition);
 }
 
@@ -482,6 +498,9 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
     (void) attrs;
     EVdfg_stones_ptr msg =  vmsg;
     int i, base = evp->stone_lookup_table_size;
+    int auto_stones = 0;
+    auto_stone_list *auto_list = malloc(sizeof(auto_stone_list));
+
     CMtrace_out(cm, EVerbose, "Client %d getting Deploy message\n", dfg->my_node_id);
 
     CManager_lock(cm);
@@ -522,12 +541,19 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
 	INT_EVassoc_general_action(cm, local_stone, msg->stone_list[i].action, 
 	    &local_list[0]);
 	if (msg->stone_list[i].period_secs != -1) {
-	    INT_EVenable_auto_stone(cm, local_stone, msg->stone_list[i].period_secs, msg->stone_list[i].period_usecs);
+	    auto_list= realloc(auto_list, sizeof(auto_list[0]) * (auto_stones+2));
+	    auto_list[auto_stones].stone = local_stone;
+	    auto_list[auto_stones].period_secs = msg->stone_list[i].period_secs;
+	    auto_list[auto_stones].period_usecs = msg->stone_list[i].period_usecs;
+	    
+//	    INT_EVenable_auto_stone(cm, local_stone, msg->stone_list[i].period_secs, msg->stone_list[i].period_usecs);
+	    auto_stones++;
 	}
 	if (action_type(msg->stone_list[i].action) == Action_Terminal) {
 	    dfg->active_sink_count++;
 	}
     }    
+    auto_list[auto_stones].period_secs = -1;
     if (conn != NULL) {
 	CMFormat startup_ack_msg = INT_CMlookup_format(dfg->cm, EVdfg_startup_ack_format_list);
 	EVstartup_ack_msg response_msg;
@@ -537,6 +563,8 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
     } else {
       	CMtrace_out(cm, EVerbose, "Client %d no master conn\n", dfg->my_node_id);
     }
+    INT_CMCondition_set_client_data(cm, dfg->ready_condition, (void*)auto_list);
+    
     CManager_unlock(cm);
 }
 
