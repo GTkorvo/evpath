@@ -75,7 +75,7 @@ typedef attr_list (*CMTransport_listen_func) ARGS((CManager cm,
                                                    attr_list listen_info));
 typedef void *(*CMTransport_read_block_func) ARGS((CMtrans_services svc,
 						   void *conn_data,
-						   int *actual));
+ 						   int *actual));
 typedef int (*CMTransport_read_to_buffer_func) ARGS((CMtrans_services svc,
 						     void *conn_data,
 						     void *buffer,
@@ -191,7 +191,8 @@ libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc);
  *      transport-private data.  CM will not examine this pointer, but
  *      will pass it back to later routines as "transport_data".
  *      There are currently no provisions for unloading transports, so
- *      there is no provision to free() the transport-private data.
+ *      there is no provision to free() the transport-private data (aside
+ *      from that done by the transport with 'add_shutdown_task').
  *  - attr_list non_blocking_listen(CManager cm, CMtrans_services svc,
  *                             transport_entry trans, attr_list listen_info);
  *      This routine will be called in response to a CMlisten() or
@@ -265,7 +266,7 @@ libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc);
  *      actually read and placed in the buffer.  A return value of -1
  *      indicates a fatal error and initiates a shutdown of the
  *      connection.
- *  - void *read_block(CMtrans_services svc, void *conn_data, int *actual);
+ *  -  CMBuffer read_block(CMtrans_services svc, void *conn_data, int *actual);
  *      This "read" call is designed for use by transports which have
  *      a stronger sense of message boundaries and may need to manage
  *      their own buffers.  Generally this is called by trans->
@@ -275,7 +276,8 @@ libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc);
  *      read_to_buffer(), a length of -1 or a return value of NULL,
  *      indicates a fatal error and connection shutdown is initated.
  *      A length of 0 indicates that a complete message has not yet
- *      been received.
+ *      been received.  The return value should be a CMBuffer value
+ *      containing the data (or partial data) available on the connection.
  *  -  int writev(CMtrans_services svc, void *conn_data, void *iov, 
  *                int iovcnt, attr_list attrs);
  *      writev() is the basic vector write function (similar to Posix
@@ -308,4 +310,100 @@ libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc);
  *      successfully written on the connection.  Both
  *      set_write_notify() and NBwritev() must be exported for
  *      non-blocking writes to be possible with a given transport.
+ *
+ * 	In addition to the calls above that are exported by the transport
+ * DLL, there are several other entries in the transport_item data
+ * structure.  The "trans_name" and "cm" entries are obvious.  "trans_data"
+ * is a void pointer to the transport data structure (as returned by
+ * initialize).  The other two entries are "data_available" and
+ * "write_possible".  These function pointers which are really upcalls
+ * provided by CM to let the transport notify CM of certain conditions on
+ * specific connections:  I.E. that data is a available on a specific
+ * connection, or that a write is now possible (after a non-blocking write
+ * has failed to write all data).  These function profiles are:
+ *  void (*data_available)(transport_entry trans, CMConnection conn);
+ *  void (*write_possible)(transport_entry trans, CMConnection conn);
+ * 
+ *
+ *
+ *    The CMtrans_services data structure, passed in to all the transport
+ *    functions above as the 'svc' parameter, contains functions that
+ *    transports can use to manipulate CM-level data structures, schedule
+ *    tasks, etc.  These are:
+ *  - void* (*malloc_function)(int size);
+ *  - void* (*realloc_function)(void *ptr, int size);
+ *  - void (*free_function)(void *ptr);
+ *    The malloc/realloc/free function set duplicate the standard library
+ *    functions.   (No strong reason at the moment to use these instead of
+ *    calling directly.)
+ *  - void (*fd_add_select)(CManager cm, int fd, select_list_func func, 
+ *                     void *param1, void *param2);
+ *    This upcall adds a function to CM's select() list.  The function
+ *    'func' will be called with 'param1' and 'param2' when select() detects
+ *    that 'fd' has data available.  The most common use of this function is
+ *    to pass trans->data_available as 'func', the 'trans' entry as param1
+ *    and the CM-level connection structure 'conn' as param2.
+ *  - void (*fd_remove_select)(Cmanager cm, int fd)
+ *    This upcall clears the select list entry for 'fd'.
+ *  - void (*fd_write_select)(Cmanager cm, int fd)
+ *    This upcall adds a function to CM's select() list for the 'write
+ *    possible' condition.  The function 'func' will be called with 'param1'
+ *    and 'param2' when select() detects that 'fd' is in a 'write possible'
+ *    condition.  The most common use of this function is to pass
+ *    trans->write_possible as 'func', the 'trans' entry as param1 
+ *    and the CM-level connection structure 'conn' as param2.
+ *  - (*trace_out)(CManager cm, char *format, ...)
+ *    This is a printf()-like call that will result in debugging output IFF
+ *    the CMTransportVerbose environment variable is set.
+ *  - CMConnection (*connection_create)(transport_entry trans, 
+ *                                      void *conn_data, attr_list conn_list)
+ *    This upcall creates a CM-level CMConnection value to be associated
+ *    with a new transport-level structure.  The 'conn_data' provided will
+ *    be passed as 'conn_data' to other calls.  The conn_list set of
+ *    attributes will be returned by CMConnection_get_attrs().  This call is
+ *    typically used by the transport 'initate_conn' function, creating a
+ *    CMConnection value that will be returned directly from the function.
+ *    It is also employed when 'accepting' a new connection.  In this later
+ *    case, the CMConnection value is not returned directly to any caller as
+ *    accepting a connection is an asynchronous operation in CM.
+ *  - void (*add_shutdown_task)(CManager cm, CMPollFunc func, void *data)
+ *    Add a function that will be called when the CManager is shutdown. The
+ *    function is called with 'cm' and 'data' as its parameters.  Mostly
+ *    useful for freeing transport data.
+ *  - void (*add_periodic_task)(CManager cm, int period_sec, 
+ *                              int period_usec, CMPollFunc func, void *data)
+ *    Add a function that will be called at regular intervals, specified by
+ *    period_sec and period_usec. The function is called with 'cm' and
+ *    'data' as its parameters.  Note that the periodicity is not
+ *    guaranteed.  This is serviced by the network handler thread, or by
+ *    non-threaded applications calling some function that causes CM to
+ *    service the network.  If those threads are otherwise engaged, the
+ *    function won't be invoked until the network is to be serviced again.
+ *  - void (*connection_close)(CMConnection conn)
+ *    Call CMConnection_close() on the particular connection.  Generally,
+ *    transports should not call this, but should let the higher levels
+ *    close a connection in response to a reported error.  However, if a
+ *    transport comes to know about a failure outside of a read/write
+ *    situation, this can be called to close the connection.
+ *  - CMbuffer (*get_data_buffer)(CManager cm, int length)
+ *      There are several buffer management calls for use by CMtransports.
+ *    Generally stream-oriented transports like TCP sockets don't need these
+ *    calls at all.  If a transport can read a few bytes at a type from an
+ *    incoming data stream and efficiently deposit those bytes into whatever
+ *    memory destination memory is needed, the transport can respond to
+ *    read_to_buffer() requests and let CM manage the memory for incoming
+ *    messages.  If not, then the transport should export a 'read_buffer'
+ *    interface and return a CMBuffer value.  CMBuffer values generally must
+ *    be managed by CM so that reference counts, deallocation,
+ *    CMtake_buffer, etc. all work, so the buffer management calls allow a
+ *    transport to work with CM to create appropriate CMbuffer values.  The
+ *    simplest of these calls is 'get_data_buffer'.  This allows a transport
+ *    to create a CMBuffer value of a specific size, using CM-allocated
+ *    memory, and give up control of that buffer once it has been filled
+ *    with data.  Here the transport controls only the size of the
+ *    allocation (as opposed to allowing CM to realloc() the buffer manually
+ *    as data comes in).  The get_data_buffer() call is currently used by
+ *    the cmudp transport.
+ *  - CMbuffer (*create_data_buffer)(CManager cm, void *buffer, int length)
+ *  - CMbuffer (*create_data_and_link_buffer)(CManager cm, void *buffer, int length)
  */
