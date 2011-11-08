@@ -1369,7 +1369,6 @@ cm_return_data_buf(CManager cm, CMbuffer cmb)
     if (cmb) cmb->in_use_by_cm = 0;
     if (cmb && cmb->return_callback != NULL) {
 	CMbuffer last = NULL, tmp = cm->cm_buffer_list;
-	(cmb->return_callback)(cmb->return_callback_data);
 	/* UNLINK */
 	while (tmp != NULL) {
 	    if (tmp != cmb) {
@@ -1384,10 +1383,10 @@ cm_return_data_buf(CManager cm, CMbuffer cmb)
 	    }
 	    last = tmp;
 	    tmp = tmp->next;
-	    
+	    (cmb->return_callback)(cmb->return_callback_data);
+	    cmb->buffer = NULL;
+	    cmb->size = 0;
 	}
-	cmb->buffer = NULL;
-	cmb->size = 0;
     }
 }
 
@@ -1435,6 +1434,7 @@ cm_user_return_data_buf(CManager cm, void *buffer)
 	    /* add the buffer to the CMs list */
 	    tmp->next = cm->cm_buffer_list;
 	    cm->cm_buffer_list = tmp;
+	    cm_return_data_buf(cm, tmp);
 	    return 1;
 	}
 	last = tmp;
