@@ -320,13 +320,13 @@ dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg,
     (void) attrs;
     dfg->my_node_id = msg->node_id;
     auto_list = (auto_stone_list *) INT_CMCondition_get_client_data(cm, dfg->ready_condition);
-    while (auto_list[i].period_secs != -1) {
+    while (auto_list && auto_list[i].period_secs != -1) {
         /* everyone is ready, enable auto stones */
 	printf("Deploy handler activate %d, local %d, period_secs %d, period_usecs %d\n", i, auto_list[i].stone, auto_list[i].period_secs, auto_list[i].period_usecs);
 	INT_EVenable_auto_stone(cm, auto_list[i].stone, auto_list[i].period_secs, auto_list[i].period_usecs);
 	i++;
     }
-    free(auto_list);
+    if (auto_list) free(auto_list);
     CMtrace_out(cm, EVerbose, "Client DFG %p is ready, signaling %d\n", dfg, dfg->ready_condition);
     CMCondition_signal(cm, dfg->ready_condition);
 }
@@ -850,6 +850,7 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	    dfg->my_node_id = 0;
 	}
 	dfg->ready_condition = CMCondition_get(cm, NULL);
+	INT_CMCondition_set_client_data(cm, dfg->ready_condition, NULL);
 	check_all_nodes_registered(dfg);
     } else {
 	CMConnection conn = CMget_conn(cm, master_attrs);
@@ -872,6 +873,7 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	free_attr_list(contact_list);
 
 	dfg->ready_condition = CMCondition_get(cm, conn);
+	INT_CMCondition_set_client_data(cm, dfg->ready_condition, NULL);
 	msg.node_name = node_name;
 	msg.contact_string = my_contact_str;
 	msg.source_count = evp->source_count;
