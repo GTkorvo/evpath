@@ -2121,6 +2121,15 @@ EVadd_standard_routines(CManager cm, char *extern_string,
 #endif
 
 /*!
+ * Add a set of sructure types that will be visible in COD.
+ *
+ * \param cm The CManager in which the routines should be visible
+ * \param lists A NULL-terminated list of FMStructDescLists.
+ */
+extern void
+EVadd_standard_structs(CManager cm, FMStructDescList *lists);
+
+/*!
  * Register a handler to be called when a bridge stone is closed
  *
  * \param cm The CManager managing the bridge stones

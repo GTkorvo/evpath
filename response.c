@@ -1210,6 +1210,26 @@ INT_EVadd_standard_routines(CManager cm, char *extern_string,
     evp->externs[count + 1].externs = NULL;
 }
 
+extern void 
+INT_EVadd_standard_structs(CManager cm, FMStructDescList *lists)
+{
+    event_path_data evp = cm->evp;
+    int count = 0, new = 0, i;
+    
+    while (lists[new] != NULL) new++;
+
+    if (evp->extern_structs == NULL) {
+	evp->extern_structs = malloc(sizeof(evp->extern_structs[0]) * (new+1));
+    } else {
+	while(evp->extern_structs[count] != NULL) count++;
+	evp->extern_structs = realloc(evp->extern_structs, 
+			       sizeof(evp->extern_structs[0]) * (count + new + 1));
+    }
+    for (i=0; i<= new; i++) {
+	evp->extern_structs[count + i] = lists[i];
+    }
+}
+
 static void
 internal_cod_submit(cod_exec_context ec, int port, void *data, void *type_info)
 {
@@ -1599,6 +1619,13 @@ generate_filter_code(CManager cm, struct response_spec *mrd, stone_type stone,
     memset(instance, 0, sizeof(*instance));
     add_standard_routines(stone, parse_context);
     add_metrics_routines(stone, parse_context);
+    if (cm->evp->extern_structs) {
+	int count = -1;
+	while(cm->evp->extern_structs[++count] != NULL) {
+	    cod_add_struct_type(cm->evp->extern_structs[count], parse_context);
+	}
+    }
+	
     if (cm->evp->externs) {
 	int count = -1;
 	while (cm->evp->externs[++count].extern_decl != NULL) {
@@ -1736,6 +1763,13 @@ generate_multityped_code(CManager cm, struct response_spec *mrd, stone_type ston
     add_standard_routines(stone, parse_context);
     add_queued_routines(parse_context, formats);
     add_queued_constants(parse_context, formats);
+    if (cm->evp->extern_structs) {
+	int count = -1;
+	while(cm->evp->extern_structs[++count] != NULL) {
+	    cod_add_struct_type(cm->evp->extern_structs[count], parse_context);
+	}
+    }
+	
     if (cm->evp->externs) {
 	int count = -1;
 	while (cm->evp->externs[++count].extern_decl != NULL) {

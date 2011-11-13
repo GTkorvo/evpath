@@ -485,6 +485,7 @@ extern void INT_EVadd_standard_routines(CManager cm, char *extern_string, cod_ex
 #else
 extern void INT_EVadd_standard_routines(CManager cm, char *extern_string, void *externs);
 #endif
+extern void INT_EVadd_standard_structs(CManager cm, FMStructDescList *lists);
 extern void INT_EVregister_close_handler(CManager cm, EVStoneCloseHandlerFunc handler, void *client_data );
 extern void CMwake_server_thread(CManager cm);
 extern int CMtrace_val[];

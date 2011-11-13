@@ -244,6 +244,7 @@ typedef struct _event_path_data {
     thr_mutex_t lock;
     int use_backpressure;
     extern_routines externs;
+    FMStructDescList *extern_structs;
     EVStoneCloseHandlerFunc app_stone_close_handler;
     void *app_stone_close_data;
 } *event_path_data;
