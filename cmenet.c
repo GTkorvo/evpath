@@ -591,7 +591,7 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 	    svc->trace_out(cm, "CMEnet trying to bind port %d", target);
 
 	    server = enet_host_create (& address /* the address to bind the server host to */, 
-				       0,     /* allow up to 4095 clients and/or outgoing connections */,
+				       0     /* allow up to 4095 clients and/or outgoing connections */,
 				       1      /* allow up to 2 channels to be used, 0 and 1 */,
 				       0      /* assume any amount of incoming bandwidth */,
 				       0      /* assume any amount of outgoing bandwidth */);
