@@ -567,7 +567,7 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 
 	svc->trace_out(cm, "CMEnet trying to bind selected port %d", port_num);
 	server = enet_host_create (& address /* the address to bind the server host to */, 
-				   4095      /* allow up to 4095 clients and/or outgoing connections */,  /* MAX!  GSE */
+				   0      /* allow up to 4095 clients and/or outgoing connections */,
 				   1      /* allow up to 2 channels to be used, 0 and 1 */,
 				   0      /* assume any amount of incoming bandwidth */,
 				   0      /* assume any amount of outgoing bandwidth */);
@@ -591,7 +591,7 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 	    svc->trace_out(cm, "CMEnet trying to bind port %d", target);
 
 	    server = enet_host_create (& address /* the address to bind the server host to */, 
-				       40,// 4095      /* allow up to 4095 clients and/or outgoing connections */,  /* MAX!  GSE */
+				       0,     /* allow up to 4095 clients and/or outgoing connections */,
 				       1      /* allow up to 2 channels to be used, 0 and 1 */,
 				       0      /* assume any amount of incoming bandwidth */,
 				       0      /* assume any amount of outgoing bandwidth */);
@@ -712,16 +712,6 @@ libcmenet_LTX_initialize(CManager cm, CMtrans_services svc,
     svc->trace_out(cm, "Initialize ENET reliable UDP transport built in %s",
 		   EVPATH_LIBRARY_BUILD_DIR);
     if (socket_global_init == 0) {
-#ifdef HAVE_WINDOWS_H
-	int nErrorStatus;
-	/* initialize the winsock package */
-	nErrorStatus = WSAStartup(wVersionRequested, &wsaData);
-	if (nErrorStatus != 0) {
-	    fprintf(stderr, "Could not initialize windows socket library!");
-	    WSACleanup();
-	    exit(-1);
-	}
-#endif
 	if (enet_initialize () != 0) {
 	    fprintf (stderr, "An error occurred while initializing ENet.\n");
 	    //return EXIT_FAILURE;
