@@ -322,7 +322,6 @@ dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg,
     auto_list = (auto_stone_list *) INT_CMCondition_get_client_data(cm, dfg->ready_condition);
     while (auto_list && auto_list[i].period_secs != -1) {
         /* everyone is ready, enable auto stones */
-	printf("Deploy handler activate %d, local %d, period_secs %d, period_usecs %d\n", i, auto_list[i].stone, auto_list[i].period_secs, auto_list[i].period_usecs);
 	INT_EVenable_auto_stone(cm, auto_list[i].stone, auto_list[i].period_secs, auto_list[i].period_usecs);
 	i++;
     }
