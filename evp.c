@@ -216,7 +216,6 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	    break;
 	case Action_Decode:
 	    if (act->o.decode.context) {
-		printf("Freeing context %p\n", act->o.decode.context);
 		free_FFSContext(act->o.decode.context);
 		act->o.decode.context = NULL;
 	    }
@@ -243,7 +242,6 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	switch(resp->action_type) {
 	case Action_Decode:
 	    if (resp->o.decode.context) {
-		printf("Freeing context %p\n", resp->o.decode.context);
 		free_FFSContext(resp->o.decode.context);
 		resp->o.decode.context = NULL;
 	    }
