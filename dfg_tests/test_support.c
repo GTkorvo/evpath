@@ -184,11 +184,6 @@ test_fork_children(char **list, char *master_contact)
     }
 }
 
-typedef struct _delay_struct {
-    char **list;
-    char *master_contact;
-} delay_struct;
-
 static void
 delay_fork_wrapper(CManager cm, void *client_data)
 {
