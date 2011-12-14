@@ -438,7 +438,7 @@ INT_create_filter_action_spec(FMStructDescList format_list, char *function)
     int format_count = 0;
     int i;
     char *str;
-    while(format_list[format_count].format_name != NULL) format_count++;
+    while(format_list && (format_list[format_count].format_name != NULL)) format_count++;
     str = malloc(50);
     sprintf(str, "Filter Action   Format Count %d\n", format_count);
 
