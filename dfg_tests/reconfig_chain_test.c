@@ -9,7 +9,7 @@
 
 static int status;
 static EVdfg test_dfg;
-const int reconfig_node_count = 5;
+const int reconfig_node_count = 1;
 
 char *str_contact;
 char **reconfig_list = NULL;
