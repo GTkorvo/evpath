@@ -9,6 +9,13 @@
 static int status;
 static EVdfg test_dfg;
 
+static char *filter_func = "{\n\
+int hop_count;\n\
+hop_count = attr_ivalue(event_attrs, \"hop_count_atom\");\n\
+hop_count++;\n\
+set_int_attr(event_attrs, \"hop_count_atom\", hop_count);\n\
+}\0\0";
+
 static
 int
 simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
@@ -16,8 +23,15 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     simple_rec_ptr event = vevent;
     (void)cm;
     (void)client_data;
+    int hop_count;
+    atom_t hop_count_atom = -1;
+    if (hop_count_atom == -1) {
+	hop_count_atom = attr_atom_from_string("hop_count_atom");
+    }
+    get_int_attr(attrs, hop_count_atom, &hop_count);
     checksum_simple_record(event, attrs, quiet);
     EVdfg_shutdown(test_dfg, 0);
+    if (!quiet) printf("\nreceived had %d hops\n", hop_count);
     return 0;
 }
 
@@ -27,6 +41,7 @@ be_test_master(int argc, char **argv)
 {
     char **nodes;
     CManager cm;
+    attr_list contact_list;
     char *str_contact;
     EVdfg_stone src, last, tmp, sink;
     EVsource source_handle;
@@ -43,6 +58,8 @@ be_test_master(int argc, char **argv)
     }
     cm = CManager_create();
     CMlisten(cm);
+    contact_list = CMget_contact_list(cm);
+    str_contact = attr_list_to_string(contact_list);
 
 /*
 **  LOCAL DFG SUPPORT   Sources and sinks that might or might not be utilized.
@@ -57,15 +74,16 @@ be_test_master(int argc, char **argv)
 **  DFG CREATION
 */
     test_dfg = EVdfg_create(cm);
-    str_contact = EVdfg_get_contact_list(test_dfg);
     EVdfg_register_node_list(test_dfg, &nodes[0]);
     src = EVdfg_create_source_stone(test_dfg, "master_source");
     EVdfg_assign_node(src, nodes[0]);
+    char *filter;
+    filter = create_filter_action_spec(NULL, filter_func);
 
     last = src;
 
     for (i=1; i < node_count -1; i++) {
-	tmp = EVdfg_create_stone(test_dfg, NULL);
+	tmp = EVdfg_create_stone(test_dfg, filter);
 	EVdfg_link_port(last, 0, tmp);
 	EVdfg_assign_node(tmp, nodes[i]);
 	last = tmp;
@@ -94,9 +112,13 @@ be_test_master(int argc, char **argv)
 
     if (EVdfg_source_active(source_handle)) {
 	simple_rec rec;
+	atom_t hop_count_atom;
+	attr_list attrs = create_attr_list();
+	hop_count_atom = attr_atom_from_string("hop_count_atom");
+	add_int_attr(attrs, hop_count_atom, 1);
 	generate_simple_record(&rec);
 	/* submit would be quietly ignored if source is not active */
-	EVsubmit(source_handle, &rec, NULL);
+	EVsubmit(source_handle, &rec, attrs);
     }
 
     status = EVdfg_wait_for_shutdown(test_dfg);
