@@ -64,6 +64,19 @@ extern void EVdfg_join_dfg(EVdfg dfg, char *node_name, char *master_contact);
 extern int EVdfg_shutdown(EVdfg dfg, int result);
 extern int EVdfg_wait_for_shutdown(EVdfg dfg);
 
+/*
+  (VERY) tentative reconfiguration interface
+*/
+
+extern void EVdfg_reconfig_insert(EVdfg dfg, int src_stone_id, EVdfg_stone new_stone, int dest_stone_id, EVevent_list q_event);
+extern void EVdfg_reconfig_delete_link(EVdfg dfg, int src_index, int dest_index);
+extern void REVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index);
+extern void EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index);
+extern void EVdfg_reconfig_link_port_to_stone(EVdfg dfg, int src_stone_index, int port, EVdfg_stone target_stone, EVevent_list q_events);
+extern void EVdfg_reconfig_link_port_from_stone(EVdfg dfg, EVdfg_stone src_stone, int port, int target_index, EVevent_list q_events);
+extern void EVdfg_reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events);
+extern void EVdfg_reconfig_transfer_events(EVdfg dfg, int src_stone_index, int src_port, int dest_stone_index, int dest_port);
+
 /* 
 **  Calls that support the begin/end points.  
 **  All those below must happen in the actual cohort 
