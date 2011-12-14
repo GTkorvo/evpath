@@ -9,6 +9,7 @@
 #include "evpath.h"
 #include "cm_internal.h"
 #include "ev_deploy.h"
+#include "revpath.h"
 
 #define STATUS_UNDETERMINED -2
 #define STATUS_NO_CONTRIBUTION -1
@@ -33,6 +34,16 @@ struct _EVdfg_stone {
     int action_count;
     char *action;
     char **extra_actions;
+	
+    /* dynamic reconfiguration structures below */
+    EVdfg_stone *new_out_links;
+    EVdfg_stone bridge_target;
+    EVevent_list pending_events;
+    EVevent_list processed_pending_events;
+    int new_out_count;
+    int *new_out_ports;
+    int invalid;
+    int frozen;
 };
 
 typedef struct _EVint_node_rec {
@@ -66,6 +77,18 @@ struct _EVdfg {
     int active_sink_count;
     int deploy_ack_count;
     int startup_ack_condition;
+	
+    /* reconfig data is below */
+    int reconfig;
+    int deployed_stone_count;
+    int old_node_count;
+    int sig_reconfig_bool;
+    int transfer_events_count;
+    int delete_count;
+    int **transfer_events_list;
+    int **delete_list;
+	
+    int no_deployment;
 };
 
 EVdfg_stone
@@ -102,6 +125,13 @@ EVdfg_create_stone(EVdfg dfg, char *action)
     stone->action_count = 1;
     stone->action = action;
     stone->extra_actions = NULL;
+    stone->new_out_count = 0;
+    stone->invalid = 0;
+    stone->frozen = 0;
+    stone->bridge_target = NULL;
+    stone->pending_events = NULL;
+    stone->processed_pending_events = NULL;
+	
     if (dfg->stone_count == 0) {
 	dfg->stones = malloc(sizeof(dfg->stones[0]));
     } else {
@@ -121,6 +151,56 @@ EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec,
     stone->period_usecs = period_usec;
 }
 
+
+static void dump_dfg_stone(EVdfg_stone s);
+
+static void 
+reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events)
+{
+    if (src->new_out_count == 0) {
+        src->new_out_links = malloc(sizeof(src->new_out_links[0]));
+        memset(src->new_out_links, 0, sizeof(src->new_out_links[0]));
+        src->new_out_count = 1;
+	src->new_out_ports = malloc(sizeof(src->new_out_ports[0]));
+    } else {
+        src->new_out_links = realloc(src->new_out_links,
+				     sizeof(src->new_out_links[0]) * (src->new_out_count+1));
+        memset(&src->new_out_links[src->new_out_count], 0, sizeof(src->new_out_links[0]));
+        ++(src->new_out_count);
+	src->new_out_ports = realloc(src->new_out_ports, sizeof(src->new_out_ports[0]) * (src->new_out_count));
+    }
+    src->new_out_links[src->new_out_count - 1] = dest;
+    src->processed_pending_events = q_events;
+    src->new_out_ports[src->new_out_count - 1] = port;
+}
+
+
+extern void EVdfg_reconfig_link_port_to_stone(EVdfg dfg, int src_stone_index, int port, EVdfg_stone target_stone, EVevent_list q_events) {
+	reconfig_link_port(dfg->stones[src_stone_index], port, target_stone, q_events);
+}
+
+extern void EVdfg_reconfig_link_port_from_stone(EVdfg dfg, EVdfg_stone src_stone, int port, int target_index, EVevent_list q_events) {
+	reconfig_link_port(src_stone, port, dfg->stones[target_index], q_events);
+}
+
+extern void EVdfg_reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events) {
+	reconfig_link_port(src, port, dest, q_events);
+}
+
+extern void EVdfg_reconfig_insert(EVdfg dfg, int src_stone_index, EVdfg_stone new_stone, int dest_stone_index, EVevent_list q_events) {
+    reconfig_link_port(dfg->stones[src_stone_index], 0, new_stone, q_events);
+    reconfig_link_port(new_stone, 0, dfg->stones[dest_stone_index], NULL);
+    CMtrace_out(dfg->cm, EVdfgVerbose, "Inside reconfig_insert, sin = %d, min = %d, din = %d : \n", dfg->stones[src_stone_index]->node, new_stone->node, dfg->stones[dest_stone_index]->node);
+}
+
+extern void EVdfg_reconfig_insert_on_port(EVdfg dfg, EVdfg_stone src_stone, int port, EVdfg_stone new_stone, EVevent_list q_events) {
+    EVdfg_stone dest_stone = src_stone->out_links[port];
+    reconfig_link_port(src_stone, port, new_stone, q_events);
+    /* link port on the new stone to the old destination */
+    reconfig_link_port(new_stone, port, dest_stone, NULL);
+    CMtrace_out(dfg->cm, EVdfgVerbose, "Inside reconfig_insert_on_port, sin = %d, min = %d, din = %d : \n", src_stone->node, new_stone->node, dest_stone->node);
+}
+
 extern void
 EVdfg_link_port(EVdfg_stone src, int port, EVdfg_stone dest)
 {
@@ -137,7 +217,7 @@ EVdfg_link_port(EVdfg_stone src, int port, EVdfg_stone dest)
     }
     src->out_links[port] = dest;
 }
-	
+
 extern void
 EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs)
 {
@@ -326,7 +406,7 @@ dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg,
 	i++;
     }
     if (auto_list) free(auto_list);
-    CMtrace_out(cm, EVerbose, "Client DFG %p is ready, signaling %d\n", dfg, dfg->ready_condition);
+    CMtrace_out(cm, EVdfgVerbose, "Client DFG %p is ready, signalling %d\n", dfg, dfg->ready_condition);
     CMCondition_signal(cm, dfg->ready_condition);
 }
 
@@ -340,7 +420,7 @@ dfg_conn_shutdown_handler(CManager cm, CMConnection conn, void *vmsg,
     (void)cm;
     (void)conn;
     (void)attrs;
-    CMtrace_out(cm, EVerbose, "The master knows about a stone %d failure\n", msg->stone);
+    CMtrace_out(cm, EVdfgVerbose, "The master knows about a stone %d failure\n", msg->stone);
     if (dfg->node_fail_handler != NULL) {
 	int i;
 	int target_stone = -1;
@@ -388,8 +468,9 @@ dfg_shutdown_handler(CManager cm, CMConnection conn, void *vmsg,
 	int i = 0;
 	dfg->shutdown_value = msg->value;
 	dfg->already_shutdown = 1;
-	CMtrace_out(cm, EVerbose, "Client %d has confirmed shutdown\n", dfg->my_node_id);
+	CMtrace_out(cm, EVdfgVerbose, "Client %d has confirmed shutdown\n", dfg->my_node_id);
 	while (dfg->shutdown_conditions && (dfg->shutdown_conditions[i] != -1)){
+	    CMtrace_out(cm, EVdfgVerbose, "Client %d shutdown signalling %d\n", dfg->my_node_id, dfg->shutdown_conditions[i]);
 	    CMCondition_signal(dfg->cm, dfg->shutdown_conditions[i++]);
 	}
     }
@@ -407,15 +488,16 @@ dfg_stone_close_handler(CManager cm, CMConnection conn, int stone,
     /* first, freeze the stone so that we don't lose any more data */
     INT_EVfreeze_stone(cm, stone);
 
-	int i;
-	for (i=0; i < evp->stone_lookup_table_size; i++ ) {
-	    if (stone == evp->stone_lookup_table[i].local_id) {
-	        global_stone_id = evp->stone_lookup_table[i].global_id;
-	    }
+    int i;
+    for (i=0; i < evp->stone_lookup_table_size; i++ ) {
+	if (stone == evp->stone_lookup_table[i].local_id) {
+	    global_stone_id = evp->stone_lookup_table[i].global_id;
 	}
-	if (global_stone_id == -1) {
-	    printf("Bad mojo, failed to find global stone id after stone close\n");
-	}
+    }
+    if (global_stone_id == -1) {
+	CMtrace_out(cm, EVdfgVerbose, "Bad mojo, failed to find global stone id after stone close of stone %d\n", stone);
+	return;
+    }
     if (dfg->master_connection != NULL) {
 	CMFormat conn_shutdown_msg = INT_CMlookup_format(dfg->cm, EVdfg_conn_shutdown_format_list);
 	EVconn_shutdown_msg msg;
@@ -435,6 +517,8 @@ EVdfg_assign_canonical_name(EVdfg dfg, char *given_name, char *canonical_name)
     int node;
     for (node = 0; node < dfg->node_count; node++) {
 	if (dfg->nodes[node].name == given_name) {
+	    if (dfg->realized == 1)
+		CMtrace_out(dfg->cm, EVdfgVerbose, "Reconfigure canonical name assignment, node = %d\n", node);
 	    dfg->nodes[node].canonical_name = strdup(canonical_name);
 	}
     }
@@ -469,7 +553,16 @@ node_register_handler(CManager cm, CMConnection conn, void *vmsg,
 	    return;
 	}
     } else {
-	int n = dfg->node_count++;
+	int n;
+	
+	if (dfg->realized == 1 && dfg->reconfig == 0) {
+	    dfg->reconfig = 1;
+	    dfg->sig_reconfig_bool = 1;
+	    dfg->old_node_count = dfg->node_count;
+	    CMtrace_out(dfg->cm, EVdfgVerbose, "Reconfigure, msg->contact_string = %s\n", msg->contact_string);
+	    CMtrace_out(dfg->cm, EVdfgVerbose, "node_count = %d, stone_count = %d\n", dfg->node_count, dfg->stone_count);
+	}
+	n = dfg->node_count++;
 	dfg->nodes = realloc(dfg->nodes, (sizeof(dfg->nodes[0])*dfg->node_count));
 	memset(&dfg->nodes[n], 0, sizeof(dfg->nodes[0]));
 	dfg->nodes[n].name = strdup(msg->node_name);
@@ -481,8 +574,7 @@ node_register_handler(CManager cm, CMConnection conn, void *vmsg,
 	dfg->nodes[n].contact_list = attr_list_from_string(dfg->nodes[n].str_contact_list);
 	new_node = n;
     }
-    CMtrace_out(cm, EVerbose, "Client \"%s\" has joined DFG, contact %s\n", msg->node_name, dfg->nodes[new_node].str_contact_list);
-
+    CMtrace_out(cm, EVdfgVerbose, "Client \"%s\" has joined DFG, contact %s\n", msg->node_name, dfg->nodes[new_node].str_contact_list);
     check_all_nodes_registered(dfg);
 }
 
@@ -500,7 +592,7 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
     int auto_stones = 0;
     auto_stone_list *auto_list = malloc(sizeof(auto_stone_list));
 
-    CMtrace_out(cm, EVerbose, "Client %d getting Deploy message\n", dfg->my_node_id);
+    CMtrace_out(cm, EVdfgVerbose, "Client %d getting Deploy message\n", dfg->my_node_id);
 
     CManager_lock(cm);
     /* add stones to local lookup table */
@@ -538,14 +630,12 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
 	}
 	local_list[msg->stone_list[i].out_count] = -1;
 	INT_EVassoc_general_action(cm, local_stone, msg->stone_list[i].action, 
-	    &local_list[0]);
+				   &local_list[0]);
 	if (msg->stone_list[i].period_secs != -1) {
 	    auto_list= realloc(auto_list, sizeof(auto_list[0]) * (auto_stones+2));
 	    auto_list[auto_stones].stone = local_stone;
 	    auto_list[auto_stones].period_secs = msg->stone_list[i].period_secs;
 	    auto_list[auto_stones].period_usecs = msg->stone_list[i].period_usecs;
-	    
-//	    INT_EVenable_auto_stone(cm, local_stone, msg->stone_list[i].period_secs, msg->stone_list[i].period_usecs);
 	    auto_stones++;
 	}
 	if (action_type(msg->stone_list[i].action) == Action_Terminal) {
@@ -558,9 +648,9 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
 	EVstartup_ack_msg response_msg;
 	response_msg.node_id = msg->canonical_name;
 	INT_CMwrite(dfg->master_connection, startup_ack_msg, &response_msg);
-	CMtrace_out(cm, EVerbose, "Client %d wrote startup ack\n", dfg->my_node_id);
+	CMtrace_out(cm, EVdfgVerbose, "Client %d wrote startup ack\n", dfg->my_node_id);
     } else {
-      	CMtrace_out(cm, EVerbose, "Client %d no master conn\n", dfg->my_node_id);
+      	CMtrace_out(cm, EVdfgVerbose, "Client %d no master conn\n", dfg->my_node_id);
     }
     INT_CMCondition_set_client_data(cm, dfg->ready_condition, (void*)auto_list);
     
@@ -575,7 +665,16 @@ EVdfg_create(CManager cm)
 
     memset(dfg, 0, sizeof(struct _EVdfg));
     dfg->cm = cm;
-    
+    dfg->reconfig = 0;
+    dfg->deployed_stone_count = 0;
+    dfg->sig_reconfig_bool = 0;
+    dfg->old_node_count = 1;
+    dfg->transfer_events_count = 0;
+    dfg->delete_count = 0;
+    dfg->transfer_events_list = NULL;
+    dfg->delete_list = NULL;
+    dfg->no_deployment = 0;
+
     contact_list = CMget_contact_list(cm);
     dfg->master_contact_str = attr_list_to_string(contact_list);
     dfg->startup_ack_condition = -1;
@@ -623,17 +722,19 @@ check_connectivity(EVdfg dfg)
 {
     int i;
     for (i=0; i< dfg->stone_count; i++) {
+	CMtrace_out(dfg->cm, EVdfgVerbose, "Stone %d - assigned to node %s, action %s\n", i, dfg->nodes[dfg->stones[i]->node].canonical_name, (dfg->stones[i]->action ? dfg->stones[i]->action : "NULL"));
 	if (dfg->stones[i]->action_count == 0) {
-	    printf("Warning, stone %d (assigned to node %s) has no actions registered", i, dfg->nodes[dfg->stones[i]->node].name);
+	    printf("Warning, stone %d (assigned to node %s) has no actions registered", i, dfg->nodes[dfg->stones[i]->node].canonical_name);
 	    continue;
 	}
-	if (dfg->stones[i]->out_count == 0) {
+	if ((dfg->stones[i]->out_count == 0) && (dfg->stones[i]->new_out_count == 0)) {
 	    char *action_spec = dfg->stones[i]->action;
 	    switch(action_type(action_spec)) {
 	    case Action_Terminal:
+	    case Action_Bridge:
 		break;
 	    default:
-		printf("Warning, stone %d (assigned to node %s) has no outputs connected to other stones\n", i, dfg->nodes[dfg->stones[i]->node].name);
+		printf("Warning, stone %d (assigned to node %s) has no outputs connected to other stones\n", i, dfg->nodes[dfg->stones[i]->node].canonical_name);
 		printf("	This stone's first registered action is \"%s\"\n",
 		       action_spec);
 		break;
@@ -647,6 +748,10 @@ EVdfg_realize(EVdfg dfg)
 {
     check_connectivity(dfg);
 //    check_types(dfg);
+
+    if (dfg->realized == 1) {
+	dfg->reconfig = 0;
+    }
     dfg->realized = 1;
     return 1;
 }
@@ -683,15 +788,19 @@ EVdfg_assign_node(EVdfg_stone stone, char *node_name)
     if (node == -1) {
 	printf("Node \"%s\" not found in node list\n", node_name);
     }
+	
+    if (dfg->realized == 1) {
+	CMtrace_out(dfg->cm, EVdfgVerbose, "assign node, node# = %d\n", node);
+    }
     stone->node = node;
 }
 
 extern int 
 EVdfg_ready_wait(EVdfg dfg)
 {
-    CMtrace_out(cm, EVerbose, "DFG %p wait for ready\n", dfg);
+    CMtrace_out(cm, EVdfgVerbose, "DFG %p wait for ready\n", dfg);
     CMCondition_wait(dfg->cm, dfg->ready_condition);
-    CMtrace_out(cm, EVerbose, "DFG %p ready wait released\n", dfg);
+    CMtrace_out(cm, EVdfgVerbose, "DFG %p ready wait released\n", dfg);
     return 1;
 }
 
@@ -758,12 +867,11 @@ EVdfg_register_source(char *name, EVsource src)
 	evp->sources = malloc(sizeof(evp->sources[0]));
     } else {
 	evp->sources = realloc(evp->sources,
-				     sizeof(evp->sources[0]) * (evp->source_count + 1));
+			       sizeof(evp->sources[0]) * (evp->source_count + 1));
     }
     evp->sources[evp->source_count].name = name;
     evp->sources[evp->source_count].src = src;
     evp->source_count++;
-
 }
 
 extern void
@@ -891,7 +999,7 @@ EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	INT_CMwrite(conn, register_msg, &msg);
 	free(my_contact_str);
 	dfg->master_connection = conn;
-	CMtrace_out(cm, EVerbose, "DFG %p node name %s\n", dfg, node_name);
+	CMtrace_out(cm, EVdfgVerbose, "DFG %p node name %s\n", dfg, node_name);
     }
 }
 
@@ -906,6 +1014,9 @@ create_bridge_stone(EVdfg dfg, EVdfg_stone target)
     }
     action = INT_create_bridge_action_spec(target->stone_id, contact);
     stone = EVdfg_create_stone(dfg, action);
+    stone->bridge_stone = 1;
+    stone->bridge_target = target;
+	
     return stone;
 }
 
@@ -922,6 +1033,7 @@ add_bridge_stones(EVdfg dfg)
 		cur->out_links[j] = create_bridge_stone(dfg, target);
 		/* put the bridge stone where the source stone is */
 		cur->out_links[j]->node = cur->node;
+		CMtrace_out(dfg->cm, EVdfgVerbose, "Created bridge stone %p, target node is %d, assigned to node %d\n", cur->out_links[j], target->node, cur->node);
 	    }
 	}
     }
@@ -996,6 +1108,277 @@ deploy_to_node(EVdfg dfg, int node)
     free(msg.stone_list);
 }
 
+
+void reconfig_delete_link(EVdfg dfg, int src_index, int dest_index) {
+    int i;
+	
+    EVdfg_stone src = dfg->stones[src_index];
+    EVdfg_stone dest = dfg->stones[dest_index];
+    EVdfg_stone temp_stone = NULL;
+	
+    for (i = 0; i < src->out_count; ++i) {
+	if (src->bridge_stone == 0) {
+	    if (src->out_links[i]->bridge_stone) {
+		temp_stone = src->out_links[i];
+		if (temp_stone->bridge_target == dest) {
+		    if (src->node == 0) {
+			//EVfreeze_stone(dfg->cm, temp_stone->stone_id);
+			//transfer_events = EVextract_stone_events(dfg->cm, temp_stone->stone_id);
+			if (src->frozen == 0) {
+			    EVfreeze_stone(dfg->cm, src->stone_id);
+			}
+			EVstone_remove_split_target(dfg->cm, src->stone_id, temp_stone->stone_id);
+			//	    EVfreeze_stone(dfg->cm, temp_stone->stone_id);
+			//	    transfer_events = EVextract_stone_events(dfg->cm, temp_stone->stone_id);
+			EVfree_stone(dfg->cm, temp_stone->stone_id);
+		    } else {
+			if (src->frozen == 0) {
+			    REVfreeze_stone(dfg->nodes[src->node].conn, src->stone_id);
+			}
+			REVstone_remove_split_target(dfg->nodes[src->node].conn, src->stone_id, temp_stone->stone_id);
+			//	    REVfreeze_stone(dfg->nodes[temp_stone->node].conn, temp_stone->stone_id);
+			
+			CMtrace_out(dfg->cm, EVdfgVerbose, "deleting remotely.. sounds good till here.. src->node = %d, src_index = %d\n", src->node, src_index);
+			fflush(stdout);
+			
+			//	    transfer_events = REVextract_stone_events(dfg->nodes[temp_stone->node].conn, temp_stone->stone_id);
+			
+			CMtrace_out(dfg->cm, EVdfgVerbose, "exracted events in delete..\n");
+			fflush(stdout);
+			
+			REVfree_stone(dfg->nodes[src->node].conn, temp_stone->stone_id);
+			//free(temp-stone);
+		    }
+		    //temp_stone = NULL;
+		    src->out_links[i]->invalid = 1;
+		    src->frozen = 1;
+		    break;
+		}
+	    } else {
+		if(src->out_links[i] == dest && src->out_links[i]->invalid == 0) {
+		    if (src->node == 0) {
+			if (src->frozen == 0) {
+			    EVfreeze_stone(dfg->cm, src->stone_id);
+			}
+			EVstone_remove_split_target(dfg->cm, src->stone_id, dest->stone_id);
+		    } else {
+			if (src->frozen == 0) {
+			    REVfreeze_stone(dfg->nodes[src->node].conn, src->stone_id);
+			}
+			REVstone_remove_split_target(dfg->nodes[src->node].conn, src->stone_id, dest->stone_id);
+		    }
+		    src->out_links[i]->invalid = 1;
+		    src->frozen = 1;
+		    break;
+		}
+	    }
+	}
+    }
+   
+}
+
+
+static void reconfig_deploy(EVdfg dfg) {
+    int i;
+    int j;
+    EVstone new_bridge_stone_id = -1;
+    EVdfg_stone temp_stone = NULL;
+    EVdfg_stone cur = NULL;
+    EVdfg_stone target = NULL;
+	
+	
+    for (i = dfg->old_node_count; i < dfg->node_count; ++i) {
+	deploy_to_node(dfg, i);
+    }
+	
+    for (i = 0; i < dfg->stone_count; ++i) {
+	if (dfg->stones[i]->new_out_count > 0) {
+	    cur = dfg->stones[i];
+	    CMtrace_out(dfg->cm, EVdfgVerbose, "Reconfig_deploy, stone %d, (%x)\n", i, cur->stone_id);
+	    if (cur->frozen == 0) {
+		CMtrace_out(dfg->cm, EVdfgVerbose, "Freezing stone %d, (%x)\n", i, cur->stone_id);
+		if (cur->node == 0) {
+		    /* Master */
+		    EVfreeze_stone(dfg->cm, cur->stone_id);
+		} else {
+		    REVfreeze_stone(dfg->nodes[cur->node].conn, cur->stone_id);
+		}
+		cur->frozen = 1;
+	    }
+	    for (j = 0; j < cur->new_out_count; ++j) {
+		CMtrace_out(dfg->cm, EVdfgVerbose, " stone %d (%x) has new out link\n", i, cur->stone_id);
+		if (cur->new_out_ports[j] < cur->out_count) {
+		    temp_stone = cur->out_links[cur->new_out_ports[j]];
+		} else {
+		    temp_stone = NULL;
+		}
+		cur->out_links[cur->new_out_ports[j]] = cur->new_out_links[j];
+		
+		target = cur->out_links[cur->new_out_ports[j]];
+		if (target && (cur->bridge_stone == 0) && (cur->node != target->node)) {
+		    cur->out_links[cur->new_out_ports[j]] = create_bridge_stone(dfg, target);
+		    CMtrace_out(dfg->cm, EVdfgVerbose, "Created bridge stone (reconfig_deploy) %p, target node %d, assigned to node %d\n", cur->out_links[j], target->node, cur->node);
+		    /* put the bridge stone where the source stone is */
+		    cur->out_links[cur->new_out_ports[j]]->node = cur->node;
+		    cur->out_links[cur->new_out_ports[j]]->pending_events = cur->processed_pending_events;
+		    if (cur->node == 0) {
+			new_bridge_stone_id = EVcreate_bridge_action(dfg->cm, dfg->nodes[target->node].contact_list, target->stone_id);
+			cur->out_links[cur->new_out_ports[j]]->stone_id = new_bridge_stone_id;
+			EVstone_add_split_target(dfg->cm, cur->stone_id, new_bridge_stone_id);
+		    } else {
+			new_bridge_stone_id = REVcreate_bridge_action(dfg->nodes[cur->node].conn, dfg->nodes[target->node].contact_list, target->stone_id);
+			REVstone_add_split_target(dfg->nodes[cur->node].conn, cur->stone_id, new_bridge_stone_id);
+		    }
+		}
+		else {
+		    if (cur->node == 0) {
+			EVstone_add_split_target(dfg->cm, cur->stone_id, target->stone_id);
+		    }
+		    else {
+			REVstone_add_split_target(dfg->nodes[cur->node].conn, cur->stone_id, target->stone_id);
+		    }
+		}
+		
+		if (temp_stone != NULL) {
+		    if (temp_stone->invalid == 0) {
+			if (temp_stone->frozen == 0) {
+			    if (temp_stone->node == 0) {
+				EVfreeze_stone(dfg->cm, temp_stone->stone_id);
+				EVtransfer_events(dfg->cm, temp_stone->stone_id, cur->out_links[cur->new_out_ports[j]]->stone_id);
+			    } else {
+				REVfreeze_stone(dfg->nodes[temp_stone->node].conn, temp_stone->stone_id);
+				REVtransfer_events(dfg->nodes[temp_stone->node].conn, temp_stone->stone_id, cur->out_links[cur->new_out_ports[j]]->stone_id);
+			    }
+			}
+			if (cur->node == 0) {
+			    EVstone_remove_split_target(dfg->cm, cur->stone_id, temp_stone->stone_id);
+			} else {
+			    REVstone_remove_split_target(dfg->nodes[cur->node].conn, cur->stone_id, temp_stone->stone_id);
+			}
+
+			if (temp_stone->bridge_stone) {
+			    if (cur->node == 0) {
+				CMtrace_out(dfg->cm, EVdfgVerbose, "\nreconfig_deploy: Locally freeing..\n");
+				fflush(stdout);
+				EVfree_stone(dfg->cm, temp_stone->stone_id);
+			    } else {
+				CMtrace_out(dfg->cm, EVdfgVerbose, "reconfig_deploy: Remotely freeing..\n");
+				fflush(stdout);
+				REVfree_stone(dfg->nodes[temp_stone->node].conn, temp_stone->stone_id);
+			    }
+			    //free(temp_stone);
+			    //temp_stone = NULL;
+			}
+			temp_stone->invalid = 1;
+		    }
+		}
+	    }
+	}
+    }
+    
+    
+    /* ****** Transferring events ******
+     */
+    
+    for (i = 0; i < dfg->transfer_events_count; ++i) {
+	EVdfg_stone temp = dfg->stones[dfg->transfer_events_list[i][0]];
+	EVdfg_stone src = temp->out_links[dfg->transfer_events_list[i][1]];
+	EVdfg_stone dest;
+	
+	CMtrace_out(dfg->cm, EVdfgVerbose, " Transfering events\n");
+	if (temp->node == 0) {
+	    if (temp->frozen == 0) {
+		EVfreeze_stone(dfg->cm, temp->stone_id);
+		temp->frozen = 1;
+	    }
+	    if (src->frozen == 0) {
+		EVfreeze_stone(dfg->cm, src->stone_id);
+		src->frozen = 1;
+	    }
+	} else {
+	    if (temp->frozen == 0) {
+		REVfreeze_stone(dfg->nodes[temp->node].conn, temp->stone_id);
+		temp->frozen = 1;
+	    }
+	    if (src->frozen == 0) {
+		REVfreeze_stone(dfg->nodes[src->node].conn, src->stone_id);
+		src->frozen = 1;
+	    }
+	}
+	
+	temp = dfg->stones[dfg->transfer_events_list[i][2]];
+	dest = temp->out_links[dfg->transfer_events_list[i][3]];
+	
+	if (src->node == 0) {
+	    EVtransfer_events(dfg->cm, src->stone_id, dest->stone_id);
+	} else {
+	    REVtransfer_events(dfg->nodes[src->node].conn, src->stone_id, dest->stone_id);
+	}
+    }
+    
+    /* ****** Deleting links ******
+     */
+    
+    for (i = 0; i < dfg->delete_count; ++i) {
+	CMtrace_out(dfg->cm, EVdfgVerbose, " Deleting a link\n");
+	reconfig_delete_link(dfg, dfg->delete_list[i][0], dfg->delete_list[i][1]);
+    }
+    
+    for (i = 0; i < dfg->stone_count; ++i) {
+        cur = dfg->stones[i];
+	if (cur->frozen == 1 && cur->invalid == 0) {
+	    if (dfg->stones[i]->new_out_count > 0) {
+		free(cur->new_out_links);
+		free(cur->new_out_ports);
+		cur->new_out_count = 0;
+	    }
+	    if (cur->node == 0) {
+		//	    if (cur->pending_events != NULL) {
+		//	      printf("\nResubmitting events locally! Cheers!\n");
+		//	      fflush(stdout);
+		//	      EVsubmit_encoded(dfg->cm, cur->stone_id, cur->pending_events->buffer, cur->pending_events->length, dfg->nodes[0].contact_list);
+		//	    }
+		EVunfreeze_stone(dfg->cm, cur->stone_id);
+	    } else {
+		//	    if (cur->pending_events != NULL) {
+		//	      printf("\nResubmitting events remotely! Cheers!\n");
+		//	      fflush(stdout);
+		//REVsubmit_encoded(dfg->nodes[cur->node].conn, cur->stone_id, cur->pending_events->buffer, cur->pending_events->length, dfg->nodes[cur->node].contact_list);
+		//            }
+		REVunfreeze_stone(dfg->nodes[cur->node].conn, cur->stone_id);
+	    }
+	    cur->frozen = 0;
+	}
+    }
+    
+    
+    if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
+	for (i = 0; i < dfg->stone_count; ++i) {
+	    printf("Stone# %d : ", i);
+	    dump_dfg_stone(dfg->stones[i]);
+	}
+    }
+    dfg->deployed_stone_count = dfg->stone_count;
+}
+
+static void
+dump_dfg_stone(EVdfg_stone s)
+{
+    int i;
+    printf("stone %p, node %d, stone_id %x\n", s, s->node, s->stone_id);
+    if (s->bridge_stone) printf("      bridge_stone\n");
+    printf(" out_count %d : ", s->out_count);
+    for (i=0; i < s->out_count; i++) {
+	printf("%p, ", s->out_links[i]);
+    }
+    printf("\n action_count %d, action = \"%s\"\n", s->action_count, (s->action ? s->action : "NULL"));
+    printf("new_out_count %d : ", s->new_out_count);
+    for (i=0; i < s->new_out_count; i++) {
+	printf("(port %d) -> %p, ", s->new_out_ports[i], s->new_out_links[i]);
+    }
+    printf("\nbridge_target %p\n", s->bridge_target);
+}
+
 static void
 dfg_startup_ack_handler(CManager cm, CMConnection conn, void *vmsg, 
 		  void *client_data, attr_list attrs)
@@ -1005,25 +1388,133 @@ dfg_startup_ack_handler(CManager cm, CMConnection conn, void *vmsg,
     (void) conn;
     (void) attrs;
     dfg->deploy_ack_count++;
-    CMtrace_out(cm, EVerbose, "Client %s reports deployed, count %d\n", msg->node_id, dfg->deploy_ack_count);
-    if (dfg->deploy_ack_count == dfg->node_count) {
-	CMtrace_out(cm, EVerbose, "That was the last one, Signalling %d\n", dfg->startup_ack_condition);
+    CMtrace_out(cm, EVdfgVerbose, "Client %s reports deployed, count %d\n", msg->node_id, dfg->deploy_ack_count);
+    if ((dfg->deploy_ack_count == dfg->node_count) && (dfg->startup_ack_condition != -1)) {
+	CMtrace_out(cm, EVdfgVerbose, "That was the last one, Signalling %d\n", dfg->startup_ack_condition);
 	CMCondition_signal(cm, dfg->startup_ack_condition);
+	dfg->startup_ack_condition = -1;
     }
+}
+
+extern void EVdfg_reconfig_transfer_events(EVdfg dfg, int src_stone_index, int src_port, int dest_stone_index, int dest_port) 
+{
+	
+    if (dfg->transfer_events_count == 0) {
+	dfg->transfer_events_list = malloc(sizeof(int *));
+    } else {
+	dfg->transfer_events_list = realloc(dfg->transfer_events_list, (dfg->transfer_events_count + 1) * sizeof(int *));
+    }
+	
+    dfg->transfer_events_list[dfg->transfer_events_count] = malloc(4 * sizeof(int));
+	
+    dfg->transfer_events_list[dfg->transfer_events_count][0] = src_stone_index;
+    dfg->transfer_events_list[dfg->transfer_events_count][1] = src_port;
+    dfg->transfer_events_list[dfg->transfer_events_count][2] = dest_stone_index;
+    dfg->transfer_events_list[dfg->transfer_events_count][3] = dest_port;
+	
+    ++dfg->transfer_events_count;
+}
+
+static void reconfig_add_bridge_stones(EVdfg dfg) 
+{	
+    int i;
+    int j;
+    int k;
+    EVdfg_stone cur = NULL;
+	
+    for (i = dfg->deployed_stone_count; i < dfg->stone_count; ++i) {
+	if (dfg->stones[i]->bridge_stone == 0) {
+	    cur = dfg->stones[i];
+	    for (k = dfg->old_node_count; k < dfg->node_count; ++k) {
+		if (k == cur->node && cur->new_out_count !=0 ) {
+		    for (j = 0; j < cur->new_out_count; ++j) {
+			EVdfg_link_port(cur, cur->new_out_ports[j], cur->new_out_links[j]);
+		    }
+		    
+		    free(cur->new_out_links);
+		    free(cur->new_out_ports);
+		    
+		    cur->new_out_links = NULL;
+		    cur->new_out_ports = NULL;
+		    
+		    cur->new_out_count = 0;
+		    for (j = 0; j < cur->out_count; ++j) {
+			EVdfg_stone temp_stone, target = cur->out_links[j];
+			if (target->bridge_stone) {
+			    temp_stone = target;
+			    target = target->bridge_target;
+			}
+			if (target && (!cur->bridge_stone) && (cur->node != target->node)) {
+			    cur->out_links[j] = create_bridge_stone(dfg, target);
+			    /* put the bridge stone where the source stone is */
+			    cur->out_links[j]->node = cur->node;
+			}
+		    }
+		    break;
+		}
+	    }
+	}
+    }
+}
+
+
+extern void EVdfg_reconfig_delete_link(EVdfg dfg, int src_index, int dest_index)
+{
+    if (dfg->delete_count == 0) {
+	dfg->delete_list = malloc(sizeof(int *));
+    } else {
+	dfg->delete_list = realloc(dfg->delete_list, (dfg->delete_count + 1) * sizeof(int *));
+    }
+	
+    dfg->delete_list[dfg->delete_count] = malloc(2 * sizeof(int));
+	
+    dfg->delete_list[dfg->delete_count][0] = src_index;
+    dfg->delete_list[dfg->delete_count][1] = dest_index;
+	
+    ++dfg->delete_count;
+}
+
+
+extern
+void REVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index)
+{
+    REVfreeze_stone(dfg->nodes[dfg->stones[stone_index]->node].conn, dfg->stones[stone_index]->out_links[0]->stone_id);
+
+    if (dfg->realized == 1) {
+	dfg->reconfig = 0;
+    }
+    dfg->no_deployment = 1;
+}
+
+extern
+void EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index) 
+{
+    EVfreeze_stone(dfg->cm, dfg->stones[stone_index]->out_links[0]->stone_id);
+	
+    if (dfg->realized == 1) {
+	dfg->reconfig = 0;
+    }
+    dfg->no_deployment = 1;
 }
 
 static void
 perform_deployment(EVdfg dfg)
 {
     int i;
-    assign_stone_ids(dfg);
-    add_bridge_stones(dfg);
-    dfg->deploy_ack_count = 1;  /* we are number 1 */
-    if (dfg->startup_ack_condition == -1) {
-	dfg->startup_ack_condition = INT_CMCondition_get(dfg->cm, NULL);
-    }
-    for (i=0; i < dfg->node_count; i++) {
-	deploy_to_node(dfg, i);
+
+    if (dfg->sig_reconfig_bool == 0) {
+	assign_stone_ids(dfg);
+	add_bridge_stones(dfg);
+	dfg->deploy_ack_count = 1;  /* we are number 1 */
+	if (dfg->startup_ack_condition == -1) {
+	    dfg->startup_ack_condition = INT_CMCondition_get(dfg->cm, NULL);
+	}
+	for (i=0; i < dfg->node_count; i++) {
+	    deploy_to_node(dfg, i);
+	}
+    } else {
+	reconfig_add_bridge_stones(dfg);
+	reconfig_deploy(dfg);
     }
 }
 
@@ -1031,7 +1522,26 @@ static void
 wait_for_startup_acks(EVdfg dfg)
 {
     if (dfg->deploy_ack_count != dfg->node_count) {
-	CMCondition_wait(dfg->cm, dfg->startup_ack_condition);
+	if (dfg->startup_ack_condition != -1) 
+	    CMCondition_wait(dfg->cm, dfg->startup_ack_condition);
+    }
+}
+
+static void
+reconfig_signal_ready(EVdfg dfg)
+{
+    int i;
+    CMFormat ready_msg = CMlookup_format(dfg->cm, EVdfg_ready_format_list);
+    EVready_msg msg;
+    CMtrace_out(cm, EVdfgVerbose, "Master signaling DFG %p ready for operation\n",
+				dfg);
+    for (i=dfg->old_node_count; i < dfg->node_count; i++) {
+	if (dfg->nodes[i].conn != NULL) {
+	    msg.node_id = i;
+	    CMwrite(dfg->nodes[i].conn, ready_msg, &msg);
+	    CMtrace_out(cm, EVdfgVerbose, "Master - ready sent to node \"%s\"\n",
+			dfg->nodes[i].name);
+	}
     }
 }
 
@@ -1041,13 +1551,13 @@ signal_ready(EVdfg dfg)
     int i;
     CMFormat ready_msg = CMlookup_format(dfg->cm, EVdfg_ready_format_list);
     EVready_msg msg;
-    CMtrace_out(cm, EVerbose, "Master signaling DFG %p ready for operation\n",
+    CMtrace_out(cm, EVdfgVerbose, "Master signaling DFG %p ready for operation\n",
 		dfg);
     for (i=0; i < dfg->node_count; i++) {
 	if (dfg->nodes[i].conn != NULL) {
 	    msg.node_id = i;
 	    INT_CMwrite(dfg->nodes[i].conn, ready_msg, &msg);
-	    CMtrace_out(cm, EVerbose, "Master - ready sent to node \"%s\"\n",
+	    CMtrace_out(cm, EVdfgVerbose, "Master - ready sent to node \"%s\"\n",
 			dfg->nodes[i].name);
 	} else {
 	    if (!dfg->nodes[i].self) {
@@ -1056,7 +1566,7 @@ signal_ready(EVdfg dfg)
 	    }
 	}
     }
-    CMtrace_out(cm, EVerbose, "Master DFG %p is ready, signaling\n", dfg);
+    CMtrace_out(cm, EVdfgVerbose, "Master DFG %p is ready, signalling %d\n", dfg, dfg->ready_condition);
     CMCondition_signal(dfg->cm, dfg->ready_condition);
 }
 
@@ -1077,39 +1587,39 @@ possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn)
 	    signal_from_client = i;
 	}
     }
-	    
-    CMtrace_out(cm, EVerbose, "Client %d signals %d, See if we're all ready to signal shutdown\n", signal_from_client, value);
+	
+    CMtrace_out(cm, EVdfgVerbose, "Client %d signals %d, See if we're all ready to signal shutdown\n", signal_from_client, value);
     dfg->nodes[signal_from_client].shutdown_status_contribution = value;
     for (i=0; i < dfg->node_count; i++) {
-	CMtrace_out(cm, EVerbose, "NODE %d status is :", i);
+	CMtrace_out(cm, EVdfgVerbose, "NODE %d status is :", i);
 	switch (dfg->nodes[i].shutdown_status_contribution) {
 	case STATUS_UNDETERMINED:
-	    CMtrace_out(cm, EVerbose, "NOT READY FOR SHUTDOWN\n");
+	    CMtrace_out(cm, EVdfgVerbose, "NOT READY FOR SHUTDOWN\n");
 	    shutdown = 0;
 	    break;
 	case STATUS_NO_CONTRIBUTION:
-	    CMtrace_out(cm, EVerbose, "READY for shutdown, no status\n");
+	    CMtrace_out(cm, EVdfgVerbose, "READY for shutdown, no status\n");
 	    break;
 	case STATUS_SUCCESS:
-	    CMtrace_out(cm, EVerbose, "READY for shutdown, SUCCESS\n");
+	    CMtrace_out(cm, EVdfgVerbose, "READY for shutdown, SUCCESS\n");
 	    break;
 	default:
-	    CMtrace_out(cm, EVerbose, "READY for shutdown, FAILURE %d\n",
+	    CMtrace_out(cm, EVdfgVerbose, "READY for shutdown, FAILURE %d\n",
 			dfg->nodes[i].shutdown_status_contribution);
 	    status |= dfg->nodes[i].shutdown_status_contribution;
 	    break;
 	}	    
     }
     if (!shutdown) {
-	CMtrace_out(cm, EVerbose, "DFG not ready for shutdown\n");
+	CMtrace_out(cm, EVdfgVerbose, "DFG not ready for shutdown\n");
 	return;
     }
-    CMtrace_out(cm, EVerbose, "DFG shutdown with value %d\n", status);
+    CMtrace_out(cm, EVdfgVerbose, "DFG shutdown with value %d\n", status);
     msg.value = status;
     for (i=0; i < dfg->node_count; i++) {
 	if (dfg->nodes[i].conn != NULL) {
 	    INT_CMwrite(dfg->nodes[i].conn, shutdown_msg, &msg);
-	    CMtrace_out(cm, EVerbose, "DFG shutdown message sent to client \"%s\"\n", dfg->nodes[i].name);
+	    CMtrace_out(cm, EVdfgVerbose, "DFG shutdown message sent to client \"%s\"(%d)\n", dfg->nodes[i].canonical_name, i);
 	} else {
 	    if (!dfg->nodes[i].self) {
 		printf("Failure, no connection, not self, node %d\n", i);
@@ -1121,9 +1631,10 @@ possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn)
     i = 0;
     dfg->already_shutdown = 1;
     while(dfg->shutdown_conditions && (dfg->shutdown_conditions[i] != -1)) {
+	CMtrace_out(cm, EVdfgVerbose, "Client %d shutdown signalling %d\n", dfg->my_node_id, dfg->shutdown_conditions[i]);
 	CMCondition_signal(dfg->cm, dfg->shutdown_conditions[i++]);
     }
-    CMtrace_out(cm, EVerbose, "Master DFG shutdown\n");
+    CMtrace_out(cm, EVdfgVerbose, "Master DFG shutdown\n");
 }
 
 extern void EVdfg_node_join_handler(EVdfg dfg, EVdfgJoinHandlerFunc func)
@@ -1143,7 +1654,7 @@ check_all_nodes_registered(EVdfg dfg)
     if (dfg->node_join_handler != NULL) {
 	EVint_node_list node = &dfg->nodes[dfg->node_count-1];
 	(dfg->node_join_handler)(dfg, node->name, NULL, NULL);
-	if (dfg->realized == 0) return;
+	if ((dfg->realized == 0) || (dfg->realized == 1 && dfg->reconfig == 1)) return;
     } else {
 	/* must be static node list */
 	for(i=0; i<dfg->node_count; i++) {
@@ -1152,8 +1663,17 @@ check_all_nodes_registered(EVdfg dfg)
 	    }
 	}
     }
-    perform_deployment(dfg);
-    wait_for_startup_acks(dfg);
-    signal_ready(dfg);
+	
+    if (dfg->no_deployment == 0) {
+	perform_deployment(dfg);
+	wait_for_startup_acks(dfg);
+    }
+    dfg->no_deployment = 0;
+    if (dfg->sig_reconfig_bool == 0) {
+	signal_ready(dfg);
+    } else {
+	reconfig_signal_ready(dfg);
+    }
+    dfg->deployed_stone_count = dfg->stone_count;
 }
 
