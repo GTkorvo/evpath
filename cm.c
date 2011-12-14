@@ -1250,9 +1250,9 @@ CMinternal_get_conn(CManager cm, attr_list attrs)
     }
     if (conn == NULL) {
 	conn = CMinternal_initiate_conn(cm, attrs);
-	if (conn != NULL) {
-	    conn->ref_count++;
-	}
+    }
+    if (conn != NULL) {
+	conn->ref_count++;
     }
     if (CMtrace_on(cm, CMConnectionVerbose)) {
 	printf("CMinternal_get_conn returning ");
