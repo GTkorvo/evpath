@@ -267,7 +267,7 @@ extern void IntCMConn_write_unlock ARGS((CMConnection cl, char *file,
 extern int CMConn_write_locked ARGS((CMConnection cl));
 
 typedef enum _CMTraceType {
-    CMAlwaysTrace, CMControlVerbose, CMConnectionVerbose, CMLowLevelVerbose, CMDataVerbose, CMTransportVerbose, CMFormatVerbose, CMFreeVerbose, CMAttrVerbose, EVerbose, EVWarning, CMIBTransportVerbose,
+    CMAlwaysTrace, CMControlVerbose, CMConnectionVerbose, CMLowLevelVerbose, CMDataVerbose, CMTransportVerbose, CMFormatVerbose, CMFreeVerbose, CMAttrVerbose, EVerbose, EVWarning, CMIBTransportVerbose, EVdfgVerbose,
     CMLastTraceType /* add before this one */
 } CMTraceType;
 
@@ -497,3 +497,5 @@ extern void CMdo_performance_response(CMConnection conn, int length, int func,
 extern int
 INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector data_vec,
                 int vec_count, int byte_count, attr_list attrs, int nowp, int data_vec_stack);
+extern void
+INT_CMConnection_dereference(CMConnection conn);
