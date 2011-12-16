@@ -597,6 +597,7 @@ CManager_free(CManager cm)
 	INT_CMfree(cm->transports);
     }
 
+    free_FFSContext(cm->FFScontext);
     INT_CMfree(cm->in_formats);
 
     for (i=0 ; i < cm->reg_format_count; i++) {
@@ -667,7 +668,6 @@ INT_CManager_close(CManager cm)
 
     CMtrace_out(cm, CMFreeVerbose, "CMControlList close CL=%lx current reference count will be %d\n", 
 		(long) cl, cl->reference_count - 1);
-    CMControlList_close(cl);
     if (cm->shutdown_functions != NULL) {
 	int i = 0;
 	func_entry *shutdown_functions = cm->shutdown_functions;
@@ -684,6 +684,7 @@ INT_CManager_close(CManager cm)
 	}
 	INT_CMfree(shutdown_functions);
     }
+    CMControlList_close(cl);
     CMControlList_free(cl);
 
     cm->reference_count--;
@@ -1773,6 +1774,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 				   data_length, stone_id);
 #endif
 	cm_return_data_buf(cm, cm_data_buf);
+	free_attr_list(attrs);
 	return 0;
     }
     for (i = 0; i < cm->reg_format_count; i++) {
