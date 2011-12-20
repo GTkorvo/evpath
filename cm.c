@@ -598,6 +598,7 @@ CManager_free(CManager cm)
     }
 
     free_FFSContext(cm->FFScontext);
+    cm->FFScontext = NULL;
     INT_CMfree(cm->in_formats);
 
     for (i=0 ; i < cm->reg_format_count; i++) {
@@ -626,7 +627,6 @@ CManager_free(CManager cm)
      */
     /* thr_mutex_free(cm->exchange_lock);*/
 
-    free_FFSContext(cm->FFScontext);
     thr_mutex_free(cm->context_lock);
 
     i = 0;
@@ -688,10 +688,10 @@ INT_CManager_close(CManager cm)
     CMControlList_free(cl);
 
     cm->reference_count--;
-    CMtrace_out(cm, CMFreeVerbose, "CManager %lx ref count now %d\n", 
-		(long) cm, cm->reference_count);
+    CMtrace_out(cm, CMFreeVerbose, "CManager %p ref count now %d\n", 
+		cm, cm->reference_count);
     if (cm->reference_count == 0) {
-	CMtrace_out(cm, CMFreeVerbose, "Freeing CManager %lx\n", (long)cl);
+	CMtrace_out(cm, CMFreeVerbose, "Freeing CManager %p\n", cm);
 	CManager_unlock(cm);
 	CManager_free(cm);
     } else {
