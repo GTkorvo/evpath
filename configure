@@ -13347,15 +13347,15 @@ for tmp_search_value in $search_list; do
    fi
 done
 
+#if test -n "$with_deb_build_specified"; then
+#  if test "include" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "include" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
 if test -n "$with_rpm_build_specified"; then
-  if test "include" == "lib"; then
-     tmp_search_results=$libdir;
-  fi
-  if test "include" == "include"; then
-     tmp_search_results=$incdir;
-  fi
-fi
-if test -n "$with_deb_build_specified"; then
 # test build directories
    if test -d "../ffs"; then
       tmp_search_results=`pwd`/../ffs;
@@ -13461,15 +13461,15 @@ for tmp_search_value in $search_list; do
    fi
 done
 
+#if test -n "$with_deb_build_specified"; then
+#  if test "lib" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "lib" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
 if test -n "$with_rpm_build_specified"; then
-  if test "lib" == "lib"; then
-     tmp_search_results=$libdir;
-  fi
-  if test "lib" == "include"; then
-     tmp_search_results=$incdir;
-  fi
-fi
-if test -n "$with_deb_build_specified"; then
 # test build directories
    if test -d "../ffs"; then
       tmp_search_results=`pwd`/../ffs;
@@ -13728,15 +13728,15 @@ for tmp_search_value in $search_list; do
    fi
 done
 
+#if test -n "$with_deb_build_specified"; then
+#  if test "include" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "include" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
 if test -n "$with_rpm_build_specified"; then
-  if test "include" == "lib"; then
-     tmp_search_results=$libdir;
-  fi
-  if test "include" == "include"; then
-     tmp_search_results=$incdir;
-  fi
-fi
-if test -n "$with_deb_build_specified"; then
 # test build directories
    if test -d "../gen_thread"; then
       tmp_search_results=`pwd`/../gen_thread;
@@ -13842,15 +13842,15 @@ for tmp_search_value in $search_list; do
    fi
 done
 
+#if test -n "$with_deb_build_specified"; then
+#  if test "lib" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "lib" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
 if test -n "$with_rpm_build_specified"; then
-  if test "lib" == "lib"; then
-     tmp_search_results=$libdir;
-  fi
-  if test "lib" == "include"; then
-     tmp_search_results=$incdir;
-  fi
-fi
-if test -n "$with_deb_build_specified"; then
 # test build directories
    if test -d "../gen_thread"; then
       tmp_search_results=`pwd`/../gen_thread;
@@ -14109,15 +14109,15 @@ for tmp_search_value in $search_list; do
    fi
 done
 
+#if test -n "$with_deb_build_specified"; then
+#  if test "include" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "include" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
 if test -n "$with_rpm_build_specified"; then
-  if test "include" == "lib"; then
-     tmp_search_results=$libdir;
-  fi
-  if test "include" == "include"; then
-     tmp_search_results=$incdir;
-  fi
-fi
-if test -n "$with_deb_build_specified"; then
 # test build directories
    if test -d "../cercs_env"; then
       tmp_search_results=`pwd`/../cercs_env;
@@ -14223,15 +14223,15 @@ for tmp_search_value in $search_list; do
    fi
 done
 
+#if test -n "$with_deb_build_specified"; then
+#  if test "lib" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "lib" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
 if test -n "$with_rpm_build_specified"; then
-  if test "lib" == "lib"; then
-     tmp_search_results=$libdir;
-  fi
-  if test "lib" == "include"; then
-     tmp_search_results=$incdir;
-  fi
-fi
-if test -n "$with_deb_build_specified"; then
 # test build directories
    if test -d "../cercs_env"; then
       tmp_search_results=`pwd`/../cercs_env;
@@ -14533,15 +14533,15 @@ for tmp_search_value in $search_list; do
    fi
 done
 
+#if test -n "$with_deb_build_specified"; then
+#  if test "include" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "include" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
 if test -n "$with_rpm_build_specified"; then
-  if test "include" == "lib"; then
-     tmp_search_results=$libdir;
-  fi
-  if test "include" == "include"; then
-     tmp_search_results=$incdir;
-  fi
-fi
-if test -n "$with_deb_build_specified"; then
 # test build directories
    if test -d "../atl"; then
       tmp_search_results=`pwd`/../atl;
@@ -14647,15 +14647,15 @@ for tmp_search_value in $search_list; do
    fi
 done
 
+#if test -n "$with_deb_build_specified"; then
+#  if test "lib" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "lib" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
 if test -n "$with_rpm_build_specified"; then
-  if test "lib" == "lib"; then
-     tmp_search_results=$libdir;
-  fi
-  if test "lib" == "include"; then
-     tmp_search_results=$incdir;
-  fi
-fi
-if test -n "$with_deb_build_specified"; then
 # test build directories
    if test -d "../atl"; then
       tmp_search_results=`pwd`/../atl;
@@ -14916,15 +14916,15 @@ for tmp_search_value in $search_list; do
    fi
 done
 
+#if test -n "$with_deb_build_specified"; then
+#  if test "include" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "include" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
 if test -n "$with_rpm_build_specified"; then
-  if test "include" == "lib"; then
-     tmp_search_results=$libdir;
-  fi
-  if test "include" == "include"; then
-     tmp_search_results=$incdir;
-  fi
-fi
-if test -n "$with_deb_build_specified"; then
 # test build directories
    if test -d "../enet"; then
       tmp_search_results=`pwd`/../enet;
@@ -15030,15 +15030,15 @@ for tmp_search_value in $search_list; do
    fi
 done
 
+#if test -n "$with_deb_build_specified"; then
+#  if test "lib" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "lib" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
 if test -n "$with_rpm_build_specified"; then
-  if test "lib" == "lib"; then
-     tmp_search_results=$libdir;
-  fi
-  if test "lib" == "include"; then
-     tmp_search_results=$incdir;
-  fi
-fi
-if test -n "$with_deb_build_specified"; then
 # test build directories
    if test -d "../enet"; then
       tmp_search_results=`pwd`/../enet;
