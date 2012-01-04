@@ -32,6 +32,8 @@ join_handler(EVdfg dfg, char *identifier, void* available_sources, void *availab
     int i;
     char *canon_name = malloc(20);
     EVdfg_stone last, tmp, sink;
+    (void) available_sources;
+    (void) available_sinks;
     if (client_count < node_count) {
 	sprintf(canon_name, "client%d", client_count);
     } else {
@@ -96,7 +98,7 @@ be_test_master(int argc, char **argv)
 */
     test_dfg = EVdfg_create(cm);
     str_contact = EVdfg_get_contact_list(test_dfg);
-    EVdfg_node_join_handler(test_dfg, join_handler);
+    EVdfg_node_join_handler(test_dfg, (EVdfgJoinHandlerFunc)join_handler);
     src = EVdfg_create_source_stone(test_dfg, "master_source");
 
 /* We're node 0 in the DFG */
