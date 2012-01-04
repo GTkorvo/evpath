@@ -188,6 +188,7 @@ static void
 delay_fork_wrapper(CManager cm, void *client_data)
 {
     delay_struct *str = (delay_struct*)client_data;
+    (void) cm;
     test_fork_children(str->list, str->master_contact);
     free(str);
 }

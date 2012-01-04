@@ -277,8 +277,8 @@ main(int argc, char **argv)
 	int remote_stone, stone = 0;
 	int count, i;
 	char *map;
-	int a = 0;
-	int b = 0;
+	int a_count = 0;
+	int b_count = 0;
 	EVsource a_handle, b_handle;
 	atom_t CMDEMO_TEST_ATOM;
 	if (argc == 2) {
@@ -313,12 +313,12 @@ main(int argc, char **argv)
 	}
 	for (i=0; i < count ; i++) {
 	    if (map[i] == 1) {
-		a++;
+		a_count++;
 	    } else {
-		b++;
+		b_count++;
 	    }
 	}
-	if (a != b) printf("MAP FUNCTION FAILED TO GENERATE EQUAL MAP\n");
+	if (a_count != b_count) printf("MAP FUNCTION FAILED TO GENERATE EQUAL MAP\n");
 	for (i=0; i < count ; i++) {
 	    if (map[i] == 1) {
 		rec_a_ptr a = malloc(sizeof(*a));

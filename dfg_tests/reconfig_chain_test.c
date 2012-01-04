@@ -69,6 +69,8 @@ join_handler(EVdfg dfg, char *identifier, void* available_sources, void *availab
     EVdfg_stone last, tmp, sink;
     static EVdfg_stone src;
     static int graph_already_realized = 0;
+    (void) available_sources;
+    (void) available_sinks;
 
     client_count++;
     if (!graph_already_realized) {

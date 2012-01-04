@@ -7,7 +7,6 @@
 #include "ev_dfg.h"
 #include "test_support.h"
 
-extern int quiet;
 static int status;
 static EVdfg test_dfg;
 static int repeat_count = 10;

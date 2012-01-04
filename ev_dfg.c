@@ -193,8 +193,10 @@ extern void EVdfg_reconfig_insert(EVdfg dfg, int src_stone_index, EVdfg_stone ne
     CMtrace_out(dfg->cm, EVdfgVerbose, "Inside reconfig_insert, sin = %d, min = %d, din = %d : \n", dfg->stones[src_stone_index]->node, new_stone->node, dfg->stones[dest_stone_index]->node);
 }
 
-extern void EVdfg_reconfig_insert_on_port(EVdfg dfg, EVdfg_stone src_stone, int port, EVdfg_stone new_stone, EVevent_list q_events) {
+extern void EVdfg_reconfig_insert_on_port(EVdfg dfg, EVdfg_stone src_stone, int port, EVdfg_stone new_stone, EVevent_list q_events) 
+{
     EVdfg_stone dest_stone = src_stone->out_links[port];
+    (void)dfg;
     reconfig_link_port(src_stone, port, new_stone, q_events);
     /* link port on the new stone to the old destination */
     reconfig_link_port(new_stone, port, dest_stone, NULL);
