@@ -25,20 +25,26 @@
 
 typedef struct _rec_a {
     int a_field;
+    int sequence;
 } rec_a, *rec_a_ptr;
 
 typedef struct _rec_b {
     int b_field;
+    int sequence;
 } rec_b, *rec_b_ptr;
 
 typedef struct _rec_c {
     int c_field;
+    int sequence_a;
+    int sequence_b;
 } rec_c, *rec_c_ptr;
 
 static FMField a_field_list[] =
 {
     {"a_field", "integer",
      sizeof(int), FMOffset(rec_a_ptr, a_field)},
+    {"sequence", "integer",
+     sizeof(int), FMOffset(rec_a_ptr, sequence)},
     {NULL, NULL, 0, 0}
 };
 
@@ -46,6 +52,8 @@ static FMField b_field_list[] =
 {
     {"b_field", "integer",
      sizeof(int), FMOffset(rec_b_ptr, b_field)},
+    {"sequence", "integer",
+     sizeof(int), FMOffset(rec_b_ptr, sequence)},
     {NULL, NULL, 0, 0}
 };
 
@@ -53,6 +61,10 @@ static FMField c_field_list[] =
 {
     {"c_field", "integer",
      sizeof(int), FMOffset(rec_c_ptr, c_field)},
+    {"sequence_a", "integer",
+     sizeof(int), FMOffset(rec_c_ptr, sequence_a)},
+    {"sequence_b", "integer",
+     sizeof(int), FMOffset(rec_c_ptr, sequence_b)},
     {NULL, NULL, 0, 0}
 };
 
@@ -81,20 +93,26 @@ static
 void
 generate_a_record(rec_a_ptr event)
 {
+    static int sequence = 0;
     /* always even */
     event->a_field = ((int) lrand48() % 50) * 2;
+    event->sequence = sequence++;
 }
 
 static
 void
 generate_b_record(rec_b_ptr event)
 {
+    static int sequence = 0;
     /* always odd */
     event->b_field = ((int) lrand48() % 50) * 2 + 1;
+    event->sequence = sequence++;
 }
 
 int quiet = 1;
-
+static int repeat_count = 100;
+char *a_map = NULL;
+char *b_map = NULL;
 static
 int
 output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
@@ -104,6 +122,15 @@ output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     if (event->c_field % 2 != 1) {
 	printf("Received record should be odd, got %d\n", event->c_field);
     }
+
+    if (a_map == NULL) {
+	a_map = malloc(repeat_count);
+	memset(a_map, 0, repeat_count);
+	b_map = malloc(repeat_count);
+	memset(b_map, 0, repeat_count);
+    }
+    a_map[event->sequence_a]++;
+    b_map[event->sequence_b]++;
     if (quiet <= 0) {
 	printf("In the handler, event data is :\n");
 	printf("	c_field = %d\n", event->c_field);
@@ -119,47 +146,34 @@ output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 
 static int do_regression_master_test();
 static int regression = 1;
-static int repeat_count = 100;
 static atom_t CM_TRANSPORT;
 static atom_t CM_NETWORK_POSTFIX;
 static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
 
-/*
-static char *trans = "{\
+static char *trans = "{\n\
+    int found = 0;\n\
+    a_rec *a;\n\
+    b_rec *b;\n\
     c_rec c;\n\
-    if ((input_queue[0].size < 1) || \n\
-        (input_queue[1].size < 1)) return;\n\
-    c.c_field = input_queue[0].events[0].data.a_field + \n\
-		input_queue[1].events[0].data.a_field;\n\
-    event_discard(input_queue[0].events[0]);\n\
-    event_discard(input_queue[1].events[0]);\n\
-    EVsubmit(0, c);\n\
-    return;\n\
-}\0\0";
-*/
-
-static char *trans = "{\
-    int found = 0;\
-    a_rec *a;\
-    b_rec *b;\
-    c_rec c;\
-    if (EVpresent(a_rec_ID, 0)) {\
-        a = EVdata_a_rec(0); ++found;\
-    }\
-    if (EVpresent(b_rec_ID, 0)) {\
-        b = EVdata_b_rec(0); ++found;\
-    }\
-    if (found == 2) {\
-        c.c_field = a.a_field + b.b_field;\
-        if (!EVpresent_b_rec(0))\
-            printf(\"??? <1> not present (1)\\n\");\
-        EVdiscard_a_rec(0);\
-        if (!EVpresent_b_rec(0))\
-            printf(\"??? <2> not present (1)\\n\");\
-        EVdiscard_b_rec(0);\
-        EVsubmit(0, c);\
-    }\
+    if (EVpresent(a_rec_ID, 0)) {\n\
+        a = EVdata_a_rec(0); ++found;\n\
+    }\n\
+    if (EVpresent(b_rec_ID, 0)) {\n\
+        b = EVdata_b_rec(0); ++found;\n\
+    }\n\
+    if (found == 2) {\n\
+        c.c_field = a.a_field + b.b_field;\n\
+	c.sequence_a = a.sequence;\n\
+	c.sequence_b = b.sequence;\n\
+        if (!EVpresent_b_rec(0))\n\
+            printf(\"??? <1> not present (1)\\n\");\n\
+        EVdiscard_a_rec(0);\n\
+        if (!EVpresent_b_rec(0))\n\
+            printf(\"??? <2> not present (1)\\n\");\n\
+        EVdiscard_b_rec(0);\n\
+        EVsubmit(0, c);\n\
+    }\n\
 }\0\0";
 
 
@@ -194,7 +208,6 @@ main(int argc, char **argv)
 	argv++;
 	argc--;
     }
-    srand48(getpid());
 #ifdef USE_PTHREADS
     gen_pthread_init();
 #endif
@@ -264,6 +277,8 @@ main(int argc, char **argv)
 	int remote_stone, stone = 0;
 	int count, i;
 	char *map;
+	int a = 0;
+	int b = 0;
 	EVsource a_handle, b_handle;
 	atom_t CMDEMO_TEST_ATOM;
 	if (argc == 2) {
@@ -296,6 +311,14 @@ main(int argc, char **argv)
 	    }
 	    map[mark] = 1;
 	}
+	for (i=0; i < count ; i++) {
+	    if (map[i] == 1) {
+		a++;
+	    } else {
+		b++;
+	    }
+	}
+	if (a != b) printf("MAP FUNCTION FAILED TO GENERATE EQUAL MAP\n");
 	for (i=0; i < count ; i++) {
 	    if (map[i] == 1) {
 		rec_a_ptr a = malloc(sizeof(*a));
@@ -366,6 +389,7 @@ do_regression_master_test()
     int message_count = 0;
     EVstone term, fstone;
     EVaction faction;
+    int i;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
 #else
@@ -419,7 +443,6 @@ do_regression_master_test()
 	    printf("Doing non-threaded communication handling\n");
 	}
     }
-    srand48(1);
 
     term = EValloc_stone(cm);
     EVassoc_terminal_action(cm, term, c_format_list, output_handler, &message_count);
@@ -472,5 +495,9 @@ do_regression_master_test()
     free(string_list);
     CManager_close(cm);
     if (message_count != repeat_count / 2) printf("Message count == %d\n", message_count);
+    for (i=0; i < repeat_count / 2 ; i++) {
+	if (a_map[i] != 1) printf("A_map[%d] = %d\n", i, a_map[i]);
+	if (b_map[i] != 1) printf("B_map[%d] = %d\n", i, b_map[i]);
+    }
     return !(message_count == repeat_count / 2);
 }
