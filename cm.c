@@ -1024,7 +1024,9 @@ CMConnection_failed(CMConnection conn)
 	    CMtrace_out(conn->cm, CMConnectionVerbose, 
 			"CM - Calling close handler %p for connection %p\n",
 			(void*) list->close_handler, (void*)conn);
+	    CManager_unlock(conn->cm);
 	    list->close_handler(conn->cm, conn, list->close_client_data);
+	    CManager_lock(conn->cm);
 	    INT_CMfree(list);
 	    list = next;
 	}

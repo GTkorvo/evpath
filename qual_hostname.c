@@ -183,16 +183,23 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 	getdomainname((&buf[end]) + 1, len - end - 1);
 	if (buf[end + 1] == 0) {
 	    char *tmp_name;
+	    struct hostent *host = gethostbyname(buf);
 	    buf[end] = 0;
 	    /* getdomainname was useless, hope that gethostbyname helps */
-	    tmp_name = (gethostbyname(buf))->h_name;
-	    strncpy(buf, tmp_name, len);
+	    if (host) {
+		tmp_name = (gethostbyname(buf))->h_name;
+		strncpy(buf, tmp_name, len);
+	    }		
 	}
 #else
 	{
 	    /* no getdomainname, hope that gethostbyname will help */
-	    char *tmp_name = (gethostbyname(buf))->h_name;
-	    strncpy(buf, tmp_name, len);
+	    struct hostent *host = gethostbyname(buf);
+	    char *tmp_name;
+	    if (host) {
+		tmp_name = (gethostbyname(buf))->h_name;
+		strncpy(buf, tmp_name, len);
+	    }
 	}
 #endif
 	buf[len - 1] = '\0';

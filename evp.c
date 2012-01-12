@@ -1800,14 +1800,19 @@ INT_EVforget_connection(CManager cm, CMConnection conn)
     }
 }
 
-
+/*
+ *  this handler gets called on a CMConnection write failure, indicating that an event couldn't be sent to a particular remote stone.
+ *  Its job is to determine what stone and to call the upper-level stone close handler (probably EV_DFG)
+ */
 static void
 stone_close_handler(CManager cm, CMConnection conn, void *client_data)
 {
     event_path_data evp = cm->evp;
     int s = (long)client_data;  /* stone ID */
     int a = 0;
-    stone_type stone = stone_struct(evp, s);
+    stone_type stone;
+    CManager_lock(cm);
+    stone = stone_struct(evp, s);
     CMtrace_out(cm, EVerbose, "Got a close for connection %p on stone %x, shutting down\n",
 		conn, s);
     for (a=0 ; a < stone->proto_action_count; a++) {
@@ -1823,10 +1828,13 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
 		return_event(evp, event);
 		}*/
 	    if (evp->app_stone_close_handler) {
+		CManager_unlock(cm);
 	        evp->app_stone_close_handler(cm, conn, s, evp->app_stone_close_data);
+		CManager_lock(cm);
 	    }
 	}
     }
+    CManager_unlock(cm);
 }
 
 static void

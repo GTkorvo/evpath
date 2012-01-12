@@ -1133,7 +1133,7 @@ uninstall-am: uninstall-binPROGRAMS uninstall-includeHEADERS \
 	uninstall-libLTLIBRARIES uninstall-pkgconfigDATA
 
 
-cm_interface.c revp.c revpath.h: evpath.h gen_interface.pl
+cm_interface.c revp.c revpath.h: evpath.h gen_interface.pl ev_dfg.h
 	@PERL@ $(srcdir)/gen_interface.pl
 all-local:
 check-local:

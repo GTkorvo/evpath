@@ -257,7 +257,7 @@ sub mod_EVhandler {
 {
     local ($/, *INPUT);
 	
-    unless (open(INPUT,'<', "$dirname/evpath.h")) {
+    unless (open(INPUT, "cat $dirname/evpath.h $dirname/ev_dfg.h |")) {
 	die "sudden flaming death, no evpath.h\n";
     }
 
@@ -341,7 +341,9 @@ print INT<<EOF;
 #include "cod.h"
 #include "atl.h"
 #include "evpath.h"
+#include "ev_dfg.h"
 #include "cm_internal.h"
+#include "ev_dfg_internal.h"
 #ifdef	__cplusplus
 extern "C" \{
 #endif
@@ -355,6 +357,8 @@ EOF
 	undef $evsource;
 	undef $cmtaskhandle;
 	undef $cmformat;
+	undef $evdfg;
+	undef $evdfg_stone;
 	foreach $arg (split ( ",", $arguments{$subr})) {
 	    $_ = $arg;
 	    if (/\W+(\w+)\W*$/) {
@@ -372,8 +376,14 @@ EOF
 	    if (/CMTaskHandle/) {
 		$cmtaskhandle = $name;
 	    }
-	    if ((/CMFormat/) && (!/CMFormatList/)){
+	    if (/CMFormat\W/) {
 		$cmformat = $name;
+	    }
+	    if (/EVdfg\W/) {
+		$evdfg = $name;
+	    }
+	    if (/EVdfg_stone\W/) {
+		$evdfg_stone = $name;
 	    }
 	}
 
@@ -396,6 +406,10 @@ EOF
 		    print INT "\tCManager cm = $cmtaskhandle->cm;\n";
 		} elsif (defined($cmformat)) {
 		    print INT "\tCManager cm = $cmformat->cm;\n";
+		} elsif (defined($evdfg)) {
+		    print INT "\tCManager cm = $evdfg->cm;\n";
+		} elsif (defined($evdfg_stone)) {
+		    print INT "\tCManager cm = $evdfg_stone->dfg->cm;\n";
 		} else {
 #		    print INT "\tCManager cm = duh;\n";
 		}

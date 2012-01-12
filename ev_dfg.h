@@ -40,7 +40,7 @@ extern EVdfg EVdfg_create(CManager cm);
 extern char *EVdfg_get_contact_list(EVdfg dfg);
 extern EVdfg_stone EVdfg_create_stone(EVdfg dfg, char *action_spec);
 extern void EVdfg_add_action (EVdfg_stone stone, char *action_spec);
-extern EVdfg_stone EVdfg_create_source_stone(EVdfg, char *source_name);
+extern EVdfg_stone EVdfg_create_source_stone(EVdfg dfg, char *source_name);
 extern EVdfg_stone EVdfg_create_sink_stone(EVdfg dfg, char *handler_name);
 extern void EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec, 
 				    int period_usec);
@@ -52,10 +52,10 @@ extern void EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs);
 extern void EVdfg_assign_node(EVdfg_stone stone, char *node);
 extern void EVdfg_register_node_list(EVdfg dfg, char** list);
 extern void EVdfg_assign_canonical_name(EVdfg dfg, char *given_name, char *canonical_name);
-typedef int (*EVdfgJoinHandlerFunc) ARGS((EVdfg dfg, char *identifier, void* available_sources, void *available_sinks));
-typedef void (*EVdfgFailHandlerFunc) ARGS((EVdfg dfg, char *identifier, int reporting_stone));
-extern void EVdfg_node_join_handler ARGS((EVdfg dfg, EVdfgJoinHandlerFunc func));
-extern void EVdfg_node_fail_handler ARGS((EVdfg dfg, EVdfgFailHandlerFunc func));
+typedef int (*EVdfgJoinHandlerFunc) (EVdfg dfg, char *identifier, void* available_sources, void *available_sinks);
+typedef void (*EVdfgFailHandlerFunc) (EVdfg dfg, char *identifier, int reporting_stone);
+extern void EVdfg_node_join_handler (EVdfg dfg, EVdfgJoinHandlerFunc func);
+extern void EVdfg_node_fail_handler (EVdfg dfg, EVdfgFailHandlerFunc func);
 
 extern int EVdfg_realize(EVdfg dfg);
 extern int EVdfg_ready_wait(EVdfg dfg);
@@ -70,12 +70,13 @@ extern int EVdfg_wait_for_shutdown(EVdfg dfg);
 
 extern void EVdfg_reconfig_insert(EVdfg dfg, int src_stone_id, EVdfg_stone new_stone, int dest_stone_id, EVevent_list q_event);
 extern void EVdfg_reconfig_delete_link(EVdfg dfg, int src_index, int dest_index);
-extern void REVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index);
+extern void EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index);
 extern void EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index);
 extern void EVdfg_reconfig_link_port_to_stone(EVdfg dfg, int src_stone_index, int port, EVdfg_stone target_stone, EVevent_list q_events);
 extern void EVdfg_reconfig_link_port_from_stone(EVdfg dfg, EVdfg_stone src_stone, int port, int target_index, EVevent_list q_events);
 extern void EVdfg_reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events);
 extern void EVdfg_reconfig_transfer_events(EVdfg dfg, int src_stone_index, int src_port, int dest_stone_index, int dest_port);
+extern void EVdfg_reconfig_insert_on_port(EVdfg dfg, EVdfg_stone src_stone, int port, EVdfg_stone new_stone, EVevent_list q_events);
 
 /* 
 **  Calls that support the begin/end points.  
