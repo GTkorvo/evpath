@@ -870,6 +870,7 @@ attr_list attrs;
 
     if (IP == 0) {
 	IP = get_self_ip_addr(svc);
+	if (IP == 0) IP = INADDR_LOOPBACK;
     }
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
