@@ -402,28 +402,31 @@ handle_conn_shutdown(EVdfg dfg, int stone)
 	int target_stone = -1;
 	char *failed_node = NULL;
 	char *contact_str = NULL;
+	CMtrace_out(cm, EVdfgVerbose, "IN CONN_SHUTDOWN_HANDLER\n");
 	for (i=0; i< dfg->stone_count; i++) {
 	    int j;
 	    for (j = 0; j < dfg->stones[i]->out_count; j++) {
 		if (dfg->stones[i]->out_links[j]->stone_id == stone) {
 		    EVdfg_stone out_stone = dfg->stones[i]->out_links[j];
-		    printf("Found reporting stone as output %d of stone %d\n",
-			   j, i);
+		    CMtrace_out(cm, EVdfgVerbose, "Found reporting stone as output %d of stone %d\n",
+				j, i);
 		    parse_bridge_action_spec(out_stone->action, 
 					     &target_stone, &contact_str);
-		    printf("Dead stone is %d\n", target_stone);
+		    CMtrace_out(cm, EVdfgVerbose, "Dead stone is %d\n", target_stone);
 		}
 	    }
 	}
 	for (i=0; i< dfg->stone_count; i++) {
 	    if (dfg->stones[i]->stone_id == target_stone) {
 		int node = dfg->stones[i]->node;
-		printf("Dead node is %d, name %s\n", node,
-		       dfg->nodes[node].canonical_name);
+		CMtrace_out(cm, EVdfgVerbose, "Dead node is %d, name %s\n", node,
+			    dfg->nodes[node].canonical_name);
 		failed_node = dfg->nodes[node].canonical_name;
 	    }
 	}
+	CManager_unlock(dfg->cm);
 	dfg->node_fail_handler(dfg, failed_node, target_stone);
+	CManager_lock(dfg->cm);
 	dfg->reconfig = 1;
 	dfg->sig_reconfig_bool = 1;
 	check_all_nodes_registered(dfg);
@@ -1735,5 +1738,6 @@ check_all_nodes_registered(EVdfg dfg)
 	reconfig_signal_ready(dfg);
     }
     dfg->deployed_stone_count = dfg->stone_count;
+    dfg->old_node_count = dfg->node_count;
 }
 
