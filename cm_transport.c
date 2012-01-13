@@ -46,7 +46,7 @@ add_transport_to_cm(CManager cm, transport_entry transport)
 }
 
 int
-load_transport(CManager cm, const char *trans_name)
+load_transport(CManager cm, const char *trans_name, int quiet)
 {
     transport_entry *trans_list = global_transports;
     transport_entry transport;
@@ -86,7 +86,7 @@ load_transport(CManager cm, const char *trans_name)
 
 #if !NO_DYNAMIC_LINKING 
     if (lt_dlinit() != 0) {
-	fprintf (stderr, "error during initialization: %s\n", lt_dlerror());
+	if (!quiet) fprintf (stderr, "error during initialization: %s\n", lt_dlerror());
 	return 0;
     }
 
@@ -94,11 +94,11 @@ load_transport(CManager cm, const char *trans_name)
     lt_dladdsearchdir(EVPATH_LIBRARY_INSTALL_DIR);
     handle = lt_dlopen(libname);
     if (!handle) {
-	fprintf(stderr, "Failed to load required '%s' dll.  Error \"%s\".\n",
-		trans_name, lt_dlerror());
-	fprintf(stderr, "Search path includes '.', '%s', '%s' and any default search paths supported by ld.so\n", EVPATH_LIBRARY_BUILD_DIR, 
-		EVPATH_LIBRARY_INSTALL_DIR);
-
+	if (!quiet) fprintf(stderr, "Failed to load required '%s' dll.  Error \"%s\".\n",
+			    trans_name, lt_dlerror());
+	if (!quiet) fprintf(stderr, "Search path includes '.', '%s', '%s' and any default search paths supported by ld.so\n", 
+			    EVPATH_LIBRARY_BUILD_DIR, 
+			    EVPATH_LIBRARY_INSTALL_DIR);
     } else {
 	CMtrace_out(cm, CMTransportVerbose, "Loading local or staticly linked version of \"%s\" transport\n",
 		    trans_name);

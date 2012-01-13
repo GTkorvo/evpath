@@ -322,7 +322,7 @@ extern int CMpbio_get_port_callback(void *client_data)
     int int_port_num;
 
     if (contact_attrs == NULL) {
-	CMinternal_listen(cm, NULL);
+	CMinternal_listen(cm, NULL, 1);
     }
     contact_attrs = INT_CMget_contact_list(cm);
     if (CM_IP_PORT == -1) {

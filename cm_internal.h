@@ -306,10 +306,10 @@ extern void free_CMFormat ARGS((CMFormat format));
 
 extern void CMcomplete_format_registration ARGS((CMFormat format, int lock));
 extern int CMcontrol_list_wait ARGS((CMControlList cl));
-extern int load_transport ARGS((CManager cm, const char *trans_name));
+extern int load_transport ARGS((CManager cm, const char *trans_name, int quiet));
 extern transport_entry add_transport_to_cm ARGS((CManager cm, transport_entry trans));
 
-extern int CMinternal_listen ARGS((CManager cm, attr_list listen_info));
+extern int CMinternal_listen ARGS((CManager cm, attr_list listen_info, int try_others));
 extern CMConnection CMinternal_get_conn ARGS((CManager cm, attr_list attrs));
 extern void CMconn_fail_conditions ARGS((CMConnection conn));
 extern int CMpbio_send_format_preload ARGS((FMFormat ioformat, CMConnection conn));

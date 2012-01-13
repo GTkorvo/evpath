@@ -313,7 +313,7 @@ INT_CMget_specific_contact_list(CManager cm, attr_list attrs)
 	i++;
     }
     /* chosen transport not listened? */
-    INT_CMlisten_specific(cm, attrs);
+    CMinternal_listen(cm, attrs, /* try others*/ 0);
     /* try again */
     i = 0;
     while (cm->contact_lists && (cm->contact_lists[i] != NULL)) {
@@ -354,7 +354,7 @@ INT_CMlisten(CManager cm)
 }
 
 extern int
-CMinternal_listen(CManager cm, attr_list listen_info)
+CMinternal_listen(CManager cm, attr_list listen_info, int try_others)
 {
     int success = 0;
     transport_entry *trans_list;
@@ -367,10 +367,11 @@ CMinternal_listen(CManager cm, attr_list listen_info)
         CMtrace_out(cm, CMConnectionVerbose,
 		    "CM - Listening only on transport \"%s\"\n",
 		    choosen_transport);
-	if (load_transport(cm, choosen_transport) == 0) {
+	if (load_transport(cm, choosen_transport, 1) == 0) {
 	    CMtrace_out(cm, CMConnectionVerbose,
 			"Failed to load transport \"%s\".  Revert to default.\n",
 			choosen_transport);
+	    if (!try_others) return success;
 	    choosen_transport = NULL;
 	}
     }
@@ -401,7 +402,7 @@ INT_CMlisten_specific(CManager cm, attr_list listen_info)
 {
     int success = 0;
     if (!cm->initialized) CMinitialize(cm);
-    success = CMinternal_listen(cm, listen_info);
+    success = CMinternal_listen(cm, listen_info, /* try others*/ 1);
     return (success != 0);
 }
 
@@ -420,13 +421,13 @@ CMinitialize(CManager cm)
     char *def = cercs_getenv("CMDefaultTransport");
     if (def != NULL) CMglobal_default_transport = def;
     if (CMglobal_default_transport) {
-	if (load_transport(cm, CMglobal_default_transport) == 0) {
+	if (load_transport(cm, CMglobal_default_transport, 0) == 0) {
 	    fprintf(stderr, "Failed to initialize default transport.  Exiting.\n");
 	    exit(1);
 	}
     }
     while ((transport_names != NULL) && (transport_names[0] != NULL)) {
-	load_transport(cm, transport_names[0]);
+	load_transport(cm, transport_names[0], 1);
 	transport_names++;
     }
     cm->initialized++;
@@ -1157,7 +1158,7 @@ CMinternal_initiate_conn(CManager cm, attr_list attrs)
 	get_string_attr(attrs, CM_TRANSPORT, &choosen_transport);
     }
     if (choosen_transport != NULL) {
-	if (load_transport(cm, choosen_transport) == 0) {
+	if (load_transport(cm, choosen_transport, 1) == 0) {
 	    CMtrace_out(cm, CMConnectionVerbose,
 			"Failed to load transport \"%s\".  Revert to default.\n",
 			choosen_transport);
