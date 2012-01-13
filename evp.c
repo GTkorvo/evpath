@@ -1811,6 +1811,7 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
     int s = (long)client_data;  /* stone ID */
     int a = 0;
     stone_type stone;
+    EVStoneCloseHandlerFunc handler = NULL;
     CManager_lock(cm);
     stone = stone_struct(evp, s);
     CMtrace_out(cm, EVerbose, "Got a close for connection %p on stone %x, shutting down\n",
@@ -1828,13 +1829,12 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
 		return_event(evp, event);
 		}*/
 	    if (evp->app_stone_close_handler) {
-		CManager_unlock(cm);
-	        evp->app_stone_close_handler(cm, conn, s, evp->app_stone_close_data);
-		CManager_lock(cm);
+	        handler = evp->app_stone_close_handler;
 	    }
 	}
     }
     CManager_unlock(cm);
+    if (handler) handler(cm, conn, s, evp->app_stone_close_data);
 }
 
 static void
