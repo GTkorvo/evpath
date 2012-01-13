@@ -29,6 +29,11 @@ extern int getdomainname ARGS((char *name, int namelen));
 #  pragma warning (disable: 2259)
 #endif
 
+static int ipv4_is_loopback(int addr)
+{
+  return (htonl(addr) & htonl(0xff000000)) == htonl(0x7f000000);
+}
+
 /*
  *  qual_hostname.c
  *
@@ -62,7 +67,7 @@ get_self_ip_addr(CMtrans_services svc)
     if (host != NULL) {
 	for (p = host->h_addr_list; *p != 0; p++) {
 	    struct in_addr *in = *(struct in_addr **) p;
-	    if (ntohl(in->s_addr) != INADDR_LOOPBACK) {
+	    if (!ipv4_is_loopback(ntohl(in->s_addr))) {
 		if (svc)
 		    svc->trace_out(NULL, "CM<transport> - Get self IP addr %lx, net %d.%d.%d.%d",
 				   ntohl(in->s_addr),
@@ -218,7 +223,7 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 	int good_addr = 0;
 	for (p = host->h_addr_list; *p != 0; p++) {
 	    struct in_addr *in = *(struct in_addr **) p;
-	    if (ntohl(in->s_addr) != INADDR_LOOPBACK) {
+	    if (!ipv4_is_loopback(ntohl(in->s_addr))) {
 		good_addr++;
 		svc->trace_out(NULL,
 			       "CM<transport> - Hostname gets good addr %lx, %d.%d.%d.%d",
