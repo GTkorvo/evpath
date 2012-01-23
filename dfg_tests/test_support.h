@@ -25,6 +25,7 @@ typedef struct _delay_struct {
 } delay_struct;
 
 
+extern void(*on_exit_handler)();
 extern FMStructDescRec simple_format_list[];
 extern void generate_simple_record(simple_rec_ptr event);
 extern int checksum_simple_record(simple_rec_ptr event, attr_list attrs, 

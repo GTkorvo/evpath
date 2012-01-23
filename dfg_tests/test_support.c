@@ -118,12 +118,14 @@ checksum_simple_record(simple_rec_ptr event, attr_list attrs, int quiet)
 static pid_t subproc_proc = 0;
 int quiet = 1;
 static int no_fork = 0;
+void(*on_exit_handler)() = NULL;
 
 static void
 fail_and_die(int signal)
 {
     (void) signal;
     fprintf(stderr, "EVPath test failed to complete in reasonable time\n");
+    if (on_exit_handler) on_exit_handler();
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
     }
@@ -262,5 +264,6 @@ main(int argc, char **argv)
     if (!regression_master) {
 	return be_test_child(argc, argv);
     }
+    alarm(70);
     return be_test_master(argc-1, &argv[1]);
 }
