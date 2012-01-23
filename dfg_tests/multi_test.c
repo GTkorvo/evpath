@@ -63,6 +63,8 @@ static FMStructDescRec c_format_list[] =
 
 static FMStructDescList queue_list[] = {a_format_list, b_format_list, c_format_list, NULL};
 
+static int repeat_count = 100;
+
 static
 void
 generate_a_record(rec_a_ptr event)
@@ -78,8 +80,6 @@ generate_b_record(rec_b_ptr event)
     /* always odd */
     event->b_field = ((int) lrand48() % 50) * 2 + 1;
 }
-
-static int repeat_count = 100;
 
 static
 int
@@ -108,27 +108,27 @@ output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     return 0;
 }
 
-static char *trans = "{\
-    int found = 0;\
-    a_rec *a;\
-    b_rec *b;\
-    c_rec c;\
-    if (EVpresent(a_rec_ID, 0)) {\
-        a = EVdata_a_rec(0); ++found;\
-    }\
-    if (EVpresent(b_rec_ID, 0)) {\
-        b = EVdata_b_rec(0); ++found;\
-    }\
-    if (found == 2) {\
-        c.c_field = a.a_field + b.b_field;\
-        if (!EVpresent_b_rec(0))\
-            printf(\"??? <1> not present (1)\\n\");\
-        EVdiscard_a_rec(0);\
-        if (!EVpresent_b_rec(0))\
-            printf(\"??? <2> not present (1)\\n\");\
-        EVdiscard_b_rec(0);\
-        EVsubmit(0, c);\
-    }\
+static char *trans = "{\n\
+    int found = 0;\n\
+    a_rec *a;\n\
+    b_rec *b;\n\
+    c_rec c;\n\
+    if (EVpresent(a_rec_ID, 0)) {\n\
+        a = EVdata_a_rec(0); ++found;\n\
+    }\n\
+    if (EVpresent(b_rec_ID, 0)) {\n\
+        b = EVdata_b_rec(0); ++found;\n\
+    }\n\
+    if (found == 2) {\n\
+        c.c_field = a.a_field + b.b_field;\n\
+        if (!EVpresent_b_rec(0))\n\
+            printf(\"??? <1> not present (1)\\n\");\n\
+        EVdiscard_a_rec(0);\n\
+        if (!EVpresent_b_rec(0))\n\
+            printf(\"??? <2> not present (1)\\n\");\n\
+        EVdiscard_b_rec(0);\n\
+        EVsubmit(0, c);\n\
+    }\n\
 }\0\0";
 
 static void
@@ -137,6 +137,8 @@ data_free(void *event_data, void *client_data)
     (void) client_data;
     free(event_data);
 }
+
+
 
 extern int
 be_test_master(int argc, char **argv)
@@ -148,7 +150,6 @@ be_test_master(int argc, char **argv)
     EVsource a_handle, b_handle;
     char * q_action_spec;
     int count, i;
-    char *map;
 
     (void)argc; (void)argv;
     cm = CManager_create();
@@ -205,34 +206,18 @@ be_test_master(int argc, char **argv)
 
     
     count = repeat_count;
-    map = malloc(count);
-    memset(map, 0, count);
-    /* setup map so that it is half ones and half zeroes */
-    for (i=0; i < count / 2 ; i++) {
-	int j;
-	int step = lrand48() % (count - i);
-	int mark = 0;
-	for (j = 0; j < step; j++) {
-	    mark++;
-	    while (map[mark] == 1) mark++;
+    for (i=0; i < count/2 ; i++) {
+	if (EVdfg_source_active(a_handle)) {
+	    rec_a_ptr a = malloc(sizeof(*a));
+	    generate_a_record(a);
+	    if (quiet <=0) {printf("submitting a -> %d\n", a->a_field);}
+	    EVsubmit(a_handle, a, NULL);
 	}
-	map[mark] = 1;
-    }
-    for (i=0; i < count ; i++) {
-	if (map[i] == 1) {
-	    if (EVdfg_source_active(a_handle)) {
-		rec_a_ptr a = malloc(sizeof(*a));
-		generate_a_record(a);
-		if (quiet <=0) {printf("submitting a -> %d\n", a->a_field);}
-		EVsubmit(a_handle, a, NULL);
-		}
-	} else {
-	    if (EVdfg_source_active(b_handle)) {
-		rec_b_ptr b = malloc(sizeof(*b));
-		generate_b_record(b);
-		if (quiet <=0) {printf("submitting b -> %d\n", b->b_field);}
-		EVsubmit(b_handle, b, NULL);
-	    }
+	if (EVdfg_source_active(b_handle)) {
+	    rec_b_ptr b = malloc(sizeof(*b));
+	    generate_b_record(b);
+	    if (quiet <=0) {printf("submitting b -> %d\n", b->b_field);}
+	    EVsubmit(b_handle, b, NULL);
 	}
     }
     CMsleep(cm, 1);
@@ -256,7 +241,6 @@ be_test_child(int argc, char **argv)
     CManager cm;
     EVsource a_handle, b_handle;
     int count, i;
-    char *map;
 
     cm = CManager_create();
     if (argc != 3) {
@@ -282,34 +266,19 @@ be_test_child(int argc, char **argv)
     }
 
     count = repeat_count;
-    map = malloc(count);
-    memset(map, 0, count);
-    /* setup map so that it is half ones and half zeroes */
-    for (i=0; i < count / 2 ; i++) {
-	int j;
-	int step = lrand48() % (count - i);
-	int mark = 0;
-	for (j = 0; j < step; j++) {
-	    mark++;
-	    while (map[mark] == 1) mark++;
+
+    for (i=0; i < count/2 ; i++) {
+	if (EVdfg_source_active(a_handle)) {
+	    rec_a_ptr a = malloc(sizeof(*a));
+	    generate_a_record(a);
+	    if (quiet <=0) {printf("submitting a -> %d\n", a->a_field);}
+	    EVsubmit(a_handle, a, NULL);
 	}
-	map[mark] = 1;
-    }
-    for (i=0; i < count ; i++) {
-	if (map[i] == 1) {
-	    if (EVdfg_source_active(a_handle)) {
-		rec_a_ptr a = malloc(sizeof(*a));
-		generate_a_record(a);
-		if (quiet <=0) {printf("submitting a -> %d\n", a->a_field);}
-		EVsubmit(a_handle, a, NULL);
-		}
-	} else {
-	    if (EVdfg_source_active(b_handle)) {
-		rec_b_ptr b = malloc(sizeof(*b));
-		generate_b_record(b);
-		if (quiet <=0) {printf("submitting b -> %d\n", b->b_field);}
-		EVsubmit(b_handle, b, NULL);
-	    }
+	if (EVdfg_source_active(b_handle)) {
+	    rec_b_ptr b = malloc(sizeof(*b));
+	    generate_b_record(b);
+	    if (quiet <=0) {printf("submitting b -> %d\n", b->b_field);}
+	    EVsubmit(b_handle, b, NULL);
 	}
     }
     return EVdfg_wait_for_shutdown(test_dfg);
