@@ -13,10 +13,6 @@
 #include "ev_dfg_internal.h"
 #include <assert.h>
 
-#define STATUS_UNDETERMINED -2
-#define STATUS_NO_CONTRIBUTION -1
-#define STATUS_SUCCESS 0
-#define STATUS_FAILURE 1
 char *str_state[] = {"DFG_Joining", "DFG_Starting", "DFG_Running", "DFG_Reconfiguring", "DFG_Shutting_Down"};
 
 static void handle_conn_shutdown(EVdfg dfg, int stone);
