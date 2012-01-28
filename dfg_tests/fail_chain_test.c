@@ -20,6 +20,32 @@ set_int_attr(event_attrs, \"hop_count_atom\", hop_count);\n\
 
 #define REPEAT_COUNT 100
 
+#include "ev_dfg_internal.h"
+void
+on_failure()
+{
+    int i;
+    printf("In failure\n");
+    for (i=0; i < test_dfg->node_count; i++) {
+	printf("NODE %d status is :", i);
+	switch (test_dfg->nodes[i].shutdown_status_contribution) {
+	case STATUS_UNDETERMINED:
+	    printf("NOT READY FOR SHUTDOWN\n");
+	    break;
+	case STATUS_NO_CONTRIBUTION:
+	    printf("READY for shutdown, no status\n");
+	    break;
+	case STATUS_SUCCESS:
+	    printf("READY for shutdown, SUCCESS\n");
+	    break;
+	default:
+	    printf("READY for shutdown, FAILURE %d\n",
+			test_dfg->nodes[i].shutdown_status_contribution);
+	    break;
+	}	    
+    }
+}
+
 static
 int
 simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
@@ -93,6 +119,7 @@ be_test_master(int argc, char **argv)
     if (argc == 1) {
 	sscanf(argv[0], "%d", &node_count);
     }
+    on_exit_handler = on_failure;
     nodes = malloc(sizeof(nodes[0]) * (node_count+1));
     stones = malloc(sizeof(stones[0]) * (node_count+1));
     for (i=0; i < node_count; i++) {
