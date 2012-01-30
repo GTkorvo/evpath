@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <strings.h>
+#include <string.h>
 #include <unistd.h>
 #include "config.h"
 #include "evpath.h"
@@ -21,7 +21,7 @@ set_int_attr(event_attrs, \"hop_count_atom\", hop_count);\n\
 #define REPEAT_COUNT 100
 
 #include "ev_dfg_internal.h"
-void
+static void
 on_failure()
 {
     int i;
@@ -63,6 +63,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     checksum_simple_record(event, attrs, quiet);
     count++;
     if (count == REPEAT_COUNT) {
+	printf("SINK complete\n");
         EVdfg_shutdown(test_dfg, 0);
     } else {
 //        printf("."); fflush(stdout);
@@ -185,7 +186,6 @@ be_test_master(int argc, char **argv)
     }
 
     if (EVdfg_source_active(source_handle)) {
-        int i = 0;
 	for (i=0 ; i < REPEAT_COUNT; i++) {
 	    simple_rec rec;
 	    atom_t hop_count_atom;
@@ -197,6 +197,7 @@ be_test_master(int argc, char **argv)
 	    EVsubmit(source_handle, &rec, attrs);
 	    CMsleep(cm, 1);
 	}
+	printf("Source complete\n");
     }
 
     status = EVdfg_wait_for_shutdown(test_dfg);
