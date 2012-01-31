@@ -95,6 +95,7 @@ typedef struct _EVint_node_rec {
 typedef enum {DFG_Joining, DFG_Starting, DFG_Running, DFG_Reconfiguring, DFG_Shutting_Down} DFG_State;
 extern char *str_state[];
 
+#define STATUS_FAILED -3
 #define STATUS_UNDETERMINED -2
 #define STATUS_NO_CONTRIBUTION -1
 #define STATUS_SUCCESS 0

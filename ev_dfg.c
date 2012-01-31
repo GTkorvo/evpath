@@ -420,6 +420,7 @@ handle_conn_shutdown(EVdfg dfg, int stone)
 		failed_node = dfg->nodes[node].canonical_name;
 	    }
 	}
+	dfg->nodes[node].shutdown_value = STATUS_FAILED;
 	CManager_unlock(dfg->cm);
 	dfg->node_fail_handler(dfg, failed_node, target_stone);
 	CManager_lock(dfg->cm);
@@ -1657,6 +1658,9 @@ possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn)
 	    break;
 	case STATUS_SUCCESS:
 	    CMtrace_out(cm, EVdfgVerbose, "READY for shutdown, SUCCESS\n");
+	    break;
+	case STATUS_FAILED:
+	    CMtrace_out(cm, EVdfgVerbose, "ALREADY FAILED\n");
 	    break;
 	default:
 	    CMtrace_out(cm, EVdfgVerbose, "READY for shutdown, FAILURE %d\n",
