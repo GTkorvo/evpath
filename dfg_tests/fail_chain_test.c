@@ -21,11 +21,15 @@ set_int_attr(event_attrs, \"hop_count_atom\", hop_count);\n\
 #define REPEAT_COUNT 100
 
 #include "ev_dfg_internal.h"
+static int received_count = -1;
 static void
 on_failure()
 {
     int i;
     printf("In failure\n");
+    if (received_count != -1) {
+	printf("I'm the sink, got only %d events\n", received_count);
+    }
     for (i=0; i < test_dfg->node_count; i++) {
 	printf("NODE %d status is :", i);
 	switch (test_dfg->nodes[i].shutdown_status_contribution) {
@@ -62,6 +66,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     get_int_attr(attrs, hop_count_atom, &hop_count);
     checksum_simple_record(event, attrs, quiet);
     count++;
+    received_count = count;
     if (count == REPEAT_COUNT) {
 	printf("SINK complete\n");
         EVdfg_shutdown(test_dfg, 0);
@@ -186,7 +191,7 @@ be_test_master(int argc, char **argv)
     }
 
     if (EVdfg_source_active(source_handle)) {
-	for (i=0 ; i < REPEAT_COUNT; i++) {
+	for (i=0 ; i < REPEAT_COUNT + 5; i++) {
 	    simple_rec rec;
 	    atom_t hop_count_atom;
 	    attr_list attrs = create_attr_list();
