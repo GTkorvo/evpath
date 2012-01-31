@@ -68,7 +68,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     count++;
     received_count = count;
     if (count == REPEAT_COUNT) {
-	printf("SINK complete\n");
+	if (!quiet) printf("SINK complete\n");
         EVdfg_shutdown(test_dfg, 0);
     } else {
 //        printf("."); fflush(stdout);
@@ -202,7 +202,7 @@ be_test_master(int argc, char **argv)
 	    EVsubmit(source_handle, &rec, attrs);
 	    CMsleep(cm, 1);
 	}
-	printf("Source complete\n");
+	if (!quiet) printf("Source complete\n");
     }
 
     status = EVdfg_wait_for_shutdown(test_dfg);
@@ -251,8 +251,8 @@ be_test_child(int argc, char **argv)
 	EVsubmit(src, &rec, NULL);
     }
     if (die_early) {
-      CMsleep(cm, 45);
-      printf("Node %s exiting early\n", argv[1]);
+	CMsleep(cm, 45);
+	if (!quiet) printf("Node %s exiting early\n", argv[1]);
 	exit(0);
     } else {
 	return EVdfg_wait_for_shutdown(test_dfg);
