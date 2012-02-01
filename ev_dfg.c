@@ -418,9 +418,9 @@ handle_conn_shutdown(EVdfg dfg, int stone)
 		CMtrace_out(cm, EVdfgVerbose, "Dead node is %d, name %s\n", node,
 			    dfg->nodes[node].canonical_name);
 		failed_node = dfg->nodes[node].canonical_name;
+		dfg->nodes[node].shutdown_status_contribution = STATUS_FAILED;
 	    }
 	}
-	dfg->nodes[node].shutdown_value = STATUS_FAILED;
 	CManager_unlock(dfg->cm);
 	dfg->node_fail_handler(dfg, failed_node, target_stone);
 	CManager_lock(dfg->cm);
