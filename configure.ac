@@ -91,8 +91,12 @@ LTLIBS="$cercs_cv_atl_link_dir/libatl.la $LTLIBS"
 
 CERCS_REQUIRE_PACKAGE(enet,enet/enet.h,libenet.la)
 
+CERCS_REQUIRE_PACKAGE(nnti,nnti.h,libtrios_nssi.a)
+
 AC_CHECK_LIB(ibverbs, ibv_open_device, [build_ib=enable], [build_ib=disable])
 AC_CHECK_LIB(enet,enet_initialize, [build_enet=enable],[build_enet=disable])
+AC_CHECK_LIB(trios_nssi,NNTI_init, [build_nnti=enable],[build_nnti=disable])
+st build_nnti=enable
 
 computenode=disable
 do_dyn_linking=0
@@ -113,6 +117,7 @@ AC_DEFINE_UNQUOTED([NO_DYNAMIC_LINKING], [$do_dyn_linking], [Build with dynamic 
 AM_CONDITIONAL([CNL], [test x$computenode = xenable])
 AM_CONDITIONAL([BUILD_IB], [test x$build_ib = xenable])
 AM_CONDITIONAL([BUILD_ENET], [test x$build_enet = xenable])
+AM_CONDITIONAL([BUILD_NNTI], [test x$build_nnti = xenable])
 
 AC_SUBST(EVDIR)
 AC_SUBST(LTLIBS)

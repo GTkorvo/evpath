@@ -117,6 +117,15 @@ libcmmulticast_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(libcmmulticast_la_LDFLAGS) $(LDFLAGS) -o $@
 @CNL_FALSE@am_libcmmulticast_la_rpath = -rpath $(libdir)
 @CNL_TRUE@am_libcmmulticast_la_rpath = -rpath $(libdir)
+@BUILD_NNTI_TRUE@libcmnnti_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+@BUILD_NNTI_TRUE@	$(am__DEPENDENCIES_1)
+am__libcmnnti_la_SOURCES_DIST = cmnnti.c
+@BUILD_NNTI_TRUE@am_libcmnnti_la_OBJECTS = cmnnti.lo
+libcmnnti_la_OBJECTS = $(am_libcmnnti_la_OBJECTS)
+libcmnnti_la_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libcmnnti_la_LDFLAGS) $(LDFLAGS) -o $@
+@BUILD_NNTI_TRUE@@CNL_FALSE@am_libcmnnti_la_rpath = -rpath $(libdir)
 @CNL_FALSE@libcmselect_la_DEPENDENCIES = $(am__DEPENDENCIES_1) \
 @CNL_FALSE@	$(am__DEPENDENCIES_1)
 am__libcmselect_la_SOURCES_DIST = cmselect.c
@@ -175,11 +184,12 @@ LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	--mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
 SOURCES = $(libcmenet_la_SOURCES) $(libcmib_la_SOURCES) \
-	$(libcmmulticast_la_SOURCES) $(libcmselect_la_SOURCES) \
-	$(libcmsockets_la_SOURCES) $(libcmudp_la_SOURCES) \
-	$(libevpath_la_SOURCES)
+	$(libcmmulticast_la_SOURCES) $(libcmnnti_la_SOURCES) \
+	$(libcmselect_la_SOURCES) $(libcmsockets_la_SOURCES) \
+	$(libcmudp_la_SOURCES) $(libevpath_la_SOURCES)
 DIST_SOURCES = $(am__libcmenet_la_SOURCES_DIST) \
 	$(am__libcmib_la_SOURCES_DIST) $(libcmmulticast_la_SOURCES) \
+	$(am__libcmnnti_la_SOURCES_DIST) \
 	$(am__libcmselect_la_SOURCES_DIST) \
 	$(am__libcmsockets_la_SOURCES_DIST) $(libcmudp_la_SOURCES) \
 	$(am__libevpath_la_SOURCES_DIST)
@@ -389,7 +399,9 @@ EXTRA_DIST =
 @BUILD_IB_TRUE@LIB_IB = libcmib.la 
 @BUILD_ENET_FALSE@LIB_ENET = 
 @BUILD_ENET_TRUE@LIB_ENET = libcmenet.la 
-@CNL_FALSE@lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la libcmsockets.la libcmselect.la $(LIB_IB) $(LIB_ENET)
+@BUILD_NNTI_FALSE@LIB_NNTI = 
+@BUILD_NNTI_TRUE@LIB_NNTI = libcmnnti.la 
+@CNL_FALSE@lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la libcmsockets.la libcmselect.la $(LIB_IB) $(LIB_ENET) $(LIB_NNTI)
 @CNL_TRUE@lib_LTLIBRARIES = libevpath.la  libcmmulticast.la libcmudp.la 
 EXTRA_LTLIBRARIES = 
 pkgconfigdir = $(libdir)/pkgconfig
@@ -417,6 +429,9 @@ noinst_HEADERS = cm_internal.h  ev_internal.h
 @BUILD_ENET_TRUE@libcmenet_la_SOURCES = cmenet.c
 @BUILD_ENET_TRUE@libcmenet_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env -lenet
 @BUILD_ENET_TRUE@libcmenet_la_LDFLAGS = -module -export-symbols-regex "libcmenet.*"
+@BUILD_NNTI_TRUE@libcmnnti_la_SOURCES = cmnnti.c
+@BUILD_NNTI_TRUE@libcmnnti_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env -libverbs
+@BUILD_NNTI_TRUE@libcmnnti_la_LDFLAGS = -module -export-symbols-regex "libcmnnti.*"
 libcmmulticast_la_SOURCES = cmmulticast.c
 libcmmulticast_la_LIBADD = $(LTLIBS) $(LIBS)
 libcmmulticast_la_LDFLAGS = -module -export-symbols-regex "libcmmulticast.*"
@@ -519,6 +534,8 @@ libcmib.la: $(libcmib_la_OBJECTS) $(libcmib_la_DEPENDENCIES)
 	$(libcmib_la_LINK) $(am_libcmib_la_rpath) $(libcmib_la_OBJECTS) $(libcmib_la_LIBADD) $(LIBS)
 libcmmulticast.la: $(libcmmulticast_la_OBJECTS) $(libcmmulticast_la_DEPENDENCIES) 
 	$(libcmmulticast_la_LINK) $(am_libcmmulticast_la_rpath) $(libcmmulticast_la_OBJECTS) $(libcmmulticast_la_LIBADD) $(LIBS)
+libcmnnti.la: $(libcmnnti_la_OBJECTS) $(libcmnnti_la_DEPENDENCIES) 
+	$(libcmnnti_la_LINK) $(am_libcmnnti_la_rpath) $(libcmnnti_la_OBJECTS) $(libcmnnti_la_LIBADD) $(LIBS)
 libcmselect.la: $(libcmselect_la_OBJECTS) $(libcmselect_la_DEPENDENCIES) 
 	$(libcmselect_la_LINK) $(am_libcmselect_la_rpath) $(libcmselect_la_OBJECTS) $(libcmselect_la_LIBADD) $(LIBS)
 libcmsockets.la: $(libcmsockets_la_OBJECTS) $(libcmsockets_la_DEPENDENCIES) 
@@ -600,6 +617,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmenet.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmib.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmmulticast.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmnnti.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmselect.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmsockets.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmudp.Plo@am__quote@
