@@ -89,7 +89,7 @@ endif
 
 if BUILD_NNTI
 libcmnnti_la_SOURCES = cmnnti.c
-libcmnnti_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env -libverbs
+libcmnnti_la_LIBADD = $(LTLIBS) $(LIBS) @SOCKET_LIBS@ -lcercs_env -ltrios_nssi -libverbs
 libcmnnti_la_LDFLAGS = -module -export-symbols-regex "libcmnnti.*"
 endif
 
