@@ -96,7 +96,6 @@ CERCS_REQUIRE_PACKAGE(nnti,nnti.h,libtrios_nssi.a)
 AC_CHECK_LIB(ibverbs, ibv_open_device, [build_ib=enable], [build_ib=disable])
 AC_CHECK_LIB(enet,enet_initialize, [build_enet=enable],[build_enet=disable])
 AC_CHECK_LIB(trios_nssi,NNTI_init, [build_nnti=enable],[build_nnti=disable])
-st build_nnti=enable
 
 computenode=disable
 do_dyn_linking=0

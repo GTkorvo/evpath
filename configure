@@ -19167,7 +19167,6 @@ else
   build_nnti=disable
 fi
 
-st build_nnti=enable
 
 computenode=disable
 do_dyn_linking=0
