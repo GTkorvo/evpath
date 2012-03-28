@@ -61,7 +61,7 @@ typedef struct nnti_transport_data {
 #define MSGBUFSIZE 25600
 
 typedef struct nnti_connection_data {
-    int nnti_IP;
+    char *peer_hostname;
     int nnti_port;
     CMbuffer read_buffer;
     int read_buf_len;
@@ -98,6 +98,7 @@ CMtrans_services svc;
 	svc->malloc_func(sizeof(struct nnti_connection_data));
     nnti_conn_data->read_buffer = NULL;
     nnti_conn_data->nnti_port = -1;
+    nnti_conn_data->peer_hostname = NULL;
     nnti_conn_data->next = NULL;
     return nnti_conn_data;
 }
@@ -162,7 +163,6 @@ attr_list conn_attr_list;
     int int_port_num;
     nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) trans->trans_data;
     char *host_name;
-    static int nnti_ip = 0;
     char server_url[256];
     struct connect_message *cmsg;
 
@@ -173,15 +173,7 @@ attr_list conn_attr_list;
     } else {
         svc->trace_out(cm, "NNTI transport connect to host %s", host_name);
     }
-    if (!query_attr(attrs, CM_NNTI_ADDR, /* type pointer */ NULL,
-    /* value pointer */ (attr_value *) (long) &nnti_ip)) {
-	svc->trace_out(cm, "CMNNTI transport found no NNTI_ADDR attribute");
-	/* wasn't there */
-	nnti_ip = 0;
-    } else {
-	svc->trace_out(cm, "CMNNTI transport connect to NNTI_IP %lx", nnti_ip);
-    }
-    if ((host_name == NULL) && (nnti_ip == 0))
+    if (host_name == NULL)
 	return -1;
 
     if (!query_attr(attrs, CM_NNTI_PORT, /* type pointer */ NULL,
@@ -199,7 +191,7 @@ attr_list conn_attr_list;
     }
 
     int timeout = 500;
-    ntd->svc->trace_out(trans->cm, "Connecting to URL \"%s\"\n", server_url);
+    ntd->svc->trace_out(trans->cm, "Connecting to URL \"%s\"", server_url);
     int err = NNTI_connect(&ntd->trans_hdl, server_url, timeout, 
 			   &nnti_conn_data->peer_hdl);
     if (err != NNTI_OK) {
@@ -216,7 +208,7 @@ attr_list conn_attr_list;
         return 1;
     }
 
-    svc->trace_out(trans->cm, " register ACK memory...\n");
+    svc->trace_out(trans->cm, " register ACK memory...");
 
     if (err != NNTI_OK) {
         fprintf (stderr, "Error: NNTI_register_memory(RECV_DST) for server message returned non-zero: %d\n", err);
@@ -234,9 +226,9 @@ attr_list conn_attr_list;
         return 1;
     }
 
-    svc->trace_out(trans->cm, " NNTI_send() returned. Call wait... \n");
-    nnti_conn_data->nnti_IP = nnti_ip;
+    svc->trace_out(trans->cm, " NNTI_send() returned. Call wait... ");
     nnti_conn_data->nnti_port = int_port_num;
+    nnti_conn_data->peer_hostname = strdup(host_name);
     nnti_conn_data->ntd = ntd;
 
     /* Wait for message to be sent */
@@ -246,78 +238,16 @@ attr_list conn_attr_list;
         fprintf (stderr, "Error: NNTI_wait() for sending returned non-zero: %d\n", err);
         return 1;
     }
-    svc->trace_out(trans->cm, " NNTI_wait() of send request returned... \n");
+    svc->trace_out(trans->cm, " NNTI_wait() of send request returned... ");
 
 
     svc->trace_out(cm, "--> Connection established");
 
-    nnti_conn_data->nnti_IP = nnti_ip;
     nnti_conn_data->nnti_port = int_port_num;
     nnti_conn_data->ntd = ntd;
     nnti_conn_data->send_buffer = req_buf;
     return 1;
 }
-
-#ifdef NOT_DEF
-static void
-libcmnnti_data_available(void *vtrans, void *vinput)
-{
-    transport_entry trans = vtrans;
-    int input_fd = (long)vinput;
-    int nbytes;
-    nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) trans->trans_data;
-    nnti_conn_data_ptr ncd = ntd->connections;
-    struct sockaddr_in addr;
-    unsigned int addrlen = sizeof(addr);
-    char *msgbuf;
-    int unused;
-
-    while (ncd != NULL) {
-	if (memcmp(&addr, &ncd->dest_addr, sizeof(addr)) == 0) {
-	    ntd->svc->trace_out(trans->cm, "NNTI data available on existing connetion, IP addr %lx\n", 
-			   ncd->nnti_IP);
-	    break;
-	}
-	ncd = ncd->next;
-    }
-    if (ncd == NULL) {
-	CMConnection conn;
-	attr_list conn_attr_list;
-	ncd = create_nnti_conn_data(ntd->svc);
-
-	conn_attr_list = create_attr_list();
-
-	conn = ntd->svc->connection_create(trans, ncd, conn_attr_list);
-	ncd->nnti_IP = ntohl(addr.sin_addr.s_addr);
-	ncd->nnti_port = ntohs(addr.sin_port);
-	ncd->ntd = ntd;
-	ncd->conn = conn;
-	ncd->attrs = conn_attr_list;
-	ncd->next = NULL;
-	add_connection(ntd, ncd);
-	add_attr(conn_attr_list, CM_NNTI_ADDR, Attr_Int4,
-		 (attr_value) (long)ncd->nnti_IP);
-	add_attr(conn_attr_list, CM_NNTI_PORT, Attr_Int4,
-		 (attr_value) (long)ncd->nnti_port);
-
-	ntd->svc->trace_out(trans->cm, "NNTI data available on new connetion, IP addr %lx\n", 
-			   ncd->nnti_IP);
-    }
-
-    ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, MSGBUFSIZE + 4);
-
-    msgbuf = &((char*)ncd->read_buffer->buffer)[0];
-    if ((nbytes = recvfrom(input_fd, msgbuf, MSGBUFSIZE, 0,
-			   (struct sockaddr *) &addr, &addrlen)) < 0) {
-	perror("recvfrom");
-	exit(1);
-    }
-    ncd->read_buf_len = nbytes;
-    /* kick this upstairs */
-    trans->data_available(vtrans, ncd->conn);
-    ntd->svc->return_data_buffer(trans->cm, ncd->read_buffer);
-}
-#endif
 
 /* 
  * Initiate a connection to a nnti group.
@@ -337,8 +267,8 @@ attr_list attrs;
 	return NULL;
     }
 
-    add_attr(conn_attr_list, CM_NNTI_ADDR, Attr_Int4,
-	     (attr_value) (long)nnti_conn_data->nnti_IP);
+    add_attr(conn_attr_list, CM_IP_HOSTNAME, Attr_String,
+	     (attr_value) strdup(nnti_conn_data->peer_hostname));
     add_attr(conn_attr_list, CM_NNTI_PORT, Attr_Int4,
 	     (attr_value) (long)nnti_conn_data->nnti_port);
 
@@ -361,7 +291,6 @@ transport_entry trans;
 attr_list attrs;
 {
     nnti_transport_data_ptr ntd = trans->trans_data;
-    int host_addr;
     int int_port_num;
     char *host_name;
     char my_host_name[256];
@@ -375,12 +304,6 @@ attr_list attrs;
 	svc->trace_out(cm, "CMself check NNTI transport found no IP_HOST attribute");
 	host_name = NULL;
     }
-    if (!query_attr(attrs, CM_NNTI_ADDR, /* type pointer */ NULL,
-    /* value pointer */ (attr_value *)(long) & host_addr)) {
-	svc->trace_out(cm, "CMself check NNTI transport found no NNTI_ADDR attribute");
-	if (host_name == NULL) return 0;
-	host_addr = 0;
-    }
     if (!query_attr(attrs, CM_NNTI_PORT, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & int_port_num)) {
 	svc->trace_out(cm, "CMself check NNTI transport found no NNTI_PORT attribute");
@@ -390,10 +313,6 @@ attr_list attrs;
 
     if (host_name && (strcmp(host_name, my_host_name) != 0)) {
 	svc->trace_out(cm, "CMself check - Hostnames don't match");
-	return 0;
-    }
-    if (host_addr && (IP != host_addr)) {
-	svc->trace_out(cm, "CMself check - Host IP addrs don't match, %lx, %lx", IP, host_addr);
 	return 0;
     }
     if (int_port_num != ntd->self_port) {
@@ -429,16 +348,12 @@ nnti_conn_data_ptr ncd;
 	svc->trace_out(cm, "Conn Eq CMNnti transport found no NNTI_PORT attribute");
 	return 0;
     }
-    if (!query_attr(attrs, CM_NNTI_ADDR, /* type pointer */ NULL,
-    /* value pointer */ (attr_value *) (long) &requested_IP)) {
-	svc->trace_out(cm, "CMNnti transport found no NNTI_ADDR attribute");
-    }
-    svc->trace_out(cm, "CMNnti Conn_eq comparing IP/ports %x/%d and %x/%d",
-		   ncd->nnti_IP, ncd->nnti_port,
-		   requested_IP, int_port_num);
+    svc->trace_out(cm, "CMNnti Conn_eq comparing host/ports %s/%d and %s/%d",
+		   ncd->peer_hostname, ncd->nnti_port,
+		   host_name, int_port_num);
 
-    if ((ncd->nnti_IP == requested_IP) &&
-	(ncd->nnti_port == int_port_num)) {
+    if ((ncd->nnti_port == int_port_num) &&
+	(strcmp(ncd->peer_hostname, host_name) == 0)) {
 	svc->trace_out(cm, "CMNnti Conn_eq returning TRUE");
 	return 1;
     }
@@ -460,6 +375,8 @@ typedef struct listen_struct {
   transport_entry trans;
 } *listen_struct_p;
 
+static int SHUTDOWN = 0;
+
 int
 listen_thread_func(void *vlsp)
 {
@@ -474,14 +391,15 @@ listen_thread_func(void *vlsp)
     while (1) {
         attr_list conn_attr_list = NULL;
         err = NNTI_wait(&ntd->mr_recvs, NNTI_RECV_QUEUE, timeout, &wait_status);
+	if (SHUTDOWN) return 0;
 	if (err == NNTI_ETIMEDOUT) {
-	    ntd->svc->trace_out(trans->cm, "NNTI_wait() on receiving result %d timed out...\n", err);
+	    ntd->svc->trace_out(trans->cm, "NNTI_wait() on receiving result %d timed out...", err);
 	    continue;
         } else if (err != NNTI_OK) {
             fprintf (stderr, "Error: NNTI_wait() on receiving result returned non-zero: %d\n", err);
             return 1;
         } else {
-	    ntd->svc->trace_out(trans->cm, "  message arived: msg wait_status=%d size=%lu offs=%lu addr=%lu, offset was %ld\n",
+	    ntd->svc->trace_out(trans->cm, "  message arived: msg wait_status=%d size=%lu offs=%lu addr=%lu, offset was %ld",
 		     wait_status.result, wait_status.length, wait_status.offset, wait_status.start+wait_status.offset, wait_status.offset);
         }
 
@@ -492,14 +410,14 @@ listen_thread_func(void *vlsp)
 	    nnti_conn_data_ptr ncd = ntd->connections;
 	    while (ncd != NULL) {
 	        if (memcmp(&wait_status.src, &ncd->peer_hdl, sizeof(wait_status.src)) == 0) {
-		    ntd->svc->trace_out(trans->cm, "NNTI data available on existing connetion, IP addr %lx\n", 
-					ncd->nnti_IP);
+		    ntd->svc->trace_out(trans->cm, "NNTI data available on existing connection, from host %s", 
+					ncd->peer_hostname);
 		    break;
 		}
 		ncd = ncd->next;
 	    }
 	    if (cm->message_type == 1) {
-	      ntd->svc->trace_out(trans->cm, "  client %s:%d is connecting\n",
+	      ntd->svc->trace_out(trans->cm, "  client %s:%d is connecting",
 		       cm->name, cm->port);
 	      
 	      assert(ncd == NULL);
@@ -514,7 +432,7 @@ listen_thread_func(void *vlsp)
 	      //            ncd->res_addr = cm->res_addr;
 	      
 	      /* register memory region for sending acknowledgement to this client */
-	      ntd->svc->trace_out(trans->cm, "   ID %d register small send buffer to client %d (offset=%d)...\n",
+	      ntd->svc->trace_out(trans->cm, "   ID %d register small send buffer to client %d (offset=%d)...",
 				  cm->port, nnti_conn_count-1, ncd->acks_offset);
 	      
 	      err = NNTI_register_memory (&ntd->trans_hdl,
@@ -540,6 +458,7 @@ listen_thread_func(void *vlsp)
 	      /* kick this upstairs */
 	      trans->data_available(trans, ncd->conn);
 	      ntd->svc->return_data_buffer(trans->cm, ncd->read_buffer);
+	      ncd->read_buffer = NULL;
 	    }
         }
     }
@@ -564,18 +483,6 @@ attr_list listen_info;
     char *last_colon;
     int err;
 
-    if (listen_info != NULL &&
-	(!query_attr(listen_info, CM_NNTI_PORT, /* type pointer */ NULL,
-		     (attr_value *) (long) &int_port_num))) {
-	svc->trace_out(cm, "CMNNTI transport found no NNTI_PORT attribute");
-	int_port_num = 0;
-    } else {
-	if (int_port_num > USHRT_MAX || int_port_num < 0) {
-	    fprintf(stderr, "Requested port number %d is invalid\n", int_port_num);
-	    return NULL;
-	}
-	svc->trace_out(cm, "CMNNTI transport connect to port %d", int_port_num);
-    }
     NNTI_init(NNTI_TRANSPORT_IB, NULL, &trans_hdl);
     NNTI_get_url(&trans_hdl, url, sizeof(url));
     last_colon = rindex(url, ':');
@@ -606,7 +513,7 @@ attr_list listen_info;
         fprintf (stderr, "Error: NNTI_register_memory(NNTI_RECV_DST) for client messages returned non-zero: %d\n", err);
         return NULL;
     } else {
-	ntd->svc->trace_out(trans->cm, "Successfully registered memory on listen side incoming %p\n", ntd->incoming);
+	ntd->svc->trace_out(trans->cm, "Successfully registered memory on listen side incoming %p", ntd->incoming);
     }
 
     ntd->self_port = int_port_num;
@@ -671,8 +578,25 @@ attr_list attrs;
 	cm->size = size;
 	size = 0;
 	for(i=0; i<iovcnt; i++) {
-	    memcpy(&cm->payload[size], iov[i].iov_base, iov[i].iov_len);
-	    size += iov[i].iov_len;
+	    switch (i) {
+	    case 0:
+	      memcpy(&cm->payload[size], iov[i].iov_base, iov[i].iov_len);
+	      break;
+	    case 1:
+	      break;
+	      memcpy(&cm->payload[size], iov[i].iov_base, iov[i].iov_len);
+	      break;
+	    case 2:
+	      memcpy(&cm->payload[size], iov[i].iov_base, iov[i].iov_len);
+	      break;
+	    case 3:
+	      memcpy(&cm->payload[size], iov[i].iov_base, iov[i].iov_len);
+	      break;
+	    default:
+	      memcpy(&cm->payload[size], iov[i].iov_base, iov[i].iov_len);
+	      break;
+	    }
+	  size += iov[i].iov_len;
 	}
     }
     err = NNTI_send(&ncd->peer_hdl, &ncd->mr_send, NULL);
@@ -680,16 +604,16 @@ attr_list attrs;
         fprintf (stderr, "Error: NNTI_send() returned non-zero: %d\n", err);
         return 1;
     }
-    svc->trace_out(ncd->ntd->cm, "    NNTI_send() returned. Call wait... \n");
+    svc->trace_out(ncd->ntd->cm, "    NNTI_send() returned. Call wait... ");
 
     /* Wait for message to be sent */
     NNTI_status_t               status;
     err = NNTI_wait(&ncd->mr_send, NNTI_SEND_SRC, timeout, &status);
-    if (err != NNTI_OK) {
-        fprintf (stderr, "Error: NNTI_wait() for sending returned non-zero: %d\n", err);
-        return 1;
-    }
-    svc->trace_out(ncd->ntd->cm, "    NNTI_wait() of send request returned... \n");
+    //    if (err != NNTI_OK) {
+    //        fprintf (stderr, "Error: NNTI_wait() for sending returned non-zero: %d\n", err);
+    //        return 1;
+    //    }
+    svc->trace_out(ncd->ntd->cm, "    NNTI_wait() of send request returned... ");
 	
     return iovcnt;
 }
@@ -699,6 +623,8 @@ free_nnti_data(CManager cm, void *ntdv)
 {
     nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) ntdv;
     CMtrans_services svc = ntd->svc;
+    printf("NNTI SHUTDOWN\n");
+    SHUTDOWN=1;
     svc->free_func(ntd);
 }
 
@@ -734,7 +660,7 @@ libcmnnti_LTX_shutdown_conn(svc, ncd)
 CMtrans_services svc;
 struct nnti_connection_data* ncd;
 {
-    free(ncd->read_buffer);
+    free(ncd->peer_hostname);
     free(ncd);
 }
 
