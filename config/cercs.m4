@@ -133,17 +133,20 @@ no_dash_arg=`echo $arg | sed 's/^-//g'`
 root=`echo $3 | sed 's/\..*//'`
 translit(if test ! -r $cercs_cv_$1_link_dir, `/`, `_`)/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-translit(arg="$cercs_cv_$1_link_arg "`echo $cercs_cv_$1_link_dir, `/',`_') | sed "/./ s/^/-R/1"`
+translit(R_arg=`echo $cercs_cv_$1_link_dir, `/',`_') | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "$1"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi]
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 )
 ])dnl
