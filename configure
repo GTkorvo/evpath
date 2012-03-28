@@ -13800,17 +13800,20 @@ if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
 root=`echo libffs.la | sed 's/\..*//'`
 if test ! -r $cercs_cv_ffs_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-arg="$cercs_cv_ffs_link_arg "`echo $cercs_cv_ffs_link_dir | sed "/./ s/^/-R/1"`
+R_arg=`echo $cercs_cv_ffs_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "ffs"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 
 
@@ -13841,11 +13844,11 @@ else
 
 search_list="$PWD/../ffs $PWD/../../ffs $PWD/../../../ffs"
 tmp_search_results=""
-echo "configure:13844: searching for $search_list " >&5
+echo "configure:13847: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13848: first found $tmp_search_results " >&5
+	echo "configure:13851: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13883,11 +13886,11 @@ else
 
 search_list="$PWD/../ffs $PWD/../../ffs $PWD/../../../ffs"
 tmp_search_results=""
-echo "configure:13886: searching for $search_list " >&5
+echo "configure:13889: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13890: first found $tmp_search_results " >&5
+	echo "configure:13893: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13952,11 +13955,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/ffs/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:13955: searching for $search_list " >&5
+echo "configure:13958: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13959: first found $tmp_search_results " >&5
+	echo "configure:13962: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14047,11 +14050,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/ffs/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:14050: searching for $search_list " >&5
+echo "configure:14053: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14054: first found $tmp_search_results " >&5
+	echo "configure:14057: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14142,11 +14145,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/ffs/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:14145: searching for $search_list " >&5
+echo "configure:14148: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14149: first found $tmp_search_results " >&5
+	echo "configure:14152: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14203,17 +14206,20 @@ if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
 root=`echo libffs.la | sed 's/\..*//'`
 if test ! -r $cercs_cv_ffs_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-arg="$cercs_cv_ffs_link_arg "`echo $cercs_cv_ffs_link_dir | sed "/./ s/^/-R/1"`
+R_arg=`echo $cercs_cv_ffs_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "ffs"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 
 
@@ -14297,11 +14303,11 @@ fi
 
 search_list="$search_list /usr/include/gen_thread.h /usr/local/include/gen_thread.h /opt/gen_thread/include/gen_thread.h /opt/misc/include/gen_thread.h /opt/misc/include/$cercs_cv_archive/gen_thread.h /opt/local/include/gen_thread.h"
 tmp_search_results=""
-echo "configure:14300: searching for $search_list " >&5
+echo "configure:14306: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14304: first found $tmp_search_results " >&5
+	echo "configure:14310: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14411,11 +14417,11 @@ fi
 
 search_list="$search_list /usr/lib/libgen_thread.la /usr/local/lib/libgen_thread.la /opt/gen_thread/lib/libgen_thread.la /opt/misc/lib/libgen_thread.la /opt/misc/lib/$cercs_cv_archive/libgen_thread.la /opt/local/lib/libgen_thread.la"
 tmp_search_results=""
-echo "configure:14414: searching for $search_list " >&5
+echo "configure:14420: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14418: first found $tmp_search_results " >&5
+	echo "configure:14424: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14504,11 +14510,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/gen_thread/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:14507: searching for $search_list " >&5
+echo "configure:14513: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14511: first found $tmp_search_results " >&5
+	echo "configure:14517: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14599,11 +14605,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/gen_thread/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:14602: searching for $search_list " >&5
+echo "configure:14608: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14606: first found $tmp_search_results " >&5
+	echo "configure:14612: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14694,11 +14700,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/gen_thread/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:14697: searching for $search_list " >&5
+echo "configure:14703: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14701: first found $tmp_search_results " >&5
+	echo "configure:14707: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14755,17 +14761,20 @@ if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
 root=`echo libgen_thread.la | sed 's/\..*//'`
 if test ! -r $cercs_cv_gen_thread_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-arg="$cercs_cv_gen_thread_link_arg "`echo $cercs_cv_gen_thread_link_dir | sed "/./ s/^/-R/1"`
+R_arg=`echo $cercs_cv_gen_thread_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "gen_thread"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 
 
@@ -14796,11 +14805,11 @@ else
 
 search_list="$PWD/../gen_thread $PWD/../../gen_thread $PWD/../../../gen_thread"
 tmp_search_results=""
-echo "configure:14799: searching for $search_list " >&5
+echo "configure:14808: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14803: first found $tmp_search_results " >&5
+	echo "configure:14812: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14838,11 +14847,11 @@ else
 
 search_list="$PWD/../gen_thread $PWD/../../gen_thread $PWD/../../../gen_thread"
 tmp_search_results=""
-echo "configure:14841: searching for $search_list " >&5
+echo "configure:14850: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14845: first found $tmp_search_results " >&5
+	echo "configure:14854: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14907,11 +14916,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/gen_thread/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:14910: searching for $search_list " >&5
+echo "configure:14919: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14914: first found $tmp_search_results " >&5
+	echo "configure:14923: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15002,11 +15011,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/gen_thread/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15005: searching for $search_list " >&5
+echo "configure:15014: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15009: first found $tmp_search_results " >&5
+	echo "configure:15018: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15097,11 +15106,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/gen_thread/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15100: searching for $search_list " >&5
+echo "configure:15109: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15104: first found $tmp_search_results " >&5
+	echo "configure:15113: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15158,17 +15167,20 @@ if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
 root=`echo libgen_thread.la | sed 's/\..*//'`
 if test ! -r $cercs_cv_gen_thread_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-arg="$cercs_cv_gen_thread_link_arg "`echo $cercs_cv_gen_thread_link_dir | sed "/./ s/^/-R/1"`
+R_arg=`echo $cercs_cv_gen_thread_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "gen_thread"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 
 
@@ -15252,11 +15264,11 @@ fi
 
 search_list="$search_list /usr/include/cercs_env.h /usr/local/include/cercs_env.h /opt/cercs_env/include/cercs_env.h /opt/misc/include/cercs_env.h /opt/misc/include/$cercs_cv_archive/cercs_env.h /opt/local/include/cercs_env.h"
 tmp_search_results=""
-echo "configure:15255: searching for $search_list " >&5
+echo "configure:15267: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15259: first found $tmp_search_results " >&5
+	echo "configure:15271: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15366,11 +15378,11 @@ fi
 
 search_list="$search_list /usr/lib/libcercs_env.la /usr/local/lib/libcercs_env.la /opt/cercs_env/lib/libcercs_env.la /opt/misc/lib/libcercs_env.la /opt/misc/lib/$cercs_cv_archive/libcercs_env.la /opt/local/lib/libcercs_env.la"
 tmp_search_results=""
-echo "configure:15369: searching for $search_list " >&5
+echo "configure:15381: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15373: first found $tmp_search_results " >&5
+	echo "configure:15385: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15459,11 +15471,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/cercs_env/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15462: searching for $search_list " >&5
+echo "configure:15474: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15466: first found $tmp_search_results " >&5
+	echo "configure:15478: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15554,11 +15566,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/cercs_env/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15557: searching for $search_list " >&5
+echo "configure:15569: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15561: first found $tmp_search_results " >&5
+	echo "configure:15573: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15649,11 +15661,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/cercs_env/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15652: searching for $search_list " >&5
+echo "configure:15664: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15656: first found $tmp_search_results " >&5
+	echo "configure:15668: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15710,17 +15722,20 @@ if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
 root=`echo libcercs_env.la | sed 's/\..*//'`
 if test ! -r $cercs_cv_cercs_env_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-arg="$cercs_cv_cercs_env_link_arg "`echo $cercs_cv_cercs_env_link_dir | sed "/./ s/^/-R/1"`
+R_arg=`echo $cercs_cv_cercs_env_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "cercs_env"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 
 
@@ -15751,11 +15766,11 @@ else
 
 search_list="$PWD/../cercs_env $PWD/../../cercs_env $PWD/../../../cercs_env"
 tmp_search_results=""
-echo "configure:15754: searching for $search_list " >&5
+echo "configure:15769: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15758: first found $tmp_search_results " >&5
+	echo "configure:15773: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15793,11 +15808,11 @@ else
 
 search_list="$PWD/../cercs_env $PWD/../../cercs_env $PWD/../../../cercs_env"
 tmp_search_results=""
-echo "configure:15796: searching for $search_list " >&5
+echo "configure:15811: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15800: first found $tmp_search_results " >&5
+	echo "configure:15815: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15862,11 +15877,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/cercs_env/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15865: searching for $search_list " >&5
+echo "configure:15880: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15869: first found $tmp_search_results " >&5
+	echo "configure:15884: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15957,11 +15972,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/cercs_env/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15960: searching for $search_list " >&5
+echo "configure:15975: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15964: first found $tmp_search_results " >&5
+	echo "configure:15979: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16052,11 +16067,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/cercs_env/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:16055: searching for $search_list " >&5
+echo "configure:16070: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16059: first found $tmp_search_results " >&5
+	echo "configure:16074: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16113,17 +16128,20 @@ if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
 root=`echo libcercs_env.la | sed 's/\..*//'`
 if test ! -r $cercs_cv_cercs_env_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-arg="$cercs_cv_cercs_env_link_arg "`echo $cercs_cv_cercs_env_link_dir | sed "/./ s/^/-R/1"`
+R_arg=`echo $cercs_cv_cercs_env_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "cercs_env"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 
 
@@ -16250,11 +16268,11 @@ fi
 
 search_list="$search_list /usr/include/atl.h /usr/local/include/atl.h /opt/atl/include/atl.h /opt/misc/include/atl.h /opt/misc/include/$cercs_cv_archive/atl.h /opt/local/include/atl.h"
 tmp_search_results=""
-echo "configure:16253: searching for $search_list " >&5
+echo "configure:16271: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16257: first found $tmp_search_results " >&5
+	echo "configure:16275: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16364,11 +16382,11 @@ fi
 
 search_list="$search_list /usr/lib/libatl.la /usr/local/lib/libatl.la /opt/atl/lib/libatl.la /opt/misc/lib/libatl.la /opt/misc/lib/$cercs_cv_archive/libatl.la /opt/local/lib/libatl.la"
 tmp_search_results=""
-echo "configure:16367: searching for $search_list " >&5
+echo "configure:16385: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16371: first found $tmp_search_results " >&5
+	echo "configure:16389: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16457,11 +16475,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/atl/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:16460: searching for $search_list " >&5
+echo "configure:16478: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16464: first found $tmp_search_results " >&5
+	echo "configure:16482: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16552,11 +16570,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/atl/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:16555: searching for $search_list " >&5
+echo "configure:16573: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16559: first found $tmp_search_results " >&5
+	echo "configure:16577: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16647,11 +16665,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/atl/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:16650: searching for $search_list " >&5
+echo "configure:16668: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16654: first found $tmp_search_results " >&5
+	echo "configure:16672: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16708,17 +16726,20 @@ if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
 root=`echo libatl.la | sed 's/\..*//'`
 if test ! -r $cercs_cv_atl_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-arg="$cercs_cv_atl_link_arg "`echo $cercs_cv_atl_link_dir | sed "/./ s/^/-R/1"`
+R_arg=`echo $cercs_cv_atl_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "atl"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 
 
@@ -16749,11 +16770,11 @@ else
 
 search_list="$PWD/../atl $PWD/../../atl $PWD/../../../atl"
 tmp_search_results=""
-echo "configure:16752: searching for $search_list " >&5
+echo "configure:16773: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16756: first found $tmp_search_results " >&5
+	echo "configure:16777: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16791,11 +16812,11 @@ else
 
 search_list="$PWD/../atl $PWD/../../atl $PWD/../../../atl"
 tmp_search_results=""
-echo "configure:16794: searching for $search_list " >&5
+echo "configure:16815: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16798: first found $tmp_search_results " >&5
+	echo "configure:16819: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16860,11 +16881,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/atl/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:16863: searching for $search_list " >&5
+echo "configure:16884: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16867: first found $tmp_search_results " >&5
+	echo "configure:16888: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16955,11 +16976,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/atl/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:16958: searching for $search_list " >&5
+echo "configure:16979: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16962: first found $tmp_search_results " >&5
+	echo "configure:16983: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17050,11 +17071,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/atl/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:17053: searching for $search_list " >&5
+echo "configure:17074: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17057: first found $tmp_search_results " >&5
+	echo "configure:17078: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17111,17 +17132,20 @@ if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
 root=`echo libatl.la | sed 's/\..*//'`
 if test ! -r $cercs_cv_atl_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-arg="$cercs_cv_atl_link_arg "`echo $cercs_cv_atl_link_dir | sed "/./ s/^/-R/1"`
+R_arg=`echo $cercs_cv_atl_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "atl"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 
 
@@ -17207,11 +17231,11 @@ fi
 
 search_list="$search_list /usr/include/enet/enet.h /usr/local/include/enet/enet.h /opt/enet/include/enet/enet.h /opt/misc/include/enet/enet.h /opt/misc/include/$cercs_cv_archive/enet/enet.h /opt/local/include/enet/enet.h"
 tmp_search_results=""
-echo "configure:17210: searching for $search_list " >&5
+echo "configure:17234: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17214: first found $tmp_search_results " >&5
+	echo "configure:17238: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17321,11 +17345,11 @@ fi
 
 search_list="$search_list /usr/lib/libenet.la /usr/local/lib/libenet.la /opt/enet/lib/libenet.la /opt/misc/lib/libenet.la /opt/misc/lib/$cercs_cv_archive/libenet.la /opt/local/lib/libenet.la"
 tmp_search_results=""
-echo "configure:17324: searching for $search_list " >&5
+echo "configure:17348: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17328: first found $tmp_search_results " >&5
+	echo "configure:17352: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17414,11 +17438,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/enet/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:17417: searching for $search_list " >&5
+echo "configure:17441: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17421: first found $tmp_search_results " >&5
+	echo "configure:17445: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17509,11 +17533,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/enet/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:17512: searching for $search_list " >&5
+echo "configure:17536: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17516: first found $tmp_search_results " >&5
+	echo "configure:17540: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17604,11 +17628,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/enet/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:17607: searching for $search_list " >&5
+echo "configure:17631: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17611: first found $tmp_search_results " >&5
+	echo "configure:17635: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17665,17 +17689,20 @@ if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
 root=`echo libenet.la | sed 's/\..*//'`
 if test ! -r $cercs_cv_enet_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-arg="$cercs_cv_enet_link_arg "`echo $cercs_cv_enet_link_dir | sed "/./ s/^/-R/1"`
+R_arg=`echo $cercs_cv_enet_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "enet"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 
 
@@ -17706,11 +17733,11 @@ else
 
 search_list="$PWD/../enet $PWD/../../enet $PWD/../../../enet"
 tmp_search_results=""
-echo "configure:17709: searching for $search_list " >&5
+echo "configure:17736: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17713: first found $tmp_search_results " >&5
+	echo "configure:17740: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17748,11 +17775,11 @@ else
 
 search_list="$PWD/../enet $PWD/../../enet $PWD/../../../enet"
 tmp_search_results=""
-echo "configure:17751: searching for $search_list " >&5
+echo "configure:17778: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17755: first found $tmp_search_results " >&5
+	echo "configure:17782: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17817,11 +17844,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/enet/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:17820: searching for $search_list " >&5
+echo "configure:17847: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17824: first found $tmp_search_results " >&5
+	echo "configure:17851: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17912,11 +17939,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/enet/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:17915: searching for $search_list " >&5
+echo "configure:17942: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17919: first found $tmp_search_results " >&5
+	echo "configure:17946: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18007,11 +18034,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/enet/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18010: searching for $search_list " >&5
+echo "configure:18037: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18014: first found $tmp_search_results " >&5
+	echo "configure:18041: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18068,17 +18095,20 @@ if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
 root=`echo libenet.la | sed 's/\..*//'`
 if test ! -r $cercs_cv_enet_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-arg="$cercs_cv_enet_link_arg "`echo $cercs_cv_enet_link_dir | sed "/./ s/^/-R/1"`
+R_arg=`echo $cercs_cv_enet_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "enet"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 
 
@@ -18163,11 +18193,11 @@ fi
 
 search_list="$search_list /usr/include/nnti.h /usr/local/include/nnti.h /opt/nnti/include/nnti.h /opt/misc/include/nnti.h /opt/misc/include/$cercs_cv_archive/nnti.h /opt/local/include/nnti.h"
 tmp_search_results=""
-echo "configure:18166: searching for $search_list " >&5
+echo "configure:18196: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18170: first found $tmp_search_results " >&5
+	echo "configure:18200: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18277,11 +18307,11 @@ fi
 
 search_list="$search_list /usr/lib/libtrios_nssi.a /usr/local/lib/libtrios_nssi.a /opt/nnti/lib/libtrios_nssi.a /opt/misc/lib/libtrios_nssi.a /opt/misc/lib/$cercs_cv_archive/libtrios_nssi.a /opt/local/lib/libtrios_nssi.a"
 tmp_search_results=""
-echo "configure:18280: searching for $search_list " >&5
+echo "configure:18310: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18284: first found $tmp_search_results " >&5
+	echo "configure:18314: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18370,11 +18400,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/nnti/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18373: searching for $search_list " >&5
+echo "configure:18403: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18377: first found $tmp_search_results " >&5
+	echo "configure:18407: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18465,11 +18495,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/nnti/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18468: searching for $search_list " >&5
+echo "configure:18498: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18472: first found $tmp_search_results " >&5
+	echo "configure:18502: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18560,11 +18590,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/nnti/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18563: searching for $search_list " >&5
+echo "configure:18593: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18567: first found $tmp_search_results " >&5
+	echo "configure:18597: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18621,17 +18651,20 @@ if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
 root=`echo libtrios_nssi.a | sed 's/\..*//'`
 if test ! -r $cercs_cv_nnti_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-arg="$cercs_cv_nnti_link_arg "`echo $cercs_cv_nnti_link_dir | sed "/./ s/^/-R/1"`
+R_arg=`echo $cercs_cv_nnti_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "nnti"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 
 
@@ -18662,11 +18695,11 @@ else
 
 search_list="$PWD/../nnti $PWD/../../nnti $PWD/../../../nnti"
 tmp_search_results=""
-echo "configure:18665: searching for $search_list " >&5
+echo "configure:18698: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18669: first found $tmp_search_results " >&5
+	echo "configure:18702: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18704,11 +18737,11 @@ else
 
 search_list="$PWD/../nnti $PWD/../../nnti $PWD/../../../nnti"
 tmp_search_results=""
-echo "configure:18707: searching for $search_list " >&5
+echo "configure:18740: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18711: first found $tmp_search_results " >&5
+	echo "configure:18744: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18773,11 +18806,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/nnti/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18776: searching for $search_list " >&5
+echo "configure:18809: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18780: first found $tmp_search_results " >&5
+	echo "configure:18813: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18868,11 +18901,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/nnti/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18871: searching for $search_list " >&5
+echo "configure:18904: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18875: first found $tmp_search_results " >&5
+	echo "configure:18908: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18963,11 +18996,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/nnti/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18966: searching for $search_list " >&5
+echo "configure:18999: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18970: first found $tmp_search_results " >&5
+	echo "configure:19003: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -19024,17 +19057,20 @@ if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
 root=`echo libtrios_nssi.a | sed 's/\..*//'`
 if test ! -r $cercs_cv_nnti_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
-arg="$cercs_cv_nnti_link_arg "`echo $cercs_cv_nnti_link_dir | sed "/./ s/^/-R/1"`
+R_arg=`echo $cercs_cv_nnti_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "nnti"` -eq 0; then
 # if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
 else
+new_Rflags="$R_arg $new_Rflags"
 new_flags="$arg $new_flags"
 fi
 fi
 LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
 fi
 
 
@@ -19355,8 +19391,6 @@ $as_echo "#define HAVE_MAC_SYSCTL 1" >>confdefs.h
 
   fi
 
-TMP_LDFLAGS=$LDFLAGS
-LDFLAGS=""
 for ac_func in gettimeofday uname sysinfo sysconf getloadavg
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
@@ -19369,8 +19403,8 @@ _ACEOF
 fi
 done
 
-LDFLAGS=$TMP_LDFLAGS
 
+LDFLAGS="$LDFLAGS $LDRFLAGS"
 ac_config_files="$ac_config_files Makefile evpath-3.0.pc mtests/Makefile tests/Makefile tests/testdll/Makefile rtests/Makefile examples/Makefile old_tests/Makefile dfg_tests/Makefile libltdl/Makefile"
 
 cat >confcache <<\_ACEOF
