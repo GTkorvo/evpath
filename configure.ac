@@ -135,7 +135,10 @@ fi
 
 dnl Attempt to get the right tests in place for sysinfo and sysctl.  
 CERCS_CHECK_SYSCTL_STYLE
+TMP_LDFLAGS=$LDFLAGS
+LDFLAGS=""
 AC_CHECK_FUNCS([gettimeofday uname sysinfo sysconf getloadavg])
+LDFLAGS=$TMP_LDFLAGS
 
 dnl Output the makefile
 AC_CONFIG_FILES([Makefile evpath-3.0.pc mtests/Makefile tests/Makefile tests/testdll/Makefile rtests/Makefile examples/Makefile old_tests/Makefile dfg_tests/Makefile libltdl/Makefile])

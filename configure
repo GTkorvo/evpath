@@ -19355,6 +19355,8 @@ $as_echo "#define HAVE_MAC_SYSCTL 1" >>confdefs.h
 
   fi
 
+TMP_LDFLAGS=$LDFLAGS
+LDFLAGS=""
 for ac_func in gettimeofday uname sysinfo sysconf getloadavg
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
@@ -19367,6 +19369,7 @@ _ACEOF
 fi
 done
 
+LDFLAGS=$TMP_LDFLAGS
 
 ac_config_files="$ac_config_files Makefile evpath-3.0.pc mtests/Makefile tests/Makefile tests/testdll/Makefile rtests/Makefile examples/Makefile old_tests/Makefile dfg_tests/Makefile libltdl/Makefile"
 
