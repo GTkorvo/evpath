@@ -60,6 +60,7 @@ AC_CHECK_LIB(m,sqrt,[MATH_LIB=-lm])
 AC_SUBST(MATH_LIB)
 AC_CHECK_FUNC(inet_aton,,[LIBS="$LIBS -lresolv"])
 CERCS_REQUIRE_PACKAGE(ffs, ffs.h, libffs.la)
+CERCS_REQUIRE_PACKAGE(dill, , libdill.la)
 CERCS_REQUIRE_PACKAGE(gen_thread, gen_thread.h,libgen_thread.la)
 CERCS_REQUIRE_PACKAGE(cercs_env, cercs_env.h,libcercs_env.la)
 if test -n "$cercs_cv_gen_thread_link_dir"; then

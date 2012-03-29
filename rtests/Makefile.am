@@ -14,5 +14,5 @@ noinst_PROGRAMS = $(TESTS)
 
 LDADD = ../libevpath.la
 
-LDFLAGS = -static
+LDFLAGS = -static @LDFLAGS@
 

@@ -51,7 +51,7 @@ libevpath_la_SOURCES += cmsockets.c cmselect.c
 endif
 
 libevpath_la_LDFLAGS = $(MATH_LIB) -version-info 1:0:0
-libevpath_la_LIBADD =  $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lffs -lcod @SOCKET_LIBS@ 
+libevpath_la_LIBADD =  $(LIBLTDL) -lgen_thread -lcercs_env $(LTLIBS) -lffs -lcod -ldill @SOCKET_LIBS@ 
 libevpath_la_DEPENDENCIES = $(LIBLTDL) $(LTLIBS)
 
 INSTALL_HEADER = ${srcdir}/config/install-sh -m 644

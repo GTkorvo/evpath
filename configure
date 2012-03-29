@@ -793,6 +793,7 @@ with_rpm_build
 with_deb_build
 with_local
 with_ffs
+with_dill
 with_gen_thread
 with_cercs_env
 with_atl
@@ -1457,6 +1458,7 @@ Optional Packages:
   --with-deb-build        Assume necessary files in CERCS packages will be installed
   --with-local            Use only local copies of CERCS packages
   --with-ffs=DIR	Where to find ffs package
+  --with-dill=DIR	Where to find dill package
   --with-gen_thread=DIR	Where to find gen_thread package
   --with-cercs_env=DIR	Where to find cercs_env package
   --with-atl=DIR	Where to find atl package
@@ -13342,11 +13344,11 @@ fi
 
 search_list="$search_list /usr/include/ffs.h /usr/local/include/ffs.h /opt/ffs/include/ffs.h /opt/misc/include/ffs.h /opt/misc/include/$cercs_cv_archive/ffs.h /opt/local/include/ffs.h"
 tmp_search_results=""
-echo "configure:13345: searching for $search_list " >&5
+echo "configure:13347: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13349: first found $tmp_search_results " >&5
+	echo "configure:13351: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13456,11 +13458,11 @@ fi
 
 search_list="$search_list /usr/lib/libffs.la /usr/local/lib/libffs.la /opt/ffs/lib/libffs.la /opt/misc/lib/libffs.la /opt/misc/lib/$cercs_cv_archive/libffs.la /opt/local/lib/libffs.la"
 tmp_search_results=""
-echo "configure:13459: searching for $search_list " >&5
+echo "configure:13461: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13463: first found $tmp_search_results " >&5
+	echo "configure:13465: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13549,11 +13551,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/ffs/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:13552: searching for $search_list " >&5
+echo "configure:13554: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13556: first found $tmp_search_results " >&5
+	echo "configure:13558: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13644,11 +13646,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/ffs/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:13647: searching for $search_list " >&5
+echo "configure:13649: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13651: first found $tmp_search_results " >&5
+	echo "configure:13653: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13739,11 +13741,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/ffs/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:13742: searching for $search_list " >&5
+echo "configure:13744: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13746: first found $tmp_search_results " >&5
+	echo "configure:13748: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13844,11 +13846,11 @@ else
 
 search_list="$PWD/../ffs $PWD/../../ffs $PWD/../../../ffs"
 tmp_search_results=""
-echo "configure:13847: searching for $search_list " >&5
+echo "configure:13849: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13851: first found $tmp_search_results " >&5
+	echo "configure:13853: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13886,11 +13888,11 @@ else
 
 search_list="$PWD/../ffs $PWD/../../ffs $PWD/../../../ffs"
 tmp_search_results=""
-echo "configure:13889: searching for $search_list " >&5
+echo "configure:13891: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13893: first found $tmp_search_results " >&5
+	echo "configure:13895: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -13955,11 +13957,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/ffs/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:13958: searching for $search_list " >&5
+echo "configure:13960: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:13962: first found $tmp_search_results " >&5
+	echo "configure:13964: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14050,11 +14052,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/ffs/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:14053: searching for $search_list " >&5
+echo "configure:14055: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14057: first found $tmp_search_results " >&5
+	echo "configure:14059: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14145,11 +14147,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/ffs/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:14148: searching for $search_list " >&5
+echo "configure:14150: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14152: first found $tmp_search_results " >&5
+	echo "configure:14154: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14210,6 +14212,813 @@ R_arg=`echo $cercs_cv_ffs_link_dir | sed "/./ s/^/-R/1"`
 fi
 fi
 if test `echo $arg | grep -c "ffs"` -eq 0; then
+# if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
+new_flags="$new_flags $arg"
+else
+new_Rflags="$R_arg $new_Rflags"
+new_flags="$arg $new_flags"
+fi
+fi
+LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
+fi
+
+
+fi
+
+
+
+
+if test -z "$with_local_specified"; then
+
+
+
+
+# Check whether --with-dill was given.
+if test "${with_dill+set}" = set; then :
+  withval=$with_dill;
+fi
+
+
+if test -n "$with_dill"; then
+unset cercs_cv_dill_include_arg
+unset cercs_cv_dill_link_arg
+if test `echo $with_dill | sed 's/\(.\).*/\1/g'` != "/"; then
+with_dill=`pwd`/$with_dill
+fi
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking needed link args for dill package" >&5
+$as_echo_n "checking needed link args for dill package... " >&6; }
+if ${cercs_cv_dill_link_dir+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+
+
+
+cercs_tmp=""
+search_list="./libdill.la"
+CHAOS_HOMEDIR=""
+if test -n "$CSH"; then
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+fi
+if test -n "$with_dill"; then
+    if test `echo $with_dill | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_dill" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_dill
+    fi
+
+    search_list="$search_list $EXPANDED/libdill.la $EXPANDED/lib/libdill.la $EXPANDED/share/libdill.la $EXPANDED/$cercs_cv_archive/libdill.la $EXPANDED/$cercs_cv_archive/lib/libdill.la $EXPANDED/dill/libdill.la $EXPANDED/dill/$cercs_cv_archive/libdill.la $EXPANDED/dill/lib/libdill.la $EXPANDED/dill/lib/$cercs_cv_archive/libdill.la"
+fi
+if test -z "$with_installed_specified"; then
+  search_list="$search_list `pwd`/../dill/libdill.la `pwd`/../lib/libdill.la `pwd`/../share/libdill.la"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/dill/libdill.la $HOME/$cercs_cv_archive/lib/libdill.la $HOME/lib/libdill.la"
+  fi
+fi
+if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/dill/lib/libdill.la $CHAOS_HOMEDIR/$cercs_cv_archive/lib/libdill.la $CHAOS_HOMEDIR/dill/$cercs_cv_archive/lib/libdill.la $CHAOS_HOMEDIR/dill/lib/libdill.la $CHAOS_HOMEDIR/lib/libdill.la"
+fi
+if test "$libdir" != '${exec_prefix}/lib'; then
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/libdill.la $search_list"
+fi
+if test "$exec_prefix" != "NONE"; then
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/libdill.la $search_list"
+fi
+if test "$includedir" != '${prefix}/include'; then
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/libdill.la $search_list"
+fi
+if test "$prefix" != "NONE"; then
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/libdill.la $search_list"
+fi
+if test "lib" == "lib"; then
+  for tmp_lib_value in $sys_lib_search_path_spec; do
+     search_list="$search_list $tmp_lib_value/libdill.la"
+  done
+fi
+
+search_list="$search_list /usr/lib/libdill.la /usr/local/lib/libdill.la /opt/dill/lib/libdill.la /opt/misc/lib/libdill.la /opt/misc/lib/$cercs_cv_archive/libdill.la /opt/local/lib/libdill.la"
+tmp_search_results=""
+echo "configure:14309: searching for $search_list " >&5
+for tmp_search_value in $search_list; do
+   if test -r $tmp_search_value; then
+	tmp_search_results=$tmp_search_value
+	echo "configure:14313: first found $tmp_search_results " >&5
+	break
+   fi
+done
+
+#if test -n "$with_deb_build_specified"; then
+#  if test "lib" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "lib" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
+if test -n "$with_rpm_build_specified"; then
+# test build directories
+   if test -d "../dill"; then
+      tmp_search_results=`pwd`/../dill;
+   fi
+   if test -d "../../dill"; then
+      tmp_search_results=`pwd`/../../dill;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../dill/libdill.la"; then
+      tmp_search_results='${abs_top_srcdir}/../dill';
+   fi
+   if test -f "$srcdir/../../dill/libdill.la"; then
+      tmp_search_results='${abs_top_srcdir}/../../dill';
+   fi
+fi
+if test -n "$tmp_search_results"; then
+  cercs_tmp=$tmp_search_results
+fi
+
+
+found=libdill.la
+if test -z "$cercs_tmp" -o "$cercs_tmp" != "libdill.la"; then
+case libdill.la in
+   *.la)  lib_tmp=`echo libdill.la | sed 's/.la$/.so/g'`
+
+
+
+cercs_tmp=""
+search_list="./$lib_tmp"
+CHAOS_HOMEDIR=""
+if test -n "$CSH"; then
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+fi
+if test -n "$with_dill"; then
+    if test `echo $with_dill | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_dill" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_dill
+    fi
+
+    search_list="$search_list $EXPANDED/$lib_tmp $EXPANDED/lib/$lib_tmp $EXPANDED/share/$lib_tmp $EXPANDED/$cercs_cv_archive/$lib_tmp $EXPANDED/$cercs_cv_archive/lib/$lib_tmp $EXPANDED/dill/$lib_tmp $EXPANDED/dill/$cercs_cv_archive/$lib_tmp $EXPANDED/dill/lib/$lib_tmp $EXPANDED/dill/lib/$cercs_cv_archive/$lib_tmp"
+fi
+if test -z "$with_installed_specified"; then
+  search_list="$search_list `pwd`/../dill/$lib_tmp `pwd`/../lib/$lib_tmp `pwd`/../share/$lib_tmp"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/dill/$lib_tmp $HOME/$cercs_cv_archive/lib/$lib_tmp $HOME/lib/$lib_tmp"
+  fi
+fi
+if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/dill/lib/$lib_tmp $CHAOS_HOMEDIR/$cercs_cv_archive/lib/$lib_tmp $CHAOS_HOMEDIR/dill/$cercs_cv_archive/lib/$lib_tmp $CHAOS_HOMEDIR/dill/lib/$lib_tmp $CHAOS_HOMEDIR/lib/$lib_tmp"
+fi
+if test "$libdir" != '${exec_prefix}/lib'; then
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/$lib_tmp $search_list"
+fi
+if test "$exec_prefix" != "NONE"; then
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/$lib_tmp $search_list"
+fi
+if test "$includedir" != '${prefix}/include'; then
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/$lib_tmp $search_list"
+fi
+if test "$prefix" != "NONE"; then
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/$lib_tmp $search_list"
+fi
+if test "lib" == "lib"; then
+  for tmp_lib_value in $sys_lib_search_path_spec; do
+     search_list="$search_list $tmp_lib_value/$lib_tmp"
+  done
+fi
+
+search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/dill/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
+tmp_search_results=""
+echo "configure:14402: searching for $search_list " >&5
+for tmp_search_value in $search_list; do
+   if test -r $tmp_search_value; then
+	tmp_search_results=$tmp_search_value
+	echo "configure:14406: first found $tmp_search_results " >&5
+	break
+   fi
+done
+
+#if test -n "$with_deb_build_specified"; then
+#  if test "lib" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "lib" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
+if test -n "$with_rpm_build_specified"; then
+# test build directories
+   if test -d "../dill"; then
+      tmp_search_results=`pwd`/../dill;
+   fi
+   if test -d "../../dill"; then
+      tmp_search_results=`pwd`/../../dill;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../dill/$lib_tmp"; then
+      tmp_search_results='${abs_top_srcdir}/../dill';
+   fi
+   if test -f "$srcdir/../../dill/$lib_tmp"; then
+      tmp_search_results='${abs_top_srcdir}/../../dill';
+   fi
+fi
+if test -n "$tmp_search_results"; then
+  cercs_tmp=$tmp_search_results
+fi
+
+	found=$lib_tmp
+	;;
+esac
+fi
+if test -z "$cercs_tmp" -o "$cercs_tmp" != "libdill.la"; then
+case libdill.la in
+   *.la)  lib_tmp=`echo libdill.la | sed 's/.la$/.dylib/g'`
+
+
+
+cercs_tmp=""
+search_list="./$lib_tmp"
+CHAOS_HOMEDIR=""
+if test -n "$CSH"; then
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+fi
+if test -n "$with_dill"; then
+    if test `echo $with_dill | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_dill" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_dill
+    fi
+
+    search_list="$search_list $EXPANDED/$lib_tmp $EXPANDED/lib/$lib_tmp $EXPANDED/share/$lib_tmp $EXPANDED/$cercs_cv_archive/$lib_tmp $EXPANDED/$cercs_cv_archive/lib/$lib_tmp $EXPANDED/dill/$lib_tmp $EXPANDED/dill/$cercs_cv_archive/$lib_tmp $EXPANDED/dill/lib/$lib_tmp $EXPANDED/dill/lib/$cercs_cv_archive/$lib_tmp"
+fi
+if test -z "$with_installed_specified"; then
+  search_list="$search_list `pwd`/../dill/$lib_tmp `pwd`/../lib/$lib_tmp `pwd`/../share/$lib_tmp"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/dill/$lib_tmp $HOME/$cercs_cv_archive/lib/$lib_tmp $HOME/lib/$lib_tmp"
+  fi
+fi
+if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/dill/lib/$lib_tmp $CHAOS_HOMEDIR/$cercs_cv_archive/lib/$lib_tmp $CHAOS_HOMEDIR/dill/$cercs_cv_archive/lib/$lib_tmp $CHAOS_HOMEDIR/dill/lib/$lib_tmp $CHAOS_HOMEDIR/lib/$lib_tmp"
+fi
+if test "$libdir" != '${exec_prefix}/lib'; then
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/$lib_tmp $search_list"
+fi
+if test "$exec_prefix" != "NONE"; then
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/$lib_tmp $search_list"
+fi
+if test "$includedir" != '${prefix}/include'; then
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/$lib_tmp $search_list"
+fi
+if test "$prefix" != "NONE"; then
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/$lib_tmp $search_list"
+fi
+if test "lib" == "lib"; then
+  for tmp_lib_value in $sys_lib_search_path_spec; do
+     search_list="$search_list $tmp_lib_value/$lib_tmp"
+  done
+fi
+
+search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/dill/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
+tmp_search_results=""
+echo "configure:14497: searching for $search_list " >&5
+for tmp_search_value in $search_list; do
+   if test -r $tmp_search_value; then
+	tmp_search_results=$tmp_search_value
+	echo "configure:14501: first found $tmp_search_results " >&5
+	break
+   fi
+done
+
+#if test -n "$with_deb_build_specified"; then
+#  if test "lib" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "lib" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
+if test -n "$with_rpm_build_specified"; then
+# test build directories
+   if test -d "../dill"; then
+      tmp_search_results=`pwd`/../dill;
+   fi
+   if test -d "../../dill"; then
+      tmp_search_results=`pwd`/../../dill;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../dill/$lib_tmp"; then
+      tmp_search_results='${abs_top_srcdir}/../dill';
+   fi
+   if test -f "$srcdir/../../dill/$lib_tmp"; then
+      tmp_search_results='${abs_top_srcdir}/../../dill';
+   fi
+fi
+if test -n "$tmp_search_results"; then
+  cercs_tmp=$tmp_search_results
+fi
+
+	found=$lib_tmp
+	;;
+esac
+fi
+if test -z "$cercs_tmp" -o "$cercs_tmp" != "libdill.la"; then
+case libdill.la in
+    *.la) lib_tmp=`echo libdill.la | sed 's/.la$/.a/g'`
+
+
+
+cercs_tmp=""
+search_list="./$lib_tmp"
+CHAOS_HOMEDIR=""
+if test -n "$CSH"; then
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+fi
+if test -n "$with_dill"; then
+    if test `echo $with_dill | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_dill" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_dill
+    fi
+
+    search_list="$search_list $EXPANDED/$lib_tmp $EXPANDED/lib/$lib_tmp $EXPANDED/share/$lib_tmp $EXPANDED/$cercs_cv_archive/$lib_tmp $EXPANDED/$cercs_cv_archive/lib/$lib_tmp $EXPANDED/dill/$lib_tmp $EXPANDED/dill/$cercs_cv_archive/$lib_tmp $EXPANDED/dill/lib/$lib_tmp $EXPANDED/dill/lib/$cercs_cv_archive/$lib_tmp"
+fi
+if test -z "$with_installed_specified"; then
+  search_list="$search_list `pwd`/../dill/$lib_tmp `pwd`/../lib/$lib_tmp `pwd`/../share/$lib_tmp"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/dill/$lib_tmp $HOME/$cercs_cv_archive/lib/$lib_tmp $HOME/lib/$lib_tmp"
+  fi
+fi
+if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/dill/lib/$lib_tmp $CHAOS_HOMEDIR/$cercs_cv_archive/lib/$lib_tmp $CHAOS_HOMEDIR/dill/$cercs_cv_archive/lib/$lib_tmp $CHAOS_HOMEDIR/dill/lib/$lib_tmp $CHAOS_HOMEDIR/lib/$lib_tmp"
+fi
+if test "$libdir" != '${exec_prefix}/lib'; then
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/$lib_tmp $search_list"
+fi
+if test "$exec_prefix" != "NONE"; then
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/$lib_tmp $search_list"
+fi
+if test "$includedir" != '${prefix}/include'; then
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/$lib_tmp $search_list"
+fi
+if test "$prefix" != "NONE"; then
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/$lib_tmp $search_list"
+fi
+if test "lib" == "lib"; then
+  for tmp_lib_value in $sys_lib_search_path_spec; do
+     search_list="$search_list $tmp_lib_value/$lib_tmp"
+  done
+fi
+
+search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/dill/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
+tmp_search_results=""
+echo "configure:14592: searching for $search_list " >&5
+for tmp_search_value in $search_list; do
+   if test -r $tmp_search_value; then
+	tmp_search_results=$tmp_search_value
+	echo "configure:14596: first found $tmp_search_results " >&5
+	break
+   fi
+done
+
+#if test -n "$with_deb_build_specified"; then
+#  if test "lib" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "lib" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
+if test -n "$with_rpm_build_specified"; then
+# test build directories
+   if test -d "../dill"; then
+      tmp_search_results=`pwd`/../dill;
+   fi
+   if test -d "../../dill"; then
+      tmp_search_results=`pwd`/../../dill;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../dill/$lib_tmp"; then
+      tmp_search_results='${abs_top_srcdir}/../dill';
+   fi
+   if test -f "$srcdir/../../dill/$lib_tmp"; then
+      tmp_search_results='${abs_top_srcdir}/../../dill';
+   fi
+fi
+if test -n "$tmp_search_results"; then
+  cercs_tmp=$tmp_search_results
+fi
+
+	found=$lib_tmp
+	;;
+esac
+fi
+if test -n "$cercs_tmp" -a "$cercs_tmp" != "libdill.la"; then
+cercs_cv_dill_link_dir=`$PATHPROG $cercs_tmp | sed 's#\\\\#/#g' | sed "s/.$found//g"`
+else
+cercs_cv_dill_link_dir=""
+fi
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $cercs_cv_dill_link_dir" >&5
+$as_echo "$cercs_cv_dill_link_dir" >&6; }
+ld_arg="-L"
+new_flags=$LDFLAGS
+cercs_cv_dill_link_arg=`echo $cercs_cv_dill_link_dir | sed "/./ s/^/$ld_arg/1"`
+if test -n "$cercs_cv_dill_link_arg"; then
+arg=$cercs_cv_dill_link_arg
+no_dash_arg=`echo $arg | sed 's/^-//g'`
+if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
+root=`echo libdill.la | sed 's/\..*//'`
+if test ! -r $cercs_cv_dill_link_dir/$root.la; then
+if eval "test \"\${LIBTOOL+set}\" = set"; then
+R_arg=`echo $cercs_cv_dill_link_dir | sed "/./ s/^/-R/1"`
+fi
+fi
+if test `echo $arg | grep -c "dill"` -eq 0; then
+# if arg does not includes a project spec add it at the end
+new_Rflags="$new_Rflags $R_arg"
+new_flags="$new_flags $arg"
+else
+new_Rflags="$R_arg $new_Rflags"
+new_flags="$arg $new_flags"
+fi
+fi
+LDFLAGS=$new_flags
+LDRFLAGS=$new_Rflags
+fi
+
+
+else
+
+
+
+
+# Check whether --with-dill was given.
+if test "${with_dill+set}" = set; then :
+  withval=$with_dill;
+fi
+
+
+if test -n "$with_dill"; then
+unset cercs_cv_dill_include_arg
+unset cercs_cv_dill_link_arg
+if test `echo $with_dill | sed 's/\(.\).*/\1/g'` != "/"; then
+with_dill=`pwd`/$with_dill
+fi
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking needed link args for dill package" >&5
+$as_echo_n "checking needed link args for dill package... " >&6; }
+if ${cercs_cv_dill_link_dir+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+
+
+search_list="$PWD/../dill $PWD/../../dill $PWD/../../../dill"
+tmp_search_results=""
+echo "configure:14698: searching for $search_list " >&5
+for tmp_search_value in $search_list; do
+   if test -r $tmp_search_value; then
+	tmp_search_results=$tmp_search_value
+	echo "configure:14702: first found $tmp_search_results " >&5
+	break
+   fi
+done
+
+if test -n "$tmp_search_results"; then
+cercs_tmp=$tmp_search_results
+fi
+
+
+found=libdill.la
+if test -z "$cercs_tmp" -o "$cercs_tmp" != "libdill.la"; then
+case libdill.la in
+   *.la)  lib_tmp=`echo libdill.la | sed 's/.la$/.so/g'`
+
+
+
+cercs_tmp=""
+search_list="./$lib_tmp"
+CHAOS_HOMEDIR=""
+if test -n "$CSH"; then
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+fi
+if test -n "$with_dill"; then
+    if test `echo $with_dill | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_dill" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_dill
+    fi
+
+    search_list="$search_list $EXPANDED/$lib_tmp $EXPANDED/lib/$lib_tmp $EXPANDED/share/$lib_tmp $EXPANDED/$cercs_cv_archive/$lib_tmp $EXPANDED/$cercs_cv_archive/lib/$lib_tmp $EXPANDED/dill/$lib_tmp $EXPANDED/dill/$cercs_cv_archive/$lib_tmp $EXPANDED/dill/lib/$lib_tmp $EXPANDED/dill/lib/$cercs_cv_archive/$lib_tmp"
+fi
+if test -z "$with_installed_specified"; then
+  search_list="$search_list `pwd`/../dill/$lib_tmp `pwd`/../lib/$lib_tmp `pwd`/../share/$lib_tmp"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/dill/$lib_tmp $HOME/$cercs_cv_archive/lib/$lib_tmp $HOME/lib/$lib_tmp"
+  fi
+fi
+if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/dill/lib/$lib_tmp $CHAOS_HOMEDIR/$cercs_cv_archive/lib/$lib_tmp $CHAOS_HOMEDIR/dill/$cercs_cv_archive/lib/$lib_tmp $CHAOS_HOMEDIR/dill/lib/$lib_tmp $CHAOS_HOMEDIR/lib/$lib_tmp"
+fi
+if test "$libdir" != '${exec_prefix}/lib'; then
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/$lib_tmp $search_list"
+fi
+if test "$exec_prefix" != "NONE"; then
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/$lib_tmp $search_list"
+fi
+if test "$includedir" != '${prefix}/include'; then
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/$lib_tmp $search_list"
+fi
+if test "$prefix" != "NONE"; then
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/$lib_tmp $search_list"
+fi
+if test "lib" == "lib"; then
+  for tmp_lib_value in $sys_lib_search_path_spec; do
+     search_list="$search_list $tmp_lib_value/$lib_tmp"
+  done
+fi
+
+search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/dill/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
+tmp_search_results=""
+echo "configure:14767: searching for $search_list " >&5
+for tmp_search_value in $search_list; do
+   if test -r $tmp_search_value; then
+	tmp_search_results=$tmp_search_value
+	echo "configure:14771: first found $tmp_search_results " >&5
+	break
+   fi
+done
+
+#if test -n "$with_deb_build_specified"; then
+#  if test "lib" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "lib" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
+if test -n "$with_rpm_build_specified"; then
+# test build directories
+   if test -d "../dill"; then
+      tmp_search_results=`pwd`/../dill;
+   fi
+   if test -d "../../dill"; then
+      tmp_search_results=`pwd`/../../dill;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../dill/$lib_tmp"; then
+      tmp_search_results='${abs_top_srcdir}/../dill';
+   fi
+   if test -f "$srcdir/../../dill/$lib_tmp"; then
+      tmp_search_results='${abs_top_srcdir}/../../dill';
+   fi
+fi
+if test -n "$tmp_search_results"; then
+  cercs_tmp=$tmp_search_results
+fi
+
+	found=$lib_tmp
+	;;
+esac
+fi
+if test -z "$cercs_tmp" -o "$cercs_tmp" != "libdill.la"; then
+case libdill.la in
+   *.la)  lib_tmp=`echo libdill.la | sed 's/.la$/.dylib/g'`
+
+
+
+cercs_tmp=""
+search_list="./$lib_tmp"
+CHAOS_HOMEDIR=""
+if test -n "$CSH"; then
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+fi
+if test -n "$with_dill"; then
+    if test `echo $with_dill | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_dill" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_dill
+    fi
+
+    search_list="$search_list $EXPANDED/$lib_tmp $EXPANDED/lib/$lib_tmp $EXPANDED/share/$lib_tmp $EXPANDED/$cercs_cv_archive/$lib_tmp $EXPANDED/$cercs_cv_archive/lib/$lib_tmp $EXPANDED/dill/$lib_tmp $EXPANDED/dill/$cercs_cv_archive/$lib_tmp $EXPANDED/dill/lib/$lib_tmp $EXPANDED/dill/lib/$cercs_cv_archive/$lib_tmp"
+fi
+if test -z "$with_installed_specified"; then
+  search_list="$search_list `pwd`/../dill/$lib_tmp `pwd`/../lib/$lib_tmp `pwd`/../share/$lib_tmp"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/dill/$lib_tmp $HOME/$cercs_cv_archive/lib/$lib_tmp $HOME/lib/$lib_tmp"
+  fi
+fi
+if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/dill/lib/$lib_tmp $CHAOS_HOMEDIR/$cercs_cv_archive/lib/$lib_tmp $CHAOS_HOMEDIR/dill/$cercs_cv_archive/lib/$lib_tmp $CHAOS_HOMEDIR/dill/lib/$lib_tmp $CHAOS_HOMEDIR/lib/$lib_tmp"
+fi
+if test "$libdir" != '${exec_prefix}/lib'; then
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/$lib_tmp $search_list"
+fi
+if test "$exec_prefix" != "NONE"; then
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/$lib_tmp $search_list"
+fi
+if test "$includedir" != '${prefix}/include'; then
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/$lib_tmp $search_list"
+fi
+if test "$prefix" != "NONE"; then
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/$lib_tmp $search_list"
+fi
+if test "lib" == "lib"; then
+  for tmp_lib_value in $sys_lib_search_path_spec; do
+     search_list="$search_list $tmp_lib_value/$lib_tmp"
+  done
+fi
+
+search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/dill/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
+tmp_search_results=""
+echo "configure:14862: searching for $search_list " >&5
+for tmp_search_value in $search_list; do
+   if test -r $tmp_search_value; then
+	tmp_search_results=$tmp_search_value
+	echo "configure:14866: first found $tmp_search_results " >&5
+	break
+   fi
+done
+
+#if test -n "$with_deb_build_specified"; then
+#  if test "lib" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "lib" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
+if test -n "$with_rpm_build_specified"; then
+# test build directories
+   if test -d "../dill"; then
+      tmp_search_results=`pwd`/../dill;
+   fi
+   if test -d "../../dill"; then
+      tmp_search_results=`pwd`/../../dill;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../dill/$lib_tmp"; then
+      tmp_search_results='${abs_top_srcdir}/../dill';
+   fi
+   if test -f "$srcdir/../../dill/$lib_tmp"; then
+      tmp_search_results='${abs_top_srcdir}/../../dill';
+   fi
+fi
+if test -n "$tmp_search_results"; then
+  cercs_tmp=$tmp_search_results
+fi
+
+	found=$lib_tmp
+	;;
+esac
+fi
+if test -z "$cercs_tmp" -o "$cercs_tmp" != "libdill.la"; then
+case libdill.la in
+    *.la) lib_tmp=`echo libdill.la | sed 's/.la$/.a/g'`
+
+
+
+cercs_tmp=""
+search_list="./$lib_tmp"
+CHAOS_HOMEDIR=""
+if test -n "$CSH"; then
+    CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
+fi
+if test -n "$with_dill"; then
+    if test `echo $with_dill | cut -c1` = "~"; then
+        EXPANDED=`echo "echo $with_dill" | csh -sf 2>/dev/null` || EXPANDED=""
+    else
+        EXPANDED=$with_dill
+    fi
+
+    search_list="$search_list $EXPANDED/$lib_tmp $EXPANDED/lib/$lib_tmp $EXPANDED/share/$lib_tmp $EXPANDED/$cercs_cv_archive/$lib_tmp $EXPANDED/$cercs_cv_archive/lib/$lib_tmp $EXPANDED/dill/$lib_tmp $EXPANDED/dill/$cercs_cv_archive/$lib_tmp $EXPANDED/dill/lib/$lib_tmp $EXPANDED/dill/lib/$cercs_cv_archive/$lib_tmp"
+fi
+if test -z "$with_installed_specified"; then
+  search_list="$search_list `pwd`/../dill/$lib_tmp `pwd`/../lib/$lib_tmp `pwd`/../share/$lib_tmp"
+  if test "$CHAOS_HOMEDIR" != "$HOME"; then
+    search_list="$search_list $HOME/dill/$lib_tmp $HOME/$cercs_cv_archive/lib/$lib_tmp $HOME/lib/$lib_tmp"
+  fi
+fi
+if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/dill/lib/$lib_tmp $CHAOS_HOMEDIR/$cercs_cv_archive/lib/$lib_tmp $CHAOS_HOMEDIR/dill/$cercs_cv_archive/lib/$lib_tmp $CHAOS_HOMEDIR/dill/lib/$lib_tmp $CHAOS_HOMEDIR/lib/$lib_tmp"
+fi
+if test "$libdir" != '${exec_prefix}/lib'; then
+  tmpdir=`echo ${libdir} |  sed 's%/$%%'`
+  search_list="$tmpdir/$lib_tmp $search_list"
+fi
+if test "$exec_prefix" != "NONE"; then
+  tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/$lib_tmp $search_list"
+fi
+if test "$includedir" != '${prefix}/include'; then
+  tmpdir=`echo ${includedir} |  sed 's%/$%%'`
+  search_list="$tmpdir/$lib_tmp $search_list"
+fi
+if test "$prefix" != "NONE"; then
+  tmpdir=`echo ${prefix} |  sed 's%/$%%'`
+  search_list="$tmpdir/lib/$lib_tmp $search_list"
+fi
+if test "lib" == "lib"; then
+  for tmp_lib_value in $sys_lib_search_path_spec; do
+     search_list="$search_list $tmp_lib_value/$lib_tmp"
+  done
+fi
+
+search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/dill/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
+tmp_search_results=""
+echo "configure:14957: searching for $search_list " >&5
+for tmp_search_value in $search_list; do
+   if test -r $tmp_search_value; then
+	tmp_search_results=$tmp_search_value
+	echo "configure:14961: first found $tmp_search_results " >&5
+	break
+   fi
+done
+
+#if test -n "$with_deb_build_specified"; then
+#  if test "lib" == "lib"; then
+#     tmp_search_results=$libdir;
+#  fi
+#  if test "lib" == "include"; then
+#     tmp_search_results=$incdir;
+#  fi
+#fi
+if test -n "$with_rpm_build_specified"; then
+# test build directories
+   if test -d "../dill"; then
+      tmp_search_results=`pwd`/../dill;
+   fi
+   if test -d "../../dill"; then
+      tmp_search_results=`pwd`/../../dill;
+   fi
+# srcdir presence overrides
+   if test -f "$srcdir/../dill/$lib_tmp"; then
+      tmp_search_results='${abs_top_srcdir}/../dill';
+   fi
+   if test -f "$srcdir/../../dill/$lib_tmp"; then
+      tmp_search_results='${abs_top_srcdir}/../../dill';
+   fi
+fi
+if test -n "$tmp_search_results"; then
+  cercs_tmp=$tmp_search_results
+fi
+
+	found=$lib_tmp
+	;;
+esac
+fi
+if test -n "$cercs_tmp" -a "$cercs_tmp" != "libdill.la"; then
+cercs_cv_dill_link_dir=`$PATHPROG $cercs_tmp | sed 's#\\\\#/#g' | sed "s/.$found//g"`
+else
+cercs_cv_dill_link_dir=""
+fi
+
+fi
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $cercs_cv_dill_link_dir" >&5
+$as_echo "$cercs_cv_dill_link_dir" >&6; }
+ld_arg="-L"
+new_flags=$LDFLAGS
+cercs_cv_dill_link_arg=`echo $cercs_cv_dill_link_dir | sed "/./ s/^/$ld_arg/1"`
+if test -n "$cercs_cv_dill_link_arg"; then
+arg=$cercs_cv_dill_link_arg
+no_dash_arg=`echo $arg | sed 's/^-//g'`
+if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
+root=`echo libdill.la | sed 's/\..*//'`
+if test ! -r $cercs_cv_dill_link_dir/$root.la; then
+if eval "test \"\${LIBTOOL+set}\" = set"; then
+R_arg=`echo $cercs_cv_dill_link_dir | sed "/./ s/^/-R/1"`
+fi
+fi
+if test `echo $arg | grep -c "dill"` -eq 0; then
 # if arg does not includes a project spec add it at the end
 new_Rflags="$new_Rflags $R_arg"
 new_flags="$new_flags $arg"
@@ -14303,11 +15112,11 @@ fi
 
 search_list="$search_list /usr/include/gen_thread.h /usr/local/include/gen_thread.h /opt/gen_thread/include/gen_thread.h /opt/misc/include/gen_thread.h /opt/misc/include/$cercs_cv_archive/gen_thread.h /opt/local/include/gen_thread.h"
 tmp_search_results=""
-echo "configure:14306: searching for $search_list " >&5
+echo "configure:15115: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14310: first found $tmp_search_results " >&5
+	echo "configure:15119: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14417,11 +15226,11 @@ fi
 
 search_list="$search_list /usr/lib/libgen_thread.la /usr/local/lib/libgen_thread.la /opt/gen_thread/lib/libgen_thread.la /opt/misc/lib/libgen_thread.la /opt/misc/lib/$cercs_cv_archive/libgen_thread.la /opt/local/lib/libgen_thread.la"
 tmp_search_results=""
-echo "configure:14420: searching for $search_list " >&5
+echo "configure:15229: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14424: first found $tmp_search_results " >&5
+	echo "configure:15233: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14510,11 +15319,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/gen_thread/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:14513: searching for $search_list " >&5
+echo "configure:15322: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14517: first found $tmp_search_results " >&5
+	echo "configure:15326: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14605,11 +15414,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/gen_thread/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:14608: searching for $search_list " >&5
+echo "configure:15417: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14612: first found $tmp_search_results " >&5
+	echo "configure:15421: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14700,11 +15509,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/gen_thread/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:14703: searching for $search_list " >&5
+echo "configure:15512: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14707: first found $tmp_search_results " >&5
+	echo "configure:15516: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14805,11 +15614,11 @@ else
 
 search_list="$PWD/../gen_thread $PWD/../../gen_thread $PWD/../../../gen_thread"
 tmp_search_results=""
-echo "configure:14808: searching for $search_list " >&5
+echo "configure:15617: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14812: first found $tmp_search_results " >&5
+	echo "configure:15621: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14847,11 +15656,11 @@ else
 
 search_list="$PWD/../gen_thread $PWD/../../gen_thread $PWD/../../../gen_thread"
 tmp_search_results=""
-echo "configure:14850: searching for $search_list " >&5
+echo "configure:15659: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14854: first found $tmp_search_results " >&5
+	echo "configure:15663: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -14916,11 +15725,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/gen_thread/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:14919: searching for $search_list " >&5
+echo "configure:15728: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:14923: first found $tmp_search_results " >&5
+	echo "configure:15732: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15011,11 +15820,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/gen_thread/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15014: searching for $search_list " >&5
+echo "configure:15823: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15018: first found $tmp_search_results " >&5
+	echo "configure:15827: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15106,11 +15915,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/gen_thread/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15109: searching for $search_list " >&5
+echo "configure:15918: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15113: first found $tmp_search_results " >&5
+	echo "configure:15922: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15264,11 +16073,11 @@ fi
 
 search_list="$search_list /usr/include/cercs_env.h /usr/local/include/cercs_env.h /opt/cercs_env/include/cercs_env.h /opt/misc/include/cercs_env.h /opt/misc/include/$cercs_cv_archive/cercs_env.h /opt/local/include/cercs_env.h"
 tmp_search_results=""
-echo "configure:15267: searching for $search_list " >&5
+echo "configure:16076: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15271: first found $tmp_search_results " >&5
+	echo "configure:16080: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15378,11 +16187,11 @@ fi
 
 search_list="$search_list /usr/lib/libcercs_env.la /usr/local/lib/libcercs_env.la /opt/cercs_env/lib/libcercs_env.la /opt/misc/lib/libcercs_env.la /opt/misc/lib/$cercs_cv_archive/libcercs_env.la /opt/local/lib/libcercs_env.la"
 tmp_search_results=""
-echo "configure:15381: searching for $search_list " >&5
+echo "configure:16190: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15385: first found $tmp_search_results " >&5
+	echo "configure:16194: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15471,11 +16280,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/cercs_env/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15474: searching for $search_list " >&5
+echo "configure:16283: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15478: first found $tmp_search_results " >&5
+	echo "configure:16287: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15566,11 +16375,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/cercs_env/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15569: searching for $search_list " >&5
+echo "configure:16378: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15573: first found $tmp_search_results " >&5
+	echo "configure:16382: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15661,11 +16470,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/cercs_env/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15664: searching for $search_list " >&5
+echo "configure:16473: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15668: first found $tmp_search_results " >&5
+	echo "configure:16477: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15766,11 +16575,11 @@ else
 
 search_list="$PWD/../cercs_env $PWD/../../cercs_env $PWD/../../../cercs_env"
 tmp_search_results=""
-echo "configure:15769: searching for $search_list " >&5
+echo "configure:16578: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15773: first found $tmp_search_results " >&5
+	echo "configure:16582: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15808,11 +16617,11 @@ else
 
 search_list="$PWD/../cercs_env $PWD/../../cercs_env $PWD/../../../cercs_env"
 tmp_search_results=""
-echo "configure:15811: searching for $search_list " >&5
+echo "configure:16620: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15815: first found $tmp_search_results " >&5
+	echo "configure:16624: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15877,11 +16686,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/cercs_env/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15880: searching for $search_list " >&5
+echo "configure:16689: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15884: first found $tmp_search_results " >&5
+	echo "configure:16693: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -15972,11 +16781,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/cercs_env/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:15975: searching for $search_list " >&5
+echo "configure:16784: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:15979: first found $tmp_search_results " >&5
+	echo "configure:16788: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16067,11 +16876,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/cercs_env/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:16070: searching for $search_list " >&5
+echo "configure:16879: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16074: first found $tmp_search_results " >&5
+	echo "configure:16883: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16268,11 +17077,11 @@ fi
 
 search_list="$search_list /usr/include/atl.h /usr/local/include/atl.h /opt/atl/include/atl.h /opt/misc/include/atl.h /opt/misc/include/$cercs_cv_archive/atl.h /opt/local/include/atl.h"
 tmp_search_results=""
-echo "configure:16271: searching for $search_list " >&5
+echo "configure:17080: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16275: first found $tmp_search_results " >&5
+	echo "configure:17084: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16382,11 +17191,11 @@ fi
 
 search_list="$search_list /usr/lib/libatl.la /usr/local/lib/libatl.la /opt/atl/lib/libatl.la /opt/misc/lib/libatl.la /opt/misc/lib/$cercs_cv_archive/libatl.la /opt/local/lib/libatl.la"
 tmp_search_results=""
-echo "configure:16385: searching for $search_list " >&5
+echo "configure:17194: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16389: first found $tmp_search_results " >&5
+	echo "configure:17198: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16475,11 +17284,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/atl/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:16478: searching for $search_list " >&5
+echo "configure:17287: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16482: first found $tmp_search_results " >&5
+	echo "configure:17291: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16570,11 +17379,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/atl/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:16573: searching for $search_list " >&5
+echo "configure:17382: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16577: first found $tmp_search_results " >&5
+	echo "configure:17386: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16665,11 +17474,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/atl/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:16668: searching for $search_list " >&5
+echo "configure:17477: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16672: first found $tmp_search_results " >&5
+	echo "configure:17481: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16770,11 +17579,11 @@ else
 
 search_list="$PWD/../atl $PWD/../../atl $PWD/../../../atl"
 tmp_search_results=""
-echo "configure:16773: searching for $search_list " >&5
+echo "configure:17582: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16777: first found $tmp_search_results " >&5
+	echo "configure:17586: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16812,11 +17621,11 @@ else
 
 search_list="$PWD/../atl $PWD/../../atl $PWD/../../../atl"
 tmp_search_results=""
-echo "configure:16815: searching for $search_list " >&5
+echo "configure:17624: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16819: first found $tmp_search_results " >&5
+	echo "configure:17628: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16881,11 +17690,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/atl/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:16884: searching for $search_list " >&5
+echo "configure:17693: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16888: first found $tmp_search_results " >&5
+	echo "configure:17697: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -16976,11 +17785,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/atl/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:16979: searching for $search_list " >&5
+echo "configure:17788: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:16983: first found $tmp_search_results " >&5
+	echo "configure:17792: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17071,11 +17880,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/atl/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:17074: searching for $search_list " >&5
+echo "configure:17883: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17078: first found $tmp_search_results " >&5
+	echo "configure:17887: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17231,11 +18040,11 @@ fi
 
 search_list="$search_list /usr/include/enet/enet.h /usr/local/include/enet/enet.h /opt/enet/include/enet/enet.h /opt/misc/include/enet/enet.h /opt/misc/include/$cercs_cv_archive/enet/enet.h /opt/local/include/enet/enet.h"
 tmp_search_results=""
-echo "configure:17234: searching for $search_list " >&5
+echo "configure:18043: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17238: first found $tmp_search_results " >&5
+	echo "configure:18047: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17345,11 +18154,11 @@ fi
 
 search_list="$search_list /usr/lib/libenet.la /usr/local/lib/libenet.la /opt/enet/lib/libenet.la /opt/misc/lib/libenet.la /opt/misc/lib/$cercs_cv_archive/libenet.la /opt/local/lib/libenet.la"
 tmp_search_results=""
-echo "configure:17348: searching for $search_list " >&5
+echo "configure:18157: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17352: first found $tmp_search_results " >&5
+	echo "configure:18161: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17438,11 +18247,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/enet/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:17441: searching for $search_list " >&5
+echo "configure:18250: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17445: first found $tmp_search_results " >&5
+	echo "configure:18254: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17533,11 +18342,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/enet/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:17536: searching for $search_list " >&5
+echo "configure:18345: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17540: first found $tmp_search_results " >&5
+	echo "configure:18349: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17628,11 +18437,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/enet/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:17631: searching for $search_list " >&5
+echo "configure:18440: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17635: first found $tmp_search_results " >&5
+	echo "configure:18444: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17733,11 +18542,11 @@ else
 
 search_list="$PWD/../enet $PWD/../../enet $PWD/../../../enet"
 tmp_search_results=""
-echo "configure:17736: searching for $search_list " >&5
+echo "configure:18545: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17740: first found $tmp_search_results " >&5
+	echo "configure:18549: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17775,11 +18584,11 @@ else
 
 search_list="$PWD/../enet $PWD/../../enet $PWD/../../../enet"
 tmp_search_results=""
-echo "configure:17778: searching for $search_list " >&5
+echo "configure:18587: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17782: first found $tmp_search_results " >&5
+	echo "configure:18591: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17844,11 +18653,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/enet/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:17847: searching for $search_list " >&5
+echo "configure:18656: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17851: first found $tmp_search_results " >&5
+	echo "configure:18660: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -17939,11 +18748,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/enet/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:17942: searching for $search_list " >&5
+echo "configure:18751: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:17946: first found $tmp_search_results " >&5
+	echo "configure:18755: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18034,11 +18843,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/enet/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18037: searching for $search_list " >&5
+echo "configure:18846: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18041: first found $tmp_search_results " >&5
+	echo "configure:18850: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18193,11 +19002,11 @@ fi
 
 search_list="$search_list /usr/include/nnti.h /usr/local/include/nnti.h /opt/nnti/include/nnti.h /opt/misc/include/nnti.h /opt/misc/include/$cercs_cv_archive/nnti.h /opt/local/include/nnti.h"
 tmp_search_results=""
-echo "configure:18196: searching for $search_list " >&5
+echo "configure:19005: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18200: first found $tmp_search_results " >&5
+	echo "configure:19009: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18307,11 +19116,11 @@ fi
 
 search_list="$search_list /usr/lib/libtrios_nssi.a /usr/local/lib/libtrios_nssi.a /opt/nnti/lib/libtrios_nssi.a /opt/misc/lib/libtrios_nssi.a /opt/misc/lib/$cercs_cv_archive/libtrios_nssi.a /opt/local/lib/libtrios_nssi.a"
 tmp_search_results=""
-echo "configure:18310: searching for $search_list " >&5
+echo "configure:19119: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18314: first found $tmp_search_results " >&5
+	echo "configure:19123: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18400,11 +19209,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/nnti/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18403: searching for $search_list " >&5
+echo "configure:19212: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18407: first found $tmp_search_results " >&5
+	echo "configure:19216: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18495,11 +19304,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/nnti/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18498: searching for $search_list " >&5
+echo "configure:19307: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18502: first found $tmp_search_results " >&5
+	echo "configure:19311: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18590,11 +19399,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/nnti/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18593: searching for $search_list " >&5
+echo "configure:19402: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18597: first found $tmp_search_results " >&5
+	echo "configure:19406: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18695,11 +19504,11 @@ else
 
 search_list="$PWD/../nnti $PWD/../../nnti $PWD/../../../nnti"
 tmp_search_results=""
-echo "configure:18698: searching for $search_list " >&5
+echo "configure:19507: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18702: first found $tmp_search_results " >&5
+	echo "configure:19511: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18737,11 +19546,11 @@ else
 
 search_list="$PWD/../nnti $PWD/../../nnti $PWD/../../../nnti"
 tmp_search_results=""
-echo "configure:18740: searching for $search_list " >&5
+echo "configure:19549: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18744: first found $tmp_search_results " >&5
+	echo "configure:19553: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18806,11 +19615,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/nnti/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18809: searching for $search_list " >&5
+echo "configure:19618: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18813: first found $tmp_search_results " >&5
+	echo "configure:19622: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18901,11 +19710,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/nnti/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18904: searching for $search_list " >&5
+echo "configure:19713: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:18908: first found $tmp_search_results " >&5
+	echo "configure:19717: first found $tmp_search_results " >&5
 	break
    fi
 done
@@ -18996,11 +19805,11 @@ fi
 
 search_list="$search_list /usr/lib/$lib_tmp /usr/local/lib/$lib_tmp /opt/nnti/lib/$lib_tmp /opt/misc/lib/$lib_tmp /opt/misc/lib/$cercs_cv_archive/$lib_tmp /opt/local/lib/$lib_tmp"
 tmp_search_results=""
-echo "configure:18999: searching for $search_list " >&5
+echo "configure:19808: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
    if test -r $tmp_search_value; then
 	tmp_search_results=$tmp_search_value
-	echo "configure:19003: first found $tmp_search_results " >&5
+	echo "configure:19812: first found $tmp_search_results " >&5
 	break
    fi
 done

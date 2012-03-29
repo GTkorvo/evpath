@@ -15,6 +15,6 @@ check-local:
 
 noinst_PROGRAMS = cmtest cmping bulktest take_test cmconn
 
-LDFLAGS = ../libevpath.la
+LDFLAGS = ../libevpath.la @LDFLAGS@
 
 DEPENDENCIES = ../libevpath.la
