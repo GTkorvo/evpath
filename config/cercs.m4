@@ -1,4 +1,4 @@
-dnl  Sun Mar 25 14:10:39 EDT 2012
+dnl  Thu Mar 29 11:23:26 EDT 2012
 dnl
 dnl cercs_require_package(package, include_file, library_file)
 dnl   either include file or library_file may be left off if not needed
