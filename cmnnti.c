@@ -333,7 +333,6 @@ nnti_conn_data_ptr ncd;
 {
 
     int int_port_num;
-    int requested_IP = -1;
     char *host_name = NULL;
 
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
@@ -425,7 +424,7 @@ listen_thread_func(void *vlsp)
 	      ncd->ntd = ntd;
 	      ncd->peer_hdl = wait_status.src;
 	      ncd->size = NNTI_REQUEST_BUFFER_SIZE;
-	      ncd->raddr = NULL;
+	      ncd->raddr = 0;
 	      ncd->cksum = 0;
 	      ncd->acks_offset=(nnti_conn_count++)*NNTI_REQUEST_BUFFER_SIZE;
 	      //            ncd->buf_addr = cm->buf_addr;
@@ -572,6 +571,7 @@ attr_list attrs;
     int err;
     int timeout = 1000;
     for(i=0; i<iovcnt; i++) size+= iov[i].iov_len;
+    printf("Message size is %d, limit %d\n", size, NNTI_REQUEST_BUFFER_SIZE);
     if (size + sizeof(struct client_message) < NNTI_REQUEST_BUFFER_SIZE) {
         struct client_message *cm = (void*)ncd -> send_buffer;
 	cm->message_type = 2;
@@ -598,23 +598,31 @@ attr_list attrs;
 	    }
 	  size += iov[i].iov_len;
 	}
-    }
-    err = NNTI_send(&ncd->peer_hdl, &ncd->mr_send, NULL);
-    if (err != NNTI_OK) {
-        fprintf (stderr, "Error: NNTI_send() returned non-zero: %d\n", err);
-        return 1;
-    }
-    svc->trace_out(ncd->ntd->cm, "    NNTI_send() returned. Call wait... ");
-
-    /* Wait for message to be sent */
-    NNTI_status_t               status;
-    err = NNTI_wait(&ncd->mr_send, NNTI_SEND_SRC, timeout, &status);
-    //    if (err != NNTI_OK) {
-    //        fprintf (stderr, "Error: NNTI_wait() for sending returned non-zero: %d\n", err);
-    //        return 1;
-    //    }
-    svc->trace_out(ncd->ntd->cm, "    NNTI_wait() of send request returned... ");
+	err = NNTI_send(&ncd->peer_hdl, &ncd->mr_send, NULL);
+	if (err != NNTI_OK) {
+	  fprintf (stderr, "Error: NNTI_send() returned non-zero: %d\n", err);
+	  return 1;
+	}
+	svc->trace_out(ncd->ntd->cm, "    NNTI_send() returned. Call wait... ");
 	
+	/* Wait for message to be sent */
+	NNTI_status_t               status;
+	timeout = 1000;
+    again:
+	err = NNTI_wait(&ncd->mr_send, NNTI_SEND_SRC, timeout, &status);
+	if (err == NNTI_ETIMEDOUT) {
+	    timeout *=2;
+	    printf("Timed out on send, timeout now %d\n", timeout);
+	    goto again;
+	}
+	if (err != NNTI_OK) {
+	    fprintf (stderr, "Error: NNTI_wait() for sending returned non-zero: %d\n", err);
+	        return 1;
+	}
+	svc->trace_out(ncd->ntd->cm, "    NNTI_wait() of send request returned... ");
+    } else {
+      fprintf(stderr, "MESSAGE TOO BIG FOR NNTI SHORT MESSAGE\n");
+    }
     return iovcnt;
 }
 
