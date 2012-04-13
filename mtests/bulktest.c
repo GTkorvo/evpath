@@ -100,6 +100,8 @@ static int size = 400;
 static int vecs = 20;
 int quiet = 1;
 
+int message_count = 0;
+
 static
 void 
 generate_record(simple_rec_ptr event)
@@ -237,6 +239,7 @@ main(int argc, char **argv)
 	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		     (attr_value) strdup(transport));
 	}
+	printf("TRANSPORT IS %s\n", transport);
 	CMlisten_specific(cm, listen_list);
 	contact_list = CMget_contact_list(cm);
 	printf("Contact list \"%s\"\n", attr_list_to_string(contact_list));
@@ -293,12 +296,17 @@ main(int argc, char **argv)
 }
 
 static pid_t subproc_proc = 0;
+int expected_count = MSG_COUNT;
 
 static void
 fail_and_die(int signal)
 {
     (void)signal;
     fprintf(stderr, "CMtest failed to complete in reasonable time\n");
+    if (message_count != expected_count) {
+	printf ("failure, received %d messages instead of %d\n",
+		message_count, expected_count);
+    }
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
     }
@@ -334,13 +342,11 @@ do_regression_master_test()
     char *args[] = {"bulktest", "-c", NULL, NULL, NULL, NULL, NULL, NULL};
     int exit_state;
     int forked = 0;
-    attr_list contact_list;
-    char *string_list;
+    attr_list contact_list, listen_list = NULL;
+    char *string_list, *transport;
     char size_str[4];
     char vec_str[4];
     CMFormat format;
-    int message_count = 0;
-    int expected_count = MSG_COUNT;
     int done = 0;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
@@ -355,7 +361,13 @@ do_regression_master_test()
 #endif
     cm = CManager_create();
     forked = CMfork_comm_thread(cm);
-    CMlisten(cm);
+    if ((transport = getenv("CMTransport")) != NULL) {
+	listen_list = create_attr_list();
+	add_attr(listen_list, CM_TRANSPORT, Attr_String,
+		 (attr_value) strdup(transport));
+    printf("TRANSPORT IS %s\n", transport);
+    }
+    CMlisten_specific(cm, listen_list);
     contact_list = CMget_contact_list(cm);
     string_list = attr_list_to_string(contact_list);
     free_attr_list(contact_list);
