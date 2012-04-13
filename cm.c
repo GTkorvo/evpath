@@ -371,6 +371,9 @@ CMinternal_listen(CManager cm, attr_list listen_info, int try_others)
 	    CMtrace_out(cm, CMConnectionVerbose,
 			"Failed to load transport \"%s\".  Revert to default.\n",
 			choosen_transport);
+	    CMtrace_out(cm, CMTransportVerbose,
+			"Failed to load transport \"%s\".  Revert to default.\n",
+			choosen_transport);
 	    if (!try_others) return success;
 	    choosen_transport = NULL;
 	}
@@ -1347,6 +1350,8 @@ cm_get_data_buf(CManager cm, int length)
     tmp = cm_create_transport_buffer(cm, INT_CMmalloc(length), length);
     tmp->next = cm->cm_buffer_list;
     cm->cm_buffer_list = tmp;
+    CMtrace_out(cm, CMLowLevelVerbose, "cm_get_data_buf called len %d, return %p, next %p\n",
+		length, tmp, tmp->next);
     return tmp;
 }
 
@@ -1370,6 +1375,7 @@ cm_extend_data_buf(CManager cm, CMbuffer tmp, int length)
 extern void
 cm_return_data_buf(CManager cm, CMbuffer cmb)
 {
+    CMtrace_out(cm, CMLowLevelVerbose, "cm_return_data_buf called %p  in_use %d, callback %p\n",cmb, cmb->in_use_by_cm, cmb->return_callback);
     if (cmb) cmb->in_use_by_cm = 0;
     if (cmb && cmb->return_callback != NULL) {
 	CMbuffer last = NULL, tmp = cm->cm_buffer_list;
