@@ -50,6 +50,7 @@ typedef struct nnti_transport_data {
     int socket_fd;
     int self_ip;
     int self_port;
+    attr_list listen_attrs;
     char *self_hostname;
     char* incoming;
     char* outbound;
@@ -131,16 +132,6 @@ unlink_connection(nnti_transport_data_ptr ntd, nnti_conn_data_ptr ncd)
 }
 
 
-extern void
-libcmnnti_LTX_shntdown_conn(svc, ncd)
-CMtrans_services svc;
-nnti_conn_data_ptr ncd;
-{
-    unlink_connection(ncd->ntd, ncd);
-    free_attr_list(ncd->attrs);
-    free(ncd);
-}
-
 #include "qual_hostname.c"
 
 struct connect_message {
@@ -149,6 +140,8 @@ struct connect_message {
     uint32_t name_len;
     char name[1];
 };
+
+static int SHUTDOWN = 0;
 
 
 static int
@@ -233,11 +226,18 @@ attr_list conn_attr_list;
 
     /* Wait for message to be sent */
     NNTI_status_t               status;
+    timeout = 500;
+ again:
     err = NNTI_wait(&nnti_conn_data->mr_send, NNTI_SEND_SRC, timeout, &status);
     if (err != NNTI_OK) {
         fprintf (stderr, "Error: NNTI_wait() for sending returned non-zero: %d\n", err);
         return 1;
     }
+	if (err == NNTI_ETIMEDOUT) {
+	    timeout *=2;
+	    if (SHUTDOWN) return 0;
+	    goto again;
+	}
     svc->trace_out(trans->cm, " NNTI_wait() of send request returned... ");
 
 
@@ -374,8 +374,6 @@ typedef struct listen_struct {
   transport_entry trans;
 } *listen_struct_p;
 
-static int SHUTDOWN = 0;
-
 int
 listen_thread_func(void *vlsp)
 {
@@ -416,6 +414,8 @@ listen_thread_func(void *vlsp)
 		ncd = ncd->next;
 	    }
 	    if (cm->message_type == 1) {
+	      int err;
+	      char server_url[256];
 	      ntd->svc->trace_out(trans->cm, "  client %s:%d is connecting",
 		       cm->name, cm->port);
 	      
@@ -423,6 +423,14 @@ listen_thread_func(void *vlsp)
 	      ncd = create_nnti_conn_data(svc);
 	      ncd->ntd = ntd;
 	      ncd->peer_hdl = wait_status.src;
+	      sprintf(server_url, "ib://%s:%d/", cm->name, cm->port);
+
+	      //	      err = NNTI_connect(&ntd->trans_hdl, server_url, timeout, 
+	      //				 &ncd->peer_hdl);
+	      //	      if (err != NNTI_OK) {
+	      //		fprintf (stderr, "Error: NNTI_connect() to peer returned non-zero: %d\n", err);
+	      //		return 1;
+	      //	      }
 	      ncd->size = NNTI_REQUEST_BUFFER_SIZE;
 	      ncd->raddr = 0;
 	      ncd->cksum = 0;
@@ -482,6 +490,9 @@ attr_list listen_info;
     char *last_colon;
     int err;
 
+    if (ntd->listen_attrs != NULL) {
+	return ntd->listen_attrs;
+    }
     NNTI_init(NNTI_TRANSPORT_IB, NULL, &trans_hdl);
     NNTI_get_url(&trans_hdl, url, sizeof(url));
     last_colon = rindex(url, ':');
@@ -518,6 +529,7 @@ attr_list listen_info;
     ntd->self_port = int_port_num;
     ntd->trans_hdl = trans_hdl;
     ntd->self_hostname = strdup(hostname);
+    ntd->listen_attrs = listen_list;
     pthread_t new_thread = 0;
     listen_struct_p lsp = malloc(sizeof(*lsp));
     lsp->svc = svc;
@@ -571,7 +583,6 @@ attr_list attrs;
     int err;
     int timeout = 1000;
     for(i=0; i<iovcnt; i++) size+= iov[i].iov_len;
-    printf("Message size is %d, limit %d\n", size, NNTI_REQUEST_BUFFER_SIZE);
     if (size + sizeof(struct client_message) < NNTI_REQUEST_BUFFER_SIZE) {
         struct client_message *cm = (void*)ncd -> send_buffer;
 	cm->message_type = 2;
@@ -583,7 +594,6 @@ attr_list attrs;
 	      memcpy(&cm->payload[size], iov[i].iov_base, iov[i].iov_len);
 	      break;
 	    case 1:
-	      break;
 	      memcpy(&cm->payload[size], iov[i].iov_base, iov[i].iov_len);
 	      break;
 	    case 2:
@@ -596,9 +606,10 @@ attr_list attrs;
 	      memcpy(&cm->payload[size], iov[i].iov_base, iov[i].iov_len);
 	      break;
 	    }
-	  size += iov[i].iov_len;
+	    size += iov[i].iov_len;
 	}
 	err = NNTI_send(&ncd->peer_hdl, &ncd->mr_send, NULL);
+
 	if (err != NNTI_OK) {
 	  fprintf (stderr, "Error: NNTI_send() returned non-zero: %d\n", err);
 	  return 1;
@@ -612,7 +623,7 @@ attr_list attrs;
 	err = NNTI_wait(&ncd->mr_send, NNTI_SEND_SRC, timeout, &status);
 	if (err == NNTI_ETIMEDOUT) {
 	    timeout *=2;
-	    printf("Timed out on send, timeout now %d\n", timeout);
+	    if (SHUTDOWN) return 0;
 	    goto again;
 	}
 	if (err != NNTI_OK) {
@@ -631,10 +642,12 @@ free_nnti_data(CManager cm, void *ntdv)
 {
     nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) ntdv;
     CMtrans_services svc = ntd->svc;
-    printf("NNTI SHUTDOWN\n");
+    NNTI_unregister_memory(&ntd->mr_recvs);
     SHUTDOWN=1;
     svc->free_func(ntd);
 }
+
+//extern int logger_init(const int debug_level, const char *file);
 
 extern void *
 libcmnnti_LTX_initialize(cm, svc)
@@ -642,9 +655,11 @@ CManager cm;
 CMtrans_services svc;
 {
     static int atom_init = 0;
-
+    //    char nnti_log_filename[256];
     nnti_transport_data_ptr nnti_data;
     svc->trace_out(cm, "Initialize CMNnti transport");
+    //    sprintf(nnti_log_filename, "nnti_log_%x", getpid());
+    //    logger_init(6, nnti_log_filename);
     if (atom_init == 0) {
 	CM_NNTI_PORT = attr_atom_from_string("NNTI_PORT");
 	CM_NNTI_ADDR = attr_atom_from_string("NNTI_ADDR");
@@ -659,6 +674,7 @@ CMtrans_services svc;
     nnti_data->self_ip = 0;
     nnti_data->self_port = -1;
     nnti_data->connections = NULL;
+    nnti_data->listen_attrs = NULL;
     svc->add_shutdown_task(cm, free_nnti_data, (void *) nnti_data);
     return (void *) nnti_data;
 }
@@ -666,9 +682,12 @@ CMtrans_services svc;
 extern void
 libcmnnti_LTX_shutdown_conn(svc, ncd)
 CMtrans_services svc;
-struct nnti_connection_data* ncd;
+nnti_conn_data_ptr ncd;
 {
+    unlink_connection(ncd->ntd, ncd);
+    NNTI_unregister_memory(&ncd->mr_send);
     free(ncd->peer_hostname);
+    free_attr_list(ncd->attrs);
     free(ncd);
 }
 
