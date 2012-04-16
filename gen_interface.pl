@@ -481,7 +481,16 @@ print REVP<<EOF;
 #include "atl.h"
 #include "evpath.h"
 #include "cm_internal.h"
+#ifdef LT_LIBPREFIX
 #include "libltdl/ltdl.h"
+#else
+#include <dlfcn.h>
+#define lt_dlopen(x) dlopen(x, 0)
+#define lt_dlsym(x, y) dlsym(x, y)
+#define lt_dlhandle void*
+#define lt_dlinit() 1
+#define lt_dlerror()  ""
+#endif
 #include "stdio.h"
 #include "string.h"
 #include <dlfcn.h>

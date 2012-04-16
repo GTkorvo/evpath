@@ -14,7 +14,15 @@
 #include "evpath.h"
 #include "cod.h"
 #include "cm_internal.h"
+#ifdef LT_LIBPREFIX
 #include "libltdl/ltdl.h"
+#else
+#define lt_dlopen(x) dlopen(x)
+#define lt_dlsym(x, y) dlsym(x, y)
+#define lt_dlhandle void*
+#define lt_dlinit() 1
+#define lt_dlerror()  ""
+#endif
 
 typedef enum {Response_Filter, Response_Transform, Response_Router, Response_Multityped} response_types;
 

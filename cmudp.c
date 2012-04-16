@@ -211,7 +211,6 @@ check_host(hostname, sin_addr)
 char *hostname;
 void *sin_addr;
 {
-#ifdef HAS_STRUCT_HOSTENT
     struct hostent *host_addr;
     host_addr = gethostbyname(hostname);
     if (host_addr == NULL) {
@@ -229,11 +228,6 @@ void *sin_addr;
 	memcpy(sin_addr, host_addr->h_addr, host_addr->h_length);
     }
     return 1;
-#else
-    /* VxWorks ? */
-    *((int *) sin_addr) = hostGetByName(hostname);
-    return (*(int *) sin_addr) != -1;
-#endif
 }
 
 static int

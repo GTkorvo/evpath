@@ -1,5 +1,14 @@
 #include "config.h"
+#ifdef LT_LIBPREFIX
 #include "ltdl.h"
+#else
+#include <dlfcn.h>
+#define lt_dlopen(x) dlopen(x, 0)
+#define lt_dlsym(x, y) dlsym(x, y)
+#define lt_dlhandle void*
+#define lt_dlinit() 1
+#define lt_dlerror()  ""
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>

@@ -16,7 +16,16 @@
 /* don't pull in sys/types if MODULE is defined */
 #define _SYS_TYPES_H
 #endif
+#ifdef LT_LIBPREFIX
 #include "ltdl.h"
+#else
+#include <dlfcn.h>
+#define lt_dlopen(x) dlopen(x, 0)
+#define lt_dlsym(x, y) dlsym(x, y)
+#define lt_dlhandle void*
+#define lt_dlinit() 1
+#define lt_dlerror()  ""
+#endif
 #include "assert.h"
 
 extern struct CMtrans_services_s CMstatic_trans_svcs;
