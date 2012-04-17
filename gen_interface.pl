@@ -337,6 +337,7 @@ print INT<<EOF;
  *  DO NOT EDIT
  *
  */
+#include "config.h"
 #include "ffs.h"
 #include "cod.h"
 #include "atl.h"
@@ -477,6 +478,7 @@ print REVP<<EOF;
  *  DO NOT EDIT
  *
  */
+#include "config.h"
 #include "ffs.h"
 #include "atl.h"
 #include "evpath.h"
