@@ -59,7 +59,12 @@ CMdlsym(void *vdlh, char *sym)
 {
     dlhandle dlh = (dlhandle)vdlh;
     char *tmp = malloc(strlen(sym) + strlen(dlh->lib_prefix) + 1);
+    void *sym_val;
     strcpy(tmp, dlh->lib_prefix);
     strcat(tmp, sym);
-    return dlsym(dlh->dlopen_handle, tmp);
+    sym_val = dlsym(dlh->dlopen_handle, tmp);
+    free(tmp);
+    if (!sym_val) 
+	sym_val = dlsym(dlh->dlopen_handle, sym);
+    return sym_val;
 }
