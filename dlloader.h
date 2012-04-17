@@ -1,5 +1,6 @@
 #ifdef LT_LIBPREFIX
 #include "ltdl.h"
+#define MODULE_EXT ".la"
 #else
 #include <dlfcn.h>
 #define lt_dlopen(x) CMdlopen(x, 0)
