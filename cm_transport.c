@@ -16,16 +16,7 @@
 /* don't pull in sys/types if MODULE is defined */
 #define _SYS_TYPES_H
 #endif
-#ifdef LT_LIBPREFIX
-#include "ltdl.h"
-#else
-#include <dlfcn.h>
-#define lt_dlopen(x) dlopen(x, 0)
-#define lt_dlsym(x, y) dlsym(x, y)
-#define lt_dlhandle void*
-#define lt_dlinit() 1
-#define lt_dlerror()  ""
-#endif
+#include "dlloader.h"
 #include "assert.h"
 
 extern struct CMtrans_services_s CMstatic_trans_svcs;
@@ -86,12 +77,12 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 	transport = INT_CMmalloc(sizeof(struct _transport_item));
     global_transports[i+1] = NULL;
 
-    libname = INT_CMmalloc(strlen(trans_name) + strlen("libcm") + strlen(".la") 
+    libname = INT_CMmalloc(strlen(trans_name) + strlen("libcm") + strlen(MODULE_EXT) 
 		       + 1);
     
     strcpy(libname, "libcm");
     strcat(libname, trans_name);
-    strcat(libname, ".la");
+    strcat(libname, MODULE_EXT);
 
 #if !NO_DYNAMIC_LINKING 
     if (lt_dlinit() != 0) {

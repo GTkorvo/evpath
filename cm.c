@@ -1,14 +1,5 @@
 #include "config.h"
-#ifdef LT_LIBPREFIX
-#include "ltdl.h"
-#else
-#include <dlfcn.h>
-#define lt_dlopen(x) dlopen(x, 0)
-#define lt_dlsym(x, y) dlsym(x, y)
-#define lt_dlhandle void*
-#define lt_dlinit() 1
-#define lt_dlerror()  ""
-#endif
+#include "dlloader.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -2708,7 +2699,7 @@ CM_init_select(CMControlList cl, CManager cm)
     SelectInitFunc init_function;
     SelectInitFunc shutdown_function;
     lt_dlhandle handle;	
-
+    char *libname;
 #if !NO_DYNAMIC_LINKING
 
     if (lt_dlinit() != 0) {
@@ -2717,7 +2708,11 @@ CM_init_select(CMControlList cl, CManager cm)
     }
     lt_dladdsearchdir(EVPATH_LIBRARY_BUILD_DIR);
     lt_dladdsearchdir(EVPATH_LIBRARY_INSTALL_DIR);
-    handle = lt_dlopen("libcmselect.la");
+    libname = malloc(strlen("libcmselect") + strlen(MODULE_EXT) + 1);
+    strcpy(libname, "libcmselect");
+    strcat(libname, MODULE_EXT);
+    handle = lt_dlopen(libname);
+    free(libname);
     if (!handle) {
 	fprintf(stderr, "Failed to load required select dll.  Error \"%s\".\n",
 		lt_dlerror());
