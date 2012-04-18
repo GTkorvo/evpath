@@ -162,21 +162,11 @@ static void
 handshake_with_parent(CManager cm, attr_list parent_contact_list)
 {
     CMConnection conn = CMinitiate_conn(cm, parent_contact_list);
-    EVstone stone, output_stone;
-    EVaction action;
-    EVstone remote_terminal_stone;
-    
-    char *action_spec = create_transform_action_spec(NULL, simple_format_list, ECL_generate);
-    stone = EValloc_stone (cm);
-    action = EVassoc_immediate_action (cm, stone, action_spec, NULL);
-    output_stone = EValloc_stone (cm);
-    EVaction_set_output(cm, stone, action, 0, output_stone);
-    remote_terminal_stone = REValloc_stone(conn);
-    REVassoc_terminal_action(conn, remote_terminal_stone, simple_format_list, "simple_handler");
-    
-    EVassoc_bridge_action(cm, output_stone, parent_contact_list, remote_terminal_stone);
-    EVenable_auto_stone(cm, stone, 1, 0);
-
+    alive_msg_t alive;
+    CMFormat alive_format;
+    alive.contact = attr_list_to_string(CMget_contact_list(cm));
+    alive_format = CMregister_format(cm, alive_formats);
+    CMwrite(conn, alive_format, &alive);
 }
 
 static char* argv0;
