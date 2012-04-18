@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "dlloader.h"
 
 static char **search_list = NULL;
 
@@ -14,6 +15,7 @@ CMdladdsearchdir(char *string)
 	search_list = malloc(2*sizeof(char*));
     } else {
 	while(search_list[count] != NULL) count++;
+	search_list = realloc(search_list, (count+2)*sizeof(char*));
     }
     search_list[count] = strdup(string);
     search_list[count+1] = NULL;
@@ -25,13 +27,22 @@ typedef struct {
 } *dlhandle;
 
 void *
-CMdlopen(char *lib)
+CMdlopen(char *in_lib, int mode)
 {
     int i;
     dlhandle dlh;
     void *handle;
     char *tmp;
-
+    char *lib;
+    tmp = rindex(in_lib, '.');
+    if (strcmp(tmp, ".la") == 0) {
+	/* can't open .la files */
+	lib = malloc(strlen(in_lib) + strlen(MODULE_EXT) + 1);
+	strcpy(lib, in_lib);
+	strcpy(rindex(lib, '.'), MODULE_EXT);
+    } else {
+	lib = strdup(in_lib);
+    }
     char **list = search_list;
     if ((handle = dlopen(lib, 0)) == NULL) {
 	while(list && (list[0] != NULL)) {
@@ -51,6 +62,7 @@ CMdlopen(char *lib)
     tmp = rindex(dlh->lib_prefix, '.');
     strcpy(tmp, "_LTX_");  /* kill postfix, add _LTX_ */
     dlh->dlopen_handle = handle;
+    free(lib);
     return (void*)dlh;
 }
 
