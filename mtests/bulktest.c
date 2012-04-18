@@ -181,6 +181,7 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
 static int do_regression_master_test();
 static int regression = 1;
 static atom_t CM_TRANSPORT;
+static char *argv0;
 
 int
 main(int argc, char **argv)
@@ -190,6 +191,7 @@ main(int argc, char **argv)
     CMFormat format;
     int regression_master = 1;
 
+    argv0 = argv[0];
     while (argv[1] && (argv[1][0] == '-')) {
 	if (strcmp(&argv[1][1], "size") == 0) {
 	    if (sscanf(argv[2], "%d", &size) != 1) {
@@ -329,7 +331,7 @@ run_subprocess(char **args)
     pid_t child = fork();
     if (child == 0) {
 	/* I'm the child */
-	execv("./bulktest", args);
+	execv(argv0, args);
     }
     return child;
 #endif
@@ -339,7 +341,7 @@ static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"bulktest", "-c", NULL, NULL, NULL, NULL, NULL, NULL};
+    char *args[] = {argv0, "-c", NULL, NULL, NULL, NULL, NULL, NULL};
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;

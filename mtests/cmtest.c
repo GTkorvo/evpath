@@ -151,6 +151,8 @@ static atom_t CM_NETWORK_POSTFIX;
 static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
 
+static char *argv0;
+
 int
 main(int argc, char **argv)
 {
@@ -159,6 +161,7 @@ main(int argc, char **argv)
     CMFormat format;
     int regression_master = 1;
 
+    argv0 = argv[0];
     while (argv[1] && (argv[1][0] == '-')) {
 	if (argv[1][1] == 'c') {
 	    regression_master = 0;
@@ -205,8 +208,9 @@ main(int argc, char **argv)
 	    add_attr(listen_list, CM_NETWORK_POSTFIX, Attr_String,
 		     (attr_value) strdup(postfix));
 	}
+	CMlisten(cm);
 	CMlisten_specific(cm, listen_list);
-	contact_list = CMget_contact_list(cm);
+	contact_list = CMget_specific_contact_list(cm, listen_list);
 	if (contact_list) {
 	    string_list = attr_list_to_string(contact_list);
 	} else {
@@ -244,6 +248,7 @@ main(int argc, char **argv)
 		printf("\n");
 		exit(1);
 	    }
+	    free_attr_list(contact_list);
 	}
 	format = CMregister_format(cm, simple_format_list);
 	generate_record(&data);
@@ -287,7 +292,7 @@ run_subprocess(char **args)
     pid_t child = fork();
     if (child == 0) {
 	/* I'm the child */
-	execv("./cmtest", args);
+	execv(argv0, args);
     }
     return child;
 #endif
@@ -297,7 +302,7 @@ static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"cmtest", "-c", NULL, NULL};
+    char *args[] = {argv0, "-c", NULL, NULL};
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;

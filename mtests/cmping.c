@@ -155,13 +155,16 @@ static atom_t CM_TRANSPORT;
 static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
 
+char *argv0 = NULL;
+char *arg_transport = NULL;
+
 int
 main(int argc, char **argv)
 {
     CManager cm;
     CMConnection conn = NULL;
     int regression_master = 1;
-
+    argv0 = argv[0];
     while (argv[1] && (argv[1][0] == '-')) {
 	if (argv[1][1] == 'c') {
 	    regression_master = 0;
@@ -174,6 +177,9 @@ main(int argc, char **argv)
 	} else if (argv[1][1] == 'n') {
 	    regression = 0;
 	    quiet = -1;
+	} else if (argv[1][1] == 't') {
+	    arg_transport = argv[2];
+	    argv++;
 	}
 	argv++;
 	argc--;
@@ -194,15 +200,24 @@ main(int argc, char **argv)
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
-	char *transport = NULL;
+	char *transport = arg_transport;
 	char *string_list;
-	if ((transport = getenv("CMTransport")) != NULL) {
+	if (transport == NULL) getenv("CMTransport");
+	if (transport != NULL) {
 	    listen_list = create_attr_list();
 	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		     (attr_value) strdup(transport));
 	}
 	CMlisten_specific(cm, listen_list);
 	contact_list = CMget_contact_list(cm);
+	if (transport != NULL) {
+	    char *actual_transport = NULL;
+	    get_string_attr(contact_list, CM_TRANSPORT, &actual_transport);
+	    if (!actual_transport || (strcmp(actual_transport, transport) != 0)) {
+		printf("Failed to load transport \"%s\"\n", transport);
+		exit(1);
+	    }
+	}
 	if (contact_list) {
 	    string_list = attr_list_to_string(contact_list);
 	} else {
@@ -286,7 +301,7 @@ run_subprocess(char **args)
     pid_t child = fork();
     if (child == 0) {
 	/* I'm the child */
-	execv("./cmping", args);
+	execv(argv0, args);
     }
     return child;
 #endif
@@ -315,7 +330,9 @@ do_regression_master_test()
 #endif
     cm = CManager_create();
     forked = CMfork_comm_thread(cm);
-    if ((transport = getenv("CMTransport")) != NULL) {
+    transport = arg_transport;
+    if (!transport) transport = getenv("CMTransport");
+    if (transport != NULL) {
 	listen_list = create_attr_list();
 	add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		 (attr_value) strdup(transport));

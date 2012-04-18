@@ -177,11 +177,14 @@ handshake_with_parent(CManager cm, attr_list parent_contact_list)
     CMwrite(conn, alive_format, &alive);
 }
 
+static char* argv0;
+
 int
 main(int argc, char **argv)
 {
     int be_the_child = 0;
 
+    argv0 = argv[0];
     while (argv[1] && (argv[1][0] == '-')) {
 	if (argv[1][1] == 's') {
 	    be_the_child = 1;
@@ -355,7 +358,7 @@ static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"evtest", "-s", NULL, NULL};
+    char *args[] = {argv0, "-s", NULL, NULL};
     int exit_state;
     int forked = 0;
     int ret;
