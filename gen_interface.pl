@@ -495,6 +495,7 @@ print REVP<<EOF;
 #endif
 #include "stdio.h"
 #include "string.h"
+#include "stdlib.h"
 #include <dlfcn.h>
 #ifdef	__cplusplus
 extern "C" \{
@@ -591,7 +592,7 @@ copy_EVevent_list(EVevent_list list)
 {
     EVevent_list ret;
     int i, size = count_EVevent_list(list);
-    ret = malloc(sizeof(ret[0]) * size);
+    ret = (EVevent_list) malloc(sizeof(ret[0]) * size);
     for (i=0; i < size-1; i++) {
 	ret[i].length = list[i].length;
 	ret[i].buffer = malloc(list[i].length);
