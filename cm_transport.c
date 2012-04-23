@@ -67,16 +67,6 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 	trans_list++;
 	i++;
     }
-    if (global_transports != NULL) {
-      global_transports = INT_CMrealloc(global_transports, 
-				    sizeof(global_transports) * (i + 2));
-    } else {
-        global_transports = INT_CMmalloc(sizeof(global_transports) * (i+2));
-    }
-    global_transports[i] = 
-	transport = INT_CMmalloc(sizeof(struct _transport_item));
-    global_transports[i+1] = NULL;
-
     libname = INT_CMmalloc(strlen(trans_name) + strlen("libcm") + strlen(MODULE_EXT) 
 		       + 1);
     
@@ -106,6 +96,16 @@ load_transport(CManager cm, const char *trans_name, int quiet)
     if (!handle) {
 	return 0;
     }
+    if (global_transports != NULL) {
+      global_transports = INT_CMrealloc(global_transports, 
+				    sizeof(global_transports) * (i + 2));
+    } else {
+        global_transports = INT_CMmalloc(sizeof(global_transports) * (i+2));
+    }
+    global_transports[i] = 
+	transport = INT_CMmalloc(sizeof(struct _transport_item));
+    global_transports[i+1] = NULL;
+
     INT_CMfree(libname);
     CMtrace_out(cm, CMTransportVerbose, "Loaded transport.\n");
     transport->trans_name = strdup(trans_name);
