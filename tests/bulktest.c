@@ -258,6 +258,14 @@ main(int argc, char **argv)
 	}
 	CMlisten_specific(cm, listen_list);
 	contact_list = CMget_contact_list(cm);
+	if (transport != NULL) {
+	    char *actual_transport = NULL;
+	    get_string_attr(contact_list, CM_TRANSPORT, &actual_transport);
+	    if (!actual_transport || (strcmp(actual_transport, transport) != 0)) {
+		printf("Failed to load transport \"%s\"\n", transport);
+		exit(1);
+	    }
+	}
 	if (contact_list) {
 	    string_list = attr_list_to_string(contact_list);
 	    free_attr_list(contact_list);
@@ -400,6 +408,14 @@ do_regression_master_test()
     }
     CMlisten_specific(cm, listen_list);
     contact_list = CMget_contact_list(cm);
+    if (transport != NULL) {
+      char *actual_transport = NULL;
+      get_string_attr(contact_list, CM_TRANSPORT, &actual_transport);
+      if (!actual_transport || (strcmp(actual_transport, transport) != 0)) {
+	printf("Failed to load transport \"%s\"\n", transport);
+	exit(1);
+      }
+    }
     if (contact_list) {
 	string_list = attr_list_to_string(contact_list);
 	free_attr_list(contact_list);
