@@ -241,7 +241,6 @@ main(int argc, char **argv)
 	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		     (attr_value) strdup(transport));
 	}
-	printf("TRANSPORT IS %s\n", transport);
 	CMlisten_specific(cm, listen_list);
 	contact_list = CMget_contact_list(cm);
 	printf("Contact list \"%s\"\n", attr_list_to_string(contact_list));
