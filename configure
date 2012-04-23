@@ -19069,7 +19069,7 @@ else
 
 
 cercs_tmp=""
-search_list="./libtrios_nssi.a"
+search_list="./libtrios_nssi.so"
 CHAOS_HOMEDIR=""
 if test -n "$CSH"; then
     CHAOS_HOMEDIR=`echo "echo ~chaos" | csh -sf  2>/dev/null | sed 's%/$%%'` || CHAOS_HOMEDIR=""
@@ -19081,40 +19081,40 @@ if test -n "$with_nnti"; then
         EXPANDED=$with_nnti
     fi
 
-    search_list="$search_list $EXPANDED/libtrios_nssi.a $EXPANDED/lib/libtrios_nssi.a $EXPANDED/share/libtrios_nssi.a $EXPANDED/$cercs_cv_archive/libtrios_nssi.a $EXPANDED/$cercs_cv_archive/lib/libtrios_nssi.a $EXPANDED/nnti/libtrios_nssi.a $EXPANDED/nnti/$cercs_cv_archive/libtrios_nssi.a $EXPANDED/nnti/lib/libtrios_nssi.a $EXPANDED/nnti/lib/$cercs_cv_archive/libtrios_nssi.a"
+    search_list="$search_list $EXPANDED/libtrios_nssi.so $EXPANDED/lib/libtrios_nssi.so $EXPANDED/share/libtrios_nssi.so $EXPANDED/$cercs_cv_archive/libtrios_nssi.so $EXPANDED/$cercs_cv_archive/lib/libtrios_nssi.so $EXPANDED/nnti/libtrios_nssi.so $EXPANDED/nnti/$cercs_cv_archive/libtrios_nssi.so $EXPANDED/nnti/lib/libtrios_nssi.so $EXPANDED/nnti/lib/$cercs_cv_archive/libtrios_nssi.so"
 fi
 if test -z "$with_installed_specified"; then
-  search_list="$search_list `pwd`/../nnti/libtrios_nssi.a `pwd`/../lib/libtrios_nssi.a `pwd`/../share/libtrios_nssi.a"
+  search_list="$search_list `pwd`/../nnti/libtrios_nssi.so `pwd`/../lib/libtrios_nssi.so `pwd`/../share/libtrios_nssi.so"
   if test "$CHAOS_HOMEDIR" != "$HOME"; then
-    search_list="$search_list $HOME/nnti/libtrios_nssi.a $HOME/$cercs_cv_archive/lib/libtrios_nssi.a $HOME/lib/libtrios_nssi.a"
+    search_list="$search_list $HOME/nnti/libtrios_nssi.so $HOME/$cercs_cv_archive/lib/libtrios_nssi.so $HOME/lib/libtrios_nssi.so"
   fi
 fi
 if test -n "$CHAOS_HOMEDIR" -a -n "$cercs_cv_archive"; then
-  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/nnti/lib/libtrios_nssi.a $CHAOS_HOMEDIR/$cercs_cv_archive/lib/libtrios_nssi.a $CHAOS_HOMEDIR/nnti/$cercs_cv_archive/lib/libtrios_nssi.a $CHAOS_HOMEDIR/nnti/lib/libtrios_nssi.a $CHAOS_HOMEDIR/lib/libtrios_nssi.a"
+  search_list="$search_list $CHAOS_HOMEDIR/$cercs_cv_archive/nnti/lib/libtrios_nssi.so $CHAOS_HOMEDIR/$cercs_cv_archive/lib/libtrios_nssi.so $CHAOS_HOMEDIR/nnti/$cercs_cv_archive/lib/libtrios_nssi.so $CHAOS_HOMEDIR/nnti/lib/libtrios_nssi.so $CHAOS_HOMEDIR/lib/libtrios_nssi.so"
 fi
 if test "$libdir" != '${exec_prefix}/lib'; then
   tmpdir=`echo ${libdir} |  sed 's%/$%%'`
-  search_list="$tmpdir/libtrios_nssi.a $search_list"
+  search_list="$tmpdir/libtrios_nssi.so $search_list"
 fi
 if test "$exec_prefix" != "NONE"; then
   tmpdir=`echo ${exec_prefix} |  sed 's%/$%%'`
-  search_list="$tmpdir/lib/libtrios_nssi.a $search_list"
+  search_list="$tmpdir/lib/libtrios_nssi.so $search_list"
 fi
 if test "$includedir" != '${prefix}/include'; then
   tmpdir=`echo ${includedir} |  sed 's%/$%%'`
-  search_list="$tmpdir/libtrios_nssi.a $search_list"
+  search_list="$tmpdir/libtrios_nssi.so $search_list"
 fi
 if test "$prefix" != "NONE"; then
   tmpdir=`echo ${prefix} |  sed 's%/$%%'`
-  search_list="$tmpdir/lib/libtrios_nssi.a $search_list"
+  search_list="$tmpdir/lib/libtrios_nssi.so $search_list"
 fi
 if test "lib" == "lib"; then
   for tmp_lib_value in $sys_lib_search_path_spec; do
-     search_list="$search_list $tmp_lib_value/libtrios_nssi.a"
+     search_list="$search_list $tmp_lib_value/libtrios_nssi.so"
   done
 fi
 
-search_list="$search_list /usr/lib/libtrios_nssi.a /usr/local/lib/libtrios_nssi.a /opt/nnti/lib/libtrios_nssi.a /opt/misc/lib/libtrios_nssi.a /opt/misc/lib/$cercs_cv_archive/libtrios_nssi.a /opt/local/lib/libtrios_nssi.a"
+search_list="$search_list /usr/lib/libtrios_nssi.so /usr/local/lib/libtrios_nssi.so /opt/nnti/lib/libtrios_nssi.so /opt/misc/lib/libtrios_nssi.so /opt/misc/lib/$cercs_cv_archive/libtrios_nssi.so /opt/local/lib/libtrios_nssi.so"
 tmp_search_results=""
 echo "configure:19119: searching for $search_list " >&5
 for tmp_search_value in $search_list; do
@@ -19142,10 +19142,10 @@ if test -n "$with_rpm_build_specified"; then
       tmp_search_results=`pwd`/../../nnti;
    fi
 # srcdir presence overrides
-   if test -f "$srcdir/../nnti/libtrios_nssi.a"; then
+   if test -f "$srcdir/../nnti/libtrios_nssi.so"; then
       tmp_search_results='${abs_top_srcdir}/../nnti';
    fi
-   if test -f "$srcdir/../../nnti/libtrios_nssi.a"; then
+   if test -f "$srcdir/../../nnti/libtrios_nssi.so"; then
       tmp_search_results='${abs_top_srcdir}/../../nnti';
    fi
 fi
@@ -19154,10 +19154,10 @@ if test -n "$tmp_search_results"; then
 fi
 
 
-found=libtrios_nssi.a
-if test -z "$cercs_tmp" -o "$cercs_tmp" != "libtrios_nssi.a"; then
-case libtrios_nssi.a in
-   *.la)  lib_tmp=`echo libtrios_nssi.a | sed 's/.la$/.so/g'`
+found=libtrios_nssi.so
+if test -z "$cercs_tmp" -o "$cercs_tmp" != "libtrios_nssi.so"; then
+case libtrios_nssi.so in
+   *.la)  lib_tmp=`echo libtrios_nssi.so | sed 's/.la$/.so/g'`
 
 
 
@@ -19250,9 +19250,9 @@ fi
 	;;
 esac
 fi
-if test -z "$cercs_tmp" -o "$cercs_tmp" != "libtrios_nssi.a"; then
-case libtrios_nssi.a in
-   *.la)  lib_tmp=`echo libtrios_nssi.a | sed 's/.la$/.dylib/g'`
+if test -z "$cercs_tmp" -o "$cercs_tmp" != "libtrios_nssi.so"; then
+case libtrios_nssi.so in
+   *.la)  lib_tmp=`echo libtrios_nssi.so | sed 's/.la$/.dylib/g'`
 
 
 
@@ -19345,9 +19345,9 @@ fi
 	;;
 esac
 fi
-if test -z "$cercs_tmp" -o "$cercs_tmp" != "libtrios_nssi.a"; then
-case libtrios_nssi.a in
-    *.la) lib_tmp=`echo libtrios_nssi.a | sed 's/.la$/.a/g'`
+if test -z "$cercs_tmp" -o "$cercs_tmp" != "libtrios_nssi.so"; then
+case libtrios_nssi.so in
+    *.la) lib_tmp=`echo libtrios_nssi.so | sed 's/.la$/.a/g'`
 
 
 
@@ -19440,7 +19440,7 @@ fi
 	;;
 esac
 fi
-if test -n "$cercs_tmp" -a "$cercs_tmp" != "libtrios_nssi.a"; then
+if test -n "$cercs_tmp" -a "$cercs_tmp" != "libtrios_nssi.so"; then
 cercs_cv_nnti_link_dir=`$PATHPROG $cercs_tmp | sed 's#\\\\#/#g' | sed "s/.$found//g"`
 else
 cercs_cv_nnti_link_dir=""
@@ -19457,7 +19457,7 @@ if test -n "$cercs_cv_nnti_link_arg"; then
 arg=$cercs_cv_nnti_link_arg
 no_dash_arg=`echo $arg | sed 's/^-//g'`
 if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
-root=`echo libtrios_nssi.a | sed 's/\..*//'`
+root=`echo libtrios_nssi.so | sed 's/\..*//'`
 if test ! -r $cercs_cv_nnti_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
 R_arg=`echo $cercs_cv_nnti_link_dir | sed "/./ s/^/-R/1"`
@@ -19560,10 +19560,10 @@ cercs_tmp=$tmp_search_results
 fi
 
 
-found=libtrios_nssi.a
-if test -z "$cercs_tmp" -o "$cercs_tmp" != "libtrios_nssi.a"; then
-case libtrios_nssi.a in
-   *.la)  lib_tmp=`echo libtrios_nssi.a | sed 's/.la$/.so/g'`
+found=libtrios_nssi.so
+if test -z "$cercs_tmp" -o "$cercs_tmp" != "libtrios_nssi.so"; then
+case libtrios_nssi.so in
+   *.la)  lib_tmp=`echo libtrios_nssi.so | sed 's/.la$/.so/g'`
 
 
 
@@ -19656,9 +19656,9 @@ fi
 	;;
 esac
 fi
-if test -z "$cercs_tmp" -o "$cercs_tmp" != "libtrios_nssi.a"; then
-case libtrios_nssi.a in
-   *.la)  lib_tmp=`echo libtrios_nssi.a | sed 's/.la$/.dylib/g'`
+if test -z "$cercs_tmp" -o "$cercs_tmp" != "libtrios_nssi.so"; then
+case libtrios_nssi.so in
+   *.la)  lib_tmp=`echo libtrios_nssi.so | sed 's/.la$/.dylib/g'`
 
 
 
@@ -19751,9 +19751,9 @@ fi
 	;;
 esac
 fi
-if test -z "$cercs_tmp" -o "$cercs_tmp" != "libtrios_nssi.a"; then
-case libtrios_nssi.a in
-    *.la) lib_tmp=`echo libtrios_nssi.a | sed 's/.la$/.a/g'`
+if test -z "$cercs_tmp" -o "$cercs_tmp" != "libtrios_nssi.so"; then
+case libtrios_nssi.so in
+    *.la) lib_tmp=`echo libtrios_nssi.so | sed 's/.la$/.a/g'`
 
 
 
@@ -19846,7 +19846,7 @@ fi
 	;;
 esac
 fi
-if test -n "$cercs_tmp" -a "$cercs_tmp" != "libtrios_nssi.a"; then
+if test -n "$cercs_tmp" -a "$cercs_tmp" != "libtrios_nssi.so"; then
 cercs_cv_nnti_link_dir=`$PATHPROG $cercs_tmp | sed 's#\\\\#/#g' | sed "s/.$found//g"`
 else
 cercs_cv_nnti_link_dir=""
@@ -19863,7 +19863,7 @@ if test -n "$cercs_cv_nnti_link_arg"; then
 arg=$cercs_cv_nnti_link_arg
 no_dash_arg=`echo $arg | sed 's/^-//g'`
 if test `echo $new_flags | grep -c "$no_dash_arg"` -eq 0; then
-root=`echo libtrios_nssi.a | sed 's/\..*//'`
+root=`echo libtrios_nssi.so | sed 's/\..*//'`
 if test ! -r $cercs_cv_nnti_link_dir/$root.la; then
 if eval "test \"\${LIBTOOL+set}\" = set"; then
 R_arg=`echo $cercs_cv_nnti_link_dir | sed "/./ s/^/-R/1"`

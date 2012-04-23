@@ -92,7 +92,7 @@ LTLIBS="$cercs_cv_atl_link_dir/libatl.la $LTLIBS"
 
 CERCS_REQUIRE_PACKAGE(enet,enet/enet.h,libenet.la)
 
-CERCS_REQUIRE_PACKAGE(nnti,nnti.h,libtrios_nssi.a)
+CERCS_REQUIRE_PACKAGE(nnti,nnti.h,libtrios_nssi.so)
 
 AC_CHECK_LIB(ibverbs, ibv_open_device, [build_ib=enable], [build_ib=disable])
 AC_CHECK_LIB(enet,enet_initialize, [build_enet=enable],[build_enet=disable])
