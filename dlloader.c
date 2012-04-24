@@ -35,7 +35,7 @@ CMdlopen(char *in_lib, int mode)
     char *tmp;
     char *lib;
     tmp = rindex(in_lib, '.');
-    if (strcmp(tmp, ".la") == 0) {
+    if (tmp && (strcmp(tmp, ".la") == 0)) {
 	/* can't open .la files */
 	lib = malloc(strlen(in_lib) + strlen(MODULE_EXT) + 1);
 	strcpy(lib, in_lib);
@@ -44,7 +44,7 @@ CMdlopen(char *in_lib, int mode)
 	lib = strdup(in_lib);
     }
     char **list = search_list;
-    if ((handle = dlopen(lib, 0)) == NULL) {
+    if ((handle = dlopen(lib, RTLD_LAZY)) == NULL) {
 	while(list && (list[0] != NULL)) {
 	    char *tmp = malloc(strlen(list[0]) + strlen(lib) + 2);
 	    sprintf(tmp, "%s/%s", list[0], lib);
