@@ -26,10 +26,6 @@
 #include "cm_internal.h"
 #include "cm_transport.h"
 
-#if defined(HAVE_GETDOMAINNAME) && !defined(GETDOMAINNAME_DEFINED)
-extern int getdomainname ARGS((char *name, int namelen));
-#endif
-
 #if NO_DYNAMIC_LINKING
 struct select_data;
 extern void libcmselect_LTX_add_select(CMtrans_services svc, struct select_data *sdp, int fd, 
@@ -1108,10 +1104,6 @@ CMControlList_free(CMControlList cl)
 	INT_CMfree(cl);
     }
 }
-
-#ifndef GETDOMAINNAME_DEFINED
-extern int getdomainname ARGS((char*name, int namelen));
-#endif
 
 #include "qual_hostname.c"
 
