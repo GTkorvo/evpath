@@ -18,9 +18,6 @@
 #include <net/if.h>
 #include <sys/ioctl.h>
 #endif
-#if defined(HAVE_GETDOMAINNAME) && !defined(GETDOMAINNAME_DEFINED)
-extern int getdomainname ARGS((char *name, int namelen));
-#endif
 
 #if defined (__INTEL_COMPILER)
 //  Allow unordered operations
