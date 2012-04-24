@@ -132,3 +132,5 @@
 /* Define to `int' if <sys/types.h> does not define. */
 #cmakedefine pid_t
 
+/* Define to the shared module suffix in use */
+#cmakedefine CMAKE_SHARED_MODULE_SUFFIX "@CMAKE_SHARED_MODULE_SUFFIX@"
