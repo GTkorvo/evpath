@@ -484,7 +484,7 @@ print REVP<<EOF;
 #include "evpath.h"
 #include "cm_internal.h"
 #ifdef LT_LIBPREFIX
-#include "libltdl/ltdl.h"
+#include "ltdl.h"
 #else
 #include <dlfcn.h>
 #define lt_dlopen(x) dlopen(x, 0)
