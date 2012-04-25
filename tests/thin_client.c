@@ -53,7 +53,7 @@ main(int argc, char **argv)
     FMFormat ioformat;
     FMContext fmc;
     simple_rec rec;
-    int conn;
+    long conn;
     char *comment = strdup("Stone xxxxx");
 
     if ((argc != 4) || (sscanf(argv[2], "%d", &remote_port) != 1)
