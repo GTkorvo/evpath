@@ -16,5 +16,10 @@ endforeach()
 ADD_EXECUTABLE(thin_client thin_client.c)
 TARGET_LINK_LIBRARIES(thin_client evpath)
 
+ADD_TEST(evtest_UDP evtest -t udp)
+IF (ENET_FOUND)
+    ADD_TEST(evtest_ENET evtest -t enet)
+    ADD_TEST(bulktest_ENET bulktest -t enet)
+ENDIF (ENET_FOUND)
 ADD_SUBDIRECTORY( testdll )
 
