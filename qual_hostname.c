@@ -196,9 +196,9 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 #else
 	{
 	    /* no getdomainname, hope that gethostbyname will help */
-	    struct hostent *host = gethostbyname(buf);
+	    struct hostent *he = gethostbyname(buf);
 	    char *tmp_name;
-	    if (host) {
+	    if (he) {
 		tmp_name = (gethostbyname(buf))->h_name;
 		strncpy(buf, tmp_name, len);
 	    }
