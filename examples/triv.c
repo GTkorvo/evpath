@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <string.h>
 /* this file is evpath/examples/triv.c */
 #include "evpath.h"
 

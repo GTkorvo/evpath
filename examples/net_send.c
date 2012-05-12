@@ -1,5 +1,8 @@
 #include "evpath.h"
 
+#define MON_PORT 5353
+#define MON_HOST "localhost"
+
 typedef struct _simple_rec {
     int integer_field;
 } simple_rec, *simple_rec_ptr;
@@ -24,18 +27,15 @@ int main(int argc, char **argv)
     EVsource source;
     char string_list[2048];
     attr_list contact_list;
-    EVstone remote_stone;
-
-    if (sscanf(argv[1], "%d:%s", &remote_stone, &string_list[0]) != 2) {
-	printf("Bad arguments \"%s\"\n", argv[1]);
-	exit(0);
-    }
+    EVstone remote_stone = 0 /* assume we only have one stone on the central */;
 
     cm = CManager_create();
     CMlisten(cm);
 
     stone = EValloc_stone(cm);
-    contact_list = attr_list_from_string(string_list);
+    contact_list = create_attr_list();
+    add_int_attr(contact_list, attr_atom_from_string("IP_PORT"), MON_PORT);
+    add_string_attr(contact_list, attr_atom_from_string("IP_HOST"), MON_HOST);
     EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
 
     source = EVcreate_submit_handle(cm, stone, simple_format_list);

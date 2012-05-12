@@ -51,8 +51,6 @@ int main(int argc, char **argv)
 
     split_stone = EValloc_stone(cm);
     split_action = EVassoc_split_action(cm, split_stone, NULL);
-    set_attr_atom_and_string("sum", ATL_CHAR_CONS("E","x","S","u"));
-    set_attr_atom_and_string("count", ATL_CHAR_CONS("E","x","C","o"));
 
 /* this file is evpath/examples/derived_send2.c */
     for (i = 1; i < argc; i++) {

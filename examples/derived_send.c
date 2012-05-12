@@ -1,3 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "evpath.h"
 
 typedef struct _simple_rec {
