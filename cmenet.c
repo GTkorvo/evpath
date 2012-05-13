@@ -503,8 +503,7 @@ build_listen_attrs(CManager cm, CMtrans_services svc, enet_client_data_ptr sd,
 	    }
 	}
     } else if (IP == 0) {
-        add_attr(ret_list, CM_ENET_ADDR, Attr_Int4, 
-		 (attr_value)htonl(INADDR_LOOPBACK));
+        add_int_attr(ret_list, CM_ENET_ADDR, htonl(INADDR_LOOPBACK));
     }
     add_attr(ret_list, CM_ENET_PORT, Attr_Int4,
 	     (attr_value) (long)int_port_num);
