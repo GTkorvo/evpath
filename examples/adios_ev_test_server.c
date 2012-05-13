@@ -23,6 +23,14 @@ typedef struct _meta_data_server{
 
 meta_data_server array_info;
 
+    EVstone split_req_stone;
+    EVaction split_req_action;
+
+    EVstone split_handler_stone;
+    EVaction split_handler_action;
+
+    EVstone data_server_stone ;
+    char *data_server_string_list ;
 static FMField simple_field_list[] =
 {
     {"integer_field", "integer", sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
@@ -169,11 +177,6 @@ data_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     attr_list contact_data_list;
     EVsource array_data_source;
 
-    EVstone split_stone;
-    EVaction split_action;
-    split_stone = EValloc_stone(cm);
-    split_action = EVassoc_split_action(cm,split_stone,NULL);
-
     array_data array;
     array.num_array_dim=1;
     array.start = (int*) malloc(array.num_array_dim*sizeof(int));
@@ -196,13 +199,13 @@ data_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     data_stone = EValloc_stone(cm);
     contact_data_list = attr_list_from_string(data_string_list );
     EVassoc_bridge_action(cm,data_stone,contact_data_list,client_data_stone);
-    EVaction_add_split_target(cm,split_stone,split_action,data_stone);
+    EVaction_add_split_target(cm,split_handler_stone,split_handler_action,data_stone);
 
 
-    array_data_source = EVcreate_submit_handle(cm,split_stone,arraydata_format_list);
+    array_data_source = EVcreate_submit_handle(cm,split_handler_stone,arraydata_format_list);
     EVsubmit(array_data_source,&array, NULL);
 //    EVsubmit(array_data_source,client_data, NULL);
-
+    printf("\n\n\n\n END \n\n\n\n");
     fclose(client_data_contact);
 
 
@@ -251,11 +254,6 @@ request_handler(CManager cm, void *vevent, void *metadata_server, attr_list attr
     attr_list contact_req_list;
 
     EVsource metadata_source;
-    EVstone split_stone;
-    EVaction split_action;
-    split_stone = EValloc_stone(cm);
-    split_action = EVassoc_split_action(cm,split_stone,NULL);
-
 //    FILE *client_req=fopen("client_req","r");
 //    fscanf(client_req,"%s", contact_data_req);
 //    printf("contact for req %s\n",contact_data_req);
@@ -269,19 +267,18 @@ request_handler(CManager cm, void *vevent, void *metadata_server, attr_list attr
     contact_req_list = attr_list_from_string(meta_string_list);
     EVassoc_bridge_action(cm,meta_stone,contact_req_list,client_req_stone);
     
-    EVaction_add_split_target(cm,split_stone,split_action,meta_stone);
+    EVaction_add_split_target(cm,split_req_stone,split_req_action,meta_stone);
  
-    metadata_source = EVcreate_submit_handle(cm,split_stone, metadata_server_format_list);
+    metadata_source = EVcreate_submit_handle(cm,split_req_stone, metadata_server_format_list);
     meta_data_server data;
 
-// create an action when receiving data requesting from client
-    EVstone data_server_stone = EValloc_stone(cm);
-    EVassoc_terminal_action(cm,data_server_stone, data_client_format_list, data_handler, NULL);
-    char *data_server_string_list = attr_list_to_string(CMget_contact_list(cm));
-    FILE *data_server = fopen("data_server","w");
-    fprintf(data_server,"%d:%s",data_server_stone,data_server_string_list);
-    printf("data server %d:%s\n",data_server_stone,data_server_string_list);
-    fclose(data_server);
+    data.num_array_dim=1;
+
+    data.dim_array_size = (int*) malloc(data.num_array_dim*sizeof(int));
+    data.dim_proc_size = (int*) malloc(data.num_array_dim*sizeof(int));
+
+    data.dim_array_size[0]=20;
+    data.dim_proc_size[0]=1;
 
     data.addr_size=2048;
     data.addr = (char*) malloc(data.addr_size*sizeof(char));
@@ -312,6 +309,24 @@ int main(int argc, char **argv)
     if (argc ==1) 
     {
     printf("server waiting for metadata from client\n");
+
+    split_req_stone = EValloc_stone(cm);
+    split_req_action = EVassoc_split_action(cm,split_req_stone,NULL);
+
+    split_handler_stone = EValloc_stone(cm);
+    split_handler_action = EVassoc_split_action(cm,split_handler_stone,NULL);
+
+// create an action when receiving data requesting from client
+    data_server_stone = EValloc_stone(cm);
+    EVassoc_terminal_action(cm,data_server_stone, data_client_format_list, data_handler, NULL);
+    data_server_string_list = attr_list_to_string(CMget_contact_list(cm));
+    FILE *data_server = fopen("data_server","w");
+    fprintf(data_server,"%d:%s",data_server_stone,data_server_string_list);
+    printf("data server %d:%s\n",data_server_stone,data_server_string_list);
+    fclose(data_server);
+
+
+
 // create an action when receiving metadata requesting from client
     EVstone meta_server_stone = EValloc_stone(cm);
     EVassoc_terminal_action(cm, meta_server_stone, simple_format_list, request_handler, &array_info);

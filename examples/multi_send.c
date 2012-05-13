@@ -33,10 +33,11 @@ int main(int argc, char **argv)
 
     cm = CManager_create();
     CMlisten(cm);
+int j=0;
+for (j=0;j<10;j++){
 
     split_stone = EValloc_stone(cm);
     split_action = EVassoc_split_action(cm, split_stone, NULL);
-
     for (i = 1; i < argc; i++) {
 	char string_list[2048];
 	attr_list contact_list;
@@ -54,4 +55,5 @@ int main(int argc, char **argv)
     source = EVcreate_submit_handle(cm, split_stone, simple_format_list);
     data.integer_field = 318;
     EVsubmit(source, &data, NULL);
+}
 }
