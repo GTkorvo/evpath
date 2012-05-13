@@ -2,14 +2,21 @@
 #include <string.h>
 #include <stdlib.h>
 #include "evpath.h"
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 typedef struct _simple_rec {
     int integer_field;
+    int array_size;
+    double *array;
+ 
 } simple_rec, *simple_rec_ptr;
 
 static FMField simple_field_list[] =
 {
     {"integer_field", "integer", sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
+    {"array_size", "integer", sizeof(int), FMOffset(simple_rec_ptr, array_size)},
+    {"array", "double[array_size]", sizeof(double), FMOffset(simple_rec_ptr, array)},
     {NULL, NULL, 0, 0}
 };
 static FMStructDescRec simple_format_list[] =
@@ -22,7 +29,15 @@ static int
 simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     simple_rec_ptr event = vevent;
-    printf("I got %d\n", event->integer_field);
+    
+//    event->array = (double*) malloc(event->array_size*sizeof(double));
+
+    printf("I got %d, array_dim %d\n", event->integer_field,event->array_size);
+    int i,j;
+    for (i=0;i<event->array_size;i++){
+        printf("%f ",event->array[i]);    
+      }
+      printf("\n");
 }
 
 /* this file is evpath/examples/derived_recv.c */

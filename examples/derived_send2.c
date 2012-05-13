@@ -111,7 +111,7 @@ int main(int argc, char **argv)
 	    EVsubmit(source, &data, NULL);
 	    data.integer_field++;
 	} else {
-	    EVsubmit(source2, &data2, NULL);
+//	    EVsubmit(source2, &data2, NULL);
 	    data2.data_field += 1.0;
 	    data2.data_type++;
 	}

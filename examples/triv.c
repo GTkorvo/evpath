@@ -2,7 +2,7 @@
 #include <string.h>
 /* this file is evpath/examples/triv.c */
 #include "evpath.h"
-
+#include <stdio.h>
 typedef struct _simple_rec {
     int integer_field;
 } simple_rec, *simple_rec_ptr;

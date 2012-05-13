@@ -1,5 +1,7 @@
 #include "evpath.h"
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 typedef struct _simple_rec {
     int integer_field;
 } simple_rec, *simple_rec_ptr;
