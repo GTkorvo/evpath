@@ -2,9 +2,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include "evpath.h"
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 
 typedef struct _simple_rec {
     int integer_field;
@@ -66,7 +63,7 @@ int main(int argc, char **argv)
     output.integer_field = input.integer_field;\
     output.average = sum / count;\
     output.str = input.str;\
-    return (count % 1) == 0;  /* pass filter every fifth*/ \
+    return (count % 5) == 0;  /* pass filter every fifth*/ \
 }";
 
     cm = CManager_create();

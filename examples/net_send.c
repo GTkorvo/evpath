@@ -1,5 +1,5 @@
 #include "evpath.h"
-#include <stdio.h>
+
 #define MON_PORT 5353
 #define MON_HOST "localhost"
 

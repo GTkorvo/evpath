@@ -80,7 +80,7 @@ int main(int argc, char **argv)
     output.average = sum / count;\
     set_double_attr(stone_attrs, \"sum\", sum);\n\
     set_int_attr(stone_attrs, \"count\", count);\n\
-    return (count % 1) == 0;  /* pass filter every fifth*/ \
+    return (count % 5) == 0;  /* pass filter every fifth*/ \
 }";
 
     char *trans_func2 = "\
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
     output.average = sum / count;\
     set_double_attr(stone_attrs, \"sum\", sum);\n\
     set_int_attr(stone_attrs, \"count\", count);\n\
-    return (count % 1) == 0;  /* pass filter every fifth*/ \
+    return (count % 5) == 0;  /* pass filter every fifth*/ \
 }";
 
     cm = CManager_create();

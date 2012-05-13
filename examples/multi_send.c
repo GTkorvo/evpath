@@ -2,9 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "evpath.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 typedef struct _simple_rec {
     int integer_field;
@@ -33,8 +30,10 @@ int main(int argc, char **argv)
 
     cm = CManager_create();
     CMlisten(cm);
+
     split_stone = EValloc_stone(cm);
     split_action = EVassoc_split_action(cm, split_stone, NULL);
+
     for (i = 1; i < argc; i++) {
 	char string_list[2048];
 	attr_list contact_list;
