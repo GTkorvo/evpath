@@ -13,6 +13,7 @@ include(CheckLibraryExists)
 include(CheckTypeSize)
 include(CheckStructHasMember)
 include(FindCERCSProject)
+include(CTest)
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
