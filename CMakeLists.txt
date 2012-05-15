@@ -145,6 +145,10 @@ INSTALL(TARGETS evpath evpath-static cmselect cmsockets cmudp cmmulticast
 SET (EVPATH_LIBRARY_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR})
 SET (EVPATH_LIBRARY_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/lib)
 
+if (${CMAKE_C_COMPILER_ID} MATCHES "Intel") 
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -shared-intel")
+endif()
+
 CONFIGURE_FILE( ${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h )
 
 # display status message for important variables
