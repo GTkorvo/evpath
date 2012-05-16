@@ -58,6 +58,7 @@ output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     output_rec_ptr event = vevent;
     printf("I got %d, average is now %g\n", event->integer_field, event->average);
+    return 1;
 }
 
 int main(int argc, char **argv)

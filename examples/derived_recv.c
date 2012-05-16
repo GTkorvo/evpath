@@ -23,6 +23,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     simple_rec_ptr event = vevent;
     printf("I got %d\n", event->integer_field);
+    return 1;
 }
 
 /* this file is evpath/examples/derived_recv.c */

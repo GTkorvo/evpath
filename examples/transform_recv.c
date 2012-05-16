@@ -47,6 +47,7 @@ output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     printf("I got %d, average is now %g\n", event->integer_field, event->average);
     printf("Base event is %p event, string is %p\n", event, event->str);
     printf("real string is %s\n", event->str);
+    return 1;
 }
 
 int main(int argc, char **argv)
