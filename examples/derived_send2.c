@@ -56,30 +56,30 @@ int main(int argc, char **argv)
     for (i = 1; i < argc; i++) {
 	char string_list[20480];
 	attr_list contact_list;
-	char **contacts = NULL, *contact_spec, *next;
+	char **filter_specs = NULL, *filter_spec, *next;
 	EVstone remote_stone, output_stone;
         if (sscanf(argv[i], "%d:%s", &remote_stone, &string_list[0]) != 2) {
 	    printf("Bad argument \"%s\"\n", argv[i]);
 	    exit(0);
 	}
-	contact_spec = strchr(string_list, ':');
-	if (contact_spec != NULL) {	/* if there is a filter spec */
+	filter_spec = strchr(string_list, ':');
+	if (filter_spec != NULL) {	/* if there is a filter spec */
 	    int filter_count = 0;
-	    *contact_spec = 0;           /* terminate the contact list */
-	    contact_spec++;		/* advance pointer to string start */
-	    contacts = malloc(sizeof(contacts[0]) * 2);
-	    while (contact_spec != NULL) {
-		next = strchr(contact_spec, ':');
+	    *filter_spec = 0;           /* terminate the contact list */
+	    filter_spec++;		/* advance pointer to string start */
+	    filter_specs = malloc(sizeof(filter_specs[0]) * 2);
+	    while (filter_spec != NULL) {
+		next = strchr(filter_spec, ':');
 		if (next != NULL) {
 		    *next = 0;
 		    next++;
 		}
-		atl_base64_decode((unsigned char *)contact_spec, NULL);  /* decode in place */
-		contacts = realloc(contacts, sizeof(contacts[0]) * (filter_count + 2));
-		contacts[filter_count++] = contact_spec;
-		contact_spec = next;
+		atl_base64_decode((unsigned char *)filter_spec, NULL);  /* decode in place */
+		filter_specs = realloc(filter_specs, sizeof(filter_specs[0]) * (filter_count + 2));
+		filter_specs[filter_count++] = filter_spec;
+		filter_spec = next;
 	    }
-	    contacts[filter_count] = NULL;
+	    filter_specs[filter_count] = NULL;
 	}
 
 	/* regardless of filtering or not, we'll need an output stone */
