@@ -31,7 +31,7 @@ endif
 
 noinst_PROGRAMS = $(TESTS) thin_client congestion_test congest_bulktest multiq_test store_send_test store_limit_test store_pressure_test block_test submit_wait_test multi_thread
 
-LDADD = ../libevpath.la 
+LDADD = ../libevpath.la ../libcmsockets.la  
 
 thin_client_LDADD = @FFSLINKARG@ -lffs
 thin_test_DEPENDENCIES = ../libevpath.la thin_client
