@@ -1,5 +1,11 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
+/* Define to 1 if you have the <enet/enet.h> header file. */
+#cmakedefine HAVE_ENET_ENET_H
+
+/* Define to 1 if you have the enet header and libraries */
+#cmakedefine ENET_FOUND
+
 /* Place where evpath transport libraries are built */
 #cmakedefine EVPATH_LIBRARY_BUILD_DIR "@EVPATH_LIBRARY_BUILD_DIR@"
 
