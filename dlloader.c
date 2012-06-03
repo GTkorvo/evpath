@@ -48,7 +48,8 @@ CMdlopen(char *in_lib, int mode)
 	while(list && (list[0] != NULL)) {
 	    char *tmp = malloc(strlen(list[0]) + strlen(lib) + 2);
 	    sprintf(tmp, "%s/%s", list[0], lib);
-	    handle = dlopen(tmp, 0);
+	    handle = dlopen(tmp, RTLD_LAZY);
+	    char *err = dlerror();
 	    list++;
 	    if (handle) list = NULL; // fall out
 	}
