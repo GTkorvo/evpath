@@ -1,5 +1,5 @@
 #
-#  FIND_CERCS_PROJECT -  Tue Apr 17 17:09:55 EDT 2012
+#  FIND_CERCS_PROJECT -  Sun Jun  3 06:38:24 EDT 2012
 #
 #  Use this macro like this:
 # FIND_CERCS_PROJECT(project_name 
@@ -87,7 +87,7 @@ FUNCTION (FIND_CERCS_PROJECT ARG_PROJECT)
       endif()
     endif()
     foreach (INCLUDE ${ARG_INCLUDES})
-      STRING(REGEX REPLACE "[.]" "_" INCLUDE_NAME ${INCLUDE})
+      STRING(REGEX REPLACE "[./]" "_" INCLUDE_NAME ${INCLUDE})
       STRING(TOUPPER "HAVE_${INCLUDE_NAME}" INCLUDE_VAR)
       if (${ARG_VERBOSE})
 	message(STATUS "Searching for ${INCLUDE} in ${SEARCH_PATH}")
