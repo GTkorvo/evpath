@@ -36,6 +36,8 @@
 #  pragma warning (disable: 981)
 #endif
 
+static void enet_free_func(void *packet);
+
 extern attr_list
 libcmnnti_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, 
 				  transport_entry trans, attr_list listen_info);
@@ -100,6 +102,7 @@ typedef struct nnti_connection_data {
     char *remote_host;
     int remote_IP;
     int remote_contact_port;
+    int use_enet;
 #ifdef ENET_FOUND
     ENetPeer *peer;
     ENetPacket *packet;
@@ -112,6 +115,7 @@ CMtrans_services svc;
 {
     nnti_conn_data_ptr nnti_conn_data =
 	svc->malloc_func(sizeof(struct nnti_connection_data));
+    memset(nnti_conn_data, 0, sizeof(struct nnti_connection_data));
     nnti_conn_data->read_buffer = NULL;
     nnti_conn_data->nnti_port = -1;
     nnti_conn_data->peer_hostname = NULL;
@@ -440,12 +444,12 @@ initiate_enet_conn(CManager cm, CMtrans_services svc, transport_entry trans,
         svc->trace_out(cm, "CMEnet transport connect to host_IP %lx", host_ip);
     }
     if ((host_name == NULL) && (host_ip == 0))
-	return 0;
+	return -1;
 
     if (!query_attr(attrs, CM_ENET_PORT, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & int_port_num)) {
 	svc->trace_out(cm, "CMEnet transport found no CM_ENET_PORT attribute");
-	return 0;
+	return -1;
     } else {
         svc->trace_out(cm, "CMEnet transport connect to port %d", int_port_num);
     }
@@ -467,6 +471,7 @@ attr_list attrs;
     nnti_conn_data_ptr nnti_conn_data = create_nnti_conn_data(svc);
     attr_list conn_attr_list = create_attr_list();
     CMConnection conn;
+    int enet_conn_status;
 
     if (initiate_nnti_conn(cm, svc, trans, attrs, nnti_conn_data, conn_attr_list) != 1) {
 	return NULL;
@@ -474,8 +479,18 @@ attr_list attrs;
 
 #ifdef ENET_FOUND
     sleep(1);
-    if (initiate_enet_conn(cm, svc, trans, attrs, nnti_conn_data, conn_attr_list) != 1) {
-	return NULL;
+
+    enet_conn_status = initiate_enet_conn(cm, svc, trans, attrs, nnti_conn_data, conn_attr_list);
+    switch (enet_conn_status) {
+    case -1:
+      svc->trace_out(cm, "NO ENET Contact info provided.");
+      nnti_conn_data->use_enet = 0;
+      break;
+    case 0:
+      svc->trace_out(cm, "ENET Connection failed.");
+      return NULL;
+    default:
+      nnti_conn_data->use_enet = 1;
     }
 #endif
 
@@ -725,6 +740,7 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 
 	    nnti_connection_data = enet_accept_conn(ntd, trans, &event.peer->address);
 
+	    ((nnti_conn_data_ptr)nnti_connection_data)->use_enet = 1;
             /* Store any relevant client information here. */
             event.peer -> data = nnti_connection_data;
 	    ((nnti_conn_data_ptr)nnti_connection_data)->peer = event.peer;
@@ -732,7 +748,7 @@ nnti_enet_service_network(CManager cm, void *void_trans)
             break;
 	}
         case ENET_EVENT_TYPE_RECEIVE: {
-	    nnti_conn_data_ptr econn_d = event.peer->data;
+	    nnti_conn_data_ptr ncd = event.peer->data;
 	    struct client_message *m;
 	    svc->trace_out(cm, "An ENET packet of length %u containing %s was received on channel %u.\n",
                     (unsigned int) event.packet -> dataLength,
@@ -743,20 +759,18 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 	    /*	    econn_d->packet = event.packet;*/
 	    m = (struct client_message *) event.packet->data;
 	    if (m->message_type == 1){
-
-	      struct client_message *m = (struct client_message *)(wait_status.start+wait_status.offset);
-	      econn_d->packet = event.packet;
+	      ncd->packet = event.packet;
 	      ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->size);
 	      
 	      memcpy(&((char*)ncd->read_buffer->buffer)[0], &(m->payload[0]), m->size);
 	      
 	      ncd->read_buf_len = m->size;
 	      /* kick this upstairs */
+	      ncd->read_buffer->return_callback = enet_free_func;
+	      ncd->read_buffer->return_callback_data = (void*)ncd->packet;
 	      trans->data_available(trans, ncd->conn);
 	      ntd->svc->return_data_buffer(trans->cm, ncd->read_buffer);
 	      ncd->read_buffer = NULL;
-	      ncd->read_buffer->return_callback = enet_free_func;
-	      ncd->read_buffer->return_callback_data = (void*)ncd->packet;
 	    } else {
 	      handle_control_request(m);
 	      enet_packet_destroy (event.packet);
@@ -798,11 +812,16 @@ enet_accept_conn(nnti_transport_data_ptr ntd, transport_entry trans,
     CMConnection conn;
     attr_list conn_attr_list = NULL;;
 
-    while ((ncd->remote_IP != address->host) && 
+ restart:
+    while (ncd && (ncd->remote_IP != address->host) && 
 	   (ncd->remote_contact_port != address->port)) {
-        ncd = ncd->next;
+      ncd = ncd->next;
     }
-    assert(ncd != NULL);
+    if (ncd == NULL) {
+      printf("Waiting...\n");
+      sleep(1);
+      goto restart;
+    }
 
     conn_attr_list = ncd->attrs;
 
@@ -845,9 +864,13 @@ attr_list listen_info;
     char *last_colon;
     int err;
     int use_enet = 1;
+    char *enet = getenv("NNTI_ENET");
 
     if (ntd->listen_attrs != NULL) {
 	return ntd->listen_attrs;
+    }
+    if (enet) {
+      sscanf(enet, "%d", &use_enet);
     }
     if (listen_info) {
 	get_int_attr(listen_info, CM_NNTI_ENET_CONTROL, &use_enet);
@@ -1013,7 +1036,7 @@ attr_list attrs;
     int client_header_size = ((int) (((char *) (&(((struct client_message *)NULL)->payload[0]))) - ((char *) NULL)));
     for(i=0; i<iovcnt; i++) size+= iov[i].iov_len;
 #ifdef ENET_FOUND
-    if (ncd->ntd->use_enet) {
+    if (ncd->use_enet) {
       svc->trace_out(ncd->ntd->cm, "CMENET vector write of %d bytes on peer %p",
 		     size, ncd->peer);
 
