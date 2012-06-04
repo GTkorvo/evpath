@@ -697,6 +697,10 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
     cod_parse_for_context(extern_string, context);
 }
 
+#else
+void
+add_metrics_routines(stone_type stone, cod_parse_context context)
+{}
 #endif //End of !TARGET_CNL
 
 /*int main(int argc, char **argv) {
