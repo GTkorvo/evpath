@@ -8,7 +8,7 @@ INCLUDE_DIRECTORIES(BEFORE ${evpath_BINARY_DIR} ${evpath_SOURCE_DIR} ${CMAKE_CUR
 
 foreach (TEST ${TESTS} )
     ADD_EXECUTABLE(revp_${TEST} ${TEST}.c)
-    TARGET_LINK_LIBRARIES(revp_${TEST} evpath)
+    TARGET_LINK_LIBRARIES(revp_${TEST} evpath ${BASE_LIBS})
     ADD_TEST(revp_${TEST} "revp_${TEST}")
 endforeach()
 

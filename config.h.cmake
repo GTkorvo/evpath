@@ -140,3 +140,7 @@
 
 /* Define to the shared module suffix in use */
 #cmakedefine CMAKE_SHARED_MODULE_SUFFIX "@CMAKE_SHARED_MODULE_SUFFIX@"
+
+/* Set to 1 to build without dynamic linking  */
+#undef NO_DYNAMIC_LINKING @NO_DYNAMIC_LINKING@
+

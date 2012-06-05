@@ -9,12 +9,12 @@ INCLUDE_DIRECTORIES(BEFORE ${evpath_BINARY_DIR} ${evpath_SOURCE_DIR} ${CMAKE_CUR
 
 foreach (TEST ${TESTS} )
     ADD_EXECUTABLE(${TEST} ${TEST}.c)
-    TARGET_LINK_LIBRARIES(${TEST} evpath)
+    TARGET_LINK_LIBRARIES(${TEST} evpath ${BASE_LIBS})
     ADD_TEST(${TEST} "${TEST}")
 endforeach()
 
 ADD_EXECUTABLE(thin_client thin_client.c)
-TARGET_LINK_LIBRARIES(thin_client evpath)
+TARGET_LINK_LIBRARIES(thin_client evpath ${BASE_LIBS})
 
 ADD_TEST(evtest_UDP evtest -t udp)
 IF (ENET_FOUND)
