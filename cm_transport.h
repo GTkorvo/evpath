@@ -133,7 +133,7 @@ struct _transport_item {
 }
 #endif
 
-#if defined(NO_DYNAMIC_LINKING)
+#if NO_DYNAMIC_LINKING
 struct socket_connection_data;
 
 #if defined (__INTEL_COMPILER)

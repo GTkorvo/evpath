@@ -142,5 +142,5 @@
 #cmakedefine CMAKE_SHARED_MODULE_SUFFIX "@CMAKE_SHARED_MODULE_SUFFIX@"
 
 /* Set to 1 to build without dynamic linking  */
-#undef NO_DYNAMIC_LINKING @NO_DYNAMIC_LINKING@
+#cmakedefine NO_DYNAMIC_LINKING @NO_DYNAMIC_LINKING@
 

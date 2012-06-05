@@ -42,7 +42,7 @@ pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = evpath-3.0.pc
 
 libevpath_la_SOURCES = cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c \
-                       cm_lock.c cm_perf.c cm_pbio.c cm_interface.c version.c \
+                       cm_lock.c cm_perf.c cm_pbio.c cm_interface.c dlloader.c version.c \
                        cm_threadio.c cm_evol.c evp.c response.c metrics.c \
                        revp.c evp_compat.c thin_server.c evp_threads.c ev_dfg.c
 

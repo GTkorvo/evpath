@@ -99,21 +99,21 @@ AC_CHECK_LIB(enet,enet_initialize, [build_enet=enable],[build_enet=disable])
 AC_CHECK_LIB(trios_nssi,NNTI_init, [build_nnti=enable],[build_nnti=disable])
 
 computenode=disable
-do_dyn_linking=0
+no_dyn_linking=0
 AC_ARG_ENABLE(CNL, [  --enable-CNL Enable a restricted socket only transport build to allow building on compute node linux. Default is disabled],
-	[ if test "x$enableval" = "xtrue"; then
+	[ if test "x$enableval" = "xyes"; then
 		echo "Configuring for compute node linux"
-		do_dyn_linking=1
+		no_dyn_linking=1
 		computenode=enable
 	else
-		do_dyn_linking=0
+		no_dyn_linking=0
 		computenode=disable
 	fi])
 if test x$computenode = xenable
    then
    AC_DEFINE([TARGET_CNL],[1],[The target platform is Cray Compute Node Linux (CNL).])
 fi
-AC_DEFINE_UNQUOTED([NO_DYNAMIC_LINKING], [$do_dyn_linking], [Build with dynamic linking])
+AC_DEFINE_UNQUOTED([NO_DYNAMIC_LINKING], [$no_dyn_linking], [Build with dynamic linking])
 AM_CONDITIONAL([CNL], [test x$computenode = xenable])
 AM_CONDITIONAL([BUILD_IB], [test x$build_ib = xenable])
 AM_CONDITIONAL([BUILD_ENET], [test x$build_enet = xenable])
