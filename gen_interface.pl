@@ -616,6 +616,7 @@ REVPlookup_handler(char *name)
 	f = (EVSimpleHandlerFunc)p;
 	return f;
     } 
+#if !NO_DYNAMIC_LINKING
     if (h == NULL) {
 	lt_dlinit();
 	h = lt_dlopen(NULL);
@@ -634,6 +635,7 @@ REVPlookup_handler(char *name)
 	}
 	f = (EVSimpleHandlerFunc)dlsym(dh, name);
     }
+#endif
     if (f == NULL) {
 	printf("Dynamic symbol lookup for \\"%s\\" failed.\\n\\tEither the symbol is invalid, or symbol lookup is not enabled.\\n", name);
 	printf("Make sure that the symbol is declared \\"extern\\" (not \\"static\\")\\n");

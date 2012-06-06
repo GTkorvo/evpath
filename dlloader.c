@@ -29,6 +29,9 @@ typedef struct {
 void *
 CMdlopen(char *in_lib, int mode)
 {
+#if NO_DYNAMIC_LINKING
+    return NULL;
+#else
     int i;
     dlhandle dlh;
     void *handle;
@@ -65,11 +68,15 @@ CMdlopen(char *in_lib, int mode)
     dlh->dlopen_handle = handle;
     free(lib);
     return (void*)dlh;
+#endif
 }
 
 void*
 CMdlsym(void *vdlh, char *sym)
 {
+#if NO_DYNAMIC_LINKING
+    return NULL;
+#else
     dlhandle dlh = (dlhandle)vdlh;
     char *tmp = malloc(strlen(sym) + strlen(dlh->lib_prefix) + 1);
     void *sym_val;
@@ -80,4 +87,5 @@ CMdlsym(void *vdlh, char *sym)
     if (!sym_val) 
 	sym_val = dlsym(dlh->dlopen_handle, sym);
     return sym_val;
+#endif
 }
