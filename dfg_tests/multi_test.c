@@ -167,8 +167,6 @@ be_test_master(int argc, char **argv)
     EVdfg_register_source("b_source", b_handle);
     EVdfg_register_sink_handler(cm, "c_output_handler", c_format_list,
 				(EVSimpleHandlerFunc) output_handler);
-    EVdfg_register_sink_handler(cm, "a_output_handler", a_format_list,
-				(EVSimpleHandlerFunc) output_handler);
 
 /*
 **  DFG CREATION
