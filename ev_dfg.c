@@ -121,6 +121,10 @@ INT_EVdfg_create_sink_stone(EVdfg dfg, char *sink_name)
 void
 INT_EVdfg_add_action(EVdfg_stone stone, char *action)
 {
+    if (stone->action == NULL) {
+	stone->action = action;
+	return;
+    }
     if (stone->extra_actions == NULL) {
 	stone->extra_actions = malloc(sizeof(stone->extra_actions[0]));
     } else {
