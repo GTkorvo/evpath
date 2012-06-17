@@ -680,7 +680,7 @@ static queue_item *queue_find_index(queue_item *item, int i, FMFormat format) {
         if (!item) {
             return NULL;
         }
-        if (!format || item->item->reference_format == format) {
+        if (!format || (item->item->reference_format == format)) {
             if (i == 0)
                 return item;
             --i;
@@ -834,7 +834,10 @@ static void *cod_ev_get_data(cod_exec_context ec, int absp, int queue, int index
     queue_item *item;
     item = cod_find_index(absp, ev_state, queue, index);
 
-    assert(item);
+    if (!item) {
+	printf("COD ev_get_data, queue %d, index %d (absp %d) failed to find data\n", queue, index, absp);
+	return NULL;
+    }
     assert(item->item);
 
     if (!item->item->decoded_event) {
@@ -864,13 +867,15 @@ static int cod_ev_present(cod_exec_context ec, int queue, int index) {
     return cod_find_index_rel(ev_state, queue, index) != NULL;
 }
 
-static int cod_ev_count(cod_exec_context ec, int queue) {
+static int cod_ev_count(cod_exec_context ec, long queue) {
     struct ev_state_data *ev_state = (void*) cod_get_client_data(ec, 0x34567890);
-    FMFormat type = queue < 0 ? NULL :
-        ev_state->instance->u.queued.formats[queue];
-    queue_item *item = ev_state->item;
+    FMFormat type;
+    queue_item *item;
     int count = 1;
 
+    type = queue < 0 ? NULL :
+        ev_state->instance->u.queued.formats[queue];
+    item = ev_state->item;
     while (item->next) {
         if (!type || item->item->reference_format == type)
             ++count;
@@ -1238,6 +1243,7 @@ internal_cod_submit(cod_exec_context ec, int port, void *data, void *type_info)
     event_path_data evp = ev_state->cm->evp;
     event_item *event;
     EVstone target_stone = port_to_stone(ev_state, port);
+
     if (target_stone == -1) {
         printf("Port %d on stone %d invalid\n", port, ev_state->stone);
 	return;
@@ -1387,7 +1393,11 @@ add_typed_queued_routines(cod_parse_context context, int index, FMFormat format)
     cod_parse_for_context(extern_string, context);
 
     for (cur = externs; cur->extern_name; ++cur) {
-        cod_set_closure(cur->extern_name, index, context);
+	/* 
+	 * the index here is the index of the queue itself, 
+	 * while the index in the calls above is the index of the referenced queue item 
+	 */
+        cod_set_closure(cur->extern_name, (void*)(long)index, context);
         free(cur->extern_name);
     }
     free(externs);
@@ -1407,7 +1417,7 @@ add_queued_routines(cod_parse_context context, FMFormat *formats)
                     int queue, int index);\n\
         void *EVdata(cod_exec_context ec, int queue, int index);\n\
         void *EVdata_full(cod_exec_context ec, int queue, int index);\n\
-        int EVcount(cod_exec_context ec, int queue);\n\
+        int EVcount(cod_exec_context ec, long queue);\n\
         int EVpresent(cod_exec_context ec, int queue, int index);\n\
 		int EVget_port(cod_exec_context ec, int queue);\n\
     	int EVtarget_size(cod_exec_context ec, int outstone);\n";
@@ -1741,6 +1751,48 @@ generate_filter_code(CManager cm, struct response_spec *mrd, stone_type stone,
     cod_free_parse_context(parse_context);
 
     return instance;
+}
+
+static int
+verify_multityped_code(CManager cm, struct response_spec *mrd, stone_type stone,
+			 FMFormat *formats)
+{
+    FMFormat *cur_format;
+    int ret;
+
+    cod_code code;
+    cod_parse_context parse_context = new_cod_parse_context();
+    /*    sm_ref conn_info_data_type, conn_info_param;*/
+
+    for (cur_format = formats; *cur_format; ++cur_format) {
+        add_type(parse_context, *cur_format);
+    }
+
+    add_standard_routines(stone, parse_context);
+    add_queued_routines(parse_context, formats);
+    add_queued_constants(parse_context, formats);
+    if (cm->evp->extern_structs) {
+	int count = -1;
+	while(cm->evp->extern_structs[++count] != NULL) {
+	    cod_add_struct_type(cm->evp->extern_structs[count], parse_context);
+	}
+    }
+	
+    if (cm->evp->externs) {
+	int count = -1;
+	while (cm->evp->externs[++count].extern_decl != NULL) {
+	    cod_assoc_externs(parse_context, cm->evp->externs[count].externs);
+	    cod_parse_for_context(cm->evp->externs[count].extern_decl, 
+				  parse_context);
+	}
+    }
+
+
+
+    assert(mrd->response_type == Response_Multityped);
+    cod_add_param("ec", "cod_exec_context", 0, parse_context);
+    ret = cod_code_verify(mrd->u.multityped.function, parse_context);
+    return ret;
 }
 
 static response_instance
