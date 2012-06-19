@@ -835,7 +835,6 @@ static void *cod_ev_get_data(cod_exec_context ec, int absp, int queue, int index
     item = cod_find_index(absp, ev_state, queue, index);
 
     if (!item) {
-	printf("COD ev_get_data, queue %d, index %d (absp %d) failed to find data\n", queue, index, absp);
 	return NULL;
     }
     assert(item->item);
@@ -868,11 +867,12 @@ static int cod_ev_present(cod_exec_context ec, int queue, int index) {
 }
 
 static int cod_ev_count(cod_exec_context ec, long queue) {
-    struct ev_state_data *ev_state = (void*) cod_get_client_data(ec, 0x34567890);
+    struct ev_state_data *ev_state;
     FMFormat type;
     queue_item *item;
     int count = 1;
 
+    ev_state = (void*) cod_get_client_data(ec, 0x34567890);
     type = queue < 0 ? NULL :
         ev_state->instance->u.queued.formats[queue];
     item = ev_state->item;
@@ -1166,8 +1166,6 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 		INT_EVassoc_conversion_action(cm, stone->local_id, stage,
 					      conversion_target_format,
 					      event->reference_format);
-/*	    printf(" Returning ");
-	    dump_action(stone, a, "   ");*/
 		return_value = 1;
 	    } else {
 		if (event->reference_format != conversion_target_format) {
@@ -1180,6 +1178,7 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
             return_value = 1;
         }
     }
+    fix_response_cache(stone);
     return return_value;
 }
 
