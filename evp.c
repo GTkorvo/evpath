@@ -314,6 +314,26 @@ clear_response_cache(stone_type stone)
     stone->response_cache = NULL;
 }
 
+void
+fix_response_cache(stone_type stone)
+{
+    int i;
+    for (i=stone->response_cache_count-1; i >= 0; i--) {
+	int j;
+	FMFormat ref = stone->response_cache[i].reference_format;
+	for (j=0; j < i; j++) {
+	    if (((stone->response_cache[j].reference_format == ref) ||
+		 (stone->response_cache[j].reference_format == NULL)) && 
+		(stone->response_cache[j].action_type == Action_NoAction)) {
+		/* need to kill this */
+		memmove(&stone->response_cache[j], &stone->response_cache[j+1], 
+			sizeof(stone->response_cache[0]) * (stone->response_cache_count - j - 1));
+		stone->response_cache_count--;
+	    }			
+	}
+    }
+}
+
 EVstone
 INT_EVcreate_terminal_action(CManager cm, FMStructDescList format_list, 
 			     EVSimpleHandlerFunc handler, void *client_data)
@@ -892,7 +912,7 @@ INT_EVassoc_conversion_action(CManager cm, int stone_id, int stage,
     act->requires_decoded = 0;
     act->action_type = Action_Decode;
     act->reference_format = incoming_format;
-    act->stage = (action_class) stage;
+    act->stage = Immediate;
 
     act->o.decode.context = create_FFSContext_FM(cm->evp->fmc);
     format = FFSTypeHandle_from_encode(act->o.decode.context, 
@@ -1027,6 +1047,7 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
 	printf("A NO_ACTION response has been installed into the response cache for event type \"%s\" (%p)\n", tmp = global_name_of_FMFormat(event->reference_format), event->reference_format);
 	dump_stone(stone);
 	}*/
+
     stone->response_cache[return_response].action_type = Action_NoAction;
     stone->response_cache[return_response].stage = stage;
     stone->response_cache[return_response].requires_decoded = 0;
@@ -1363,6 +1384,14 @@ dump_stone(stone_type stone)
     for (i=0; i< stone->proto_action_count; i++) {
 	dump_action(stone, NULL, i, "    ");
     }
+    printf("  response_cache_count %d:\n", stone->response_cache_count);
+    for (i=0; i< stone->response_cache_count; i++) {
+	response_cache_element *resp = &stone->response_cache[i];
+	printf("Response cache item %d, reference format %p (%s)\n", i, resp->reference_format,
+	       resp->reference_format ? resp->reference_format->format_name : "<none>");
+	printf("stage %d, action_type %s, proto_action_id %d, requires_decoded %d\n", resp->stage,
+	       action_str[resp->action_type], resp->proto_action_id, resp->requires_decoded);
+    }
 }
 
 void
@@ -1414,14 +1443,6 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 	dump_action(stone, resp, resp->proto_action_id, "    ");
 	}*/
     enqueue_event(cm, local_path_id, -1, event_to_submit);
-/*    if (event != event_to_submit) {
-
-	 * if an event was created by the decode, decrement it's
-	 * ref count now.  The parameter 'event' will be dereferenced
-	 * by our caller.
-
-	return_event(evp, event_to_submit);
-    }*/
     return 1;
 }
 
@@ -2032,6 +2053,7 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
 	}
     }
     stone->response_cache_count += queue_count;
+    fix_response_cache(stone);
     return resp_num;
 }
 
