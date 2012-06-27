@@ -97,6 +97,7 @@ typedef struct nnti_connection_data {
     char *send_buffer;
     NNTI_buffer_t res_addr;
     NNTI_buffer_t buf_addr;
+    int piggyback_size_max;
 
     /* enet support */
     char *remote_host;
@@ -341,20 +342,20 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
-	svc->trace_out(cm, "CMEnet transport found no CM_ENET_HOSTNAME attribute");
+	svc->trace_out(cm, "Cmnnti/Enet transport found no CM_ENET_HOSTNAME attribute");
 	host_name = NULL;
     } else {
-        svc->trace_out(cm, "CMEnet transport connect to host %s", host_name);
+        svc->trace_out(cm, "Cmnnti/Enet transport connect to host %s", host_name);
     }
     if (host_name == NULL)
 	return 0;
 
     if (!query_attr(attrs, CM_ENET_PORT, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & int_port_num)) {
-	svc->trace_out(cm, "CMEnet transport found no CM_ENET_PORT attribute");
+	svc->trace_out(cm, "Cmnnti/Enet transport found no CM_ENET_PORT attribute");
 	return 0;
     } else {
-        svc->trace_out(cm, "CMEnet transport connect to port %d", int_port_num);
+        svc->trace_out(cm, "Cmnnti/Enet transport connect to port %d", int_port_num);
     }
 
     /* INET socket connection, host_name is the machine name */
@@ -430,28 +431,28 @@ initiate_enet_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
-	svc->trace_out(cm, "CMEnet transport found no CM_IP_HOSTNAME attribute");
+	svc->trace_out(cm, "Cmnnti/Enet transport found no CM_IP_HOSTNAME attribute");
 	host_name = NULL;
     } else {
-        svc->trace_out(cm, "CMEnet transport connect to host %s", host_name);
+        svc->trace_out(cm, "Cmnnti/Enet transport connect to host %s", host_name);
     }
     if (!query_attr(attrs, CM_ENET_ADDR, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_ip)) {
-	svc->trace_out(cm, "CMEnet transport found no CM_ENET_ADDR attribute");
+	svc->trace_out(cm, "Cmnnti/Enet transport found no CM_ENET_ADDR attribute");
 	/* wasn't there */
 	host_ip = 0;
     } else {
-        svc->trace_out(cm, "CMEnet transport connect to host_IP %lx", host_ip);
+        svc->trace_out(cm, "Cmnnti/Enet transport connect to host_IP %lx", host_ip);
     }
     if ((host_name == NULL) && (host_ip == 0))
 	return -1;
 
     if (!query_attr(attrs, CM_ENET_PORT, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & int_port_num)) {
-	svc->trace_out(cm, "CMEnet transport found no CM_ENET_PORT attribute");
+	svc->trace_out(cm, "Cmnnti/Enet transport found no CM_ENET_PORT attribute");
 	return -1;
     } else {
-        svc->trace_out(cm, "CMEnet transport connect to port %d", int_port_num);
+        svc->trace_out(cm, "Cmnnti/Enet transport connect to port %d", int_port_num);
     }
 
     return initiate_enet_link(cm, svc, trans, nnti_conn_data, host_name, int_port_num);
@@ -499,6 +500,7 @@ attr_list attrs;
     add_attr(conn_attr_list, CM_NNTI_PORT, Attr_Int4,
 	     (attr_value) (long)nnti_conn_data->nnti_port);
 
+    nnti_conn_data->piggyback_size_max = NNTI_REQUEST_BUFFER_SIZE;
     conn = svc->connection_create(trans, nnti_conn_data, conn_attr_list);
     add_connection(nnti_conn_data->ntd, nnti_conn_data);
     nnti_conn_data->conn = conn;
@@ -588,10 +590,24 @@ nnti_conn_data_ptr ncd;
 }
 
 
-struct client_message {
-  short message_type;
+struct piggyback {
   unsigned short size;          // size of message payload
   char payload[1];
+};
+
+struct pull_request {
+  unsigned short size;          // size of message to pull
+  void *addr;
+  NNTI_buffer_t buf_addr;
+  NNTI_buffer_t res_addr;
+};
+
+struct client_message {
+  short message_type;
+  union {
+    struct piggyback pig;
+    struct pull_request pull;
+  };
 };
 
 static void
@@ -604,20 +620,109 @@ typedef struct listen_struct {
   transport_entry trans;
 } *listen_struct_p;
 
+static void
+handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
+{
+    nnti_transport_data_ptr ntd = lsp->ntd;
+    CMtrans_services svc = lsp->svc;
+    transport_entry trans = lsp->trans;
+    struct connect_message *cm = (struct connect_message *)(wait_status->start+wait_status->offset);
+	    
+    nnti_conn_data_ptr ncd = ntd->connections;
+    while (ncd != NULL) {
+	if (memcmp(&wait_status->src, &ncd->peer_hdl, sizeof(wait_status->src)) == 0) {
+	    ntd->svc->trace_out(trans->cm, "NNTI data available on existing connection, from host %s, type %d", 
+				ncd->peer_hostname, cm->message_type);
+	    break;
+	}
+	ncd = ncd->next;
+    }
+    switch (cm->message_type){
+    case 1: 
+    {
+	int err;
+	char server_url[256];
+	attr_list conn_attr_list = NULL;
+		
+	ntd->svc->trace_out(trans->cm, "  client %s:%d  (enet %d) is connecting",
+			    cm->name, cm->nnti_port, cm->enet_port);
+	      
+	assert(ncd == NULL);
+	ncd = create_nnti_conn_data(svc);
+	ncd->ntd = ntd;
+	ncd->peer_hdl = wait_status->src;
+	ncd->remote_contact_port = cm->enet_port;
+	sprintf(server_url, "ib://%s:%d/", cm->name, cm->nnti_port);
+
+	ncd->size = NNTI_REQUEST_BUFFER_SIZE;
+	ncd->raddr = 0;
+	ncd->cksum = 0;
+	ncd->acks_offset=(nnti_conn_count++)*NNTI_REQUEST_BUFFER_SIZE;
+	//            ncd->buf_addr = cm->buf_addr;
+	//            ncd->res_addr = cm->res_addr;
+		
+	/* register memory region for sending acknowledgement to this client */
+	ntd->svc->trace_out(trans->cm, "   ID %d register small send buffer to client %d (offset=%d)...",
+			    cm->nnti_port, nnti_conn_count-1, ncd->acks_offset);
+	
+	conn_attr_list = create_attr_list();
+	ncd->conn = svc->connection_create(trans, ncd, conn_attr_list);
+	ncd->attrs = conn_attr_list;
+	add_connection(ntd, ncd);
+	err = NNTI_register_memory (&ntd->trans_hdl,
+				    &ntd->outbound[ncd->acks_offset],
+				    NNTI_REQUEST_BUFFER_SIZE, 1, NNTI_SEND_SRC,
+				    &ncd->peer_hdl, &ncd->mr_send);
+	if (err != NNTI_OK) {
+	    fprintf (stderr, "Error: NNTI_register_memory(NNTI_SEND_SRC) for server message returned non-zero: %d\n", err);
+	    return;
+	}
+	
+	ncd->send_buffer = &ntd->outbound[ncd->acks_offset];
+	ncd->piggyback_size_max = NNTI_REQUEST_BUFFER_SIZE;
+    }
+    break;
+    case 2:
+    {
+	struct client_message *m = (struct client_message *)(wait_status->start+wait_status->offset);
+	ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
+	
+	memcpy(&((char*)ncd->read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
+	
+	ncd->read_buf_len = m->pig.size;
+	/* kick this upstairs */
+	trans->data_available(trans, ncd->conn);
+	ntd->svc->return_data_buffer(trans->cm, ncd->read_buffer);
+	ncd->read_buffer = NULL;
+    }
+    break;
+    default:
+    {
+	struct client_message *m = (struct client_message *)(wait_status->start+wait_status->offset);
+	handle_control_request(m);
+    }
+    }
+}
+
 int
 listen_thread_func(void *vlsp)
 {
-    int timeout = 5000;
+    int timeout = 10;
     listen_struct_p lsp = vlsp;
     nnti_transport_data_ptr ntd = lsp->ntd;
     CMtrans_services svc = lsp->svc;
     transport_entry trans = lsp->trans;
     int err;
     NNTI_status_t               wait_status;
+    int buf_size = 10;
+    NNTI_buffer_t **buf_list = malloc(sizeof(buf_list[0]) * buf_size);
   
     while (1) {
-        attr_list conn_attr_list = NULL;
-        err = NNTI_wait(&ntd->mr_recvs, NNTI_RECV_QUEUE, timeout, &wait_status);
+        int buf_count = 1;
+	int which;
+	buf_list[0] = &ntd->mr_recvs;
+	//err = NNTI_wait(&ntd->mr_recvs, NNTI_RECV_QUEUE, timeout, &wait_status);
+	err = NNTI_waitany((const NNTI_buffer_t**)buf_list, buf_count, NNTI_RECV_QUEUE, timeout, &which, &wait_status);
 	if (ntd->shutdown_listen_thread) {
 	  return 0;
 	}
@@ -632,82 +737,11 @@ listen_thread_func(void *vlsp)
 		     wait_status.result, wait_status.length, wait_status.offset, wait_status.start+wait_status.offset, wait_status.offset);
         }
 
-
         if (wait_status.result == NNTI_OK) {
-            struct connect_message *cm = (struct connect_message *)(wait_status.start+wait_status.offset);
-	    
-	    nnti_conn_data_ptr ncd = ntd->connections;
-	    while (ncd != NULL) {
-	        if (memcmp(&wait_status.src, &ncd->peer_hdl, sizeof(wait_status.src)) == 0) {
-		    ntd->svc->trace_out(trans->cm, "NNTI data available on existing connection, from host %s, type %d", 
-					ncd->peer_hostname, cm->message_type);
-		    break;
-		}
-		ncd = ncd->next;
-	    }
-	    switch (cm->message_type){
-	    case 1: 
-	    {
-		int err;
-		char server_url[256];
-		ntd->svc->trace_out(trans->cm, "  client %s:%d  (enet %d) is connecting",
-				    cm->name, cm->nnti_port, cm->enet_port);
-	      
-		assert(ncd == NULL);
-		ncd = create_nnti_conn_data(svc);
-		ncd->ntd = ntd;
-		ncd->peer_hdl = wait_status.src;
-		ncd->remote_contact_port = cm->enet_port;
-		sprintf(server_url, "ib://%s:%d/", cm->name, cm->nnti_port);
-
-		ncd->size = NNTI_REQUEST_BUFFER_SIZE;
-		ncd->raddr = 0;
-		ncd->cksum = 0;
-		ncd->acks_offset=(nnti_conn_count++)*NNTI_REQUEST_BUFFER_SIZE;
-		//            ncd->buf_addr = cm->buf_addr;
-		//            ncd->res_addr = cm->res_addr;
-		
-		/* register memory region for sending acknowledgement to this client */
-		ntd->svc->trace_out(trans->cm, "   ID %d register small send buffer to client %d (offset=%d)...",
-				    cm->nnti_port, nnti_conn_count-1, ncd->acks_offset);
-		
-		conn_attr_list = create_attr_list();
-		ncd->conn = svc->connection_create(trans, ncd, conn_attr_list);
-		ncd->attrs = conn_attr_list;
-		add_connection(ntd, ncd);
-		err = NNTI_register_memory (&ntd->trans_hdl,
-					    &ntd->outbound[ncd->acks_offset],
-					    NNTI_REQUEST_BUFFER_SIZE, 1, NNTI_SEND_SRC,
-					    &ncd->peer_hdl, &ncd->mr_send);
-		if (err != NNTI_OK) {
-		    fprintf (stderr, "Error: NNTI_register_memory(NNTI_SEND_SRC) for server message returned non-zero: %d\n", err);
-		    return 1;
-		}
-		
-		ncd->send_buffer = &ntd->outbound[ncd->acks_offset];
-	    }
-	    break;
-	    case 2:
-	    {
-		struct client_message *m = (struct client_message *)(wait_status.start+wait_status.offset);
-		ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->size);
-		
-		memcpy(&((char*)ncd->read_buffer->buffer)[0], &(m->payload[0]), m->size);
-		
-		ncd->read_buf_len = m->size;
-		/* kick this upstairs */
-		trans->data_available(trans, ncd->conn);
-		ntd->svc->return_data_buffer(trans->cm, ncd->read_buffer);
-		ncd->read_buffer = NULL;
-	    }
-	    break;
-	    default:
-	    {
-		struct client_message *m = (struct client_message *)(wait_status.start+wait_status.offset);
-		handle_control_request(m);
-	    }
-	    }
-        }
+	  if (which == 0) {
+	    handle_request_buffer_event(lsp, &wait_status);
+	  }
+	}
     }
 }
 
@@ -758,13 +792,14 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 	    /*	    econn_d->read_buffer = event.packet->data;*/
 	    /*	    econn_d->packet = event.packet;*/
 	    m = (struct client_message *) event.packet->data;
-	    if (m->message_type == 1){
+	    svc->trace_out(cm, "   Message type is %d\n", m->message_type);
+	    if (m->message_type == 2){
 	      ncd->packet = event.packet;
-	      ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->size);
+	      ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
 	      
-	      memcpy(&((char*)ncd->read_buffer->buffer)[0], &(m->payload[0]), m->size);
+	      memcpy(&((char*)ncd->read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
 	      
-	      ncd->read_buf_len = m->size;
+	      ncd->read_buf_len = m->pig.size;
 	      /* kick this upstairs */
 	      ncd->read_buffer->return_callback = enet_free_func;
 	      ncd->read_buffer->return_callback_data = (void*)ncd->packet;
@@ -795,7 +830,35 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 static void
 handle_control_request(struct client_message *m)
 {
-  printf("IN HANDLE CONTROL_REQUEST\n");
+#ifdef NOT_DEF
+  int err;
+  int offset = 0;
+  int pullsize = size;
+
+  err = NNTI_get (m.buf_addr,
+		  offset,  // get from this remote buffer+offset
+		  pullsize,      // this amount of data
+		  buf_list[which],
+		  offset); // into this buffer+offset
+
+  if (err != NNTI_OK) {
+    printf ("  THREAD: Error: NNTI_get() for client returned non-zero: %d\n",
+	    err);
+    conns[which%nc].status = 1; // failed status
+  }
+  err = NNTI_wait(ncd->, NNTI_GET_DST, timeout, &status);
+  if (err == NNTI_ETIMEDOUT) {
+    fprintf (server_out, "  THREAD:   no news about clients yet.\n");
+  } else if (err != NNTI_OK) {
+    fprintf (server_out, "  THREAD: Error: pull from client %d failed. NNTI_waitany returned: %d\n",
+	     conns[which%nc].crank, err);
+    (*n)--;
+    buf_list[which]=NULL;
+    conns[which%nc].status = 1; // failed status
+  } else {
+    // completed a pull here
+
+#endif
 }
 
 #ifdef ENET_FOUND
@@ -949,7 +1012,7 @@ attr_list listen_info;
 	while (tries > 0) {
 	    int target = low_bound + size * drand48();
 	    address.port = target;
-	    svc->trace_out(cm, "CMEnet trying to bind port %d", target);
+	    svc->trace_out(cm, "Cmnnti/Enet trying to bind port %d", target);
 
 	    server = enet_host_create (& address /* the address to bind the server host to */, 
 				       0     /* allow up to 4095 clients and/or outgoing connections */,
@@ -1022,6 +1085,118 @@ int *actual_len;
 #define IOV_MAX 16
 #endif
 
+typedef enum {enet, nnti} control_transport;
+
+typedef struct _send_handle {
+    control_transport t;
+    int size;
+#ifdef ENET_FOUND
+    ENetPacket *packet;
+#endif
+    nnti_conn_data_ptr ncd;
+} send_handle;
+
+send_handle
+get_control_message_buffer(nnti_conn_data_ptr ncd, struct client_message **mp,
+			   int size)
+{
+    send_handle ret;
+    if (ncd->use_enet) {
+	ret.t = enet;
+#ifdef ENET_FOUND
+	/* Create a reliable packet of the right size */
+	ret.packet = enet_packet_create (NULL, size,
+					 ENET_PACKET_FLAG_RELIABLE);
+	*mp = (struct client_message *) ret.packet->data;
+#endif
+    } else {
+	assert(size < NNTI_REQUEST_BUFFER_SIZE);
+	ret.t = nnti;
+	*mp = (struct client_message*)ncd -> send_buffer;
+    }	
+    ret.ncd = ncd;
+    ret.size = size;
+    return ret;
+}
+
+int
+send_control_message(send_handle h)
+{
+    CManager cm = h.ncd->ntd->cm;
+    CMtrans_services svc = h.ncd->ntd->svc;
+    if (h.t == enet) {
+#ifdef ENET_FOUND
+        svc->trace_out(cm, "CMNNTI/ENET control write of %d bytes on peer %p",
+		       h.size, h.ncd->peer);
+	/* Send the packet to the peer over channel id 0. */
+	if (enet_peer_send (h.ncd->peer, 0, h.packet) == -1) {
+	    svc->trace_out(cm, "CMNNTI/ENET control write failed.");
+	    return 0;
+	}
+	enet_host_flush(h.ncd->ntd->enet_server);
+#endif
+    } else {
+        svc->trace_out(cm, "CMNNTI control write of %d bytes",
+		       h.size);
+	NNTI_status_t               status;
+	int timeout = 1000;
+	int err = NNTI_send(&h.ncd->peer_hdl, &h.ncd->mr_send, NULL);
+	
+	if (err != NNTI_OK) {
+	    fprintf (stderr, "Error: NNTI_send() returned non-zero: %d\n", err);
+	    return 1;
+	}
+	svc->trace_out(cm, "    NNTI_send() returned. Call wait... ");
+	
+	/* Wait for message to be sent */
+	timeout = 1000;
+      again:
+	err = NNTI_wait(&h.ncd->mr_send, NNTI_SEND_SRC, timeout, &status);
+	if (err == NNTI_ETIMEDOUT) {
+	  timeout *=2;
+	  if (h.ncd->ntd->shutdown_listen_thread) return 0;
+	  goto again;
+	}
+	if (err != NNTI_OK) {
+	  fprintf (stderr, "Error: NNTI_wait() for sending returned non-zero: %d\n", err);
+	  return 1;
+	}
+	svc->trace_out(cm, "    NNTI_wait() of send request returned... ");
+	
+    }
+    return 1;
+}
+
+static int
+copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr ncd,
+				       struct iovec *iov, int iovcnt, attr_list attrs)
+{
+    send_handle h;
+    struct client_message *m;
+    CMbuffer write_buffer;
+    NNTI_buffer_t mr;
+    char *data;
+    int i, size = 0;
+    int err;
+
+    for(i=0; i<iovcnt; i++) size+= iov[i].iov_len;
+
+    h = get_control_message_buffer(ncd, &m, sizeof(*m));
+    write_buffer = svc->get_data_buffer(ncd->ntd->cm, size);
+    data = write_buffer->buffer;
+    err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, size, 1, NNTI_GET_SRC, &ncd->peer_hdl, &mr);
+    m->message_type = 3;
+    m->pull.size = size;
+    m->pull.addr = data;
+    m->pull.buf_addr = mr;
+    size = 0;
+    for(i=0; i<iovcnt; i++) {
+      memcpy(&data[size], iov[i].iov_base, iov[i].iov_len);
+      size += iov[i].iov_len;
+    }
+    if (send_control_message(h) == 0) return 0;
+}
+
 extern int
 libcmnnti_LTX_writev_func(svc, ncd, iov, iovcnt, attrs)
 CMtrans_services svc;
@@ -1031,74 +1206,25 @@ int iovcnt;
 attr_list attrs;
 {
     int size= 0, i= 0;
-    int err;
-    int timeout = 1000;
-    int client_header_size = ((int) (((char *) (&(((struct client_message *)NULL)->payload[0]))) - ((char *) NULL)));
+    int client_header_size = ((int) (((char *) (&(((struct client_message *)NULL)->pig.payload[0]))) - ((char *) NULL)));
     for(i=0; i<iovcnt; i++) size+= iov[i].iov_len;
-#ifdef ENET_FOUND
-    if (ncd->use_enet) {
-      svc->trace_out(ncd->ntd->cm, "CMENET vector write of %d bytes on peer %p",
-		     size, ncd->peer);
 
-      /* Create a reliable packet of the right size */
-      ENetPacket * packet = enet_packet_create (NULL, size + client_header_size, 
-						ENET_PACKET_FLAG_RELIABLE);
-
-      /* copy in the data */
-      struct client_message *m = (struct client_message *) packet->data;
-      m->message_type = 1;
-      m->size = size;
-
-      size = client_header_size;
-      for (i = 0; i < iovcnt; i++) {
-	memcpy(packet->data + size, iov[i].iov_base, iov[i].iov_len);
-	size += iov[i].iov_len;
-      }
-      
-      /* Send the packet to the peer over channel id 0. */
-      if (enet_peer_send (ncd->peer, 0, packet) == -1) return -1;
-      enet_host_flush(ncd->ntd->enet_server);
-      return iovcnt;
-    } else {
-#endif
-      if (size + sizeof(struct client_message) < NNTI_REQUEST_BUFFER_SIZE) {
-        struct client_message *m = (void*)ncd -> send_buffer;
+    if (size <= ncd->piggyback_size_max) {
+        send_handle h;
+	struct client_message *m;
+	h = get_control_message_buffer(ncd, &m, size + client_header_size);
 	m->message_type = 2;
-	m->size = size;
+	m->pig.size = size;
 	size = 0;
 	for(i=0; i<iovcnt; i++) {
-	  memcpy(&m->payload[size], iov[i].iov_base, iov[i].iov_len);
+	  memcpy(&m->pig.payload[size], iov[i].iov_base, iov[i].iov_len);
 	  size += iov[i].iov_len;
 	}
-	err = NNTI_send(&ncd->peer_hdl, &ncd->mr_send, NULL);
-	
-	if (err != NNTI_OK) {
-	  fprintf (stderr, "Error: NNTI_send() returned non-zero: %d\n", err);
-	  return 1;
-	}
-	svc->trace_out(ncd->ntd->cm, "    NNTI_send() returned. Call wait... ");
-	
-	/* Wait for message to be sent */
-	NNTI_status_t               status;
-	timeout = 1000;
-      again:
-	err = NNTI_wait(&ncd->mr_send, NNTI_SEND_SRC, timeout, &status);
-	if (err == NNTI_ETIMEDOUT) {
-	  timeout *=2;
-	  if (ncd->ntd->shutdown_listen_thread) return 0;
-	  goto again;
-	}
-	if (err != NNTI_OK) {
-	  fprintf (stderr, "Error: NNTI_wait() for sending returned non-zero: %d\n", err);
-	  return 1;
-	}
-	svc->trace_out(ncd->ntd->cm, "    NNTI_wait() of send request returned... ");
-      } else {
-	fprintf(stderr, "MESSAGE TOO BIG FOR NNTI SHORT MESSAGE\n");
-      }
-#ifdef ENET_FOUND
+	if (send_control_message(h) == 0) return 0;
+    } else {
+        if (copy_full_buffer_and_send_pull_request(svc, ncd, iov, iovcnt, attrs) == 0)
+	    return 0;
     }
-#endif
     return iovcnt;
 }
 
@@ -1114,7 +1240,6 @@ free_nnti_data(CManager cm, void *ntdv)
     svc->free_func(ntd);
 }
 
-//extern int logger_init(const int debug_level, const char *file);
 
 extern void *
 libcmnnti_LTX_initialize(cm, svc)
@@ -1124,11 +1249,12 @@ CMtrans_services svc;
     static int atom_init = 0;
     nnti_transport_data_ptr nnti_data;
     svc->trace_out(cm, "Initialize CMNnti transport");
-    /* {   
+    if (getenv("NNTI_LOGGING")) {   
+        extern int logger_init(const int debug_level, const char *file);
         char nnti_log_filename[256];
 	sprintf(nnti_log_filename, "nnti_log_%x", getpid());
         logger_init(6, nnti_log_filename);
-    }*/
+    }
     if (atom_init == 0) {
 	CM_NNTI_PORT = attr_atom_from_string("NNTI_PORT");
 	CM_NNTI_ADDR = attr_atom_from_string("NNTI_ADDR");
