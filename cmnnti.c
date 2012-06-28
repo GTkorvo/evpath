@@ -108,6 +108,7 @@ typedef struct nnti_connection_data {
     ENetPeer *peer;
     ENetPacket *packet;
 #endif
+    NNTI_buffer_t mr_pull;
 } *nnti_conn_data_ptr;
 
 static nnti_conn_data_ptr
@@ -611,7 +612,8 @@ struct client_message {
 };
 
 static void
-handle_control_request(struct client_message *m);
+handle_control_request(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans, 
+		       struct client_message *m);
 
 static int nnti_conn_count = 0;
 typedef struct listen_struct {
@@ -699,7 +701,7 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
     default:
     {
 	struct client_message *m = (struct client_message *)(wait_status->start+wait_status->offset);
-	handle_control_request(m);
+	handle_control_request(ncd, svc, trans, m);
     }
     }
 }
@@ -727,7 +729,7 @@ listen_thread_func(void *vlsp)
 	  return 0;
 	}
 	if (err == NNTI_ETIMEDOUT) {
-	    ntd->svc->trace_out(trans->cm, "NNTI_wait() on receiving result %d timed out...", err);
+	    //ntd->svc->trace_out(trans->cm, "NNTI_wait() on receiving result %d timed out...", err);
 	    continue;
         } else if (err != NNTI_OK) {
             fprintf (stderr, "Error: NNTI_wait() on receiving result returned non-zero: %d\n", err);
@@ -807,8 +809,8 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 	      ntd->svc->return_data_buffer(trans->cm, ncd->read_buffer);
 	      ncd->read_buffer = NULL;
 	    } else {
-	      handle_control_request(m);
-	      enet_packet_destroy (event.packet);
+		handle_control_request(ncd, svc, trans, m);
+		enet_packet_destroy (event.packet);
 	    }
             break;
 	}           
@@ -828,37 +830,48 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 #endif
 
 static void
-handle_control_request(struct client_message *m)
+handle_control_request(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
+		       struct client_message *m)
 {
-#ifdef NOT_DEF
   int err;
   int offset = 0;
-  int pullsize = size;
+  int pullsize = m->pull.size;
+  CMbuffer read_buffer;
+  char *data;
+  NNTI_status_t               status;
 
-  err = NNTI_get (m.buf_addr,
+  read_buffer = svc->get_data_buffer(ncd->ntd->cm, m->pull.size);
+  data = read_buffer->buffer;
+  err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, m->pull.size, 1,
+			     NNTI_GET_DST, &ncd->peer_hdl, &ncd->mr_pull);
+  err = NNTI_get (&m->pull.buf_addr,
 		  offset,  // get from this remote buffer+offset
 		  pullsize,      // this amount of data
-		  buf_list[which],
+		  &ncd->mr_pull,
 		  offset); // into this buffer+offset
 
   if (err != NNTI_OK) {
     printf ("  THREAD: Error: NNTI_get() for client returned non-zero: %d\n",
 	    err);
-    conns[which%nc].status = 1; // failed status
+//    conns[which%nc].status = 1; // failed status
   }
-  err = NNTI_wait(ncd->, NNTI_GET_DST, timeout, &status);
+  int timeout = 500;
+  err = NNTI_wait(&ncd->mr_pull, NNTI_GET_DST, timeout, &status);
   if (err == NNTI_ETIMEDOUT) {
-    fprintf (server_out, "  THREAD:   no news about clients yet.\n");
+    fprintf (stderr, "  THREAD:   no news about clients yet.\n");
   } else if (err != NNTI_OK) {
-    fprintf (server_out, "  THREAD: Error: pull from client %d failed. NNTI_waitany returned: %d\n",
-	     conns[which%nc].crank, err);
-    (*n)--;
-    buf_list[which]=NULL;
-    conns[which%nc].status = 1; // failed status
+    fprintf (stderr, "  THREAD: Error: pull from client failed. NNTI_waitany returned: %d\n",err);
   } else {
     // completed a pull here
+      printf("PULL WAS DONE\n");
+      ncd->read_buffer = read_buffer;
+      ncd->read_buf_len = m->pull.size;
+      /* kick this upstairs */
+      trans->data_available(trans, ncd->conn);
+      ncd->read_buffer = NULL;
+      svc->return_data_buffer(trans->cm, ncd->read_buffer);
+  }
 
-#endif
 }
 
 #ifdef ENET_FOUND
@@ -926,7 +939,7 @@ attr_list listen_info;
     int nclients = 100;
     char *last_colon;
     int err;
-    int use_enet = 1;
+    int use_enet = 0;
     char *enet = getenv("NNTI_ENET");
 
     if (ntd->listen_attrs != NULL) {
