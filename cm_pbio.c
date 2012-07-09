@@ -481,9 +481,14 @@ CMinit_local_formats(CManager cm)
 		    "\nUsing self-hosted PBIO formats\n");
     } else {
 	cm->FFScontext = create_FFSContext();
+	FMcontext_allow_self_formats(FMContext_from_FFS(cm->FFScontext));
 	CMtrace_out(cm, CMFormatVerbose, 
 		    "\nUsing external PBIO format server\n");
+	if (cm->FFSserver_identifier == -1) {
+	    CMself_hosted_formats = 1;
+	}
     }
+    cm->FFSserver_identifier = FMcontext_get_format_server_identifier(FMContext_from_FFS(cm->FFScontext));
     INT_CMregister_non_CM_message_handler(0x5042494f, CM_pbio_query);
     INT_CMregister_non_CM_message_handler(0x4f494250, CM_pbio_query);
 }

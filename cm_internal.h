@@ -95,7 +95,8 @@ typedef struct _CManager {
     int closed;
     int abort_read_ahead;
 
-    FFSContext FFScontext;	/* pbio context for data encoding */
+    FFSContext FFScontext;	/* FFS context for data encoding */
+    int FFSserver_identifier;	/* identifier for what FFS server we're talking to */
     thr_mutex_t context_lock;
 
     CMbuffer taken_buffer_list;
