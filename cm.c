@@ -815,6 +815,9 @@ CMConnection_create(transport_entry trans, void *transport_data,
     conn->closed = 0;
     conn->failed = 0;
     conn->downloaded_formats = NULL;
+    conn->remote_format_server_ID = 0;
+    conn->remote_CManager_ID = 0;
+    conn->handshake_condition = -1;
     conn->foreign_data_handler = NULL;
     conn->io_out_buffer = create_FFSBuffer();
     conn->close_list = NULL;
@@ -1119,6 +1122,41 @@ INT_CMget_self_ip_addr()
     return get_self_ip_addr(&CMstatic_trans_svcs);
 }
 
+#define CURRENT_HANDSHAKE_VERSION 1
+
+static
+void
+send_and_maybe_wait_for_handshake(CManager cm, CMConnection conn)
+{
+    struct FFSEncodeVec tmp_vec[1];
+    int msg[5], actual;
+    msg[0] = 0x434d4800;  /* CMH\0 */
+    msg[1] = (CURRENT_HANDSHAKE_VERSION << 24) + sizeof(msg);
+    msg[2] = cm->FFSserver_identifier;
+    msg[3] = 5;  /* not implemented yet */
+    msg[4] = 0;  /* not implemented yet */
+    if (conn->remote_format_server_ID != 0) {
+	/* set high bit if we already have his ID */
+	msg[3] |= 0x80000000;
+    }
+    tmp_vec[0].iov_base = &msg;
+    tmp_vec[0].iov_len = sizeof(msg);
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - sending handshake\n");
+    if (conn->remote_format_server_ID == 0) {
+	/* we will await his respone */
+	conn->handshake_condition = INT_CMCondition_get(cm, conn);
+    }
+    actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
+				      conn->transport_data, 
+				      &tmp_vec[0], 1, NULL);
+    if (actual != 1) {
+	printf("handshake write failed\n");
+    }
+    if (conn->remote_format_server_ID == 0) {
+	INT_CMCondition_wait(cm, conn->handshake_condition);
+    }
+}
+
 static
 CMConnection
 try_conn_init(CManager cm, transport_entry trans, attr_list attrs)
@@ -1137,6 +1175,7 @@ try_conn_init(CManager cm, transport_entry trans, attr_list attrs)
 	if (conn->use_read_thread) {
 	    INT_CMstart_read_thread(conn);
 	}
+	send_and_maybe_wait_for_handshake(cm, conn);
     }
     return conn;
 }
@@ -1619,14 +1658,57 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
     }
 }
 
+static void
+CMdo_handshake(CMConnection conn, int handshake_version, int byte_swap, char *base)
+{
+    int do_send = 1;
+    int remote_format_server_ID;
+    int remote_CManager_ID;
+    if (byte_swap) {
+	((char*)&remote_format_server_ID)[0] = base[3];
+	((char*)&remote_format_server_ID)[1] = base[2];
+	((char*)&remote_format_server_ID)[2] = base[1];
+	((char*)&remote_format_server_ID)[3] = base[0];
+	((char*)&remote_CManager_ID)[0] = base[7];
+	((char*)&remote_CManager_ID)[1] = base[6];
+	((char*)&remote_CManager_ID)[2] = base[5];
+	((char*)&remote_CManager_ID)[3] = base[4];
+    } else {
+	remote_format_server_ID = ((int *) base)[0];
+	remote_CManager_ID = ((int *) base)[1];
+    }
+
+    if ((remote_CManager_ID & 0x80000000) == 0x80000000) {
+	/* the other fellow already has our ID */
+	do_send = 0;
+	remote_CManager_ID ^= 0x80000000;  /* kill high bit */
+    }
+    if (conn->remote_format_server_ID != 0) {
+	if (conn->remote_format_server_ID != remote_format_server_ID) {
+	    printf("Gaak.  Got a second handshake on connection 0x%p, with a different format server ID %x vs. %x\n",
+		   conn, conn->remote_format_server_ID, remote_format_server_ID);
+	}
+    } else {
+	conn->remote_format_server_ID = remote_format_server_ID;
+	conn->remote_CManager_ID = remote_CManager_ID;
+	if (conn->handshake_condition != -1) {
+	    INT_CMCondition_signal(conn->cm, conn->handshake_condition);
+	    conn->handshake_condition = -1;
+	}
+    }
+    if (do_send) {
+	send_and_maybe_wait_for_handshake(conn->cm, conn);
+    }
+}
+
 static int
 CMact_on_data(CMConnection conn, char *buffer, int length){
     char *base = buffer;
     int byte_swap = 0;
     int get_attrs = 0;
     int skip = 0;
-    int performance_msg = 0, event_msg = 0, evcontrol_msg = 0;
-    int performance_func = 0;
+    int performance_msg = 0, event_msg = 0, evcontrol_msg = 0, handshake = 0;
+    int performance_func = 0, handshake_version = 0;
     CMbuffer cm_decode_buf = NULL, cm_data_buf;
     attr_list attrs = NULL;
     int data_length, attr_length = 0, i, decoded_length;
@@ -1665,6 +1747,12 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     case 0x434d4c00:  /* CML\0 */
 	event_msg = 1;
 	get_attrs = 1;
+	break;
+    case 0x00484d43: /* \0HMC reversed byte order - handshake */
+	byte_swap = 1;
+    case 0x434d4800:  /* CMH\0 - handshake */
+	handshake = 1;
+	get_attrs = 0;
 	break;
     default:
 	/*  non CM message */
@@ -1715,6 +1803,11 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	data_length &= 0xffffff;
 	data_length -= 8;  /* subtract off header size */
     }
+    if (handshake) {
+	handshake_version = 0xff & (data_length >> 24);
+	data_length &= 0xffffff;
+	data_length -= 8;  /* subtract off header size */
+    }
     if (event_msg) {
 	if (byte_swap) {
 	    ((char*)&stone_id)[0] = base[11];
@@ -1731,6 +1824,10 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	    length;
     }
     base = buffer + header_len;
+    if (handshake) {
+	CMdo_handshake(conn, handshake_version, byte_swap, base);
+	return 0;
+    }
     if (performance_msg) {
 	CMdo_performance_response(conn, data_length, performance_func, byte_swap,
 				  base);

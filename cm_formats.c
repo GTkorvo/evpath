@@ -391,8 +391,17 @@ CMformat_preload(CMConnection conn, CMFormat format)
 {
     int load_count = 0;
     CMFormat *loaded_list = conn->downloaded_formats;
+    int my_FFSserver_ID = conn->cm->FFSserver_identifier;
+    int remote_FFSserver_ID = conn->remote_format_server_ID;
+    int preload = 0;
 
-    if (CMself_hosted_formats == 0) return;
+    if (my_FFSserver_ID == -1) preload = 1;   /* we're self hosting formats */
+    if (remote_FFSserver_ID == -1) preload = 1;   /* they're self hosting formats */
+    if (remote_FFSserver_ID == 0) preload = 1; /* 0 is the unset state, we don't know their server, preload to be safe */
+    if (remote_FFSserver_ID != my_FFSserver_ID) preload = 1;  /* if we're both using a format server, but not the same one, preload */
+
+    if (preload == 0) return;
+
     while (loaded_list && (*loaded_list != NULL)) {
 	if (*loaded_list == format) return;
 	loaded_list++;
