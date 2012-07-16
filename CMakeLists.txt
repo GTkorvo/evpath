@@ -89,6 +89,8 @@ IF (ENET_FOUND AND NOT TARGET_CNL)
    INCLUDE_DIRECTORIES(${ENET_INCLUDE_DIR})
    LINK_DIRECTORIES(${ENET_LIB_DIR})
    TARGET_LINK_LIBRARIES(cmenet ${ENET_LIBRARIES} ${BASE_LIBS})
+ELSE (ENET_FOUND AND NOT TARGET_CNL)
+   MESSAGE (STATUS " - Enet library was not found.  This is not a fatal error, but the Enet transport will not be built.")
 ENDIF (ENET_FOUND AND NOT TARGET_CNL)
 
 CHECK_LIBRARY_EXISTS (ibverbs ibv_create_qp "" HAVE_IBVERBS)
