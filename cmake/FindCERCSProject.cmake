@@ -1,13 +1,13 @@
 #
-#  FIND_CERCS_PROJECT -  Sun Jun  3 06:38:24 EDT 2012
+#  FIND_CERCS_PROJECT -  Tue Jul 17 15:00:09 EDT 2012
 #
 #  Use this macro like this:
 # FIND_CERCS_PROJECT(project_name 
 #   LIBRARY library
 #   INCLUDES header1 header2 ...
 #   [REQUIRED]
-#   [STATIC]	<not implemented yet>
-#   [DYNAMIC]	<not implemented yet>
+#   [STATIC]
+#   [DYNAMIC]
 #   [USE_INSTALLED]
 #   [VERBOSE]
 #   [QUIET]
@@ -54,6 +54,12 @@ FUNCTION (FIND_CERCS_PROJECT ARG_PROJECT)
     endif()
     set (LIB_SEARCH_PATH)
     set (INC_SEARCH_PATH)
+    if (${ARG_STATIC}) 
+      set(CMAKE_FIND_LIBRARY_SUFFIXES .a)
+    endif (${ARG_STATIC}) 
+    if (${ARG_DYNAMIC}) 
+      set(CMAKE_FIND_LIBRARY_SUFFIXES .so)
+    endif (${ARG_DYNAMIC}) 
     if (NOT ${ARG_USE_INSTALLED} )
       if ( NOT ("${CercsArch}" STREQUAL ""))
 	list (APPEND LIB_SEARCH_PATH ../${PROJECT_NAME}/${CercsArch} ../../${PROJECT_NAME}/${CercsArch} $ENV{HOME}/${CercsArch}/lib )

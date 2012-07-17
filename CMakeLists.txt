@@ -22,10 +22,12 @@ set (EVPATH_SRC_LIST cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c
                        cm_threadio.c cm_evol.c evp.c response.c metrics.c dlloader.c
                        revp.c evp_compat.c thin_server.c evp_threads.c ev_dfg.c)
 
+set (CERCS_FIND_OPTIONS)
 
 IF (TARGET_CNL)   # This should be set to true if compiling for compute note linux
   set (NO_DYNAMIC_LINKING 1)   # dummy dyn linking in cm.c and cm_transport.c
   list (APPEND EVPATH_SRC_LIST cmsockets.c cmselect.c)  # link sockets and select mechanisms in main lib
+  list (APPEND CERCS_FIND_OPTIONS "STATIC")
 ENDIF (TARGET_CNL)
 
 if (NOT TARGET_CNL)
@@ -48,15 +50,15 @@ add_custom_command(
 )
 
 if (DEFINED CERCS_USE_INSTALLED) 
-   set (CERCS_USE_INSTALLED "USE_INSTALLED")
+   list (APPEND CERCS_FIND_OPTIONS "USE_INSTALLED")
 endif(DEFINED CERCS_USE_INSTALLED) 
 
 find_package(DL)
-FIND_CERCS_PROJECT (cercs_env LIBRARY cercs_env INCLUDES cercs_env.h REQUIRED ${CERCS_USE_INSTALLED})
-FIND_CERCS_PROJECT (atl LIBRARY atl INCLUDES atl.h REQUIRED ${CERCS_USE_INSTALLED})
-FIND_CERCS_PROJECT (gen_thread LIBRARY gen_thread INCLUDES gen_thread.h REQUIRED ${CERCS_USE_INSTALLED})
-FIND_CERCS_PROJECT (ffs LIBRARY ffs INCLUDES ffs.h REQUIRED ${CERCS_USE_INSTALLED})
-FIND_CERCS_PROJECT (dill LIBRARY dill REQUIRED ${CERCS_USE_INSTALLED})
+FIND_CERCS_PROJECT (cercs_env LIBRARY cercs_env INCLUDES cercs_env.h REQUIRED ${CERCS_FIND_OPTIONS})
+FIND_CERCS_PROJECT (atl LIBRARY atl INCLUDES atl.h REQUIRED ${CERCS_FIND_OPTIONS})
+FIND_CERCS_PROJECT (gen_thread LIBRARY gen_thread INCLUDES gen_thread.h REQUIRED ${CERCS_FIND_OPTIONS})
+FIND_CERCS_PROJECT (ffs LIBRARY ffs INCLUDES ffs.h REQUIRED ${CERCS_FIND_OPTIONS})
+FIND_CERCS_PROJECT (dill LIBRARY dill REQUIRED ${CERCS_FIND_OPTIONS})
 find_package (Threads)
 
 list (APPEND INC_DIRS ${CERCS_ENV_INCLUDE_DIR} ${ATL_INCLUDE_DIR} ${GEN_THREAD_INCLUDE_DIR} ${FFS_INCLUDE_DIR})
@@ -83,14 +85,16 @@ TARGET_LINK_LIBRARIES(cmmulticast ${BASE_LIBS})
 list (APPEND TARGETS evpath cmselect cmsockets cmudp cmmulticast)
 endif ( NOT TARGET_CNL)
 
-FIND_CERCS_PROJECT (enet LIBRARY enet INCLUDES enet/enet.h ${CERCS_USE_INSTALLED})
+FIND_CERCS_PROJECT (enet LIBRARY enet INCLUDES enet/enet.h ${CERCS_FIND_OPTIONS})
+IF (NOT ENET_FOUND)
+   MESSAGE (STATUS " - Enet library was not found.  This is not a fatal error, just that the Enet transport will not be built.")
+ENDIF (NOT ENET_FOUND)
+
 IF (ENET_FOUND AND NOT TARGET_CNL)
    add_library(cmenet MODULE cmenet.c)
    INCLUDE_DIRECTORIES(${ENET_INCLUDE_DIR})
    LINK_DIRECTORIES(${ENET_LIB_DIR})
    TARGET_LINK_LIBRARIES(cmenet ${ENET_LIBRARIES} ${BASE_LIBS})
-ELSE (ENET_FOUND AND NOT TARGET_CNL)
-   MESSAGE (STATUS " - Enet library was not found.  This is not a fatal error, but the Enet transport will not be built.")
 ENDIF (ENET_FOUND AND NOT TARGET_CNL)
 
 CHECK_LIBRARY_EXISTS (ibverbs ibv_create_qp "" HAVE_IBVERBS)
@@ -100,7 +104,7 @@ IF (HAVE_IBVERBS AND NOT TARGET_CNL)
 ENDIF (HAVE_IBVERBS AND NOT TARGET_CNL)
 
 IF (HAVE_IBVERBS AND NOT TARGET_CNL)
-    FIND_CERCS_PROJECT (nnti LIBRARY trios_nssi INCLUDES nnti.h ${CERCS_USE_INSTALLED})
+    FIND_CERCS_PROJECT (nnti LIBRARY trios_nssi INCLUDES nnti.h ${CERCS_FIND_OPTIONS})
     IF (NNTI_FOUND)
         add_library(cmnnti MODULE cmnnti.c)
 	INCLUDE_DIRECTORIES(${NNTI_INCLUDE_DIR})
