@@ -106,6 +106,9 @@ typedef int (*CMTransport_connection_eq_func) ARGS((CManager cm,
 typedef int (*CMTransport_set_write_notify_func) 
     ARGS((transport_entry, CMtrans_services svc, void *conn_data, int enable));
 
+typedef attr_list (*CMTransport_get_transport_characteristics) 
+    ARGS((transport_entry, CMtrans_services svc, void *conn_data));
+
 
 typedef void (*DataAvailableCallback) ARGS((transport_entry trans, CMConnection conn));
 typedef void (*WritePossibleCallback) ARGS((transport_entry trans, CMConnection conn));
@@ -127,6 +130,7 @@ struct _transport_item {
     CMTransport_writev_func NBwritev_func; /* non blocking */
     CMTransport_set_write_notify_func set_write_notify;
     void *trans_data;
+    CMTransport_get_transport_characteristics get_transport_characteristics;
 };
 
 #if defined(__cplusplus) || defined(c_plusplus)
@@ -152,6 +156,8 @@ extern attr_list libcmsockets_LTX_non_blocking_listen(CManager cm, CMtrans_servi
 						      transport_entry trans, attr_list listen_info);
 extern void libcmsockets_LTX_set_write_notify(transport_entry trans, CMtrans_services svc,
 					      struct socket_connection_data * scd, int enable);
+extern attr_list libcmsockets_LTX_get_transport_characteristics(transport_entry trans, CMtrans_services svc,
+								void* scd);
 
 extern int libcmsockets_LTX_read_to_buffer_func(CMtrans_services svc, struct socket_connection_data * scd, 
 						void *buffer, int requested_len, int non_blocking);
@@ -310,6 +316,11 @@ libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc);
  *      successfully written on the connection.  Both
  *      set_write_notify() and NBwritev() must be exported for
  *      non-blocking writes to be possible with a given transport.
+ * - attr_list get_transport_characteristics(transport_entry trans, 
+ *                        CMtrans_services svc, void *conn_data);
+ *      This routine is used to provide CM with characteristics of a 
+ *      transport that are not required for connections, such as reliability, 
+ *      multicast nature, etc.
  *
  * 	In addition to the calls above that are exported by the transport
  * DLL, there are several other entries in the transport_item data

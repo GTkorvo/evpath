@@ -87,6 +87,7 @@ typedef struct socket_client_data {
     CManager cm;
     char *hostname;
     int listen_port;
+    attr_list characteristics;
     CMtrans_services svc;
 } *socket_client_data_ptr;
 
@@ -120,6 +121,7 @@ static atom_t CM_PEER_IP = -1;
 static atom_t CM_PEER_HOSTNAME = -1;
 static atom_t CM_PEER_LISTEN_PORT = -1;
 static atom_t CM_NETWORK_POSTFIX = -1;
+static atom_t CM_TRANSPORT_RELIABLE = -1;
 static atom_t CM_IP_PORT = -1;
 static atom_t CM_IP_HOSTNAME = -1;
 static atom_t CM_IP_ADDR = -1;
@@ -1637,6 +1639,7 @@ CMtrans_services svc;
 	CM_PEER_HOSTNAME = attr_atom_from_string("PEER_HOSTNAME");
 	CM_PEER_LISTEN_PORT = attr_atom_from_string("PEER_LISTEN_PORT");
 	CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
+	CM_TRANSPORT_RELIABLE = attr_atom_from_string("CM_TRANSPORT_RELIABLE");
 	atom_init++;
     }
     socket_data = svc->malloc_func(sizeof(struct socket_client_data));
@@ -1644,6 +1647,16 @@ CMtrans_services svc;
     socket_data->hostname = NULL;
     socket_data->listen_port = -1;
     socket_data->svc = svc;
+    socket_data->characteristics = create_attr_list();
+    add_int_attr(socket_data->characteristics, CM_TRANSPORT_RELIABLE, 1);
     svc->add_shutdown_task(cm, free_socket_data, (void *) socket_data);
     return (void *) socket_data;
+}
+
+extern attr_list
+libcmsockets_LTX_get_transport_characteristics(transport_entry trans, CMtrans_services svc,
+					       void* vsd)
+{
+    struct socket_client_data * sd = (struct socket_client_data *) vsd;
+    return sd->characteristics;
 }

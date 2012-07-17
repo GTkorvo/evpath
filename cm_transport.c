@@ -134,6 +134,8 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 	lt_dlsym(handle, "NBwritev_func");  
     transport->set_write_notify = (CMTransport_set_write_notify_func)
 	lt_dlsym(handle, "set_write_notify");
+    transport->get_transport_characteristics = (CMTransport_get_transport_characteristics)
+	lt_dlsym(handle, "get_transport_characteristics");
     CMtrace_out(cm, CMTransportVerbose, "Listen is %p\n", transport->listen);
     if (transport->transport_init) {
 	transport->trans_data = 
@@ -168,6 +170,7 @@ load_transport(CManager cm, const char *trans_name, int quiet)
     transport->NBwritev_func = (CMTransport_writev_func)libcmsockets_LTX_NBwritev_func;
     
     transport->set_write_notify = (CMTransport_set_write_notify_func)    libcmsockets_LTX_set_write_notify;
+    transport->get_transport_characteristics = (CMTransport_get_transport_characteristics) libcmsockets_LTX_get_transport_characteristics;
     CMtrace_out(cm, CMTransportVerbose, "Listen is %p\n", transport->listen);
     if (transport->transport_init) {
 	transport->trans_data = 

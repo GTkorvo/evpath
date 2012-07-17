@@ -61,6 +61,7 @@ atom_t CM_BW_MEASURED_COF = -1;
 atom_t CM_BW_MEASURE_SIZE = -1;
 atom_t CM_BW_MEASURE_SIZEINC = -1;
 static atom_t CM_EVENT_SIZE = -1;
+static atom_t CM_TRANSPORT_RELIABLE = -1;
 
 struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, INT_CMfree, 
 					       INT_CM_fd_add_select, 
@@ -536,6 +537,7 @@ INT_CManager_create()
 	CM_BW_MEASURE_SIZE = attr_atom_from_string("CM_BW_MEASURE_SIZE");
 	CM_BW_MEASURE_SIZEINC = attr_atom_from_string("CM_BW_MEASURE_SIZEINC");
 	CM_EVENT_SIZE = attr_atom_from_string("CM_EVENT_SIZE");
+	CM_TRANSPORT_RELIABLE = attr_atom_from_string("CM_TRANSPORT_RELIABLE");
     }
 
     /* initialize data structs */
@@ -1124,11 +1126,29 @@ INT_CMget_self_ip_addr()
 
 #define CURRENT_HANDSHAKE_VERSION 1
 
+static 
+int
+transport_is_reliable(CMConnection conn)
+{
+    attr_list list;
+    int ret;
+    if (conn->trans->get_transport_characteristics == NULL) {
+	return 0; /* don't know */
+    }
+    list = conn->trans->get_transport_characteristics(conn->trans, &CMstatic_trans_svcs, 
+						      conn->trans->trans_data);
+    if (!get_int_attr(list, CM_TRANSPORT_RELIABLE, &ret)) {
+	return 0; /* don't know */
+    }
+    return ret;
+}
+
 static
 void
 send_and_maybe_wait_for_handshake(CManager cm, CMConnection conn)
 {
     struct FFSEncodeVec tmp_vec[1];
+    int reliable = transport_is_reliable(conn);
     int msg[5], actual;
     msg[0] = 0x434d4800;  /* CMH\0 */
     msg[1] = (CURRENT_HANDSHAKE_VERSION << 24) + sizeof(msg);
@@ -1142,7 +1162,7 @@ send_and_maybe_wait_for_handshake(CManager cm, CMConnection conn)
     tmp_vec[0].iov_base = &msg;
     tmp_vec[0].iov_len = sizeof(msg);
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - sending handshake\n");
-    if (conn->remote_format_server_ID == 0) {
+    if ((conn->remote_format_server_ID == 0) && reliable) {
 	/* we will await his respone */
 	conn->handshake_condition = INT_CMCondition_get(cm, conn);
     }
@@ -1152,7 +1172,7 @@ send_and_maybe_wait_for_handshake(CManager cm, CMConnection conn)
     if (actual != 1) {
 	printf("handshake write failed\n");
     }
-    if (conn->remote_format_server_ID == 0) {
+    if ((conn->remote_format_server_ID == 0) && reliable) {
 	INT_CMCondition_wait(cm, conn->handshake_condition);
     }
 }

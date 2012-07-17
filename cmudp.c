@@ -82,6 +82,7 @@ static atom_t CM_UDP_PORT = -1;
 static atom_t CM_UDP_ADDR = -1;
 static atom_t CM_IP_HOSTNAME = -1;
 static atom_t CM_TRANSPORT = -1;
+static atom_t CM_TRANSPORT_RELIABLE = -1;
 
 typedef struct udp_transport_data {
     CManager cm;
@@ -89,6 +90,7 @@ typedef struct udp_transport_data {
     int socket_fd;
     int self_ip;
     int self_port;
+    attr_list characteristics;
     struct udp_connection_data *connections;
 } *udp_transport_data_ptr;
 
@@ -707,6 +709,7 @@ CMtrans_services svc;
 	CM_UDP_ADDR = attr_atom_from_string("UDP_ADDR");
 	CM_IP_HOSTNAME = attr_atom_from_string("IP_HOST");
 	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
+	CM_TRANSPORT_RELIABLE = attr_atom_from_string("CM_TRANSPORT_RELIABLE");
 	atom_init++;
     }
     udp_data = svc->malloc_func(sizeof(struct udp_transport_data));
@@ -716,6 +719,15 @@ CMtrans_services svc;
     udp_data->self_ip = 0;
     udp_data->self_port = 0;
     udp_data->connections = NULL;
+    udp_data->characteristics = create_attr_list();
+    add_int_attr(udp_data->characteristics, CM_TRANSPORT_RELIABLE, 0);
     svc->add_shutdown_task(cm, free_udp_data, (void *) udp_data);
     return (void *) udp_data;
+}
+
+extern attr_list
+libcmudp_LTX_get_transport_characteristics(transport_entry trans, CMtrans_services svc,
+					   udp_transport_data_ptr utd)
+{
+    return utd->characteristics;
 }
