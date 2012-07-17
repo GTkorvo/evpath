@@ -143,41 +143,22 @@ load_transport(CManager cm, const char *trans_name, int quiet)
     }
     transport = add_transport_to_cm(cm, transport);
 #else
-
     if (global_transports != NULL) {
       global_transports = INT_CMrealloc(global_transports, 
 				    sizeof(global_transports) * (i + 2));
     } else {
         global_transports = INT_CMmalloc(sizeof(global_transports) * (i+2));
     }
-    global_transports[i] = 
-	transport = INT_CMmalloc(sizeof(struct _transport_item));
-    global_transports[i+1] = NULL;
-
-    transport->trans_name = strdup("socket");
-    transport->cm = cm;
+    {
+	extern transport_entry cmsockets_add_static_transport(CManager cm, CMtrans_services svc);
+	global_transports[i] = transport = cmsockets_add_static_transport(cm, &CMstatic_trans_svcs);
+    }
     transport->data_available = CMDataAvailable;  /* callback pointer */
     transport->write_possible = CMWriteQueuedData;  /* callback pointer */
-    transport->transport_init = (CMTransport_func)libcmsockets_LTX_initialize;
-    transport->listen = (CMTransport_listen_func)libcmsockets_LTX_non_blocking_listen;
-    transport->initiate_conn = (CMConnection(*)())libcmsockets_LTX_initiate_conn;
-    transport->self_check = (int(*)())libcmsockets_LTX_self_check;
-    transport->connection_eq = (int(*)())libcmsockets_LTX_connection_eq;
-    transport->shutdown_conn = (CMTransport_shutdown_conn_func)libcmsockets_LTX_shutdown_conn;
-    transport->read_to_buffer_func = (CMTransport_read_to_buffer_func)libcmsockets_LTX_read_to_buffer_func;
-    transport->read_block_func = (CMTransport_read_block_func)NULL;
-    transport->writev_func = (CMTransport_writev_func)libcmsockets_LTX_writev_func;
-    transport->NBwritev_func = (CMTransport_writev_func)libcmsockets_LTX_NBwritev_func;
-    
-    transport->set_write_notify = (CMTransport_set_write_notify_func)    libcmsockets_LTX_set_write_notify;
-    transport->get_transport_characteristics = (CMTransport_get_transport_characteristics) libcmsockets_LTX_get_transport_characteristics;
     CMtrace_out(cm, CMTransportVerbose, "Listen is %p\n", transport->listen);
-    if (transport->transport_init) {
-	transport->trans_data = 
-	    transport->transport_init(cm, &CMstatic_trans_svcs, transport);
-    }
-    transport = add_transport_to_cm(cm, transport);
+    (void) add_transport_to_cm(cm, transport);
 
+    global_transports[i+1] = NULL;
 #endif
     return 1;
 }

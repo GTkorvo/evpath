@@ -137,42 +137,6 @@ struct _transport_item {
 }
 #endif
 
-#if NO_DYNAMIC_LINKING
-struct socket_connection_data;
-
-#if defined (__INTEL_COMPILER)
-//  declaration not visible
-#  pragma warning (disable: 274)
-#endif
-extern void libcmsockets_LTX_shutdown_conn(CMtrans_services svc, struct socket_connection_data * scd);
-extern CMConnection libcmsockets_LTX_initiate_conn(CManager cm, CMtrans_services svc,
-						   transport_entry trans, attr_list attrs);
-extern int libcmsockets_LTX_self_check(CManager cm, CMtrans_services svc,
-			    transport_entry trans, attr_list attrs);
-extern int libcmsockets_LTX_connection_eq(CManager cm,
-					  CMtrans_services svc, transport_entry trans,
-					  attr_list attrs, struct socket_connection_data * scd);
-extern attr_list libcmsockets_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, 
-						      transport_entry trans, attr_list listen_info);
-extern void libcmsockets_LTX_set_write_notify(transport_entry trans, CMtrans_services svc,
-					      struct socket_connection_data * scd, int enable);
-extern attr_list libcmsockets_LTX_get_transport_characteristics(transport_entry trans, CMtrans_services svc,
-								void* scd);
-
-extern int libcmsockets_LTX_read_to_buffer_func(CMtrans_services svc, struct socket_connection_data * scd, 
-						void *buffer, int requested_len, int non_blocking);
-
-
-extern int libcmsockets_LTX_writev_func(CMtrans_services svc, struct socket_connection_data * scd, 
-					void *iov, int iovcnt, attr_list attrs);
-
-extern int libcmsockets_LTX_NBwritev_func(CMtrans_services svc, struct socket_connection_data * scd, 
-					  void *iov, int iovcnt, attr_list attrs);
-
-
-extern void *
-libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc);
-#endif
 
 #endif
 /*

@@ -1600,12 +1600,11 @@ free_socket_data(CManager cm, void *sdv)
 }
 
 extern void *
-libcmsockets_LTX_initialize(cm, svc)
-CManager cm;
-CMtrans_services svc;
+libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc, transport_entry trans)
 {
     static int atom_init = 0;
 
+    (void)trans;
     socket_client_data_ptr socket_data;
     svc->trace_out(cm, "Initialize TCP/IP Socket transport built in %s",
 		   EVPATH_LIBRARY_BUILD_DIR);
@@ -1659,4 +1658,30 @@ libcmsockets_LTX_get_transport_characteristics(transport_entry trans, CMtrans_se
 {
     struct socket_client_data * sd = (struct socket_client_data *) vsd;
     return sd->characteristics;
+}
+
+extern transport_entry
+cmsockets_add_static_transport(CManager cm, CMtrans_services svc)
+{
+    transport_entry transport;
+    transport = svc->malloc_func(sizeof(struct _transport_item));
+    transport->trans_name = strdup("socket");
+    transport->cm = cm;
+    transport->transport_init = (CMTransport_func)libcmsockets_LTX_initialize;
+    transport->listen = (CMTransport_listen_func)libcmsockets_LTX_non_blocking_listen;
+    transport->initiate_conn = (CMConnection(*)())libcmsockets_LTX_initiate_conn;
+    transport->self_check = (int(*)())libcmsockets_LTX_self_check;
+    transport->connection_eq = (int(*)())libcmsockets_LTX_connection_eq;
+    transport->shutdown_conn = (CMTransport_shutdown_conn_func)libcmsockets_LTX_shutdown_conn;
+    transport->read_to_buffer_func = (CMTransport_read_to_buffer_func)libcmsockets_LTX_read_to_buffer_func;
+    transport->read_block_func = (CMTransport_read_block_func)NULL;
+    transport->writev_func = (CMTransport_writev_func)libcmsockets_LTX_writev_func;
+    transport->NBwritev_func = (CMTransport_writev_func)libcmsockets_LTX_NBwritev_func;
+    
+    transport->set_write_notify = (CMTransport_set_write_notify_func)    libcmsockets_LTX_set_write_notify;
+    transport->get_transport_characteristics = (CMTransport_get_transport_characteristics) libcmsockets_LTX_get_transport_characteristics;
+    if (transport->transport_init) {
+	transport->trans_data = transport->transport_init(cm, svc, transport);
+    }
+    return transport;
 }
