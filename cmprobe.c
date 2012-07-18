@@ -7,9 +7,8 @@
 #endif
 #include <stdlib.h>
 #include <string.h>
-#include "cm.h"
+#include "evpath.h"
 #include "gen_thread.h"
-#include "libltdl/ltdl.h"
 #include <errno.h>
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
@@ -27,16 +26,16 @@ typedef struct _nested_rec {
     complex item;
 } nested, *nested_ptr;
 
-static IOField nested_field_list[] =
+static FMField nested_field_list[] =
 {
-    {"item", "complex", sizeof(complex), IOOffset(nested_ptr, item)},
+    {"item", "complex", sizeof(complex), FMOffset(nested_ptr, item)},
     {NULL, NULL, 0, 0}
 };
 
-static IOField complex_field_list[] =
+static FMField complex_field_list[] =
 {
-    {"r", "double", sizeof(double), IOOffset(complex_ptr, r)},
-    {"i", "double", sizeof(double), IOOffset(complex_ptr, i)},
+    {"r", "double", sizeof(double), FMOffset(complex_ptr, r)},
+    {"i", "double", sizeof(double), FMOffset(complex_ptr, i)},
     {NULL, NULL, 0, 0}
 };
 
@@ -50,29 +49,30 @@ typedef struct _simple_rec {
     int scan_sum;
 } simple_rec, *simple_rec_ptr;
 
-static IOField simple_field_list[] =
+static FMField simple_field_list[] =
 {
     {"integer_field", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, integer_field)},
+     sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
     {"short_field", "integer",
-     sizeof(short), IOOffset(simple_rec_ptr, short_field)},
+     sizeof(short), FMOffset(simple_rec_ptr, short_field)},
     {"long_field", "integer",
-     sizeof(long), IOOffset(simple_rec_ptr, long_field)},
+     sizeof(long), FMOffset(simple_rec_ptr, long_field)},
     {"nested_field", "nested",
-     sizeof(nested), IOOffset(simple_rec_ptr, nested_field)},
+     sizeof(nested), FMOffset(simple_rec_ptr, nested_field)},
     {"double_field", "float",
-     sizeof(double), IOOffset(simple_rec_ptr, double_field)},
+     sizeof(double), FMOffset(simple_rec_ptr, double_field)},
     {"char_field", "char",
-     sizeof(char), IOOffset(simple_rec_ptr, char_field)},
+     sizeof(char), FMOffset(simple_rec_ptr, char_field)},
     {"scan_sum", "integer",
-     sizeof(int), IOOffset(simple_rec_ptr, scan_sum)},
+     sizeof(int), FMOffset(simple_rec_ptr, scan_sum)},
     {NULL, NULL, 0, 0}
 };
 
-static CMFormatRec simple_format_list[] =
+static FMStructDescRec simple_format_list[] =
 {
-    {"complex", complex_field_list},
-    {"nested", nested_field_list},
+    {"simple", simple_field_list, sizeof(simple_rec), NULL},
+    {"complex", complex_field_list, sizeof(complex), NULL},
+    {"nested", nested_field_list, sizeof(nested), NULL},
     {NULL, NULL}
 };
 
@@ -128,7 +128,6 @@ main(argc, argv)
     CMFormat format;
     static int atom_init = 0;
 
-    LTDL_SET_PRELOADED_SYMBOLS();
     srand48(getpid());
 #ifdef USE_PTHREADS
     gen_pthread_init();
@@ -136,16 +135,17 @@ main(argc, argv)
     cm = CManager_create();
     (void) CMfork_comm_thread(cm);
 
+    atom_t CM_REBWM_RLEN, CM_REBWM_REPT, CM_BW_MEASURE_INTERVAL, CM_BW_MEASURE_SIZE, CM_BW_MEASURE_SIZEINC, CM_BW_MEASURED_VALUE, CM_BW_MEASURED_COF, CM_TRANSPORT;
 
     if (atom_init == 0) {
-	CM_REBWM_RLEN = atom_from_string("CM_REBWM_RLEN");
-	CM_REBWM_REPT = atom_from_string("CM_REBWM_REPT");
-	CM_BW_MEASURE_INTERVAL = atom_from_string("CM_BW_MEASURE_INTERVAL");
-	CM_BW_MEASURE_SIZE = atom_from_string("CM_BW_MEASURE_SIZE");
-	CM_BW_MEASURE_SIZEINC = atom_from_string("CM_BW_MEASURE_SIZEINC");
-	CM_BW_MEASURED_VALUE = atom_from_string("CM_BW_MEASURED_VALUE");
-	CW_BW_MEASURED_COF = atom_from_string("CM_BW_MEASURED_COF");
-
+	CM_REBWM_RLEN = attr_atom_from_string("CM_REBWM_RLEN");
+	CM_REBWM_REPT = attr_atom_from_string("CM_REBWM_REPT");
+	CM_BW_MEASURE_INTERVAL = attr_atom_from_string("CM_BW_MEASURE_INTERVAL");
+	CM_BW_MEASURE_SIZE = attr_atom_from_string("CM_BW_MEASURE_SIZE");
+	CM_BW_MEASURE_SIZEINC = attr_atom_from_string("CM_BW_MEASURE_SIZEINC");
+	CM_BW_MEASURED_VALUE = attr_atom_from_string("CM_BW_MEASURED_VALUE");
+	CM_BW_MEASURED_COF = attr_atom_from_string("CM_BW_MEASURED_COF");
+	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
 	atom_init++;
     }
 
@@ -161,8 +161,7 @@ main(argc, argv)
 	CMlisten_specific(cm, listen_list);
 	contact_list = CMget_contact_list(cm);
 	printf("Contact list \"%s\"\n", attr_list_to_string(contact_list));
-	format = CMregister_format(cm, "simple", simple_field_list,
-				   simple_format_list);
+	format = CMregister_format(cm, simple_format_list);
 	CMregister_handler(format, simple_handler, NULL);
 	CMsleep(cm, 1200);
     } else {
@@ -223,6 +222,10 @@ main(argc, argv)
 	    if (get_int_attr(result_list, CM_BW_MEASURED_VALUE, &bw_long)) {
 		printf("BW get from attr: %d\n", bw_long);
 	    }else{
+
+
+
+
 		printf("Failed to get bw from attr\n");
 	    }
 

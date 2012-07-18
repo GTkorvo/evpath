@@ -53,6 +53,7 @@ static atom_t CM_IP_HOSTNAME = -1;
 static atom_t CM_TRANSPORT = -1;
 static atom_t CM_ENET_PORT = -1;
 static atom_t CM_ENET_ADDR = -1;
+static atom_t CM_TRANSPORT_RELIABLE = -1;
 
 typedef struct nnti_transport_data {
     CManager cm;
@@ -76,6 +77,7 @@ typedef struct nnti_transport_data {
     ENetHost *enet_server;
 #endif
     int enet_listen_port;
+    attr_list characteristics;
 } *nnti_transport_data_ptr;
 
 typedef struct nnti_connection_data {
@@ -999,6 +1001,7 @@ attr_list listen_info;
     ntd->shutdown_listen_thread = 0;
     ntd->listen_thread = 0;
     ntd->use_enet = use_enet;
+    svc->add_periodic_task(cm, 1, 0, nnti_enet_service_network, (void*)trans);
     err = pthread_create(&ntd->listen_thread, NULL, (void*(*)(void*))listen_thread_func, lsp);
 #ifdef ENET_FOUND
     if (use_enet) {
@@ -1277,6 +1280,7 @@ CMtrans_services svc;
 	CM_ENET_PORT = attr_atom_from_string("CM_ENET_PORT");
 	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
 	CM_PEER_IP = attr_atom_from_string("PEER_IP");
+	CM_TRANSPORT_RELIABLE = attr_atom_from_string("CM_TRANSPORT_RELIABLE");
 	atom_init++;
     }
     nnti_data = svc->malloc_func(sizeof(struct nnti_transport_data));
@@ -1289,6 +1293,8 @@ CMtrans_services svc;
     nnti_data->connections = NULL;
     nnti_data->listen_attrs = NULL;
     nnti_data->enet_listen_port = -1;
+    nnti_data->characteristics = create_attr_list();
+    add_int_attr(nnti_data->characteristics, CM_TRANSPORT_RELIABLE, 1);
     svc->add_shutdown_task(cm, free_nnti_data, (void *) nnti_data);
     return (void *) nnti_data;
 }
@@ -1305,3 +1311,34 @@ nnti_conn_data_ptr ncd;
     free(ncd);
 }
 
+extern attr_list
+libcmnnti_LTX_get_transport_characteristics(transport_entry trans, CMtrans_services svc,
+					       void* ntdv)
+{
+    nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) ntdv;
+    return ntd->characteristics;
+}
+
+
+extern transport_entry
+cmnnti_add_static_transport(CManager cm, CMtrans_services svc)
+{
+    transport_entry transport;
+    transport = svc->malloc_func(sizeof(struct _transport_item));
+    transport->trans_name = strdup("socket");
+    transport->cm = cm;
+    transport->transport_init = (CMTransport_func)libcmnnti_LTX_initialize;
+    transport->listen = (CMTransport_listen_func)libcmnnti_LTX_non_blocking_listen;
+    transport->initiate_conn = (CMConnection(*)())libcmnnti_LTX_initiate_conn;
+    transport->self_check = (int(*)())libcmnnti_LTX_self_check;
+    transport->connection_eq = (int(*)())libcmnnti_LTX_connection_eq;
+    transport->shutdown_conn = (CMTransport_shutdown_conn_func)libcmnnti_LTX_shutdown_conn;
+    transport->read_block_func = (CMTransport_read_block_func)libcmnnti_LTX_read_block_func;
+    transport->read_block_func = (CMTransport_read_block_func)NULL;
+    transport->writev_func = (CMTransport_writev_func)libcmnnti_LTX_writev_func;
+    transport->get_transport_characteristics = (CMTransport_get_transport_characteristics) libcmnnti_LTX_get_transport_characteristics;
+    if (transport->transport_init) {
+	transport->trans_data = transport->transport_init(cm, svc, transport);
+    }
+    return transport;
+}

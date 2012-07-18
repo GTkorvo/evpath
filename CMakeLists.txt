@@ -23,6 +23,7 @@ set (EVPATH_SRC_LIST cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c
                        revp.c evp_compat.c thin_server.c evp_threads.c ev_dfg.c)
 
 set (CERCS_FIND_OPTIONS)
+set (EVPATH_TRANSPORT_DEP_LIBS)
 
 IF (TARGET_CNL)   # This should be set to true if compiling for compute note linux
   set (NO_DYNAMIC_LINKING 1)   # dummy dyn linking in cm.c and cm_transport.c
@@ -31,6 +32,7 @@ IF (TARGET_CNL)   # This should be set to true if compiling for compute note lin
 ENDIF (TARGET_CNL)
 
 if (DEFINED CERCS_USE_INSTALLED) 
+   set (CERCS_USE_INSTALLED)
    list (APPEND CERCS_FIND_OPTIONS "USE_INSTALLED")
 endif(DEFINED CERCS_USE_INSTALLED) 
 
@@ -85,13 +87,14 @@ ENDIF (HAVE_IBVERBS AND NOT TARGET_CNL)
 IF (HAVE_IBVERBS)
     FIND_CERCS_PROJECT (nnti LIBRARY trios_nssi INCLUDES nnti.h ${CERCS_FIND_OPTIONS})
     IF (NNTI_FOUND)
+        INCLUDE_DIRECTORIES(${NNTI_INCLUDE_DIR})
+	LINK_DIRECTORIES(${NNTI_LIB_DIR})
 	IF (NOT TARGET_CNL)
            add_library(cmnnti MODULE cmnnti.c)
-	   INCLUDE_DIRECTORIES(${NNTI_INCLUDE_DIR})
-	   LINK_DIRECTORIES(${NNTI_LIB_DIR})
 	   TARGET_LINK_LIBRARIES(cmnnti ${NNTI_LIBRARIES} ${ENET_LIBRARIES} ${BASE_LIBS})
 	ELSE (NOT TARGET_CNL)
-	   list (APPEND EVPATH_SRC_LIST cmsockets.c cmselect.c)  # link sockets and select mechanisms in main lib
+	   list (APPEND EVPATH_SRC_LIST cmnnti.c)  # link nnti in main lib
+	   list (APPEND EVPATH_TRANSPORT_DEP_LIBS ${NNTI_LIBRARIES} ${ENET_LIBRARIES})
         ENDIF (NOT TARGET_CNL)
     ENDIF (NNTI_FOUND)
 ENDIF (HAVE_IBVERBS)
@@ -115,7 +118,7 @@ add_custom_command(
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl
 )
 
-TARGET_LINK_LIBRARIES(evpath-static ${DL_LIBRARIES} ${BASE_LIBS})
+TARGET_LINK_LIBRARIES(evpath-static ${DL_LIBRARIES} ${BASE_LIBS} ${EVPATH_TRANSPORT_DEP_LIBS})
 
 IF (Threads_FOUND AND CMAKE_USE_PTHREADS_INIT)
     set (USE_PTHREADS True)
@@ -161,6 +164,9 @@ INSTALL(TARGETS ${TARGETS}
 
 SET (EVPATH_LIBRARY_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR})
 SET (EVPATH_LIBRARY_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/lib)
+
+ADD_EXECUTABLE(cmprobe cmprobe.c)
+TARGET_LINK_LIBRARIES(cmprobe evpath-static ${BASE_LIBS})
 
 if (${CMAKE_C_COMPILER_ID} MATCHES "Intel") 
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -shared-intel")
