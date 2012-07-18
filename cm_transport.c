@@ -49,8 +49,9 @@ int
 load_transport(CManager cm, const char *trans_name, int quiet)
 {
     transport_entry *trans_list = global_transports;
-    transport_entry transport;
+    transport_entry transport = NULL;
     int i = 0;
+    int ret = 0;
     char *libname;
 #if !NO_DYNAMIC_LINKING
     lt_dlhandle handle;	
@@ -98,18 +99,8 @@ load_transport(CManager cm, const char *trans_name, int quiet)
     if (!handle) {
 	return 0;
     }
-    if (global_transports != NULL) {
-      global_transports = INT_CMrealloc(global_transports, 
-				    sizeof(global_transports) * (i + 2));
-    } else {
-        global_transports = INT_CMmalloc(sizeof(global_transports) * (i+2));
-    }
-    global_transports[i] = 
-	transport = INT_CMmalloc(sizeof(struct _transport_item));
-    global_transports[i+1] = NULL;
-
     INT_CMfree(libname);
-    CMtrace_out(cm, CMTransportVerbose, "Loaded transport.\n");
+    transport = INT_CMmalloc(sizeof(struct _transport_item));
     transport->trans_name = strdup(trans_name);
     transport->cm = cm;
     transport->data_available = CMDataAvailable;  /* callback pointer */
@@ -136,29 +127,40 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 	lt_dlsym(handle, "set_write_notify");
     transport->get_transport_characteristics = (CMTransport_get_transport_characteristics)
 	lt_dlsym(handle, "get_transport_characteristics");
-    CMtrace_out(cm, CMTransportVerbose, "Listen is %p\n", transport->listen);
     if (transport->transport_init) {
 	transport->trans_data = 
 	    transport->transport_init(cm, &CMstatic_trans_svcs, transport);
     }
     transport = add_transport_to_cm(cm, transport);
 #else
+    if (strcmp(trans_name, "sockets")) {
+	extern transport_entry cmsockets_add_static_transport(CManager cm, CMtrans_services svc);
+	global_transports[i] = transport = cmsockets_add_static_transport(cm, &CMstatic_trans_svcs);
+	transport->data_available = CMDataAvailable;  /* callback pointer */
+	transport->write_possible = CMWriteQueuedData;  /* callback pointer */
+	(void) add_transport_to_cm(cm, transport);
+    }
+#ifdef NNTI_FOUND
+    if (strcmp(trans_name, "nnti")) {
+	extern transport_entry cmnnti_add_static_transport(CManager cm, CMtrans_services svc);
+	global_transports[i] = transport = cmnnti_add_static_transport(cm, &CMstatic_trans_svcs);
+	transport->data_available = CMDataAvailable;  /* callback pointer */
+	transport->write_possible = CMWriteQueuedData;  /* callback pointer */
+	(void) add_transport_to_cm(cm, transport);
+    }
+#endif
+    if (!transport) return 0;
+#endif
+    CMtrace_out(cm, CMTransportVerbose, "Loaded transport %s.\n", trans_name);
+    CMtrace_out(cm, CMTransportVerbose, "Listen is %p\n", transport->listen);
     if (global_transports != NULL) {
       global_transports = INT_CMrealloc(global_transports, 
 				    sizeof(global_transports) * (i + 2));
     } else {
         global_transports = INT_CMmalloc(sizeof(global_transports) * (i+2));
     }
-    {
-	extern transport_entry cmsockets_add_static_transport(CManager cm, CMtrans_services svc);
-	global_transports[i] = transport = cmsockets_add_static_transport(cm, &CMstatic_trans_svcs);
-    }
-    transport->data_available = CMDataAvailable;  /* callback pointer */
-    transport->write_possible = CMWriteQueuedData;  /* callback pointer */
-    CMtrace_out(cm, CMTransportVerbose, "Listen is %p\n", transport->listen);
-    (void) add_transport_to_cm(cm, transport);
-
+    global_transports[i] = transport;
     global_transports[i+1] = NULL;
-#endif
+
     return 1;
 }

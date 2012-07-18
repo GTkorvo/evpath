@@ -144,3 +144,6 @@
 /* Set to 1 to build without dynamic linking  */
 #cmakedefine NO_DYNAMIC_LINKING @NO_DYNAMIC_LINKING@
 
+/* Set to 1 if NNTI libraries and include file are found */
+#cmakedefine NNTI_FOUND
+

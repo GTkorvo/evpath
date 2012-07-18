@@ -30,25 +30,6 @@ IF (TARGET_CNL)   # This should be set to true if compiling for compute note lin
   list (APPEND CERCS_FIND_OPTIONS "STATIC")
 ENDIF (TARGET_CNL)
 
-if (NOT TARGET_CNL)
-add_library(evpath SHARED ${EVPATH_SRC_LIST})
-SET_TARGET_PROPERTIES(evpath PROPERTIES LINKER_LANGUAGE C)
-endif (NOT TARGET_CNL)
-add_library(evpath-static STATIC ${EVPATH_SRC_LIST})
-# The library target "evpath" already has a default OUTPUT_NAME of "evpath", so we don't need to change it.
-# The library target "evpath-static" has a default OUTPUT_NAME of "evpath-static", so change it.
-SET_TARGET_PROPERTIES(evpath-static PROPERTIES OUTPUT_NAME "evpath" )
-# Now the library target "foo-static" will be named "foo.lib" with MS tools.
-# This conflicts with the "foo.lib" import library corresponding to "foo.dll",
-# so we add a "lib" prefix (which is default on other platforms anyway):
-SET_TARGET_PROPERTIES(evpath-static PROPERTIES PREFIX "lib" LINKER_LANGUAGE C)
-
-add_custom_command(
-  OUTPUT "cm_interface.c" "revp.c" "revpath.h"
-  COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl
-)
-
 if (DEFINED CERCS_USE_INSTALLED) 
    list (APPEND CERCS_FIND_OPTIONS "USE_INSTALLED")
 endif(DEFINED CERCS_USE_INSTALLED) 
@@ -68,8 +49,6 @@ set (TARGETS evpath-static)
 
 INCLUDE_DIRECTORIES(${INC_DIRS} ${DL_INCLUDE_DIR})
 LINK_DIRECTORIES(${LIB_DIRS})
-
-TARGET_LINK_LIBRARIES(evpath-static ${DL_LIBRARIES} ${BASE_LIBS})
 
 if (NOT TARGET_CNL)
 add_library(cmsockets MODULE cmsockets.c)
@@ -103,15 +82,40 @@ IF (HAVE_IBVERBS AND NOT TARGET_CNL)
    TARGET_LINK_LIBRARIES(cmib ibverbs ${BASE_LIBS})
 ENDIF (HAVE_IBVERBS AND NOT TARGET_CNL)
 
-IF (HAVE_IBVERBS AND NOT TARGET_CNL)
+IF (HAVE_IBVERBS)
     FIND_CERCS_PROJECT (nnti LIBRARY trios_nssi INCLUDES nnti.h ${CERCS_FIND_OPTIONS})
     IF (NNTI_FOUND)
-        add_library(cmnnti MODULE cmnnti.c)
-	INCLUDE_DIRECTORIES(${NNTI_INCLUDE_DIR})
-	LINK_DIRECTORIES(${NNTI_LIB_DIR})
-	TARGET_LINK_LIBRARIES(cmnnti ${NNTI_LIBRARIES} ${ENET_LIBRARIES} ${BASE_LIBS})
-      ENDIF (NNTI_FOUND)
-ENDIF (HAVE_IBVERBS AND NOT TARGET_CNL)
+	IF (NOT TARGET_CNL)
+           add_library(cmnnti MODULE cmnnti.c)
+	   INCLUDE_DIRECTORIES(${NNTI_INCLUDE_DIR})
+	   LINK_DIRECTORIES(${NNTI_LIB_DIR})
+	   TARGET_LINK_LIBRARIES(cmnnti ${NNTI_LIBRARIES} ${ENET_LIBRARIES} ${BASE_LIBS})
+	ELSE (NOT TARGET_CNL)
+	   list (APPEND EVPATH_SRC_LIST cmsockets.c cmselect.c)  # link sockets and select mechanisms in main lib
+        ENDIF (NOT TARGET_CNL)
+    ENDIF (NNTI_FOUND)
+ENDIF (HAVE_IBVERBS)
+
+if (NOT TARGET_CNL)
+add_library(evpath SHARED ${EVPATH_SRC_LIST})
+SET_TARGET_PROPERTIES(evpath PROPERTIES LINKER_LANGUAGE C)
+endif (NOT TARGET_CNL)
+add_library(evpath-static STATIC ${EVPATH_SRC_LIST})
+# The library target "evpath" already has a default OUTPUT_NAME of "evpath", so we don't need to change it.
+# The library target "evpath-static" has a default OUTPUT_NAME of "evpath-static", so change it.
+SET_TARGET_PROPERTIES(evpath-static PROPERTIES OUTPUT_NAME "evpath" )
+# Now the library target "foo-static" will be named "foo.lib" with MS tools.
+# This conflicts with the "foo.lib" import library corresponding to "foo.dll",
+# so we add a "lib" prefix (which is default on other platforms anyway):
+SET_TARGET_PROPERTIES(evpath-static PROPERTIES PREFIX "lib" LINKER_LANGUAGE C)
+
+add_custom_command(
+  OUTPUT "cm_interface.c" "revp.c" "revpath.h"
+  COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl
+)
+
+TARGET_LINK_LIBRARIES(evpath-static ${DL_LIBRARIES} ${BASE_LIBS})
 
 IF (Threads_FOUND AND CMAKE_USE_PTHREADS_INIT)
     set (USE_PTHREADS True)
