@@ -591,15 +591,8 @@ CManager_free(CManager cm)
     int i;
     CMbuffer list = NULL;
 
-    if (cm->transports) {
-	int j = 0;
-	while (cm->transports[j] != NULL) {
-	    INT_CMfree(cm->transports[j]);
-	    j++;
-	}
-	INT_CMfree(cm->transports);
-    }
-
+    INT_CMfree(cm->transports);
+    cm->transports = NULL;
     free_FFSContext(cm->FFScontext);
     cm->FFScontext = NULL;
     INT_CMfree(cm->in_formats);
