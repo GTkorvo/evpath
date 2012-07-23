@@ -40,7 +40,7 @@ CMdlopen(char *in_lib, int mode)
     tmp = rindex(in_lib, '.');
     if (tmp && (strcmp(tmp, ".la") == 0)) {
 	/* can't open .la files */
-	lib = malloc(strlen(in_lib) + strlen(MODULE_EXT) + 1);
+	lib = malloc(strlen(in_lib) + strlen(MODULE_EXT) + 8);
 	strcpy(lib, in_lib);
 	strcpy(rindex(lib, '.'), MODULE_EXT);
     } else {
