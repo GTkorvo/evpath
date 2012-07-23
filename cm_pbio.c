@@ -484,11 +484,11 @@ CMinit_local_formats(CManager cm)
 	FMcontext_allow_self_formats(FMContext_from_FFS(cm->FFScontext));
 	CMtrace_out(cm, CMFormatVerbose, 
 		    "\nUsing external PBIO format server\n");
-	if (cm->FFSserver_identifier == -1) {
-	    CMself_hosted_formats = 1;
-	}
     }
     cm->FFSserver_identifier = FMcontext_get_format_server_identifier(FMContext_from_FFS(cm->FFScontext));
+    if (cm->FFSserver_identifier == -1) {
+	CMself_hosted_formats = 1;
+    }
     INT_CMregister_non_CM_message_handler(0x5042494f, CM_pbio_query);
     INT_CMregister_non_CM_message_handler(0x4f494250, CM_pbio_query);
 }
