@@ -51,6 +51,7 @@ static atom_t CM_NNTI_ADDR = -1;
 static atom_t CM_NNTI_ENET_CONTROL = -1;
 static atom_t CM_IP_HOSTNAME = -1;
 static atom_t CM_TRANSPORT = -1;
+static atom_t CM_NNTI_TRANSPORT = -1;
 static atom_t CM_ENET_PORT = -1;
 static atom_t CM_ENET_ADDR = -1;
 static atom_t CM_TRANSPORT_RELIABLE = -1;
@@ -176,7 +177,7 @@ attr_list conn_attr_list;
 {
     int int_port_num;
     nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) trans->trans_data;
-    char *host_name;
+    char *host_name, *nnti_transport;
     char server_url[256];
     struct connect_message *cmsg;
 
@@ -198,7 +199,14 @@ attr_list conn_attr_list;
 	svc->trace_out(cm, "CMNNTI transport connect to port %d", int_port_num);
     }
 
-    sprintf(server_url, "ib://%s:%d/", host_name, int_port_num);
+    if (!get_string_attr(attrs, CM_NNTI_TRANSPORT, &nnti_transport)) {
+	svc->trace_out(cm, "NNTI transport found no NNTI_TRANSPORT attribute");
+	nnti_transport = NULL;
+    } else {
+        svc->trace_out(cm, "NNTI transport connect using transport %s", nnti_transport);
+    }
+
+    sprintf(server_url, "%s://%s:%d/", nnti_transport, host_name, int_port_num);
 
     if (ntd->self_port == -1) {
         libcmnnti_LTX_non_blocking_listen(cm, svc, trans, NULL);
@@ -251,15 +259,15 @@ attr_list conn_attr_list;
     timeout = 500;
  again:
     err = NNTI_wait(&nnti_conn_data->mr_send, NNTI_SEND_SRC, timeout, &status);
+    if (err == NNTI_ETIMEDOUT) {
+	if (nnti_conn_data->ntd->shutdown_listen_thread) return 0;
+	timeout *=2;
+	goto again;
+    }
     if (err != NNTI_OK) {
         fprintf (stderr, "Error: NNTI_wait() for sending returned non-zero: %d\n", err);
         return 1;
     }
-	if (err == NNTI_ETIMEDOUT) {
-	    if (nnti_conn_data->ntd->shutdown_listen_thread) return 0;
-	    timeout *=2;
-	    goto again;
-	}
     svc->trace_out(trans->cm, " NNTI_wait() of send request returned... ");
 
 
@@ -645,7 +653,6 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
     case 1: 
     {
 	int err;
-	char server_url[256];
 	attr_list conn_attr_list = NULL;
 		
 	ntd->svc->trace_out(trans->cm, "  client %s:%d  (enet %d) is connecting",
@@ -656,7 +663,6 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	ncd->ntd = ntd;
 	ncd->peer_hdl = wait_status->src;
 	ncd->remote_contact_port = cm->enet_port;
-	sprintf(server_url, "ib://%s:%d/", cm->name, cm->nnti_port);
 
 	ncd->size = NNTI_REQUEST_BUFFER_SIZE;
 	ncd->raddr = 0;
@@ -933,13 +939,14 @@ attr_list listen_info;
 {
     char url[256];
     char *hostname;
+    char *nnti_transport;
     NNTI_transport_t trans_hdl;
     nnti_transport_data_ptr ntd = trans->trans_data;
     int int_port_num = 0;
     attr_list listen_list;
     int nc = 100;
     int nclients = 100;
-    char *last_colon;
+    char *last_colon, *first_colon;
     int err;
     int use_enet = 0;
     char *enet = getenv("NNTI_ENET");
@@ -953,11 +960,13 @@ attr_list listen_info;
     if (listen_info) {
 	get_int_attr(listen_info, CM_NNTI_ENET_CONTROL, &use_enet);
     }
-    NNTI_init(NNTI_TRANSPORT_IB, NULL, &trans_hdl);
+    NNTI_init(NNTI_DEFAULT_TRANSPORT, NULL, &trans_hdl);
     NNTI_get_url(&trans_hdl, url, sizeof(url));
     last_colon = rindex(url, ':');
     *last_colon = 0;
-    hostname = (url + 3);
+    first_colon = index(url, ':');
+    *first_colon = 0;
+    hostname = (first_colon + 1);
     while(hostname[0] == '/') hostname++;
 
     sscanf((last_colon + 1), "%d/", &int_port_num);
@@ -969,6 +978,8 @@ attr_list listen_info;
 	     (attr_value) (long) int_port_num);
     add_attr(listen_list, CM_TRANSPORT, Attr_String,
 	     (attr_value) strdup("nnti"));
+    add_attr(listen_list, CM_NNTI_TRANSPORT, Attr_String,
+	     (attr_value) strdup(url));
 
     if (use_enet) {
       /* setup for using NNTI_send() for control messages */
@@ -1279,6 +1290,7 @@ CMtrans_services svc;
 	CM_ENET_ADDR = attr_atom_from_string("CM_ENET_ADDR");
 	CM_ENET_PORT = attr_atom_from_string("CM_ENET_PORT");
 	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
+	CM_NNTI_TRANSPORT = attr_atom_from_string("CM_NNTI_TRANSPORT");
 	CM_PEER_IP = attr_atom_from_string("PEER_IP");
 	CM_TRANSPORT_RELIABLE = attr_atom_from_string("CM_TRANSPORT_RELIABLE");
 	atom_init++;
