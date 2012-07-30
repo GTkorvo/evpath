@@ -729,7 +729,7 @@ listen_thread_func(void *vlsp)
   
     while (1) {
         int buf_count = 1;
-	int which;
+	unsigned int which;
 	buf_list[0] = &ntd->mr_recvs;
 	//err = NNTI_wait(&ntd->mr_recvs, NNTI_RECV_QUEUE, timeout, &wait_status);
 	err = NNTI_waitany((const NNTI_buffer_t**)buf_list, buf_count, NNTI_RECV_QUEUE, timeout, &which, &wait_status);
@@ -1222,6 +1222,7 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
       size += iov[i].iov_len;
     }
     if (send_control_message(h) == 0) return 0;
+    return 1;
 }
 
 extern int
