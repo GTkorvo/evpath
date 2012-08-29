@@ -103,7 +103,7 @@ add_FMfieldlist_to_string(char *str, FMStructDescRec *f)
     char *tmp_str;
     len += strlen(f->format_name) + 5 + 35 + 20;
     str = realloc(str, len);
-    while(list[field_count].field_name != NULL) field_count++;
+    while(list && (list[field_count].field_name != NULL)) field_count++;
     tmp_str = str + strlen(str);
     sprintf(tmp_str, "FMFormat \"%s\" StructSize %d FieldCount %d\n",
 	    f->format_name, f->struct_size, field_count);
@@ -351,9 +351,10 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	response->u.multityped.reference_input_format_list =
 	    malloc((list_count +1) * sizeof(FMFormat));
 	for (j = 0; j < list_count; j++) {
-	    if ((struct_list[j])[0].format_name != NULL)
+	    if ((struct_list[j])[0].format_name != NULL) {
 		response->u.multityped.reference_input_format_list[j] =
 		    EVregister_format_set(cm, struct_list[j]);
+	    }
 	}
 	if (ref_ptr) {
 	    FMFormat *formats = malloc((list_count + 1)*sizeof(FMFormat));
@@ -870,13 +871,22 @@ static int cod_ev_count(cod_exec_context ec, long queue) {
     struct ev_state_data *ev_state;
     FMFormat type;
     queue_item *item;
-    int count = 1;
+    int count = 0;
+
+    int format_count = 0;
 
     ev_state = (void*) cod_get_client_data(ec, 0x34567890);
+    while(ev_state->instance->u.queued.formats[format_count]) format_count++;
+
+    if (format_count <= queue) {
+	printf("Error, queue parameter(%d) to EVCount is larger than queue count (%d)\n",
+	       queue, format_count);
+	return -1;
+    }
     type = queue < 0 ? NULL :
         ev_state->instance->u.queued.formats[queue];
-    item = ev_state->item;
-    while (item->next) {
+    item = ev_state->queue->queue_head;
+    while (item) {
         if (!type || item->item->reference_format == type)
             ++count;
         item = item->next;
@@ -1509,7 +1519,7 @@ add_type(cod_parse_context parse_context, FMFormat format)
 {
     FMStructDescList list = format_list_of_FMFormat(format);
     for (; list->format_name; ++list) {
-        cod_add_simple_struct_type(list->format_name, list->field_list, parse_context);
+	cod_add_simple_struct_type(list->format_name, list->field_list, parse_context);
     }
 }
 
@@ -1808,7 +1818,7 @@ generate_multityped_code(CManager cm, struct response_spec *mrd, stone_type ston
     memset(instance, 0, sizeof(*instance));
 
     for (cur_format = formats; *cur_format; ++cur_format) {
-        add_type(parse_context, *cur_format);
+	add_type(parse_context, *cur_format);
     }
 
     add_standard_routines(stone, parse_context);
