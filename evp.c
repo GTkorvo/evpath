@@ -1636,6 +1636,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		CMtrace_out(cm, EVerbose, "Executing terminal/filter event\n");
 		update_event_length_sum(cm, p, event);
 		cm->evp->current_event_item = event;
+		stone->new_enqueue_flag = 0;
 		stone->is_processing = 1;
 		CManager_unlock(cm);
 		if ((p->data_state == Requires_Contig_Encoded) && 
@@ -1696,6 +1697,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		client_data = act->o.imm.client_data;
 		out_stones = p->o.imm.output_stone_ids;
 		out_count = p->o.imm.output_count;
+		stone->new_enqueue_flag = 0;
 		stone->is_processing = 1;
 		func(cm, event, client_data, event->attrs, out_count, out_stones);
 		stone = stone_struct(cm->evp, s);
@@ -1736,13 +1738,16 @@ process_events_stone(CManager cm, int s, action_class c)
 	} else if (is_multi_action(act) || is_congestion_action(act)) {
             proto_action *p = &stone->proto_actions[act->proto_action_id];
 	    /* event_item *event = dequeue_item(cm, stone->queue, item); XXX */
-	    stone->is_processing = 1;
-            if ((act->o.multi.handler)(cm, stone->queue, item,
-					act->o.multi.client_data, p->o.imm.output_count,
-					p->o.imm.output_stone_ids))
-                more_pending++;
-	    stone = stone_struct(cm->evp, s);
-	    stone->is_processing = 0;
+	    if (stone->new_enqueue_flag) {
+		stone->new_enqueue_flag = 0;
+		stone->is_processing = 1;
+		if ((act->o.multi.handler)(cm, stone->queue, item,
+					   act->o.multi.client_data, p->o.imm.output_count,
+					   p->o.imm.output_stone_ids))
+		    more_pending++;
+		stone = stone_struct(cm->evp, s);
+		stone->is_processing = 0;
+	    }
             break;    
 	} 
 	item = next;
