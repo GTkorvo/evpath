@@ -46,6 +46,7 @@ struct multityped_spec {
     FMStructDescList *struct_list;
     char *function;
     void *client_data;
+    int accept_anonymous;
     FMFormat *reference_input_format_list;
 };
 
@@ -184,6 +185,10 @@ parse_FMformat_from_string(char *str, FMStructDescRec *f)
 	list[field_count].field_type = NULL;
 	list[field_count].field_size = 0;
 	list[field_count].field_offset = 0;
+	if (field_count == 0) {
+	    free(list);
+	    list = NULL;
+	}
 	f->format_name = name;
 	f->field_list = list;
 	f->struct_size = struct_size;
@@ -323,6 +328,7 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	int list_count, j;
 	char *function;
 	FMStructDescList *struct_list;
+	int accept_anonymous = 0;
 
 	str += strlen("Multityped Action") + 1;
 	sscanf(str, "  List Count %d\n", &list_count);
@@ -341,6 +347,12 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	    in_list[format_count2].format_name = NULL;
 	    in_list[format_count2].field_list = NULL;
 	    struct_list[j] = in_list;
+	    if (struct_list[j]->field_list == NULL) {  /* anonymous */
+		free(struct_list[j]->format_name);
+		list_count--;
+		j--;
+		accept_anonymous++;
+	    }
 	}
 	function = malloc(strlen(str) + 1);
 	strcpy(function, str);
@@ -348,6 +360,7 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	response->u.multityped.struct_list = struct_list;
 	response->u.multityped.function = function;
 	response->u.multityped.client_data = local_data;
+	response->u.multityped.accept_anonymous = accept_anonymous;
 	response->u.multityped.reference_input_format_list =
 	    malloc((list_count +1) * sizeof(FMFormat));
 	for (j = 0; j < list_count; j++) {
@@ -867,11 +880,14 @@ static int cod_ev_present(cod_exec_context ec, int queue, int index) {
     return cod_find_index_rel(ev_state, queue, index) != NULL;
 }
 
-static int cod_ev_count(cod_exec_context ec, long queue) {
+static int cod_ev_count(cod_exec_context ec, int queue) {
     struct ev_state_data *ev_state;
     FMFormat type;
     queue_item *item;
     int count = 0;
+
+    /*    queue == -1 RETURNS total event count */
+    /*    queue == -2 returns anonymous event count (I.E. count of events not in the queued format list) */
 
     int format_count = 0;
 
@@ -882,6 +898,20 @@ static int cod_ev_count(cod_exec_context ec, long queue) {
 	printf("Error, queue parameter(%d) to EVCount is larger than queue count (%d)\n",
 	       queue, format_count);
 	return -1;
+    }
+    if (queue == -2) {
+	item = ev_state->queue->queue_head;
+	while (item) {
+	    int i;
+	    for (i =0; i < format_count; i++) {
+		/* on match break out of loop */
+		if (item->item->reference_format == ev_state->instance->u.queued.formats[i]) break;
+	    }
+	    /* if we got to format_count without matching anything, increment count */
+	    if (i == format_count) ++count;
+	    item = item->next;
+	}
+	return count;
     }
     type = queue < 0 ? NULL :
         ev_state->instance->u.queued.formats[queue];
@@ -1070,6 +1100,15 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
                 && stone->proto_actions[i].data_state != Requires_Decoded) {
                 nearest_proto_action = i;
             }
+            if (stone->proto_actions[i].action_type == Action_Multi) {
+		struct response_spec *mrd;
+
+		mrd =
+		    stone->proto_actions[i].o.imm.mutable_response_data;
+		if (mrd->u.multityped.accept_anonymous) {
+		    nearest_proto_action = i;
+		}
+            }
         }
     }
     free(formatList);
@@ -1144,7 +1183,11 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    INT_EVassoc_mutated_multi_action(cm, stone->local_id, nearest_proto_action,
 					      queued_wrapper, instance,
 					      proto->matching_reference_formats);
-
+	    if (mrd->u.multityped.accept_anonymous && (conversion_target_format == NULL)) {
+		/* we're accepting this as an anonymous target */
+		INT_EVassoc_anon_multi_action(cm, stone->local_id, nearest_proto_action, queued_wrapper, instance,
+					      event->reference_format);
+	    }
             if (event->event_encoded) {
                 conversion_target_format = matching_format;
             }
@@ -1345,21 +1388,20 @@ add_standard_routines(stone_type stone, cod_parse_context context)
 }
 
 static void
-add_typed_queued_routines(cod_parse_context context, int index, FMFormat format)
+add_typed_queued_routines(cod_parse_context context, int index, const char *fmt_name)
 {
-    const char *fmt_name;
     char *extern_string;
+    char *data_extern_string;
     static char *extern_string_fmt =
-        "%s *EVdata_%s(cod_exec_context ec, cod_closure_context type, int index);\n"
-        "%s *EVdata_full_%s(cod_exec_context ec, cod_closure_context type, int index);\n"
         "void EVdiscard_%s(cod_exec_context ec, cod_closure_context type, int index);\n"
         "int EVcount_%s(cod_exec_context ec, cod_closure_context type);\n"
         "int EVpresent_%s(cod_exec_context ec, cod_closure_context queue, int index);\n"
         "void EVdiscard_and_submit_%s(cod_exec_context ec, int target, cod_closure_context queue, int index);\n"
         "attr_list EVget_attrs_%s(cod_exec_context ec, cod_closure_context queue, int index);\n";
+    static char *data_extern_string_fmt =
+        "%s *EVdata_%s(cod_exec_context ec, cod_closure_context type, int index);\n"
+        "%s *EVdata_full_%s(cod_exec_context ec, cod_closure_context type, int index);\n";
     static cod_extern_entry externs_fmt[] = {
-        {"EVdata_%s", (void *) 0},
-        {"EVdata_full_%s", (void *) 0},
         {"EVdiscard_%s", (void *) 0},
         {"EVcount_%s", (void *) 0},
         {"EVpresent_%s", (void *) 0},
@@ -1367,29 +1409,38 @@ add_typed_queued_routines(cod_parse_context context, int index, FMFormat format)
         {"EVget_attrs_%s", (void *) 0},
         {NULL, (void *) 0}
     };
+    static cod_extern_entry data_externs_fmt[] = {
+        {"EVdata_%s", (void *) 0},
+        {"EVdata_full_%s", (void *) 0},
+        {NULL, (void *) 0}
+    };
     cod_extern_entry *cur;
     cod_extern_entry *externs;
-
-    fmt_name = name_of_FMformat(format);
+    cod_extern_entry *data_externs;
 
     extern_string = malloc(strlen(fmt_name) * 9 + strlen(extern_string_fmt));
     assert(extern_string);
+    data_extern_string = malloc(strlen(fmt_name) * 9 + strlen(data_extern_string_fmt));
 
     sprintf(extern_string, extern_string_fmt,
         fmt_name, fmt_name, fmt_name, fmt_name,
-        fmt_name, fmt_name, fmt_name, fmt_name,
-        fmt_name
-        );
+        fmt_name);
+    sprintf(data_extern_string, data_extern_string_fmt,
+        fmt_name, fmt_name, fmt_name, fmt_name);
     externs = malloc(sizeof(externs_fmt));
     assert(externs);
     memcpy(externs, externs_fmt, sizeof(externs_fmt));
-    externs[0].extern_value = (void*) cod_ev_get_data_rel;
-    externs[1].extern_value = (void*) cod_ev_get_data_abs;
-    externs[2].extern_value = (void*) cod_ev_discard_rel;
-    externs[3].extern_value = (void*) cod_ev_count;
-    externs[4].extern_value = (void*) cod_ev_present;
-    externs[5].extern_value = (void*) cod_ev_discard_and_submit_rel;
-    externs[6].extern_value = (void*) cod_ev_get_attrs;
+    externs[0].extern_value = (void*) cod_ev_discard_rel;
+    externs[1].extern_value = (void*) cod_ev_count;
+    externs[2].extern_value = (void*) cod_ev_present;
+    externs[3].extern_value = (void*) cod_ev_discard_and_submit_rel;
+    externs[4].extern_value = (void*) cod_ev_get_attrs;
+
+    data_externs = malloc(sizeof(externs_fmt));
+    assert(data_externs);
+    memcpy(data_externs, data_externs_fmt, sizeof(data_externs_fmt));
+    data_externs[0].extern_value = (void*) cod_ev_get_data_rel;
+    data_externs[1].extern_value = (void*) cod_ev_get_data_abs;
 
     for (cur = externs; cur->extern_name; ++cur) {
         char *real_name = malloc(strlen(cur->extern_name) + strlen(fmt_name));
@@ -1400,17 +1451,37 @@ add_typed_queued_routines(cod_parse_context context, int index, FMFormat format)
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
-
     for (cur = externs; cur->extern_name; ++cur) {
 	/* 
 	 * the index here is the index of the queue itself, 
 	 * while the index in the calls above is the index of the referenced queue item 
 	 */
-        cod_set_closure(cur->extern_name, (void*)(long)index, context);
+	cod_set_closure(cur->extern_name, (void*)(long)index, context);
         free(cur->extern_name);
     }
     free(externs);
     free(extern_string);
+
+    if (index >= 0) {
+	for (cur = data_externs; cur->extern_name; ++cur) {
+	    char *real_name = malloc(strlen(cur->extern_name) + strlen(fmt_name));
+	    assert(real_name);
+	    sprintf(real_name, cur->extern_name, fmt_name);
+	    cur->extern_name = real_name;
+	}
+	cod_assoc_externs(context, data_externs);
+	cod_parse_for_context(data_extern_string, context);
+	for (cur = data_externs; cur->extern_name; ++cur) {
+	    /* 
+	     * the index here is the index of the queue itself, 
+	     * while the index in the calls above is the index of the referenced queue item 
+	     */
+	    cod_set_closure(cur->extern_name, (void*)(long)index, context);
+	    free(cur->extern_name);
+	}
+    }
+    free(data_externs);
+    free(data_extern_string);
 }
 
 static void
@@ -1426,7 +1497,7 @@ add_queued_routines(cod_parse_context context, FMFormat *formats)
                     int queue, int index);\n\
         void *EVdata(cod_exec_context ec, int queue, int index);\n\
         void *EVdata_full(cod_exec_context ec, int queue, int index);\n\
-        int EVcount(cod_exec_context ec, long queue);\n\
+        int EVcount(cod_exec_context ec, int queue);\n\
         int EVpresent(cod_exec_context ec, int queue, int index);\n\
 		int EVget_port(cod_exec_context ec, int queue);\n\
     	int EVtarget_size(cod_exec_context ec, int outstone);\n";
@@ -1464,8 +1535,10 @@ add_queued_routines(cod_parse_context context, FMFormat *formats)
     cod_parse_for_context(extern_string, context);
 
     for (cur = formats, i = 0; *cur; ++cur, ++i) {
-        add_typed_queued_routines(context, i, *cur);
+        add_typed_queued_routines(context, i, name_of_FMformat(*cur));
     }
+    add_typed_queued_routines(context, -1, "all");
+    add_typed_queued_routines(context, -2, "anonymous");
 }
 
 static void

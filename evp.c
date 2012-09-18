@@ -2021,6 +2021,41 @@ INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
 }
 
 extern EVaction
+INT_EVassoc_anon_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
+			       EVMultiHandlerFunc func, void *client_data, FMFormat anon_target)
+{
+    event_path_data evp = cm->evp;
+    stone_type stone;
+    int resp_num;
+
+    stone = stone_struct(evp, stone_id);
+    resp_num = stone->response_cache_count;
+    stone->response_cache = realloc(stone->response_cache, sizeof(stone->response_cache[0]) * (resp_num + 1));
+    response_cache_element *resp;
+    if (CMtrace_on(cm, EVerbose)) {
+	printf("Installing anon action response for multi action %d on ", act_num);
+	print_stone_identifier(evp, stone_id);
+	printf("\n");
+    }
+    resp = &stone->response_cache[stone->response_cache_count];
+    resp->action_type = stone->proto_actions[act_num].action_type;
+    resp->requires_decoded = 0;
+    resp->proto_action_id = act_num;
+    resp->o.multi.handler = func;
+    resp->o.multi.client_data = client_data;
+    resp->stage = cached_stage_for_action(&stone->proto_actions[act_num]);
+    resp->reference_format = anon_target;
+    if (CMtrace_on(cm, EVerbose)) {
+	char *tmp;
+	printf("\tResponse %d for format \"%s\"(%p)", stone->response_cache_count, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
+	free(tmp);
+    }
+    stone->response_cache_count += 1;
+    fix_response_cache(stone);
+    return resp_num;
+}
+
+extern EVaction
 INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
 				  EVMultiHandlerFunc func, void *client_data, 
 				  FMFormat *reference_formats)
