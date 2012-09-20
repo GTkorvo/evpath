@@ -109,6 +109,14 @@ INT_EVdfg_create_source_stone(EVdfg dfg, char *source_name)
     return INT_EVdfg_create_stone(dfg, &act[0]);
 }
 
+extern void EVdfg_add_sink_action(EVdfg_stone stone, char *sink_name)
+{
+    int len = strlen(sink_name) + strlen("sink:");
+    char *act = malloc(len + 1);
+    strcpy(stpcpy(&act[0], "sink:"), sink_name);
+    return INT_EVdfg_add_action(stone, &act[0]);
+}
+
 EVdfg_stone
 INT_EVdfg_create_sink_stone(EVdfg dfg, char *sink_name)
 {
