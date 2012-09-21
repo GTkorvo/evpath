@@ -129,7 +129,7 @@ generate_c_record(rec_c_ptr event)
     event->c_field = ((int) lrand48() % 50) * 2 + 1 * 2 + 10000*++sequence_num;
 }
 
-static int expected_sequences[20]  = {10,2,3,0,0, 0,0,0,0,0, 0,0,0,0,0};
+static int expected_sequences[20]  = {10,1,6,7,20,18,16,15,14,12, 19,17,13,11,9,2,3,4,5,8};
 static int received_sequences[EVENT_COUNT];
 
 static int message_count = 0;
@@ -153,7 +153,6 @@ static
 int
 a_output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
-    static int message_count = 0;
     rec_a_ptr event = vevent;
     (void)cm;
     if (quiet <= 0) {
@@ -170,7 +169,6 @@ static
 int
 b_output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
-    static int message_count = 0;
     rec_b_ptr event = vevent;
     (void)cm;
     if (quiet <= 0) {
@@ -187,7 +185,6 @@ static
 int
 c_output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
-    static int message_count = 0;
     rec_c_ptr event = vevent;
     (void)cm;
     if (quiet <= 0) {
@@ -203,21 +200,39 @@ c_output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 static char *trans = "{\n\
     int found = 0;\n\
     a_rec *a;\n\
-    printf(\"Event count is a_rec = %d, b_rec = %d, anon = %d\\n\", EVcount(0), EVcount(1), EVcount(-2));\n\
+    printf(\"==== Event count is a_rec = %d, b_rec = %d, anon = %d\\n\", EVcount(0), EVcount(1), EVcount_anonymous());\n\
     if (EVcount_command() > 0) {\n\
 	command *c = EVdata_command(0);\n\
 	if (c->command_field == 1) {\n\
 	    EVdiscard_and_submit_a_rec(0, EVcount_a_rec()-1);\n	\
 	    while(EVcount_a_rec()) {\n\
-	        printf(\"Submit and discard item 0 , count is %d\\n\", EVcount_a_rec());\n\
-	    EVdiscard_and_submit_a_rec(0, EVcount_a_rec()-1);\n	\
+	        printf(\"==== Submit and discard item 0(oldest in queue), count is %d\\n\", EVcount_a_rec());\n\
+	        EVdiscard_and_submit_a_rec(0, 0);\n\
 	    }\n\
 	} else {\n\
-	        printf(\"Submit and discard item -2 , count is %d\\n\", EVcount_a_rec());\n\
-		EVdiscard_and_submit_anonymous(0,0);\n\
+	    int half = EVcount_anonymous() / 2;\n\
+	    printf(\"==== There are %d anonymous events, discard half (%d) from top down \\n\", EVcount_anonymous(), half);\n\
+	    while (half--) {\n\
+	        printf(\"==== Submit and discard anonymous  %d, count is %d\\n\", EVcount_anonymous()-1,EVcount_anonymous());\n\
+		EVdiscard_and_submit_anonymous(0, EVcount_anonymous()-1);\n\
+	    }\n\
+	    half = EVcount_full() / 2;\n					\
+	    printf(\"==== There are %d total events, discard half (%d) from top (recent) down (skipping command)\\n\", EVcount_full(), half);\n\
+	    while (half--) {\n\
+	        printf(\"==== Submit and discard full  %d, count is %d\\n\", EVcount_full()-1,EVcount_full());\n\
+		EVdiscard_and_submit_full(0, EVcount_full()-2);\n\
+	    }\n\
+	    while(EVcount_a_rec()) {\n\
+	        printf(\"==== Submit and discard a_rec 0, count is %d\\n\", EVcount_a_rec());\n\
+	        EVdiscard_and_submit_a_rec(0, 0);\n\
+	    }\n\
+	    while(EVcount_anonymous()) {\n\
+	        printf(\"==== Submit and discard anonymous item 0, count is %d\\n\", EVcount_anonymous());\n\
+	        EVdiscard_and_submit_anonymous(0, 0);\n\
+	    }\n\
 	}\n\
+	EVdiscard_command(0);\n\
     }\n\
-printf(\"Exiting from handler\\n\");\n\
 }\0\0";
 
 static void
@@ -356,22 +371,68 @@ be_test_master(int argc, char **argv)
 	exit(1);
     }
 
-    
+/*
+  generate event sequence:  
+0: a=1
+1: c=2
+2: c=3
+3: b=4
+4: b=5
+5: a=6
+6: a=7
+7: b=8
+8: c=9
+9: a=10
+10: command = 1
+11: a=11
+12: c=12
+13: a=13
+14: b=14
+15: b=15
+16: c=16
+17: a=17
+18: b=18
+19: a=19
+20: c=20
+21: command = 2
+
+on command = 1 release top a, then all a from 0
+0: a=10
+1: a=1
+2: a=6
+3: a=7
+release half (6) of anonymous from top
+4: c=20    
+5: b=18
+6: c=16
+7: b=15
+8: b=14
+9: c=12
+There are 11 total events, discard half (5) from top (recent) down (skipping command)
+10: a=19
+11: a=17
+12: a=13
+13: a=11
+14: c=9
+submit any remaining a from bottom (oldest)
+submit any remaining anon from bottom (oldest)
+15: c=2
+16: c=3
+17: b=4
+18: b=5
+19: b=8
+*/
     index_atom = attr_atom_from_string("index_atom");
     /* we know the sources are here, just do submits */
     for (i=0; i < EVENT_COUNT + COMMAND_COUNT; i++) {
 	switch (i) {
+	case 0:
 	case 5:
 	case 6:
 	case 9:
 	case 11:
-	case 12:
 	case 13:
-	case 14:
-	case 15:
-	case 16:
 	case 17:
-	case 18:
 	case 19:{
 	    attr_list attrs = create_attr_list();
 	    rec_a_ptr a = malloc(sizeof(*a));
@@ -383,10 +444,12 @@ be_test_master(int argc, char **argv)
 	    EVsubmit_general(a_handle, a, (EVFreeFunction)free, NULL);
 	    break;
 	}
-	case 0:
 	case 3:
 	case 4:
-	case 7: {
+	case 7: 
+	case 14:
+	case 15:
+	case 18: {
 	    attr_list attrs = create_attr_list();
 	    rec_b_ptr b = malloc(sizeof(*b));
 	    b->b_field = 2;
@@ -400,7 +463,10 @@ be_test_master(int argc, char **argv)
 	}
 	case 1:
 	case 2:
-	case 8:	{
+	case 8:	
+	case 12:
+	case 16:
+	case 20: {
 	    attr_list attrs = create_attr_list();
 	    rec_c_ptr c = malloc(sizeof(*c));
 	    c->c_field = 3;
