@@ -1251,7 +1251,16 @@ cod_decode_event(CManager cm, int stone_num, int act_num, event_item *event) {
     stage = cached_stage_for_action(&stone->proto_actions[act_num]);
 
     resp_id = determine_action(cm, stone, stage, event, 0);
-    assert(stone->response_cache[resp_id].action_type == Action_Decode);
+    if (stone->response_cache[resp_id].action_type != Action_Decode) {
+	resp_id = determine_action(cm, stone, Immediate, event, 0);
+    }
+    if (stone->response_cache[resp_id].action_type != Action_Decode) {
+	char *tmp;
+	printf("Warning!  bad multiq action found for incoming an event on stone %x, stage %d\n",
+	       stone->local_id, stage);
+	printf("A decode response should be installed into the response cache for event type \"%s\" (%p)\n", tmp = global_name_of_FMFormat(event->reference_format), event->reference_format);
+	dump_stone(stone);
+    }
     return decode_action(cm, event, &stone->response_cache[resp_id]);
 }
 
