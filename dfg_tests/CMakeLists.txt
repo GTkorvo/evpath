@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-set (TESTS evtest rawtest chain_test filter_test tree_test multi_test dchain_test fail_chain_test reconfig_chain_test )
+set (TESTS evtest rawtest chain_test filter_test tree_test multi_test dchain_test fail_chain_test reconfig_chain_test anon_multi_test)
 
 ENABLE_TESTING()
 
