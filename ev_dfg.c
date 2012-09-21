@@ -704,6 +704,10 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
 	local_list[msg->stone_list[i].out_count] = -1;
 	INT_EVassoc_general_action(cm, local_stone, msg->stone_list[i].action, 
 				   &local_list[0]);
+	for (j=0; j < msg->stone_list[i].extra_actions; j++) {
+	    INT_EVassoc_general_action(cm, local_stone, msg->stone_list[i].xactions[j], 
+				       &local_list[0]);
+	}	    
 	if (msg->stone_list[i].period_secs != -1) {
 	    auto_list= realloc(auto_list, sizeof(auto_list[0]) * (auto_stones+2));
 	    auto_list[auto_stones].stone = local_stone;
@@ -1140,8 +1144,16 @@ deploy_to_node(EVdfg dfg, int node)
 		}
 	    }
 	    mstone->action = dstone->action;
-	    mstone->extra_actions = 0;
-	    mstone->xactions = NULL;
+	    if (dstone->action_count > 1) {
+		mstone->extra_actions = dstone->action_count - 1;
+		mstone->xactions = malloc(sizeof(mstone->xactions[0])*mstone->extra_actions);
+		for (k=0; k < mstone->extra_actions; k++) {
+		    mstone->xactions[k] = dstone->extra_actions[k];
+		}
+	    } else {
+		mstone->extra_actions = 0;
+		mstone->xactions = NULL;
+	    }
 	    j++;
 	}
     }
@@ -1155,6 +1167,7 @@ deploy_to_node(EVdfg dfg, int node)
     for(i=0 ; i < msg.stone_count; i++) {
 	free(msg.stone_list[i].out_links);
 	if (msg.stone_list[i].attrs) free(msg.stone_list[i].attrs);
+	if (msg.stone_list[i].xactions) free(msg.stone_list[i].xactions);
     }
     free(msg.stone_list);
 }
