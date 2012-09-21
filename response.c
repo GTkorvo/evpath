@@ -703,11 +703,36 @@ static queue_item *queue_find_index(queue_item *item, int i, FMFormat format) {
     }
 }
 
+static queue_item *queue_find_anonymous(queue_item *item, int i, FMFormat *formats) {
+    for (;;) {
+	int known = 0;
+	int j = 0;
+        if (!item) {
+            return NULL;
+        }
+	while(formats[j]) {
+	    if (item->item->reference_format == formats[j]) known++;
+	    j++;
+	}
+        if (known == 0) {
+            if (i == 0)
+                return item;
+            --i;
+        }
+        item = item->next;
+    }
+}
+
 static queue_item *cod_find_index_rel(struct ev_state_data *ev_state, int queue, int index)
 {
-    return queue_find_index(
-        ev_state->queue->queue_head, index,
-        queue < 0 ?  NULL : ev_state->instance->u.queued.formats[queue]);
+    if (queue != -2) {
+	return queue_find_index(
+	    ev_state->queue->queue_head, index,
+	    queue < 0 ?  NULL : ev_state->instance->u.queued.formats[queue]);
+    } else {
+	return queue_find_anonymous(
+	    ev_state->queue->queue_head, index, ev_state->instance->u.queued.formats);
+    }
 }
 
 static queue_item *cod_find_index_abs(struct ev_state_data *ev_state, int queue, int index) {
@@ -1490,30 +1515,32 @@ add_queued_routines(cod_parse_context context, FMFormat *formats)
     static char extern_string[] = "\
         int EVconforms(cod_exec_context ec, int queue, int index);\n\
         void EVdiscard(cod_exec_context ec, int queue, int index);\n\
-        void EVdiscard_full(cod_exec_context ec, int queue, int index);\n\
+        void EVdiscard_full(cod_exec_context ec, cod_closure_context queue, int index);\n\
         void EVdiscard_and_submit(cod_exec_context ec, int target,\
                     int queue, int index);\n\
         void EVdiscard_and_submit_full(cod_exec_context ec, int target,\
-                    int queue, int index);\n\
+                    cod_closure_context queue, int index);\n			       \
         void *EVdata(cod_exec_context ec, int queue, int index);\n\
-        void *EVdata_full(cod_exec_context ec, int queue, int index);\n\
+        void *EVdata_full(cod_exec_context ec, cod_closure_context queue, int index);\n\
         int EVcount(cod_exec_context ec, int queue);\n\
+        int EVcount_full(cod_exec_context ec, cod_closure_context type);\n\
         int EVpresent(cod_exec_context ec, int queue, int index);\n\
 		int EVget_port(cod_exec_context ec, int queue);\n\
     	int EVtarget_size(cod_exec_context ec, int outstone);\n";
 
     static cod_extern_entry externs[] = {
-        {"EVconforms", (void *)0},
-        {"EVdiscard", (void *)0},
-        {"EVdiscard_full",  (void *)0},
-        {"EVdiscard_and_submit", (void *)0},
-        {"EVdiscard_and_submit_full", (void *)0},
-        {"EVdata", (void *)0},
-        {"EVdata_full", (void *)0},
-        {"EVcount", (void *)0},
-        {"EVpresent", (void *)0},
-        {"EVget_port", (void *)0},
-        {"EVtarget_size", (void *)0},
+        {"EVconforms", (void *)0},  //0 
+        {"EVdiscard", (void *)0},  //1 
+        {"EVdiscard_full",  (void *)0},  //2 
+        {"EVdiscard_and_submit", (void *)0},  //3 
+        {"EVdiscard_and_submit_full", (void *)0},  //4 
+        {"EVdata", (void *)0},  //5 
+        {"EVdata_full", (void *)0},  //6 
+        {"EVcount", (void *)0},  //7 
+        {"EVcount_full", (void *)0},  //8 
+        {"EVpresent", (void *)0},  //9 
+        {"EVget_port", (void *)0},  //10 
+        {"EVtarget_size", (void *)0},  //11 
         {(void *)0, (void *)0}
     };
     int i;
@@ -1521,23 +1548,27 @@ add_queued_routines(cod_parse_context context, FMFormat *formats)
 
     externs[0].extern_value = (void*)cod_ev_conforms;
     externs[1].extern_value = (void*)cod_ev_discard_rel;
-    externs[2].extern_value = (void*)cod_ev_discard_abs;
+    externs[2].extern_value = (void*)cod_ev_discard_rel;
     externs[3].extern_value = (void*)cod_ev_discard_and_submit_rel;
-    externs[4].extern_value = (void*)cod_ev_discard_and_submit_abs;
+    externs[4].extern_value = (void*)cod_ev_discard_and_submit_rel;
     externs[5].extern_value = (void*)cod_ev_get_data_rel;
-    externs[6].extern_value = (void*)cod_ev_get_data_abs;
+    externs[6].extern_value = (void*)cod_ev_get_data_rel;
     externs[7].extern_value = (void*)cod_ev_count;
-    externs[8].extern_value = (void*)cod_ev_present;
-    externs[9].extern_value = (void*)cod_ev_get_port;
-    externs[10].extern_value = (void*)cod_ev_target_size;
+    externs[8].extern_value = (void*)cod_ev_count;
+    externs[9].extern_value = (void*)cod_ev_present;
+    externs[10].extern_value = (void*)cod_ev_get_port;
+    externs[11].extern_value = (void*)cod_ev_target_size;
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
+    cod_set_closure("EVdiscard_full", (void*)(long)-1, context);
+    cod_set_closure("EVdiscard_and_submit_full", (void*)(long)-1, context);
+    cod_set_closure("EVdata_full", (void*)(long)-1, context);
+    cod_set_closure("EVcount_full", (void*)(long)-1, context);
 
     for (cur = formats, i = 0; *cur; ++cur, ++i) {
         add_typed_queued_routines(context, i, name_of_FMformat(*cur));
     }
-    add_typed_queued_routines(context, -1, "all");
     add_typed_queued_routines(context, -2, "anonymous");
 }
 
