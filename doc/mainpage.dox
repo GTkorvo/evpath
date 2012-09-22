@@ -65,7 +65,7 @@ structure (simple_rec) that is to be transmitted.  EVPath deals with
 structured data and that it provides the the safe marshalling of complex
 structures, even between architectures with different machine
 representations of data.  These will be described in more detail in Section
-\ref pbio.  For the moment it is merely necessary to be aware that all data
+\ref FFS.  For the moment it is merely necessary to be aware that all data
 in EVPath is typed and types play a role in determining actions. 
 
 Next, define a function which will be called to consume data from a
@@ -90,7 +90,7 @@ handle (EVsource) with simple_format_list describing the type of data that
 we will submit with this source handle, and the stone to which it will be
 submitted.  (Here we are using the same data specification for both the
 source and sink.  In less tightly-coupled applications, these data types can
-vary, causing special rules to be invoked.  More in Section \ref pbio.  It
+vary, causing special rules to be invoked.  More in Section \ref FFS.  It
 is also possible to create many sources, each of which submit different
 types of data to the same stone.)
 \until submit_handle
@@ -279,7 +279,7 @@ former (and likely leak some memory).  Also, it's technically possible to
 register, for example, a terminal action and an bridge action on the same
 stone.  In this case, the terminal action would be applied to incoming data
 of compatible formats, but the bridge action would be applied to other data
-(more about data compatability in Section \ref pbio).  At this point, I'm
+(more about data compatability in Section \ref FFS).  At this point, I'm
 not sure if there are circumstances where this sort of flexibility is more
 useful than confusing.  But the implementation makes it easy, so for the
 moment the EVPath API will remain capable of these things.  Don't shoot
@@ -583,7 +583,7 @@ typedef struct _simple_rec {
 } simple_rec, *simple_rec_ptr;
 \endverbatim
 The details of type matching will be described more fully in Section \ref
-pbio, but for our current purposes the important point is that EVpath
+FFS, but for our current purposes the important point is that EVpath
 generates a new instance of the filter function for each distinct incoming
 type.  This helps to minimize recurring overhead (eliminating the need to
 map each new type into some single common representation allows us to
@@ -614,8 +614,354 @@ I got 22, average is now 170.4
 I got 325, average is now 181.64
 I got 27, average is now 172.9
 \endverbatim
-\todo There is a somewhat ugly hack here that has to do with our concept of
-atomic names for attributes.  
 
-\section pbio Types and PBIO
+\subsection router Router stones
+We have previously created 'split' actions to replicate events on multiple
+output paths, but sometimes what ones wants to do is to select a single
+output path down which an event should propogate. EVPath allows this to be
+done with a 'router' stone, and with the previously used
+EVaction_set_output() routine.  EVPath stones can have multiple numbered
+output 'ports'.  In split stones, the output ports are identical and largely
+anonymous.  In filter and transform stones, we only use output '0' as they
+can only support a single output. However in router stones we can have many
+outputs, each linked with a specific target stone via
+EVaction_set_output().  In particular, the code associated with a router
+action is somewhat like that of a filter stone, except that where the filter
+would return 0 or 1 indicating that the event should be dropped or passed
+forward, the code in the router function should return an positive integer
+indicating which of the output ports to which the even should be forwarded.
+That is, if one has associated target stones with three output ports,
+something like:
+\code
+     EVaction_set_output(cm, router_stone, router_action, 0, first_output_stone);
+     EVaction_set_output(cm, router_stone, router_action, 1, middle_output_stone);
+     EVaction_set_output(cm, router_stone, router_action, 2, last_output_stone);
+\endcode
+then the router function should return a value between 0 and 2 inclusive,
+and the event will be forwarded to the corresponding output stone.  (No
+sample programs included here.  Hopefully you've gotten to the point where
+you can write your own.)
+
+\subsection multistone Multi-stones
+Multi-stones (sometimes called multi-queue or multi-type stones), are the
+most complex stones in EVPath.  All of the previously-described stone
+actions are 'immediate' stones,  in which the action of the stone is applied
+to a single event and generally evpath will try to perform those actions
+immediately upon submission.  In particular, immediate processing of the
+events, with the result of either further submission or dropping the event,
+is automatic.  Situations which require aggregation of information from
+multiple events, possibly of different data types, are more directly
+supported by multi-stones.  
+
+Two main challenges in creating an event-aggregation functionality in the
+context of a system like EVPath are 1) specifying when a multi-event action
+is to run, and 2) in a situation where multiple different event data types
+might be in the queue at once making the event data visible in a
+type-safe way.  WRT 1), while some systems take the approach of creating a
+language in which action trigger preconditions can be specified, EVPath
+takes a somewhat simpler approach.  In EVPath multi-stones, the specified
+action is run every time a new event is placed in the stones event queue.
+However, there is no automatic dequeue of events, so the action has an
+opportunity to examine the contents of the event queue and make a decision
+as to whether or not its pre-conditions have been met.  If they have not,
+the action simply exits without consuming anything from its event queue.
+This essentially assigns to the action the responsibility for evaluating its
+own preconditions, however because the action code is dynamically generated
+native code, the costs are minimized.
+
+In order to allow evaluation of pre-conditions, the action must have the
+ability to inspect the stone's event queue.  The built-in CoD functions that
+allow this present multiple views of the event queue, allowing events to be
+referenced by their absolute locations in the queue (with zero being the
+oldest, first-entered event), or by relative locations in type-based queues
+(I.E. the 2nd event in the queue that matches type 'A').  The full set of
+functions provided are described in Section \ref multiqfuncs, but the
+example below demonstrates a typical action function for a multi-stone.  In
+this case, one with a pre-condition that one event of each of its two data types
+("a_rec" and "b_rec") to be present before it can operate.  It tests for the
+presence of each type of data.  If both types are not found it exits without
+further operation.  But if they are found, it accesses the data, generates a
+new record and submits it to output port 0.  Note that events must be
+explicitly discarded or they are not removed from the stone's event queue.
+It is an error to use the 'data' segment of an event after the event is discarded.
+
+\code
+static char *multi_func = "{\n\
+    int found = 0;\n\
+    a_rec *a;\n\
+    b_rec *b;\n\
+    /* if there at least one "a_rec" event */\n\
+    if (EVcount_a_rec() > 0) {\n\
+	/* get a pointer to the a_rec event data */\n\
+        a = EVdata_a_rec(0);\n\
+	++found;\n\
+    }\n\
+    /* if there at least one "b_rec" event */\n\
+    if (EVcount_b_rec() > 0) {\n\
+	/* get a pointer to the b_rec event data */\n\
+        b = EVdata_b_rec(0);\n\
+	++found;\n\
+    }\n\
+    if (found == 2) {\n\
+        c_rec c;\n\
+	/* combine the event data */
+        c.c_field = a.a_field + b.b_field;\n\
+	/* discard the used events */
+        EVdiscard_a_rec(0);\n\
+        EVdiscard_b_rec(0);\n\
+	/* submit the new, combined event */\n\
+        EVsubmit(0, c);\n\
+    }\n\
+}\0\0";
+\endcode
+
+For completeness, we include below the types of the records referenced in
+the multi-stone action above and the code lines used to create and install
+the action:
+\code
+typedef struct _rec_a {
+    int a_field;
+} rec_a, *rec_a_ptr;
+
+typedef struct _rec_b {
+    int b_field;
+} rec_b, *rec_b_ptr;
+
+typedef struct _rec_c {
+    int c_field;
+} rec_c, *rec_c_ptr;
+
+static FMField a_field_list[] =
+{
+    {"a_field", "integer",
+     sizeof(int), FMOffset(rec_a_ptr, a_field)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMField b_field_list[] =
+{
+    {"b_field", "integer",
+     sizeof(int), FMOffset(rec_b_ptr, b_field)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMField c_field_list[] =
+{
+    {"c_field", "integer",
+     sizeof(int), FMOffset(rec_c_ptr, c_field)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMStructDescRec a_format_list[] =
+{
+    {"a_rec", a_field_list, sizeof(rec_a), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
+static FMStructDescRec b_format_list[] =
+{
+    {"b_rec", b_field_list, sizeof(rec_b), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
+static FMStructDescRec c_format_list[] =
+{
+    {"c_rec", c_field_list, sizeof(rec_c), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
+
+static FMStructDescList queue_list[] = {a_format_list, b_format_list, c_format_list, NULL};
+\endcode
+\code
+	mq = create_multityped_action_spec(queue_list, multi_func);
+	maction = EVassoc_multi_action(cm, mstone, mq, NULL);
+\endcode
+
+Note that the parameter to create_multityped_action_spec() is a
+null-terminated list of FMStructDescList.  In this case, only "a_rec" and
+"b_rec" are expected incoming event types.  "c_rec" is not expected as an
+incoming event, but including it in the queue_list declares the "c_rec" type
+so that it can be used as the output type.  The complete list of functions
+available in multi-stone action routines is available below in Section \ref
+multiqfuncs. 
+
+\section FFS Types and FFS
+The prior examples have employed FMField and FMStructDescRec declarations
+describe to EVPath the data structures that are to be transmitted, as well
+as describing the structures into which EVPath is to place data for terminal
+handlers.  The software package used for these specifications is FFS.  FFS
+was designed and implemented for marshalling/unmarshalling and data
+filtering/transformation in high performance applications.  A description of
+the motivating applications for FFS can be found in :
+<br>
+<B>A Type System for High Performance Communication and Computation, </B>
+Greg Eisenhauer, Matthew Wolf, Hasan Abasi, Scott Klasky, Karsten Schwan.
+<em>in Proceedings of the Workshop on D3Science, associated with
+e-Science11, Dec 5, 2011, Stockholm, Sweden</em>
+<a href="http://www.cc.gatech.edu/systems/papers/Eisenhauer11.pdf">PDF Format</a>
+<br>
+Additional resources on FFS, including a manual, can be found on the 
+<a href="http://www.cc.gatech.edu/systems/projects/FFS/">FFS web page</a>.
+\section CoD
+The language used in the filter and transformation functions above is CoD
+(C-on-Demand).  CoD is part of the FFS package and is a
+dynamically-generated subset of C.  In general, CoD code is a text string
+representing the body of a subroutine.  The parameters of the subroutine are
+defined not by the "user provided" text, but by the generating context.  In
+the case of EVPath, the parameters are generally structures whose fields and
+data types are created from the specified input and output data types.  The
+FFS manual will eventually be extended to describe the syntax and semantics
+of FFS, but if you write code that would work in C, generally it will work
+in CoD.  In some cases, CoD has some magic that supports FFS in some way,
+and in other cases CoD leaves out some non-bits of C, mostly that can be
+replicated in some other way.  For example, CoD currently doesn't support
+switch, do-while, bit-wise complement (~) or conditional expression (?:).
+The principal magic bit off CoD relates to the fact that FFS allows
+dynamically sized arrays with the size given by integer-typed field in the
+same structure.  In order to maintain the relationship between the value of
+this "control field" and the array whose size it specifies, CoD will
+automatically reallocate the arrays whenever there is assignment done on the
+control fields.   This allows some form of dynamic memory allocation in CoD
+without the use of malloc/realloc.
+
+However, all of these are really properties of CoD and not specific to its
+use in EVPath.  The unique aspects of CoD code in EVPath are related to the
+special functions and variables that EVPath makes visible to CoD code in
+filter and transformation functions (in addition to the <B>input</b> and
+<B>output</b> parameters that have been noted previously.)
+
+In particular, within an EVPath CoD function, the following global entries
+are visible and available for use:
+- int printf(string format, ...);
+- void *malloc(int size);
+- void free(void *pointer);
+- void sleep(int seconds);
+- long lrand48();
+- double drand48();
+- attr_list stone_attrs;
+- attr_list event_attrs;
+
+Aside from the last two <em>attr_list</em> entries, all of these are just making
+the routines from the standard C library visible.  (Note that other entries
+are not, by default, visible or available, but mechanisms exist to add
+things to the set of available items.)  With respect to the attr_list
+entries, there are attribute lists associated with each event in evpath and
+associated with each stone.  These data values make those attributes
+available to CoD functions.  The <b>event_attrs</b> is actually a parameter,
+while the <b>stone_attrs</b> is an external variable, but the difference is
+immaterial inside the function.  WRT the stone_attrs list,  it may find an
+example use as a communication mechanism between CoD functions associated
+with the same stone, or it may simply be used to query other EVPath-supplied
+stone attributes.  event_attrs may be used to communicate between CoD
+functions on different stones on the event path, or simply carry event
+attributes from the source to the final destination.  
+
+In order to operate on these attribute lists, the following
+routines are also made available:
+- int attr_set(attr_list l, string name);
+  - returns boolean true if the named attribute is set, false otherwise
+- void set_long_attr(attr_list l, string name, long value);
+  - set the named attribute to the value
+- void set_float_attr(attr_list l, string name, double value);
+  - set the named attribute to the value
+- void set_double_attr(attr_list l, string name, double value);
+  - set the named attribute to the value
+- void set_int_attr(attr_list l, string name, int value);
+  - set the named attribute to the value
+- void set_string_attr(attr_list l, string name, string value);
+  - set the named attribute to the value
+- int attr_ivalue(attr_list l, string name);
+  - return the int value of the named attribute
+- long attr_lvalue(attr_list l, string name);
+  - return the long value of the named attribute
+- double attr_dvalue(attr_list l, string name);
+  - return the double value of the named attribute
+- double attr_fvalue(attr_list l, string name);
+  - return the float value of the named attribute
+- char* attr_svalue(attr_list l, string name);
+  - return the string value of the named attribute
+
+\subsection multiqfuncs Multi-stone Functions
+
+In addition to the CoD functions listed above that are available in all
+CoD-based EVPath actions, multi-stones have the following extra functions
+that allow for inspection and operation upon the stone's event queue.
+
+Generally speaking, there are multiple forms each basic action.  For
+example, the function EVcount_full() returns the total count of events in
+the stone queue, but for each of the datatypes specified for the
+multi-stone, there are also EVcount_\<name\>() functions available (where \<name\> is the string
+name of each datatype in the queue list).  These functions return the count
+of events in the queue that match that particular data type.  EVcount(int
+queue) takes a parameter which is the integer index (zero-based) of a
+datatype.  So in the example above, EVcount(0) is equivalent to
+EVcount_a_rec().  There is also an integer constant \<name\>_ID created for
+each of the queue types, so EVcount(0), EVcount(a_rec_ID) and
+EVcount_a_rec() are all equivalent forms.  In addition, because some actions
+may wish to manipulate events whose types are unknown, the queue_list may
+include a special FMStructDescList with the top-level name "anonymous" and a
+NULL field list.  If this FMStructList entry is present, EVcount_anonymous()
+will return the number of events in the stone's event queue that do \em not
+match any of the other data types in the queue list.  (If the "anonymous"
+entry is not present in the queue list, events with unmatched types will be
+rejected by the multi-stone.)
+
+In addition, functions which operate on entries in the event queue generally
+have an \em index parameter that specifies which queue entry they apply to.
+Index is zero-based and lower numbers are the oldest (first submitted)
+events.  For routines like EVdiscard_full(int index), index is interpreted
+as indicating the Nth element in the queue, regardless of type.  However,
+EVdiscard_a_rec(int index) applies to the Nth "a_rec" in the queue, ignoring
+events which are of other types.  (While this essentially this treats the "a_rec"
+elements as if they are in their own queue, there is only ever one, unified,
+event queue.)  Note that all modifications to the event
+queue take effect immediately and affect the results of subsequent calls, so
+that, for example, the code segment  
+\code
+while(EVcount_full()) EVdiscard_full(0);
+\endcode
+will discard the oldest extant event in the stone queue until there are none left.
+
+The full list of available functions are:
+\code
+int EVcount_full();
+ // return the number of events in the event queue.
+int EVcount(int queue);
+int EVcount_<em><type></em>();
+ // return the number of envents in the event queue of type <type> (or corresponding to the queue'th entry in the queue_list)
+
+void EVdiscard_full(int index);
+ // Discard (permanently remove from the queue) the event at absolute position \em index.
+void EVdiscard(int queue, int index);
+void EVdiscard_<type>(int index);
+ // discard the index'th event of type <type> (or corresponding to the queue'th entry in the queue_list)
+
+void EVdiscard_and_submit_full(int target, int index);
+ // Remove the event at absolute position \em index and submit it to output port \em target
+void EVdiscard_and_submit(int target, int queue, int index);
+void EVdiscard_and_submit_<type>(int target, int queue, int index);
+ // Remove the index'th event of type <type> (or corresponding to the queue'th entry in the queue list) and submit it to output port \em target
+
+<type> *EVdata_<type>(int index);
+void *EVdata(int queue, int index);
+ // Return the data associated the index'th event of type <type> (or corresponding to the queue'th entry in the queue list)
+<type> *EVdata_full_<type>(int index);
+void *EVdata_full(int queue, int index);
+ // Return the data associated the event in absolute position \em index (use with caution for type safety)
+
+int EVconforms(int queue, int index);
+ // returns true if the event at absolute position \em index has a type which corresponds to the queue'th entry in the queue_list.
+
+attr_list EVget_attrs_%s(int index);
+attr_list EVget_attrs(int queue, int index);
+ // Return the attribute list associated the index'th event of type <type> (or corresponding to the queue'th entry in the queue list)
+attr_list EVget_attrs_full(int queue, int index);
+ // Return the attribute list associated the event in absolute position \em index
+\endcode
+
+If anonymous event availability has been enabled, the type-specific routines
+above are also available for the "anonymous" meta-type, except that the
+corresponding EVdata() routines are not present.
+
 */
