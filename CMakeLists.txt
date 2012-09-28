@@ -12,6 +12,7 @@ include(CheckIncludeFiles)
 include(CheckLibraryExists)
 include(CheckTypeSize)
 include(CheckStructHasMember)
+include(CreateLibtoolFile)
 include(FindCERCSProject)
 include(CTest)
 
@@ -43,6 +44,12 @@ FIND_CERCS_PROJECT (gen_thread LIBRARY gen_thread INCLUDES gen_thread.h REQUIRED
 FIND_CERCS_PROJECT (ffs LIBRARY ffs INCLUDES ffs.h REQUIRED ${CERCS_FIND_OPTIONS})
 FIND_CERCS_PROJECT (dill LIBRARY dill REQUIRED ${CERCS_FIND_OPTIONS})
 find_package (Threads)
+
+list (APPEND DEPLIBS "-L${CERCS_ENV_LIB_DIR}" "${GEN_THREAD_LIB_DIR}/libcercs_env.la")
+list (APPEND DEPLIBS "-L${ATL_LIB_DIR}" "${ATL_LIB_DIR}/libatl.la")
+list (APPEND DEPLIBS "-L${GEN_THREAD_LIB_DIR}" "${GEN_THREAD_LIB_DIR}/libgen_thread.la")
+list (APPEND DEPLIBS "-L${FFS_LIB_DIR}" "${FFS_LIB_DIR}/libffs.la")
+list (APPEND DEPLIBS "-L${DILL_LIB_DIR}" "${DILL_LIB_DIR}/libdill.la")
 
 list (APPEND INC_DIRS ${CERCS_ENV_INCLUDE_DIR} ${ATL_INCLUDE_DIR} ${GEN_THREAD_INCLUDE_DIR} ${FFS_INCLUDE_DIR})
 list (APPEND LIB_DIRS ${CMAKE_CURRENT_BINARY_DIR} ${CERCS_ENV_LIB_DIR} ${ATL_LIB_DIR} ${GEN_THREAD_LIB_DIR} ${FFS_LIB_DIR} ${DILL_LIB_DIR})
@@ -102,6 +109,8 @@ if (NOT TARGET_CNL)
 add_library(evpath SHARED ${EVPATH_SRC_LIST})
 SET_TARGET_PROPERTIES(evpath PROPERTIES LINKER_LANGUAGE C)
 TARGET_LINK_LIBRARIES(evpath ${DL_LIBRARIES} ${BASE_LIBS})
+SET_TARGET_PROPERTIES(evpath PROPERTIES STATIC_LIB "libevpath.a")
+SET_TARGET_PROPERTIES(evpath PROPERTIES LT_SHOULDNOTLINK "no")
 endif (NOT TARGET_CNL)
 add_library(evpath-static STATIC ${EVPATH_SRC_LIST})
 # The library target "evpath" already has a default OUTPUT_NAME of "evpath", so we don't need to change it.
@@ -114,6 +123,7 @@ SET_TARGET_PROPERTIES(evpath-static PROPERTIES PREFIX "lib" LINKER_LANGUAGE C)
 
 add_custom_command(
   OUTPUT "cm_interface.c" "revp.c" "revpath.h"
+  SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/evpath.h ${CMAKE_CURRENT_SOURCE_DIR}/ev_dfg.h
   COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl
 )
@@ -151,6 +161,13 @@ CHECK_FUNCTION_EXISTS(gettimeofday HAVE_GETTIMEOFDAY)
 
 TRY_COMPILE(HAVE_MAC_SYSCTL ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_mac_sysctl.c)
 TRY_COMPILE(HAVE_LINUX_SYSCTL ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_mac_sysctl.c)
+
+foreach(arg ${DEPLIBS})
+   set(DEP_STRING "${DEP_STRING} ${arg}")
+endforeach(arg ${DEPLIBS})
+
+SET_TARGET_PROPERTIES(evpath PROPERTIES LT_DEPENDENCY_LIBS "${DEP_STRING}")
+CREATE_LIBTOOL_FILE(evpath /lib)
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/evpath.h DESTINATION include)
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/revpath.h DESTINATION include)
