@@ -67,8 +67,8 @@ typedef struct _CMTaskHandle *CMTaskHandle;
  * and a pointer to their locations.
  */
 typedef struct buf_entry {
-    int length;
-    void *buffer;
+    int length;		/*!< length of the encoded buffer */
+    void *buffer;	/*!< base address of the encoded buffer */
 } *EVevent_list;
 
 /*!
@@ -192,13 +192,13 @@ extern int CMlisten ARGS((CManager cm));
  * listen operations (by reporting contact attributes).
  * \note The listen_info value is interpreted by each individual transport.
  * Currently implemented transports that use this include: 
- * - the <b>sockets</b> tranport which uses the #CM_IP_PORT attribute to control
+ * - the <b>sockets</b> tranport which uses the CM_IP_PORT attribute to control
  *   which port it listens on.  If this attribute is not present it listens
  *   on any available port. 
- * - the <b>rudp</b> tranport which uses the #CM_UDP_PORT attribute to control
+ * - the <b>rudp</b> tranport which uses the CM_UDP_PORT attribute to control
  *   which port it listens on.  If this attribute is not present it listens
  *   on any available port. 
- * - the <b>atm</b> tranport which uses the #CM_ATM_SELECTOR and #CM_ATM_BHLI
+ * - the <b>atm</b> tranport which uses the CM_ATM_SELECTOR and CM_ATM_BHLI
  * attribute to control listens.  These attributes must be present.
  */
 extern int CMlisten_specific ARGS((CManager cm, attr_list listen_info));
@@ -385,6 +385,7 @@ CMregister_format ARGS((CManager cm, FMStructDescList format_list));
  * \param field_list The FM field list which describes the structure, listing all 
  * structure fields (their names, data types, offsets and sizes).
  * As with all FMFieldLists, the list is terminated with a <tt>{NULL, NULL, 0, 0}</tt> value.
+ * \param struct_size The (padded if necessary) size of the structure, typically as returned by sizeof().
  *
  * Registering a format is a precursor to sending a message or registering a
  * handler for incoming messages.  This call is the equivalent to calling CMregister_format(), 
@@ -541,7 +542,7 @@ extern void CMreturn_buffer ARGS((CManager cm, void *data));
  * \param cm The CManager in which the handler was called.
  * \param data The base address of the data (I.E. same value that was passed
  * to CMtake_buffer().
- * \return 1 if the #data value was actually from a CMtake_buffer() call.  
+ * \return 1 if the data value was actually from a CMtake_buffer() call.  
  * 0 otherwise. 
 */
 extern int CMtry_return_buffer ARGS((CManager cm, void *data));
@@ -1069,6 +1070,24 @@ typedef void (*EVSubmitCallbackFunc) ARGS((CManager cm, EVstone target,
 typedef int (*EVSimpleHandlerFunc) ARGS((CManager cm, 
 					  void *message, void *client_data,
 					  attr_list attrs));
+
+/*!
+ * The prototype for an EVPath raw terminal handler function.
+ *
+ * EVPath allows application-routines matching this prototype to be 
+ * registered as raw sinks (receiving encoded FFS data) on stones.
+ * \param cm The CManager with which this handler was registered.
+ * \param message A pointer to the incoming data, cast to void*.  The real
+ * data is formatted to match the fields of with which the format was
+ * registered. 
+ * \param msg_len The length in bytes of the message block
+ * \param client_data This value is the same client_data value that was
+ * supplied in the EVassoc_terminal_action() call.  It is not interpreted by CM,
+ * but instead can be used to maintain some application context.
+ * \param attrs The attributes (set of name/value pairs) that this message
+ * was delivered with.  These are determined by the transport and may
+ * include those specified in CMwrite_attr() when the data was written.
+ */
 typedef int (*EVRawHandlerFunc) ARGS((CManager cm, void *message, 
 				      int msg_len, void *client_data,
 				      attr_list attrs));
@@ -2104,6 +2123,7 @@ create_transform_action_spec(FMStructDescList format_list, FMStructDescList out_
 extern char *
 create_multityped_action_spec(FMStructDescList *input_format_lists, char *function);
 
+#ifdef __COD__H__
 /*!
  * Add a set of routines that will be visible in COD.
  *
@@ -2114,7 +2134,6 @@ create_multityped_action_spec(FMStructDescList *input_format_lists, char *functi
  * adddresses for each routine declared by the extern string.
  * You must include cod.h for this routine to be visible.
  */
-#ifdef __COD__H__
 extern void
 EVadd_standard_routines(CManager cm, char *extern_string, 
 			cod_extern_entry *externs);
@@ -2134,6 +2153,7 @@ EVadd_standard_structs(CManager cm, FMStructDescList *lists);
  *
  * \param cm The CManager managing the bridge stones
  * \param handler The routine to be called
+ * \param client_data This parameter will be supplied unmodifed to the handler routine upon close.
  */
 extern void
 EVregister_close_handler(CManager cm, EVStoneCloseHandlerFunc handler, void *client_data);
