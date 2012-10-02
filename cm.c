@@ -865,7 +865,9 @@ do_bw_measure(CManager cm, void *client_data)
     double bw;
     (void)cm;
     bw_measure_data data = (bw_measure_data) client_data;
+    CManager_lock(cm);
     bw=INT_CMregressive_probe_bandwidth(data->conn, data->size, data->attrs);
+    CManager_unlock(cm);
 
     /*Initialization phase*/
     if(bw<0 && data->successful_run<5){
@@ -914,7 +916,10 @@ INT_CMConnection_set_character(CMConnection conn, attr_list attrs)
 	    CMtrace_out(conn->cm, CMLowLevelVerbose,"CM_BW_MEASURE_INTERVAL prior interval is %d, killing prior task.\n", previous_interval);
 	    get_long_attr(conn->characteristics, CM_BW_MEASURE_TASK,
 			  (long*)(long)&prior_task);
-	    if (prior_task) INT_CMremove_task(prior_task);
+	    if (prior_task) {
+		INT_CMremove_task(prior_task);
+		set_long_attr(conn->characteristics, CM_BW_MEASURE_TASK, (long)0);
+	    }
 	}
 	data = malloc(sizeof(*data));
 	data->size=data->size_inc=-1;
@@ -1014,7 +1019,10 @@ CMConnection_failed(CMConnection conn)
     conn->trans->shutdown_conn(&CMstatic_trans_svcs, conn->transport_data);
     get_long_attr(conn->characteristics, CM_BW_MEASURE_TASK, 
 		  (long*)(long)&prior_task);
-    if (prior_task) INT_CMremove_task(prior_task);
+    if (prior_task) {
+	INT_CMremove_task(prior_task);
+	set_long_attr(conn->characteristics, CM_BW_MEASURE_TASK, (long)0);
+    }
     if (conn->close_list) {
 	CMCloseHandlerList list = conn->close_list;
 	conn->close_list = NULL;
