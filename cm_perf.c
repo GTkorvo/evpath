@@ -519,7 +519,8 @@ INT_CMregressive_probe_bandwidth(CMConnection conn, int size, attr_list attrs)
     int i, j;
     int cond;
     int N = 9; /* send out N tcp streams with varied length*/
-    int repeat_count = 3;
+    int repeat_count = 100000/size;  /* send about 100K */
+    repeat_count = 100;
     static int max_block_size = 0;
     static char *block = NULL;
     int microsecs_to_receive;
