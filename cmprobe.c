@@ -165,7 +165,7 @@ main(argc, argv)
 	CMregister_handler(format, simple_handler, NULL);
 	CMsleep(cm, 1200);
     } else {
-	int size;
+	int size = 500;
 	int i,j;
 	int N, repeat_time, size_inc;
 	int bw_long, bw_cof; /*measured values*/
@@ -201,7 +201,6 @@ main(argc, argv)
 
 	N=3;
 	repeat_time=2;
-	size=5000; 
 	size_inc=2000;
     
 	bw_list = create_attr_list();	    
@@ -214,30 +213,15 @@ main(argc, argv)
 	add_int_attr(bw_list, CM_BW_MEASURE_SIZE, size); 
 	add_int_attr(bw_list, CM_BW_MEASURE_SIZEINC, size_inc);
 		
-	CMConnection_set_character(conn, bw_list);
-	sleep(1);
-	result_list=CMConnection_get_attrs(conn);
-	if (get_int_attr(result_list, CM_BW_MEASURED_VALUE, &bw_long)) {
-/*		printf("BW get from attr: %d\n", bw_long);*/
-	} else{
-	    printf("Failed to get bw from attr\n");
-	}
-	
-	if (get_int_attr(result_list, CM_BW_MEASURED_COF, &bw_cof)) {
-/*		printf("BW cof get from attr: %d\n", bw_cof);*/
-	} else {
-	    printf("Failed to get bw cof from attr\n");
-	}
-
 /* Example when invoking CMregressive_probe_bandwidth on demand is needed: */
 	for(i=1; i<120; i++)
 	{
 	    double bandwidth;
 
-	    bandwidth=CMregressive_probe_bandwidth(conn, size, contact_list);
+	    bandwidth=CMprobe_bandwidth(conn, size, contact_list);
 	    printf("Estimated bandwidth at size %d is %f Mbps\n", size, bandwidth);
 	    sleep(1);
-	    if(bandwidth<0)
+	    if(bandwidth>0)
 		size+=size_inc;
 	}
 	    
