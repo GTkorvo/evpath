@@ -190,15 +190,18 @@ struct timeval now;
     if (task_list == NULL) return;
     this_delay.tv_sec = task_list->next_time.tv_sec - now.tv_sec;
     this_delay.tv_usec = task_list->next_time.tv_usec - now.tv_usec;
-    if (this_delay.tv_usec < 0) {
-	this_delay.tv_sec--;
-	this_delay.tv_usec += 1000000;
-    }
-    if (this_delay.tv_sec < 0) {
-	this_delay.tv_sec = this_delay.tv_usec = 0;
-    }
-    if ((timeout->tv_sec == -1) || (timercmp(&this_delay, timeout, <))) {
-	*timeout = this_delay;
+    if (task_list->executing == (thr_thread_t)-1) {
+	/* this task not executing already, see when it needs to run  */
+	if (this_delay.tv_usec < 0) {
+	    this_delay.tv_sec--;
+	    this_delay.tv_usec += 1000000;
+	}
+	if (this_delay.tv_sec < 0) {
+	    this_delay.tv_sec = this_delay.tv_usec = 0;
+	}
+	if ((timeout->tv_sec == -1) || (timercmp(&this_delay, timeout, <))) {
+	    *timeout = this_delay;
+	}
     }
     set_soonest_timeout(timeout, task_list->next, now);
 }
