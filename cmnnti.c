@@ -132,7 +132,7 @@ typedef struct nnti_connection_data {
 } *nnti_conn_data_ptr;
 
 #ifdef ENET_FOUND
-extern attr_list
+extern void
 enet_non_blocking_listen(CManager cm, CMtrans_services svc,
 			 transport_entry trans, attr_list listen_info);
 #endif
@@ -313,7 +313,7 @@ attr_list conn_attr_list;
 #ifdef ENET_FOUND
 static void nnti_enet_service_network(CManager cm, void *void_trans);
 
-extern attr_list
+extern void
 enet_non_blocking_listen(CManager cm, CMtrans_services svc,
 			 transport_entry trans, attr_list listen_info)
 {
@@ -358,7 +358,7 @@ enet_non_blocking_listen(CManager cm, CMtrans_services svc,
     }
     if (server == NULL) {
 	fprintf(stderr, "Failed after 5 attempts to bind to a random port.  Lots of undead servers on this host?\n");
-	return NULL;
+	return;
     }
     ntd->enet_server = server;
     ntd->enet_listen_port = address.port;
@@ -906,7 +906,7 @@ enet_accept_conn(nnti_transport_data_ptr ntd, transport_entry trans,
     while (ncd && (ncd->remote_IP != address->host) && 
 	   (ncd->remote_contact_port != address->port)) {
 	if (verbose >=1) {
-	    printf("NCD remote IP %lx, address->host %lx\n", ncd->remote_IP, address->host);
+	    printf("NCD remote IP %x, address->host %x\n", ncd->remote_IP, address->host);
 	    printf("NCD remote contact port %d, address->port %d\n", ncd->remote_contact_port, address->port);
 	}
 	ncd = ncd->next;
@@ -1008,7 +1008,7 @@ attr_list listen_info;
 			       NNTI_REQUEST_BUFFER_SIZE, nc,
 			       NNTI_RECV_QUEUE, &trans_hdl.me, &ntd->mr_recvs);
     if (err != NNTI_OK) {
-      fprintf (stderr, "Error: NNTI_register_memory(NNTI_RECV_DST) for client messages returned non-zero: %d %d\n", err, NNTI_ERROR_STRING(err));
+      fprintf (stderr, "Error: NNTI_register_memory(NNTI_RECV_DST) for client messages returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
       return NULL;
     } else {
       ntd->svc->trace_out(trans->cm, "Successfully registered memory on listen side incoming %p", ntd->incoming);
