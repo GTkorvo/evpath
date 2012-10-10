@@ -940,8 +940,14 @@ void EVdiscard_<type>(int index);
 void EVdiscard_and_submit_full(int target, int index);
  // Remove the event at absolute position \em index and submit it to output port \em target
 void EVdiscard_and_submit(int target, int queue, int index);
-void EVdiscard_and_submit_<type>(int target, int queue, int index);
+void EVdiscard_and_submit_<type>(int target, int index);
  // Remove the index'th event of type <type> (or corresponding to the queue'th entry in the queue list) and submit it to output port \em target
+
+void EVsubmit_full(int target, int index);
+ // submit the event at absolute position \em index to output port \em
+ target, without removing it from the queue
+void EVsubmit_<type>(int target, int index);
+ // submit the index'th event of type <type> to output port \em target, without removing it from the queue
 
 <type> *EVdata_<type>(int index);
 void *EVdata(int queue, int index);
