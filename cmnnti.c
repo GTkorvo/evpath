@@ -41,7 +41,6 @@ static void enet_free_func(void *packet);
 extern attr_list
 libcmnnti_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, 
 				  transport_entry trans, attr_list listen_info);
-
 struct nnti_connection_data;
 
 static atom_t CM_PEER_IP = -1;
@@ -611,6 +610,11 @@ struct pull_request {
   void *addr;
   NNTI_buffer_t buf_addr;
   NNTI_buffer_t res_addr;
+  void *msg_info;
+};
+
+struct pull_complete_notify {
+  void *msg_info;
 };
 
 struct client_message {
@@ -618,8 +622,16 @@ struct client_message {
   union {
     struct piggyback pig;
     struct pull_request pull;
+    struct pull_complete_notify pull_complete;
   };
 };
+
+static void
+handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
+			    struct client_message *m);
+static void
+handle_pull_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
+			     struct client_message *m);
 
 static void
 handle_control_request(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans, 
@@ -737,7 +749,7 @@ listen_thread_func(void *vlsp)
 	if (ntd->shutdown_listen_thread) {
 	  return 0;
 	}
-	if (err == NNTI_ETIMEDOUT) {
+	if ((err == NNTI_ETIMEDOUT) || (err==NNTI_EAGAIN)) {
 	    //ntd->svc->trace_out(trans->cm, "NNTI_wait() on receiving result %d timed out...", err);
 	    continue;
         } else if (err != NNTI_OK) {
@@ -844,43 +856,16 @@ static void
 handle_control_request(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
 		       struct client_message *m)
 {
-  int err;
-  int offset = 0;
-  int pullsize = m->pull.size;
-  CMbuffer read_buffer;
-  char *data;
-  NNTI_status_t               status;
 
-  read_buffer = svc->get_data_buffer(ncd->ntd->cm, m->pull.size);
-  data = read_buffer->buffer;
-  err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, m->pull.size, 1,
-			     NNTI_GET_DST, &ncd->peer_hdl, &ncd->mr_pull);
-  err = NNTI_get (&m->pull.buf_addr,
-		  offset,  // get from this remote buffer+offset
-		  pullsize,      // this amount of data
-		  &ncd->mr_pull,
-		  offset); // into this buffer+offset
-
-  if (err != NNTI_OK) {
-    printf ("  THREAD: Error: NNTI_get() for client returned non-zero: %d %s\n",
-	    err, NNTI_ERROR_STRING(err));
-//    conns[which%nc].status = 1; // failed status
+  switch (m->message_type) {
+  case 3: {
+      handle_pull_request_message(ncd, svc, trans, m);
+      break;
   }
-  int timeout = 500;
-  err = NNTI_wait(&ncd->mr_pull, NNTI_GET_DST, timeout, &status);
-  if (err == NNTI_ETIMEDOUT) {
-    fprintf (stderr, "  THREAD:   no news about clients yet.\n");
-  } else if (err != NNTI_OK) {
-    fprintf (stderr, "  THREAD: Error: pull from client failed. NNTI_waitany returned: %d %s\n",err, NNTI_ERROR_STRING(err));
-  } else {
-    // completed a pull here
-      printf("PULL WAS DONE\n");
-      ncd->read_buffer = read_buffer;
-      ncd->read_buf_len = m->pull.size;
-      /* kick this upstairs */
-      trans->data_available(trans, ncd->conn);
-      svc->return_data_buffer(trans->cm, ncd->read_buffer);
-      ncd->read_buffer = NULL;
+  case 4:{
+      handle_pull_complete_message(ncd, svc, trans, m);
+      break;
+  }
   }
 
 }
@@ -1205,6 +1190,15 @@ send_control_message(send_handle h)
     return 1;
 }
 
+typedef struct {
+    int send_id;
+    int size;
+    NNTI_buffer_t mr;
+    CMbuffer write_buffer;
+} *nnti_message_info;
+
+static int send_request = 32;
+
 static int
 copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr ncd,
 				       struct iovec *iov, int iovcnt, attr_list attrs)
@@ -1216,24 +1210,103 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     char *data;
     int i, size = 0;
     int err;
+    nnti_message_info local_message_info = malloc(sizeof(*local_message_info));
 
     for(i=0; i<iovcnt; i++) size+= iov[i].iov_len;
 
     h = get_control_message_buffer(ncd, &m, sizeof(*m));
     write_buffer = svc->get_data_buffer(ncd->ntd->cm, size);
     data = write_buffer->buffer;
+    printf("Registering memory %lx, size %d, trans handle %lx, peer %lx\n", data, size, &ncd->ntd->trans_hdl, &ncd->peer_hdl);
     err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, size, 1, NNTI_GET_SRC, &ncd->peer_hdl, &mr);
     m->message_type = 3;
     m->pull.size = size;
     m->pull.addr = data;
     m->pull.buf_addr = mr;
+    m->pull.msg_info = local_message_info;
+    local_message_info->send_id = send_request++;
+    local_message_info->size = size;
+    local_message_info->mr = mr;
+    local_message_info->write_buffer = write_buffer;
+
     size = 0;
     for(i=0; i<iovcnt; i++) {
       memcpy(&data[size], iov[i].iov_base, iov[i].iov_len);
       size += iov[i].iov_len;
     }
+    svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET registered buffer %p, copied %d bytes and sending pull request", data, size);
     if (send_control_message(h) == 0) return 0;
+    svc->set_pending_write(ncd->conn);
     return 1;
+}
+
+static void
+handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
+		       struct client_message *m)
+{
+    int err;
+    int offset = 0;
+    int pullsize = m->pull.size;
+    CMbuffer read_buffer;
+    char *data;
+    NNTI_status_t               status;
+      
+    read_buffer = svc->get_data_buffer(ncd->ntd->cm, m->pull.size);
+    data = read_buffer->buffer;
+    svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET Received pull request, pulling %d bytes", m->pull.size);
+    err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, m->pull.size, 1,
+			       NNTI_GET_DST, &ncd->peer_hdl, &ncd->mr_pull);
+    if (err != NNTI_OK) {
+	printf ("  CMNNTI: NNTI_register_memory() for client returned non-zero: %d %s\n",
+		err, NNTI_ERROR_STRING(err));
+    }
+    err = NNTI_get (&m->pull.buf_addr,
+		    offset,  // get from this remote buffer+offset
+		    pullsize,      // this amount of data
+		    &ncd->mr_pull,
+		    offset); // into this buffer+offset
+    
+    if (err != NNTI_OK) {
+	printf ("  THREAD: Error: NNTI_get() for client returned non-zero: %d %s\n",
+		err, NNTI_ERROR_STRING(err));
+//    conns[which%nc].status = 1; // failed status
+    }
+    int timeout = 500;
+    err = NNTI_wait(&ncd->mr_pull, NNTI_GET_DST, timeout, &status);
+    if (err == NNTI_ETIMEDOUT) {
+	fprintf (stderr, "  THREAD:   no news about clients yet.\n");
+    } else if (err != NNTI_OK) {
+	fprintf (stderr, "  THREAD: Error: pull from client failed. NNTI_waitany returned: %d %s\n",err, NNTI_ERROR_STRING(err));
+    } else {
+	// completed a pull here
+	send_handle h;
+	struct client_message *r;
+	h = get_control_message_buffer(ncd, &r, sizeof(*m));
+	r->message_type = 4;
+	r->pull_complete.msg_info = m->pull.msg_info;
+	svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET done with pull, returning control message, type %d, local_info %p", m->message_type, m->pull_complete.msg_info);
+	if (send_control_message(h) == 0) {
+	    svc->trace_out(ncd->ntd->cm, "--- control message send failed!");
+	}	  
+	
+	ncd->read_buffer = read_buffer;
+	ncd->read_buf_len = m->pull.size;
+	/* kick this upstairs */
+	trans->data_available(trans, ncd->conn);
+	svc->return_data_buffer(trans->cm, ncd->read_buffer);
+	ncd->read_buffer = NULL;
+    }
+}
+
+static void
+handle_pull_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
+		       struct client_message *m)
+{
+    nnti_message_info local_message_info = m->pull_complete.msg_info;
+    svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET received pull complete message, freeing resources, unblocking any pending writes");
+    svc->return_data_buffer(ncd->ntd->cm, local_message_info->write_buffer);
+    NNTI_unregister_memory(&local_message_info->mr);
+    svc->wake_any_pending_write(ncd->conn);
 }
 
 extern int
@@ -1350,7 +1423,7 @@ cmnnti_add_static_transport(CManager cm, CMtrans_services svc)
 {
     transport_entry transport;
     transport = svc->malloc_func(sizeof(struct _transport_item));
-    transport->trans_name = strdup("socket");
+    transport->trans_name = strdup("nnti");
     transport->cm = cm;
     transport->transport_init = (CMTransport_func)libcmnnti_LTX_initialize;
     transport->listen = (CMTransport_listen_func)libcmnnti_LTX_non_blocking_listen;
@@ -1359,7 +1432,7 @@ cmnnti_add_static_transport(CManager cm, CMtrans_services svc)
     transport->connection_eq = (int(*)())libcmnnti_LTX_connection_eq;
     transport->shutdown_conn = (CMTransport_shutdown_conn_func)libcmnnti_LTX_shutdown_conn;
     transport->read_block_func = (CMTransport_read_block_func)libcmnnti_LTX_read_block_func;
-    transport->read_block_func = (CMTransport_read_block_func)NULL;
+    transport->read_to_buffer_func = (CMTransport_read_to_buffer_func)NULL;
     transport->writev_func = (CMTransport_writev_func)libcmnnti_LTX_writev_func;
     transport->get_transport_characteristics = (CMTransport_get_transport_characteristics) libcmnnti_LTX_get_transport_characteristics;
     if (transport->transport_init) {

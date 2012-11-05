@@ -48,6 +48,7 @@ typedef CMbuffer (*CMTransport_get_data_buffer) ARGS((CManager cm, int length));
 typedef void (*CMTransport_return_data_buffer) ARGS((CManager cm, CMbuffer cmb));
 typedef void (*CMTransport_connection_close) ARGS((CMConnection conn));
 typedef void *(*CMTransport_get_transport_data) ARGS((CMConnection conn));
+typedef void (*CMTransport_action_pending_write) ARGS((CMConnection conn));
 typedef CMbuffer (*CMTransport_create_data_buffer) ARGS((CManager cm, void *buffer, int length));
 
 
@@ -69,6 +70,8 @@ typedef struct CMtrans_services_s {
     CMTransport_create_data_buffer create_data_buffer;
     CMTransport_create_data_buffer create_data_and_link_buffer;
     CMTransport_get_transport_data get_transport_data;
+    CMTransport_action_pending_write set_pending_write;
+    CMTransport_action_pending_write wake_any_pending_write;
 } *CMtrans_services;
 
 

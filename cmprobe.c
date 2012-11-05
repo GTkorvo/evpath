@@ -165,7 +165,7 @@ main(argc, argv)
 	CMregister_handler(format, simple_handler, NULL);
 	CMsleep(cm, 1200);
     } else {
-	int size = 500;
+	int size = 100;
 	int i,j;
 	int N, repeat_time, size_inc;
 	int bw_long, bw_cof; /*measured values*/
@@ -201,7 +201,7 @@ main(argc, argv)
 
 	N=3;
 	repeat_time=2;
-	size_inc=2000;
+	size_inc=200;
     
 	bw_list = create_attr_list();	    
 	    
@@ -218,7 +218,7 @@ main(argc, argv)
 	{
 	    double bandwidth;
 
-	    bandwidth=CMprobe_bandwidth(conn, size, contact_list);
+	    bandwidth=CMprobe_bandwidth(conn, size, bw_list);
 	    printf("Estimated bandwidth at size %d is %f Mbps\n", size, bandwidth);
 	    sleep(1);
 	    if(bandwidth>0)

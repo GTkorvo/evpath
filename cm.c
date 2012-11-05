@@ -63,6 +63,11 @@ atom_t CM_BW_MEASURE_SIZEINC = -1;
 static atom_t CM_EVENT_SIZE = -1;
 static atom_t CM_TRANSPORT_RELIABLE = -1;
 
+static void wait_for_pending_write(CMConnection conn);
+static void cm_wake_any_pending_write(CMConnection conn);
+static void transport_wake_any_pending_write(CMConnection conn);
+static void cm_set_pending_write(CMConnection conn);
+
 struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, INT_CMfree, 
 					       INT_CM_fd_add_select, 
 					       CM_fd_write_select, 
@@ -77,7 +82,10 @@ struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, IN
 					       INT_CMConnection_close,
 					       cm_create_transport_buffer,
 					       cm_create_transport_and_link_buffer,
-					       INT_CMget_transport_data};
+					       INT_CMget_transport_data,
+					       cm_set_pending_write,
+					       transport_wake_any_pending_write
+};
 static void CMControlList_close ARGS((CMControlList cl));
 static int CMcontrol_list_poll ARGS((CMControlList cl));
 int CMdo_non_CM_handler ARGS((CMConnection conn, int header,
@@ -2148,6 +2156,22 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
     if(!CManager_locked(conn->cm)) {
 	printf("Not LOCKED in write queued data!\n");
     }
+    cm_wake_any_pending_write(conn);
+    CManager_unlock(conn->cm);
+}
+
+static void
+transport_wake_any_pending_write(CMConnection conn)
+{
+    CManager_lock(conn->cm);
+    conn->write_pending = 0;
+    cm_wake_any_pending_write(conn);
+    CManager_unlock(conn->cm);
+}
+
+static void
+cm_wake_any_pending_write(CMConnection conn)
+{
     if (conn->write_callbacks) {
 	int i = 0;
         CMConnHandlerListEntry callbacks[16];
@@ -2163,9 +2187,14 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
     } else {
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, No notifications\n");
     }
-    CManager_unlock(conn->cm);
 }
 
+static void
+cm_set_pending_write(CMConnection conn)
+{
+    assert(CManager_locked(conn->cm));
+    conn->write_pending = 1;
+}
 
 static void
 queue_remaining_write(CMConnection conn, FFSEncodeVector tmp_vec, 
@@ -2296,8 +2325,10 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
                 int vec_count, int byte_count, attr_list attrs, int nowp, int data_vec_stack)
 {
     int actual = 0;
-    assert(!conn->write_pending);
     assert(!conn->closed && !conn->failed);
+    if (conn->write_pending) {
+	wait_for_pending_write(conn);
+    }
     if (conn->do_non_blocking_write == 1 && !nowp) {
         int actual_bytes;
         actual_bytes = 
