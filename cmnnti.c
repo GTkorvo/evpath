@@ -180,6 +180,9 @@ unlink_connection(nnti_transport_data_ptr ntd, nnti_conn_data_ptr ncd)
 
 #include "qual_hostname.c"
 
+enum {CMNNTI_CONNECT=1, CMNNTI_PIGGYBACK=2, CMNNTI_PULL_REQUEST=3, CMNNTI_PULL_COMPLETE=4};
+char *msg_type_name[] = {"NO MESSAGE", "CMNNTI_CONNECT", "CMNNTI_PIGGYBACK", "CMNNTI_PULL_REQUEST", "CMNNTI_PULL_COMPLETE"};
+
 struct connect_message {
     short message_type;
     short nnti_port;
@@ -267,7 +270,7 @@ attr_list conn_attr_list;
     }
 
     cmsg = (void*)req_buf;
-    cmsg->message_type = 1;
+    cmsg->message_type = CMNNTI_CONNECT;
     cmsg->nnti_port = ntd->self_port;
     cmsg->enet_port = ntd->enet_listen_port;
     cmsg->enet_ip = ntd->self_ip;
@@ -655,14 +658,14 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
     nnti_conn_data_ptr ncd = ntd->connections;
     while (ncd != NULL) {
 	if (memcmp(&wait_status->src, &ncd->peer_hdl, sizeof(wait_status->src)) == 0) {
-	    ntd->svc->trace_out(trans->cm, "NNTI data available on existing connection, from host %s, type %d", 
-				ncd->peer_hostname, cm->message_type);
+	    ntd->svc->trace_out(trans->cm, "NNTI data available on existing connection, from host %s, type %s (%d)", 
+				ncd->peer_hostname, msg_type_name[cm->message_type], cm->message_type);
 	    break;
 	}
 	ncd = ncd->next;
     }
     switch (cm->message_type){
-    case 1: 
+    case CMNNTI_CONNECT: 
     {
 	int err;
 	attr_list conn_attr_list = NULL;
@@ -705,7 +708,7 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	ncd->piggyback_size_max = NNTI_REQUEST_BUFFER_SIZE;
     }
     break;
-    case 2:
+    case CMNNTI_PIGGYBACK:
     {
 	struct client_message *m = (struct client_message *)(wait_status->start+wait_status->offset);
 	ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
@@ -753,7 +756,7 @@ listen_thread_func(void *vlsp)
 	    //ntd->svc->trace_out(trans->cm, "NNTI_wait() on receiving result %d timed out...", err);
 	    continue;
         } else if (err != NNTI_OK) {
-            fprintf (stderr, "Error: NNTI_wait() on receiving result returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
+            fprintf (stderr, "Error: NNTI_wait() on receiving result returned non-zero: %d %s  which is %d, status is %d\n", err, NNTI_ERROR_STRING(err), which, wait_status.result);
             return 1;
         } else {
 	    ntd->svc->trace_out(trans->cm, "  message arived: msg wait_status=%d size=%lu offs=%lu addr=%lu, offset was %ld",
@@ -815,8 +818,8 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 	    /*	    econn_d->read_buffer = event.packet->data;*/
 	    /*	    econn_d->packet = event.packet;*/
 	    m = (struct client_message *) event.packet->data;
-	    svc->trace_out(cm, "   Message type is %d\n", m->message_type);
-	    if (m->message_type == 2){
+	    svc->trace_out(cm, "   Message type is %s (%d)\n", msg_type_name[m->message_type], m->message_type);
+	    if (m->message_type == CMNNTI_PIGGYBACK){
 	      ncd->packet = event.packet;
 	      ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
 	      
@@ -858,11 +861,11 @@ handle_control_request(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_e
 {
 
   switch (m->message_type) {
-  case 3: {
+  case CMNNTI_PULL_REQUEST: {
       handle_pull_request_message(ncd, svc, trans, m);
       break;
   }
-  case 4:{
+  case CMNNTI_PULL_COMPLETE:{
       handle_pull_complete_message(ncd, svc, trans, m);
       break;
   }
@@ -1217,9 +1220,8 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     h = get_control_message_buffer(ncd, &m, sizeof(*m));
     write_buffer = svc->get_data_buffer(ncd->ntd->cm, size);
     data = write_buffer->buffer;
-    printf("Registering memory %lx, size %d, trans handle %lx, peer %lx\n", data, size, &ncd->ntd->trans_hdl, &ncd->peer_hdl);
     err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, size, 1, NNTI_GET_SRC, &ncd->peer_hdl, &mr);
-    m->message_type = 3;
+    m->message_type = CMNNTI_PULL_REQUEST;
     m->pull.size = size;
     m->pull.addr = data;
     m->pull.buf_addr = mr;
@@ -1276,13 +1278,13 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
     if (err == NNTI_ETIMEDOUT) {
 	fprintf (stderr, "  THREAD:   no news about clients yet.\n");
     } else if (err != NNTI_OK) {
-	fprintf (stderr, "  THREAD: Error: pull from client failed. NNTI_waitany returned: %d %s\n",err, NNTI_ERROR_STRING(err));
+	fprintf (stderr, "  THREAD: Error: pull from client failed. NNTI_wait returned: %d %, wait_status.result = %ds\n",err, NNTI_ERROR_STRING(err), status.result);
     } else {
 	// completed a pull here
 	send_handle h;
 	struct client_message *r;
 	h = get_control_message_buffer(ncd, &r, sizeof(*m));
-	r->message_type = 4;
+	r->message_type = CMNNTI_PULL_COMPLETE;
 	r->pull_complete.msg_info = m->pull.msg_info;
 	svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET done with pull, returning control message, type %d, local_info %p", m->message_type, m->pull_complete.msg_info);
 	if (send_control_message(h) == 0) {
@@ -1325,7 +1327,7 @@ attr_list attrs;
         send_handle h;
 	struct client_message *m;
 	h = get_control_message_buffer(ncd, &m, size + client_header_size);
-	m->message_type = 2;
+	m->message_type = CMNNTI_PIGGYBACK;
 	m->pig.size = size;
 	size = 0;
 	for(i=0; i<iovcnt; i++) {
