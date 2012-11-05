@@ -3075,7 +3075,6 @@ INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
 		 attr_list attrs)
 {
     event_item *event = get_free_event(source->cm->evp);
-    (void)attrs;
     event->contents = Event_App_Owned;
     event->event_encoded = 0;
     event->decoded_event = data;
@@ -3083,6 +3082,7 @@ INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
     event->format = source->format;
     event->free_func = free_func;
     event->free_arg = data;
+    event->attrs = CMadd_ref_attr_list(source->cm, attrs);
     internal_path_submit(source->cm, source->local_stone_id, event);
     while (process_local_actions(source->cm));
     if (event->ref_count != 1 && !event->event_encoded) {
