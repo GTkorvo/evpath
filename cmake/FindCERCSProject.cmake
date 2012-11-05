@@ -34,8 +34,6 @@
 # HAVE_<include_file>   for each include file found (UPCASED, dot is underscore)
 #
 include(CMakeParseArguments)
-CMAKE_POLICY(SET CMP0012 NEW) 
-CMAKE_POLICY(SET CMP0011 NEW) 
 
 FUNCTION (FIND_CERCS_PROJECT ARG_PROJECT)
   set(options REQUIRED;STATIC;DYNAMIC;USE_INSTALLED;VERBOSE)
