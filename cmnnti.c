@@ -24,7 +24,7 @@
 #include <cercs_env.h>
 #include "evpath.h"
 #include "cm_transport.h"
-#include <nnti.h>
+#include <Trios_nnti.h>
 
 #if defined (__INTEL_COMPILER)
 #  pragma warning (disable: 869)
@@ -1255,12 +1255,15 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
       
     read_buffer = svc->get_data_buffer(ncd->ntd->cm, m->pull.size);
     data = read_buffer->buffer;
+    printf("======== Handling pull request, size %d, data is %p\n", m->pull.size, data);
     svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET Received pull request, pulling %d bytes", m->pull.size);
     err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, m->pull.size, 1,
 			       NNTI_GET_DST, &ncd->peer_hdl, &ncd->mr_pull);
     if (err != NNTI_OK) {
 	printf ("  CMNNTI: NNTI_register_memory() for client returned non-zero: %d %s\n",
 		err, NNTI_ERROR_STRING(err));
+    } else {
+	printf("======== NNTI register memory went swell\n");
     }
     err = NNTI_get (&m->pull.buf_addr,
 		    offset,  // get from this remote buffer+offset
@@ -1272,6 +1275,8 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
 	printf ("  THREAD: Error: NNTI_get() for client returned non-zero: %d %s\n",
 		err, NNTI_ERROR_STRING(err));
 //    conns[which%nc].status = 1; // failed status
+    } else {
+	printf("======== NNTI get went swell\n");
     }
     int timeout = 500;
     err = NNTI_wait(&ncd->mr_pull, NNTI_GET_DST, timeout, &status);
