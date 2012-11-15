@@ -38,6 +38,10 @@
 
 static void enet_free_func(void *packet);
 
+typedef enum {MAP_EACH_MESSAGE_PULL, MAP_EACH_MESSAGE_PUSH,
+	      PERSISTENT_MAPPED_BUFFER_PULL, PERSISTENT_MAPPED_BUFFER_PUSH,
+	      LAST_PROTOCOL} messaging_protocols;
+
 extern attr_list
 libcmnnti_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, 
 				  transport_entry trans, attr_list listen_info);
@@ -88,6 +92,7 @@ typedef struct nnti_transport_data {
     int use_enet;
     int shutdown_listen_thread;
     struct nnti_connection_data *connections;
+    int cache_maps;
 
 #ifdef ENET_FOUND
     /* enet support */
@@ -117,6 +122,12 @@ typedef struct nnti_connection_data {
     NNTI_buffer_t res_addr;
     NNTI_buffer_t buf_addr;
     int piggyback_size_max;
+    void *outgoing_mapped_region;
+    int outgoing_mapped_size;
+    NNTI_buffer_t outgoing_mapped_mr;
+    NNTI_buffer_t incoming_mapped_region;
+    int incoming_mapped_size;
+    NNTI_buffer_t incoming_mapped_mr;
 
     /* enet support */
     char *remote_host;
@@ -1213,6 +1224,7 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     char *data;
     int i, size = 0;
     int err;
+    int register_size;
     nnti_message_info local_message_info = malloc(sizeof(*local_message_info));
 
     for(i=0; i<iovcnt; i++) size+= iov[i].iov_len;
@@ -1220,7 +1232,34 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     h = get_control_message_buffer(ncd, &m, sizeof(*m));
     write_buffer = svc->get_data_buffer(ncd->ntd->cm, size);
     data = write_buffer->buffer;
-    err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, size, 1, NNTI_GET_SRC, &ncd->peer_hdl, &mr);
+    /* 
+     * register_size might be bigger than needed, map it all 'cause we 
+     * might use it later 
+     */
+    register_size = write_buffer->size;
+    if (ncd->ntd->cache_maps && (ncd->outgoing_mapped_region == data) && 
+	(ncd->outgoing_mapped_size == register_size)) {
+	/* no need to reregister!  We'll reuse!*/
+        svc->trace_out(ncd->ntd->cm, "CMNNTI reusing already mapped region at %p, size %d",
+		       ncd->outgoing_mapped_region, ncd->outgoing_mapped_size);
+    } else {
+	if (ncd->outgoing_mapped_region != NULL) {
+	    NNTI_unregister_memory(&ncd->outgoing_mapped_mr);
+	    svc->trace_out(ncd->ntd->cm, "CMNNTI unregistering previously mapped region at %p, size %d",
+			   ncd->outgoing_mapped_region, ncd->outgoing_mapped_size);
+	}
+        svc->trace_out(ncd->ntd->cm, "CMNNTI registering region at %p, size %d",
+		       data, register_size);
+	err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, register_size, 1, NNTI_GET_SRC, &ncd->peer_hdl, &mr);
+	if (err != NNTI_OK) {
+	    printf ("  CMNNTI: NNTI_register_memory() for message returned non-zero: %d %s\n",
+		    err, NNTI_ERROR_STRING(err));
+	}
+	ncd->outgoing_mapped_region = data;
+	ncd->outgoing_mapped_size = register_size;
+	ncd->outgoing_mapped_mr = mr;
+    }
+
     m->message_type = CMNNTI_PULL_REQUEST;
     m->pull.size = size;
     m->pull.addr = data;
@@ -1253,18 +1292,41 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
     char *data;
     NNTI_status_t               status;
       
-    read_buffer = svc->get_data_buffer(ncd->ntd->cm, m->pull.size);
-    data = read_buffer->buffer;
     printf("======== Handling pull request, size %d, data is %p\n", m->pull.size, data);
     svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET Received pull request, pulling %d bytes", m->pull.size);
-    err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, m->pull.size, 1,
-			       NNTI_GET_DST, &ncd->peer_hdl, &ncd->mr_pull);
-    if (err != NNTI_OK) {
-	printf ("  CMNNTI: NNTI_register_memory() for client returned non-zero: %d %s\n",
-		err, NNTI_ERROR_STRING(err));
+
+    if (ncd->ntd->cache_maps &&
+	(memcmp(&m->pull.buf_addr, &ncd->incoming_mapped_region, sizeof(NNTI_buffer_t)) == 0)) {
+	/* no need to reregister!  We'll reuse!*/
+        svc->trace_out(ncd->ntd->cm, "CMNNTI reusing already mapped region at %p, size %d",
+		       ncd->incoming_mapped_region, ncd->incoming_mapped_size);
+	read_buffer = ncd->read_buffer;
+	data = read_buffer->buffer;
     } else {
-	printf("======== NNTI register memory went swell\n");
+	if (ncd->read_buffer != NULL) {
+	    svc->return_data_buffer(trans->cm, ncd->read_buffer);
+	    svc->trace_out(ncd->ntd->cm, "CMNNTI unregistering previously mapped region at %p, size %d",
+			   ncd->incoming_mapped_region, ncd->incoming_mapped_size);
+	    NNTI_unregister_memory(&ncd->mr_pull);
+	    ncd->read_buffer = NULL;
+	}
+
+	read_buffer = svc->get_data_buffer(ncd->ntd->cm, m->pull.size);
+	data = read_buffer->buffer;
+        svc->trace_out(ncd->ntd->cm, "CMNNTI registering region at %p, size %d",
+		       data, read_buffer->size);
+	err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, m->pull.size, 1,
+			       NNTI_GET_DST, &ncd->peer_hdl, &ncd->mr_pull);
+	if (err != NNTI_OK) {
+	    printf ("  CMNNTI: NNTI_register_memory() for client returned non-zero: %d %s\n",
+		    err, NNTI_ERROR_STRING(err));
+	} else {
+	    printf("======== NNTI register memory went swell\n");
+	}
+	ncd->incoming_mapped_size = read_buffer->size;
+	memcpy(&ncd->incoming_mapped_region, &m->pull.buf_addr, sizeof(NNTI_buffer_t));
     }
+
     err = NNTI_get (&m->pull.buf_addr,
 		    offset,  // get from this remote buffer+offset
 		    pullsize,      // this amount of data
@@ -1300,8 +1362,11 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
 	ncd->read_buf_len = m->pull.size;
 	/* kick this upstairs */
 	trans->data_available(trans, ncd->conn);
-	svc->return_data_buffer(trans->cm, ncd->read_buffer);
-	ncd->read_buffer = NULL;
+	if (!ncd->ntd->cache_maps) {
+	    svc->return_data_buffer(trans->cm, ncd->read_buffer);
+	    NNTI_unregister_memory(&ncd->mr_pull);
+	    ncd->read_buffer = NULL;
+	}
     }
 }
 
@@ -1312,7 +1377,9 @@ handle_pull_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, trans
     nnti_message_info local_message_info = m->pull_complete.msg_info;
     svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET received pull complete message, freeing resources, unblocking any pending writes");
     svc->return_data_buffer(ncd->ntd->cm, local_message_info->write_buffer);
-    NNTI_unregister_memory(&local_message_info->mr);
+    if (!ncd->ntd->cache_maps) {
+	NNTI_unregister_memory(&local_message_info->mr);
+    }
     svc->wake_any_pending_write(ncd->conn);
 }
 
@@ -1399,6 +1466,7 @@ CMtrans_services svc;
     nnti_data->listen_attrs = NULL;
     nnti_data->enet_listen_port = -1;
     nnti_data->characteristics = create_attr_list();
+    nnti_data->cache_maps = 0;
     add_int_attr(nnti_data->characteristics, CM_TRANSPORT_RELIABLE, 1);
     svc->add_shutdown_task(cm, free_nnti_data, (void *) nnti_data);
     return (void *) nnti_data;
