@@ -820,16 +820,11 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 	}
         case ENET_EVENT_TYPE_RECEIVE: {
 	    nnti_conn_data_ptr ncd = event.peer->data;
-	    struct client_message *m;
-	    svc->trace_out(cm, "An ENET packet of length %u containing %s was received on channel %u.\n",
-                    (unsigned int) event.packet -> dataLength,
-                    event.packet -> data,
-                    (unsigned int) event.channelID);
-	    /*	    econn_d->read_buffer_len = event.packet -> dataLength;*/
-	    /*	    econn_d->read_buffer = event.packet->data;*/
-	    /*	    econn_d->packet = event.packet;*/
-	    m = (struct client_message *) event.packet->data;
-	    svc->trace_out(cm, "   Message type is %s (%d)\n", msg_type_name[m->message_type], m->message_type);
+	    struct client_message *m = (struct client_message *) event.packet->data;
+	    svc->trace_out(cm, "An ENET packet of length %u was received on channel %u, message type %s(%d)",
+			   (unsigned int) event.packet -> dataLength,
+			   (unsigned int) event.channelID,
+			   msg_type_name[m->message_type], m->message_type);
 	    if (m->message_type == CMNNTI_PIGGYBACK){
 	      ncd->packet = event.packet;
 	      ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
@@ -840,7 +835,7 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 	      /* kick this upstairs */
 	      ncd->read_buffer->return_callback = enet_free_func;
 	      ncd->read_buffer->return_callback_data = (void*)ncd->packet;
-	      svc->trace_out(cm, "We received piggybacked data of size %d.\n",
+	      svc->trace_out(cm, "We received piggybacked data of size %d.",
 			     m->pig.size);
 	      trans->data_available(trans, ncd->conn);
 	      ntd->svc->return_data_buffer(trans->cm, ncd->read_buffer);
@@ -970,6 +965,9 @@ attr_list listen_info;
     if (listen_info) {
 	get_int_attr(listen_info, CM_NNTI_ENET_CONTROL, &use_enet);
     }
+    /* hope to eliminate this at some point */
+    setenv("TRIOS_NNTI_USE_RDMA_TARGET_ACK", "FALSE", 1);
+
     NNTI_init(NNTI_DEFAULT_TRANSPORT, NULL, &trans_hdl);
     NNTI_get_url(&trans_hdl, url, sizeof(url));
     last_colon = rindex(url, ':');
@@ -1226,6 +1224,7 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     int err;
     int register_size;
     nnti_message_info local_message_info = malloc(sizeof(*local_message_info));
+    NNTI_status_t               status;
 
     for(i=0; i<iovcnt; i++) size+= iov[i].iov_len;
 
@@ -1242,6 +1241,7 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
 	/* no need to reregister!  We'll reuse!*/
         svc->trace_out(ncd->ntd->cm, "CMNNTI reusing already mapped region at %p, size %d",
 		       ncd->outgoing_mapped_region, ncd->outgoing_mapped_size);
+	mr = ncd->outgoing_mapped_mr;
     } else {
 	if (ncd->outgoing_mapped_region != NULL) {
 	    NNTI_unregister_memory(&ncd->outgoing_mapped_mr);
@@ -1278,6 +1278,7 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET registered buffer %p, copied %d bytes and sending pull request", data, size);
     if (send_control_message(h) == 0) return 0;
     svc->set_pending_write(ncd->conn);
+
     return 1;
 }
 
@@ -1292,7 +1293,6 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
     char *data;
     NNTI_status_t               status;
       
-    printf("======== Handling pull request, size %d, data is %p\n", m->pull.size, data);
     svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET Received pull request, pulling %d bytes", m->pull.size);
 
     if (ncd->ntd->cache_maps &&
@@ -1307,7 +1307,11 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
 	    svc->return_data_buffer(trans->cm, ncd->read_buffer);
 	    svc->trace_out(ncd->ntd->cm, "CMNNTI unregistering previously mapped region at %p, size %d",
 			   ncd->incoming_mapped_region, ncd->incoming_mapped_size);
-	    NNTI_unregister_memory(&ncd->mr_pull);
+	    err = NNTI_unregister_memory(&ncd->mr_pull);
+	    if (err != NNTI_OK) {
+		printf ("  CMNNTI: NNTI_unregister_memory() for client returned non-zero: %d %s\n",
+			err, NNTI_ERROR_STRING(err));
+	    }
 	    ncd->read_buffer = NULL;
 	}
 
@@ -1320,8 +1324,6 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
 	if (err != NNTI_OK) {
 	    printf ("  CMNNTI: NNTI_register_memory() for client returned non-zero: %d %s\n",
 		    err, NNTI_ERROR_STRING(err));
-	} else {
-	    printf("======== NNTI register memory went swell\n");
 	}
 	ncd->incoming_mapped_size = read_buffer->size;
 	memcpy(&ncd->incoming_mapped_region, &m->pull.buf_addr, sizeof(NNTI_buffer_t));
@@ -1337,15 +1339,17 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
 	printf ("  THREAD: Error: NNTI_get() for client returned non-zero: %d %s\n",
 		err, NNTI_ERROR_STRING(err));
 //    conns[which%nc].status = 1; // failed status
-    } else {
-	printf("======== NNTI get went swell\n");
     }
     int timeout = 500;
-    err = NNTI_wait(&ncd->mr_pull, NNTI_GET_DST, timeout, &status);
-    if (err == NNTI_ETIMEDOUT) {
-	fprintf (stderr, "  THREAD:   no news about clients yet.\n");
-    } else if (err != NNTI_OK) {
-	fprintf (stderr, "  THREAD: Error: pull from client failed. NNTI_wait returned: %d %, wait_status.result = %ds\n",err, NNTI_ERROR_STRING(err), status.result);
+    err = NNTI_ETIMEDOUT;
+    while ( (err == NNTI_ETIMEDOUT ) && (timeout < 520)) {
+	err = NNTI_wait(&ncd->mr_pull, NNTI_GET_DST, timeout, &status);
+	timeout ++;
+    }
+
+    if (err != NNTI_OK) {
+	fprintf (stderr, "  THREAD: Error: pull from client failed. NNTI_wait returned: %d %s, wait_status.result = %ds\n",err, NNTI_ERROR_STRING(err), status.result);
+	/* bad shit */
     } else {
 	// completed a pull here
 	send_handle h;
@@ -1406,7 +1410,7 @@ attr_list attrs;
 	  memcpy(&m->pig.payload[size], iov[i].iov_base, iov[i].iov_len);
 	  size += iov[i].iov_len;
 	}
-        svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET piggybacking %d bytes of data in control message", size);
+        svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET outbound piggybacking %d bytes of data in control message", size);
 	if (send_control_message(h) == 0) return 0;
     } else {
         if (copy_full_buffer_and_send_pull_request(svc, ncd, iov, iovcnt, attrs) == 0)
@@ -1466,7 +1470,7 @@ CMtrans_services svc;
     nnti_data->listen_attrs = NULL;
     nnti_data->enet_listen_port = -1;
     nnti_data->characteristics = create_attr_list();
-    nnti_data->cache_maps = 0;
+    nnti_data->cache_maps = 1;
     add_int_attr(nnti_data->characteristics, CM_TRANSPORT_RELIABLE, 1);
     svc->add_shutdown_task(cm, free_nnti_data, (void *) nnti_data);
     return (void *) nnti_data;
