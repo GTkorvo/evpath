@@ -276,11 +276,11 @@ INT_CMprobe_bandwidth(CMConnection conn, int size, attr_list attrs)
     double bandwidth;
     struct FFSEncodeVec tmp_vec[1];
 
-    (void)attrs;
+
     cond = INT_CMCondition_get(conn->cm, conn);
 
     if (size < 16) size = 16;
-    if (repeat_count == 0) repeat_count = 1;
+    if (repeat_count < 10) repeat_count = 10;
     if (max_block_size == 0) {
 	char *new_block = malloc(size);
 	if (new_block == NULL) return -1;
