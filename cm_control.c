@@ -147,6 +147,7 @@ CMCondition_destroy(CMControlList cl, int condition)
 	/* free internal elements */
 	if (cond->cond_condition) {
 	    thr_condition_free(cond->cond_condition);
+	    cond->cond_condition = NULL;
 	}
 	INT_CMfree(cond);
     }
