@@ -1392,7 +1392,20 @@ cm_create_transport_and_link_buffer(CManager cm, void *buffer, int length)
 extern CMbuffer
 cm_get_data_buf(CManager cm, int length)  
 {
+    int buffer_count = 0;
     CMbuffer tmp = cm->cm_buffer_list;
+
+    CMtrace_out(cm, CMLowLevelVerbose, "cm_get_data_buf called with len %d\n",
+		length);
+    while (tmp != NULL) {
+	CMtrace_out(cm, CMLowLevelVerbose, "  buffer %d, size is %d, data %d, in_use %d\n",
+		    buffer_count, tmp->size, tmp->buffer, tmp->in_use_by_cm);
+	buffer_count++;
+	tmp = tmp->next;
+    }
+
+    tmp = cm->cm_buffer_list;
+    buffer_count = 0;
     while (tmp != NULL) {
 	if (!tmp->in_use_by_cm) {
 	    if (tmp->size < length) {
@@ -1402,17 +1415,25 @@ cm_get_data_buf(CManager cm, int length)
 		}
 		tmp->buffer = t;
 		tmp->size = length;
+		CMtrace_out(cm, CMLowLevelVerbose, "      cm_get_data_buf resizing!\n");
+		return tmp;
 	    }
-	    tmp->in_use_by_cm++;
-	    return tmp;
+	    if ((tmp->size) / 10 <= length) {
+		/* if the buffer is more than 10 times too big, don't use it */
+		tmp->in_use_by_cm++;
+		CMtrace_out(cm, CMLowLevelVerbose, "cm_get_data_buf called len %d, return existing %p, next %p, count %d\n",
+			    length, tmp, tmp->next, buffer_count);
+		return tmp;
+	    }
 	}
+	buffer_count++;
 	tmp = tmp->next;
     }
     tmp = cm_create_transport_buffer(cm, INT_CMmalloc(length), length);
     tmp->next = cm->cm_buffer_list;
     cm->cm_buffer_list = tmp;
-    CMtrace_out(cm, CMLowLevelVerbose, "cm_get_data_buf called len %d, return %p, next %p\n",
-		length, tmp, tmp->next);
+    CMtrace_out(cm, CMLowLevelVerbose, "cm_get_data_buf called len %d, return %p, next %p, count %d\n",
+		length, tmp, tmp->next, buffer_count);
     return tmp;
 }
 
@@ -1441,6 +1462,7 @@ cm_return_data_buf(CManager cm, CMbuffer cmb)
     if (cmb && cmb->return_callback != NULL) {
 	CMbuffer last = NULL, tmp = cm->cm_buffer_list;
 	/* UNLINK */
+	CMtrace_out(cm, CMLowLevelVerbose, "cm_return_data_buf --- Unlinking\n");
 	while (tmp != NULL) {
 	    if (tmp != cmb) {
 		tmp = tmp->next;
