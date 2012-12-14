@@ -827,18 +827,17 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 			   msg_type_name[m->message_type], m->message_type);
 	    if (m->message_type == CMNNTI_PIGGYBACK){
 	      ncd->packet = event.packet;
+	      
 	      ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
 	      
 	      memcpy(&((char*)ncd->read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
 	      
+	      enet_packet_destroy(event.packet);
 	      ncd->read_buf_len = m->pig.size;
 	      /* kick this upstairs */
-	      ncd->read_buffer->return_callback = enet_free_func;
-	      ncd->read_buffer->return_callback_data = (void*)ncd->packet;
 	      svc->trace_out(cm, "We received piggybacked data of size %d.",
 			     m->pig.size);
 	      trans->data_available(trans, ncd->conn);
-	      ntd->svc->return_data_buffer(trans->cm, ncd->read_buffer);
 	      ncd->read_buffer = NULL;
 	    } else {
 		handle_control_request(ncd, svc, trans, m);
@@ -1143,6 +1142,7 @@ get_control_message_buffer(nnti_conn_data_ptr ncd, struct client_message **mp,
 	ret.packet = enet_packet_create (NULL, size,
 					 ENET_PACKET_FLAG_RELIABLE);
 	*mp = (struct client_message *) ret.packet->data;
+	memset(ret.packet->data, 0, size);
 #endif
     } else {
 	assert(size < NNTI_REQUEST_BUFFER_SIZE);
@@ -1385,6 +1385,7 @@ handle_pull_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, trans
 	NNTI_unregister_memory(&local_message_info->mr);
     }
     svc->wake_any_pending_write(ncd->conn);
+    free(local_message_info);
 }
 
 extern int
