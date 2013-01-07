@@ -1398,7 +1398,7 @@ cm_get_data_buf(CManager cm, int length)
     CMtrace_out(cm, CMLowLevelVerbose, "cm_get_data_buf called with len %d\n",
 		length);
     while (tmp != NULL) {
-	CMtrace_out(cm, CMLowLevelVerbose, "  buffer %d, size is %d, data %d, in_use %d\n",
+	CMtrace_out(cm, CMLowLevelVerbose, "  buffer %d, size is %d, data %p, in_use %d\n",
 		    buffer_count, tmp->size, tmp->buffer, tmp->in_use_by_cm);
 	buffer_count++;
 	tmp = tmp->next;
