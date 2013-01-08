@@ -1073,7 +1073,7 @@ attr_list listen_info;
     ntd->shutdown_listen_thread = 0;
     ntd->listen_thread = 0;
     ntd->use_enet = use_enet;
-//    svc->add_periodic_task(cm, 1, 0, nnti_enet_service_network, (void*)trans);
+    svc->add_periodic_task(cm, 1, 0, nnti_enet_service_network, (void*)trans);
     err = pthread_create(&ntd->listen_thread, NULL, (void*(*)(void*))listen_thread_func, lsp);
 #ifdef ENET_FOUND
     if (use_enet) {
@@ -1353,14 +1353,12 @@ int nnti_rate_limit_scheduler(struct pull_request *request,
                              )
 {
     struct rate_limit_sched_data *sched_data = (struct rate_limit_sched_data *) callback_data;
-    if(sched_data->ongoing_req_count == sched_data->max_ongoing_reqs) {
+    if (sched_data->ongoing_req_count == sched_data->max_ongoing_reqs) {
         return 0;
-    }
-    else if(sched_data->ongoing_req_count < sched_data->max_ongoing_reqs) {
+    } else if (sched_data->ongoing_req_count < sched_data->max_ongoing_reqs) {
         sched_data->ongoing_req_count ++;
         return 1;
-    }
-    else {
+    } else {
         return -1;
     }
 }
@@ -1394,55 +1392,55 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
 
     if (ncd->ntd->cache_maps &&
         (memcmp(&request->buf_addr, &ncd->incoming_mapped_region, sizeof(NNTI_buffer_t)) == 0)) {
-        /* no need to reregister!  We'll reuse!*/
+	/* no need to reregister!  We'll reuse!*/
         svc->trace_out(ncd->ntd->cm, "CMNNTI reusing already mapped region at %p, size %d",
-               ncd->incoming_mapped_region, ncd->incoming_mapped_size);
-        read_buffer = ncd->read_buffer;
-        data = read_buffer->buffer;
+		       ncd->incoming_mapped_region, ncd->incoming_mapped_size);
+	read_buffer = ncd->read_buffer;
+	data = read_buffer->buffer;
     } else {
-        if (ncd->read_buffer != NULL) {
-            svc->return_data_buffer(trans->cm, ncd->read_buffer);
-            svc->trace_out(ncd->ntd->cm, "CMNNTI unregistering previously mapped region at %p, size %d",
-                   ncd->incoming_mapped_region, ncd->incoming_mapped_size);
-            err = NNTI_unregister_memory(&ncd->mr_pull);
-            if (err != NNTI_OK) {
-                printf ("  CMNNTI: NNTI_unregister_memory() for client returned non-zero: %d %s\n",
-                    err, NNTI_ERROR_STRING(err));
-            }
-            ncd->read_buffer = NULL;
-        }
+	if (ncd->read_buffer != NULL) {
+	    svc->return_data_buffer(trans->cm, ncd->read_buffer);
+	    svc->trace_out(ncd->ntd->cm, "CMNNTI unregistering previously mapped region at %p, size %d",
+			   ncd->incoming_mapped_region, ncd->incoming_mapped_size);
+	    err = NNTI_unregister_memory(&ncd->mr_pull);
+	    if (err != NNTI_OK) {
+		printf ("  CMNNTI: NNTI_unregister_memory() for client returned non-zero: %d %s\n",
+			err, NNTI_ERROR_STRING(err));
+	    }
+	    ncd->read_buffer = NULL;
+	}
 
         read_buffer = svc->get_data_buffer(ncd->ntd->cm, request->size);
-        data = read_buffer->buffer;
-            svc->trace_out(ncd->ntd->cm, "CMNNTI registering region at %p, size %d",
-                   data, read_buffer->size);
+	data = read_buffer->buffer;
+        svc->trace_out(ncd->ntd->cm, "CMNNTI registering region at %p, size %d",
+		       data, read_buffer->size);
         err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, request->size, 1,
-                       NNTI_GET_DST, &ncd->peer_hdl, &ncd->mr_pull);
-        if (err != NNTI_OK) {
-            printf ("  CMNNTI: NNTI_register_memory() for client returned non-zero: %d %s\n",
-                err, NNTI_ERROR_STRING(err));
+			       NNTI_GET_DST, &ncd->peer_hdl, &ncd->mr_pull);
+	if (err != NNTI_OK) {
+	    printf ("  CMNNTI: NNTI_register_memory() for client returned non-zero: %d %s\n",
+		    err, NNTI_ERROR_STRING(err));
             return -1;
-        }
-        ncd->incoming_mapped_size = read_buffer->size;
+	}
+	ncd->incoming_mapped_size = read_buffer->size;
         memcpy(&ncd->incoming_mapped_region, &request->buf_addr, sizeof(NNTI_buffer_t));
     }
 
     err = NNTI_get (&request->buf_addr,
-            offset,  // get from this remote buffer+offset
-            pullsize,      // this amount of data
-            &ncd->mr_pull,
-            offset); // into this buffer+offset
+		    offset,  // get from this remote buffer+offset
+		    pullsize,      // this amount of data
+		    &ncd->mr_pull,
+		    offset); // into this buffer+offset
 
     if (err != NNTI_OK) {
-        printf ("  THREAD: Error: NNTI_get() for client returned non-zero: %d %s\n",
-            err, NNTI_ERROR_STRING(err));
+	printf ("  THREAD: Error: NNTI_get() for client returned non-zero: %d %s\n",
+		err, NNTI_ERROR_STRING(err));
     //    conns[which%nc].status = 1; // failed status
         return -1;
     }
 
     // insted of waiting for current Get operation to finish, go on to pull for any other requests
     // add desitnation buffer to ntd->buf_list to wait
-    if(ncd->ntd->buf_count == ncd->ntd->buf_size) {
+    if (ncd->ntd->buf_count == ncd->ntd->buf_size) {
         ncd->ntd->buf_size ++;
         ncd->ntd->buf_list = realloc(ncd->ntd->buf_list, sizeof(sizeof(ncd->ntd->buf_list[0]) * ncd->ntd->buf_size));
     }
@@ -1459,7 +1457,7 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
     // put the current message into pull request queue
     struct pull_request_queue *request = (struct pull_request_queue *)
         svc->malloc_func (sizeof(struct pull_request_queue));
-    if(!request) {
+    if (!request) {
         svc->trace_out(ncd->ntd->cm, "CMNNTI: Error: cannot allocate memory %s:%d", __FUNCTION__, __LINE__);
         return;
     }
@@ -1475,21 +1473,19 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
     while(req) {
         // first consult the scheduler if we should pull this request.
         int should_get = (* ncd->ntd->nnti_pull_scheduler)(&req->request, &req->context, ncd->ntd->nnti_pull_sched_data);
-        if(should_get == 0) { // do not pull right now
+        if (should_get == 0) { // do not pull right now
              prev_req = req;
              req = req->next;
              continue;
-        }
-        else if(should_get == -1) { // error took place
+	} else if (should_get == -1) { // error took place
             request->state = GET_SCHED_ERROR;
             request->num_errors ++;
-            if(request->num_errors == max_num_errors_scheduling) {
+            if (request->num_errors == max_num_errors_scheduling) {
                 svc->trace_out(ncd->ntd->cm, "CMNNTI: Errror in scheduling pull %s:%d", __FUNCTION__, __LINE__);
                 // delete the request
-                if(prev_req == NULL) {
+                if (prev_req == NULL) {
                     ncd->ntd->pull_req_queue->next = req->next;
-                }
-                else {
+                } else {
                     prev_req->next = req->next;
                 }
                 // TODO: send a notification to sender side
@@ -1501,30 +1497,27 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
 
         // issue RDMA GET for the request
         int rc = perform_pull_request_message(ncd, svc, trans, &req->request);
-        if(rc == 0) { // success
+        if (rc == 0) { // success
             // move the request to ongoing_req_queue
-            if(prev_req == NULL) {
+            struct pull_request_queue *temp = req->next;
+            if (prev_req == NULL) {
                 ncd->ntd->pull_req_queue->next = req->next;
-            }
-            else {
+            } else {
                 prev_req->next = req->next;
             }
-            struct pull_request_queue *temp = req->next;
             req->state = GET_SCHED_GET_ISSUED;
             req->next = ncd->ntd->ongoing_req_queue;
             ncd->ntd->ongoing_req_queue = req;
             req = temp;
-        }
-        else {
+        } else {
             request->state = GET_SCHED_ERROR;
             request->num_errors ++;
-            if(request->num_errors == max_num_errors_scheduling) {
+            if (request->num_errors == max_num_errors_scheduling) {
                 svc->trace_out(ncd->ntd->cm, "CMNNTI: Errror in scheduling pull %s:%d", __FUNCTION__, __LINE__);
                 // delete the request
-                if(prev_req == NULL) {
+                if (prev_req == NULL) {
                     ncd->ntd->pull_req_queue->next = req->next;
-                }
-                else {
+                } else {
                     prev_req->next = req->next;
                 }
                 // TODO: send a notification to sender side
@@ -1591,7 +1584,7 @@ free_nnti_data(CManager cm, void *ntdv)
     pthread_join(ntd->listen_thread, NULL);
     ntd->shutdown_listen_thread = 0;
     svc->free_func(ntd->nnti_pull_sched_data);
-    if(ntd->nnti_pull_sched_data != ntd->nnti_pull_completion_data) {
+    if (ntd->nnti_pull_sched_data != ntd->nnti_pull_completion_data) {
         svc->free_func(ntd->nnti_pull_completion_data);
     }
     svc->free_func(ntd);
