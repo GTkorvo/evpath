@@ -3070,6 +3070,62 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     while (process_local_actions(cm));
 }
 
+static void free_ioBuffer(void *event_data, void *client_data)
+{
+    free_FFSBuffer((FFSBuffer) client_data);
+}    
+
+static event_item *
+reassign_memory_event(CManager cm, event_item *event)
+{
+    /* 
+     *  The old event item is enqueued on stones elsewhere in EVPath.  We must make the data memory 
+     *  it references available application reuse.  So, we are going to:
+     *   1 - encode and then decode the event (to get new, clean CM-owned data)
+     *   2 - modify the old event structure to reference only the new data
+     *   3 - create and return tmp_event, which references only the previous data and 
+     *       has a reference count of 1 (so that return_event() does what it needs to do).
+     */
+    event_item *tmp_event = get_free_event(cm->evp);
+    int i;
+    FFSContext tmp_context;
+    FFSTypeHandle format;
+    void *decode_buffer;
+
+    CMtrace_out(cm, EVerbose, "Doing deep copy to free up event before returning from EVsubmit()\n");
+    *tmp_event = *event;
+    tmp_event->ref_count = 1;   /* we're going to make sure the enqueued events don't reference anything that this does */
+    CMadd_ref_attr_list(cm, event->attrs);
+    encode_event(cm, event);  /* Copy all data to an FFS encode buffer in event->ioBuffer */
+    event->decoded_event = NULL;      /* we're not touching this anymore */
+    event->free_func = NULL;   /* if these were present, no longer applicable */
+    event->free_arg = NULL;
+
+    tmp_context = create_FFSContext_FM(cm->evp->fmc);
+    format = FFSTypeHandle_from_encode(tmp_context, event->encoded_event);
+    establish_conversion(tmp_context, format, format_list_of_FMFormat(event->reference_format));
+
+    if (!FFSdecode_in_place(tmp_context, event->encoded_event, &decode_buffer)) {
+	printf("Decode failed\n");
+	return 0;
+    }
+    /*
+     * The new event type is a bit unique in EVPath.  event->ioBuffer is meant to hold only encoded data, but we 
+     * want to decode that stuff, so we don't leave our data there.   Rather, the FFSbuffer created by this will be freed 
+     * via the Event_Freeable mechanism.
+     */
+    event->decoded_event = decode_buffer;
+    event->contents = Event_Freeable; /* it's all our data */
+    event->free_arg = event->ioBuffer;
+    event->ioBuffer = NULL;
+    event->free_func = free_ioBuffer;
+    event->encoded_event = NULL;
+    event->event_encoded = 0;
+    event->ref_count--;   /* we've essentially split the event.  tmp_event will be dereferenced */
+    free_FFSContext(tmp_context);
+    return tmp_event;
+}
+
 extern void
 INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func, 
 		 attr_list attrs)
@@ -3085,9 +3141,6 @@ INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
     event->attrs = CMadd_ref_attr_list(source->cm, attrs);
     internal_path_submit(source->cm, source->local_stone_id, event);
     while (process_local_actions(source->cm));
-    if (event->ref_count != 1 && !event->event_encoded) {
-	encode_event(source->cm, event);  /* reassign memory */
-    }
     return_event(source->cm->evp, event);
 }
     
@@ -3119,8 +3172,8 @@ INT_EVsubmit(EVsource source, void *data, attr_list attrs)
     event->attrs = CMadd_ref_attr_list(source->cm, attrs);
     internal_path_submit(source->cm, source->local_stone_id, event);
     while (process_local_actions(source->cm));
-    if (event->ref_count != 1 && !event->event_encoded) {
-	encode_event(source->cm, event);  /* reassign memory */
+    if (event->ref_count != 1 && (event->contents == Event_App_Owned)) {
+	event = reassign_memory_event(source->cm, event);  /* reassign memory */
     }
     return_event(source->cm->evp, event);
 }
