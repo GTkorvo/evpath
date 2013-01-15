@@ -2364,7 +2364,7 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
                 int vec_count, int byte_count, attr_list attrs, int nowp, int data_vec_stack)
 {
     int actual = 0;
-    unsigned char checksum;
+    unsigned char checksum = 0;
     int i, j, start, count = 0;
     assert(!conn->closed && !conn->failed);
     if (conn->write_pending) {
