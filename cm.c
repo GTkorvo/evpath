@@ -1772,7 +1772,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     CManager cm = conn->cm;
     CMincoming_format_list cm_format = NULL;
     int message_key;
-    unsigned char checksum, calculated_checksum = 0;
+    unsigned char checksum;
 
     if (length < 4) {
 	return 4 - length;
@@ -1886,12 +1886,16 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	CMdo_handshake(conn, handshake_version, byte_swap, base);
 	return 0;
     }
-    for (i=4; i < length; i++) {
-	calculated_checksum += ((unsigned char *)buffer)[i];
-    }
-    if (calculated_checksum != checksum) {
-	printf("Discarding incoming message because of corruption.  Checksum mismatch\n");
-	return 0;
+    if (checksum != 0) {
+	unsigned char calculated_checksum = 0;
+	for (i=4; i < length; i++) {
+	    calculated_checksum += ((unsigned char *)buffer)[i];
+	}
+	if (calculated_checksum != checksum) {
+	    printf("Discarding incoming message because of corruption.  Checksum mismatch got %x, expected %x\n",
+		   calculated_checksum, checksum);
+	    return 0;
+	}
     }
     if (performance_msg) {
 	CMdo_performance_response(conn, data_length, performance_func, byte_swap,
