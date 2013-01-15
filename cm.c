@@ -1756,6 +1756,7 @@ CMdo_handshake(CMConnection conn, int handshake_version, int byte_swap, char *ba
 static int
 CMact_on_data(CMConnection conn, char *buffer, int length){
     char *base = buffer;
+    char *check_sum_base = buffer;
     int byte_swap = 0;
     int get_attrs = 0;
     int skip = 0;
@@ -1770,39 +1771,42 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     FFSTypeHandle format;
     CManager cm = conn->cm;
     CMincoming_format_list cm_format = NULL;
+    int message_key;
+    unsigned char checksum, calculated_checksum = 0;
 
     if (length < 4) {
 	return 4 - length;
     }
-    switch (*((int*)buffer)) {  /* assume 4-byte int */
-    case 0x00444d43: /* \0DMC reversed byte order */
+    message_key = 0x00ffff00 & *((int*)buffer);
+    switch (message_key) {  /* assume 4-byte int */
+    case 0x00444d00: /* \0DMC reversed byte order */
 	byte_swap = 1;
-    case 0x434d4400:  /* CMD\0 */
+    case 0x004d4400:  /* CMD\0 */
 	break;
-    case 0x00414d43: /* \0AMC reversed byte order */
+    case 0x00414d00: /* \0AMC reversed byte order */
 	byte_swap = 1;
-    case 0x434d4100:  /* CMA\0 */
+    case 0x004d4100:  /* CMA\0 */
 	get_attrs = 1;
 	break;
-    case 0x00435645: /* \0CVE reversed byte order */
+    case 0x00005645: /* \0CVE reversed byte order */
         byte_swap = 1;
-    case 0x45564300: /* EVC\0 */
+    case 0x45560000: /* EVC\0 */
         evcontrol_msg = 1;
         break;
-    case 0x00504d43: /* \0PMC reversed byte order */
+    case 0x00504d00: /* \0PMC reversed byte order */
 	byte_swap = 1;
-    case 0x434d5000:  /* CMP\0 */
+    case 0x004d5000:  /* CMP\0 */
 	performance_msg = 1;
 	break;
-    case 0x004c4d43: /* \0LMC reversed byte order */
+    case 0x004c4d00: /* \0LMC reversed byte order */
 	byte_swap = 1;
-    case 0x434d4c00:  /* CML\0 */
+    case 0x004d4c00:  /* CML\0 */
 	event_msg = 1;
 	get_attrs = 1;
 	break;
-    case 0x00484d43: /* \0HMC reversed byte order - handshake */
+    case 0x00484d00: /* \0HMC reversed byte order - handshake */
 	byte_swap = 1;
-    case 0x434d4800:  /* CMH\0 - handshake */
+    case 0x004d4800:  /* CMH\0 - handshake */
 	handshake = 1;
 	get_attrs = 0;
 	break;
@@ -1833,6 +1837,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     }
     base = buffer + 4 + skip; /* skip used data */
     if (byte_swap) {
+	checksum = (unsigned char) check_sum_base[3];
 	((char*)&data_length)[0] = base[3];
 	((char*)&data_length)[1] = base[2];
 	((char*)&data_length)[2] = base[1];
@@ -1844,6 +1849,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	    ((char*)&attr_length)[3] = base[4];
 	}
     } else {
+	checksum = (unsigned char) check_sum_base[0];
 	data_length = ((int *) base)[0];
 	if (header_len != 8) {
 	    attr_length = ((int *) base)[1];
@@ -1878,6 +1884,13 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     base = buffer + header_len;
     if (handshake) {
 	CMdo_handshake(conn, handshake_version, byte_swap, base);
+	return 0;
+    }
+    for (i=4; i < length; i++) {
+	calculated_checksum += ((unsigned char *)buffer)[i];
+    }
+    if (calculated_checksum != checksum) {
+	printf("Discarding incoming message because of corruption.  Checksum mismatch\n");
 	return 0;
     }
     if (performance_msg) {
@@ -2347,10 +2360,21 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
                 int vec_count, int byte_count, attr_list attrs, int nowp, int data_vec_stack)
 {
     int actual = 0;
+    unsigned char checksum;
+    int i, j, start, count = 0;
     assert(!conn->closed && !conn->failed);
     if (conn->write_pending) {
 	wait_for_pending_write(conn);
     }
+    start = 4;
+    for (i=0; i < vec_count; i++) {
+	count += full_vec[i].iov_len - start;
+	for (j=start; j< full_vec[i].iov_len; j++) {
+	    checksum += ((unsigned char*)full_vec[i].iov_base)[j];
+	}
+	start = 0;
+    }
+    ((int*)full_vec[0].iov_base)[0] |= (unsigned char) checksum;
     if (conn->do_non_blocking_write == 1 && !nowp) {
         int actual_bytes;
         actual_bytes = 
