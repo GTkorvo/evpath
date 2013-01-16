@@ -50,8 +50,8 @@ is_var_array_field(FMFieldList field_list, int field)
 
 #define Max(i,j) ((i<j) ? j : i)
 
-extern FMdata_type array_str_to_data_type(const char *str, 
-						long *element_count_ptr);
+extern FMdata_type FMarray_str_to_data_type(const char *str, 
+					    long *element_count_ptr);
 static
 int
 struct_size_field_list(FMFieldList list, int pointer_size)
@@ -65,7 +65,7 @@ struct_size_field_list(FMFieldList list, int pointer_size)
 	    field_size = pointer_size;
 	} else {
 	    long elements;
-	    array_str_to_data_type(list[i].field_type, &elements);
+	    FMarray_str_to_data_type(list[i].field_type, &elements);
 	    field_size = list[i].field_size * elements;
 	}
 	assert(field_size > 0);

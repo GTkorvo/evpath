@@ -1397,7 +1397,7 @@ dump_stone(stone_type stone)
     for (i=0; i< stone->response_cache_count; i++) {
 	response_cache_element *resp = &stone->response_cache[i];
 	printf("Response cache item %d, reference format %p (%s)\n", i, resp->reference_format,
-	       resp->reference_format ? resp->reference_format->format_name : "<none>");
+	       resp->reference_format ? name_of_FMformat(resp->reference_format) : "<none>");
 	printf("stage %d, action_type %s, proto_action_id %d, requires_decoded %d\n", resp->stage,
 	       action_str[resp->action_type], resp->proto_action_id, resp->requires_decoded);
     }
