@@ -497,7 +497,10 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 	rep.remote_addr = 0;
 	rep.rkey = 0;
 	rep.max_length = 0;
-	write(scd->fd, &rep, sizeof(struct response));	
+	if (write(scd->fd, &rep, sizeof(struct response)) != sizeof(struct response)) {
+	    svc->trace_out(scd->sd->cm, "Write failed\n");
+	    return;
+	}
 	goto wait_on_q;	
     }
     
@@ -548,7 +551,10 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     // 	    retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);	    
     // 	}	
     // }while(iget == 0);
-    write(scd->fd, &rep, sizeof(struct response));
+    if (write(scd->fd, &rep, sizeof(struct response)) != sizeof(struct response)) {
+        svc->trace_out(scd->sd->cm, "Write failed\n");
+	return;
+    }
     end = getlocaltime();
     write_t = end - start;
     
@@ -1003,7 +1009,9 @@ int no_more_redirect;
 //What does no_more_redirect check?
     if (!no_more_redirect) {
 	int local_listen_port = htons(sd->listen_port);
-	write(sock, &local_listen_port, 4);
+	if (write(sock, &local_listen_port, 4) != 4) {
+	    return -1;
+	}
 	
     }
 
@@ -1464,7 +1472,9 @@ attr_list attrs;
 		   left, fd);
     
     //write out request
-    write(fd, &req, sizeof(struct request));
+    if (write(fd, &req, sizeof(struct request)) != sizeof(struct request)) {
+        goto send_error;
+    }
     end = getlocaltime();
     write_t = end - start;
     
@@ -1820,7 +1830,10 @@ CMtrans_services svc;
     int bsize = 4*1024*1024;
     void *buffer;
     
-    posix_memalign(&buffer, page_size, bsize);
+    if (posix_memalign(&buffer, page_size, bsize) != 0) {
+	svc->trace_out(socket_data->cm, "Unable to register initial memory - this is bad!\n");
+	return NULL;	
+    }    
     tbuffer *tb = (tbuffer*)malloc(sizeof(tbuffer));
     CMbuffer cb = svc->create_data_buffer(socket_data->cm, buffer, bsize);
     cb->return_callback = free_func;
@@ -2247,7 +2260,10 @@ static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd,
 	//allocate new buffer
 	tbuffer *tb = (tbuffer*)malloc(sizeof(tbuffer));
 	void *buffer;
-	posix_memalign(&buffer, page_size, req_size);
+	if (posix_memalign(&buffer, page_size, req_size) != 0) {
+	    svc->trace_out(sd->cm, "Unable to register initial memory - this is bad!\n");
+	    return NULL;	
+	}
 	
 	CMbuffer cb = svc->create_data_buffer(sd->cm, buffer, req_size);
 	tb->buf = cb;

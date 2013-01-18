@@ -768,7 +768,10 @@ int no_more_redirect;
 
     if (!no_more_redirect) {
 	int local_listen_port = htons(sd->listen_port);
-	write(sock, &local_listen_port, 4);
+	if (write(sock, &local_listen_port, 4) != 4) {
+	    svc->trace_out(cm, "Write failed\n");
+	    return;
+	}
     }
     svc->trace_out(cm, "--> Connection established");
     socket_conn_data->remote_host = host_name == NULL ? NULL : strdup(host_name);

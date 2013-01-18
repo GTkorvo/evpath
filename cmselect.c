@@ -979,7 +979,9 @@ select_data_ptr sd;
 #ifdef HAVE_WINDOWS_H
 	send(sd->wake_write_fd, &buffer, 1, 0);
 #else
-	write(sd->wake_write_fd, &buffer, 1);
+	if (write(sd->wake_write_fd, &buffer, 1) != 1) {
+	    printf("Whoops, wake write failed\n");
+	}
 #endif
     }
 }

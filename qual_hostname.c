@@ -182,7 +182,9 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 #ifdef HAVE_GETDOMAINNAME
 	int end = strlen(buf);
 	buf[end] = '.';
-	getdomainname((&buf[end]) + 1, len - end - 1);
+	if (getdomainname((&buf[end]) + 1, len - end - 1) == -1) {
+	    buf[end+1]=0;
+	}
 	if (buf[end + 1] == 0) {
 	    char *tmp_name;
 	    struct hostent *host = gethostbyname(buf);

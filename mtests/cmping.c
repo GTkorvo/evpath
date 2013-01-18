@@ -202,7 +202,9 @@ main(int argc, char **argv)
 	attr_list contact_list, listen_list = NULL;
 	char *transport = arg_transport;
 	char *string_list;
-	if (transport == NULL) getenv("CMTransport");
+	if (transport == NULL) {
+	    transport = getenv("CMTransport");
+	}
 	if (transport != NULL) {
 	    listen_list = create_attr_list();
 	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
