@@ -770,7 +770,7 @@ int no_more_redirect;
 	int local_listen_port = htons(sd->listen_port);
 	if (write(sock, &local_listen_port, 4) != 4) {
 	    svc->trace_out(cm, "Write failed\n");
-	    return;
+	    return -1;
 	}
     }
     svc->trace_out(cm, "--> Connection established");
