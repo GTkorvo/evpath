@@ -126,7 +126,7 @@ add_custom_command(
   OUTPUT "cm_interface.c" "revp.c" "revpath.h"
   SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/evpath.h ${CMAKE_CURRENT_SOURCE_DIR}/ev_dfg.h
   COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl ${CMAKE_CURRENT_SOURCE_DIR}/evpath.h ${CMAKE_CURRENT_SOURCE_DIR}/ev_dfg.h
 )
 
 TARGET_LINK_LIBRARIES(evpath-static ${DL_LIBRARIES} ${BASE_LIBS} ${EVPATH_TRANSPORT_DEP_LIBS})
