@@ -640,7 +640,7 @@ struct piggyback {
 };
 
 struct pull_request {
-  unsigned short size;          // size of message to pull
+  unsigned long size;          // size of message to pull
   void *addr;
   NNTI_buffer_t buf_addr;
   NNTI_buffer_t res_addr;
@@ -809,7 +809,7 @@ listen_thread_func(void *vlsp)
         err = NNTI_waitany((const NNTI_buffer_t**)ntd->buf_list, ntd->buf_count, NNTI_RECV_QUEUE, timeout, &which, &wait_status);
 
 	if (ntd->shutdown_listen_thread) {
-	  return 0;
+	    return 0;
 	}
 	if ((err == NNTI_ETIMEDOUT) || (err==NNTI_EAGAIN)) {
 	    //ntd->svc->trace_out(trans->cm, "NNTI_wait() on receiving result %d timed out...", err);
@@ -880,19 +880,22 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 			   (unsigned int) event.channelID,
 			   msg_type_name[m->message_type], m->message_type);
 	    if (m->message_type == CMNNTI_PIGGYBACK){
-	      ncd->packet = event.packet;
+		int piggyback_size;
+		ncd->packet = event.packet;
 	      
-	      ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
+		ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
 	      
-	      memcpy(&((char*)ncd->read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
+		piggyback_size = m->pig.size;
+		memcpy(&((char*)ncd->read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
 	      
-	      enet_packet_destroy(event.packet);
-	      ncd->read_buf_len = m->pig.size;
-	      /* kick this upstairs */
-	      svc->trace_out(cm, "We received piggybacked data of size %d.",
-			     m->pig.size);
-	      trans->data_available(trans, ncd->conn);
-	      ncd->read_buffer = NULL;
+
+		enet_packet_destroy(event.packet);
+		ncd->read_buf_len = piggyback_size;
+		/* kick this upstairs */
+		svc->trace_out(cm, "We received piggybacked data of size %d %x.",
+			       piggyback_size, piggyback_size);
+		trans->data_available(trans, ncd->conn);
+		ncd->read_buffer = NULL;
 	    } else {
 		handle_control_request(ncd, svc, trans, m);
 		enet_packet_destroy (event.packet);
@@ -1387,6 +1390,7 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
     CMbuffer read_buffer;
     char *data;
     NNTI_status_t               status;
+    chr_time recv_time;
 
     svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET Received pull request, pulling %d bytes", request->size);
 
@@ -1425,21 +1429,59 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
         memcpy(&ncd->incoming_mapped_region, &request->buf_addr, sizeof(NNTI_buffer_t));
     }
 
+    chr_timer_start(&recv_time);
     err = NNTI_get (&request->buf_addr,
 		    offset,  // get from this remote buffer+offset
 		    pullsize,      // this amount of data
 		    &ncd->mr_pull,
 		    offset); // into this buffer+offset
-
+    
     if (err != NNTI_OK) {
 	printf ("  THREAD: Error: NNTI_get() for client returned non-zero: %d %s\n",
 		err, NNTI_ERROR_STRING(err));
     //    conns[which%nc].status = 1; // failed status
         return -1;
     }
+#ifndef NO_IMMEDIATE_WAIT
+    int timeout = 500;
+    err = NNTI_ETIMEDOUT;
+    while ( (err == NNTI_ETIMEDOUT ) && (timeout < 520)) {
+	err = NNTI_wait(&ncd->mr_pull, NNTI_GET_DST, timeout, &status);
+	timeout ++;
+    }
 
-    // insted of waiting for current Get operation to finish, go on to pull for any other requests
-    // add desitnation buffer to ntd->buf_list to wait
+    chr_timer_stop(&recv_time);
+    printf("Receive time is %g millisecs, %g microsecs\n", chr_time_to_millisecs(&recv_time), chr_time_to_microsecs(&recv_time));
+    if (err != NNTI_OK) {
+	fprintf (stderr, "  THREAD: Error: pull from client failed. NNTI_wait returned: %d %s, wait_status.result = %ds\n",err, NNTI_ERROR_STRING(err), status.result);
+	/* bad shit */
+    } else {
+	// completed a pull here
+	send_handle h;
+	struct client_message *r;
+	h = get_control_message_buffer(ncd, &r, sizeof(*r));
+	r->message_type = CMNNTI_PULL_COMPLETE;
+	r->pull_complete.msg_info = request->msg_info;
+	svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET done with pull, returning control message, type %d, local_info %p", r->message_type, r->pull_complete.msg_info);
+	if (send_control_message(h) == 0) {
+	    svc->trace_out(ncd->ntd->cm, "--- control message send failed!");
+	}	  
+	
+	ncd->read_buffer = read_buffer;
+	ncd->read_buf_len = request->size;
+	/* kick this upstairs */
+	trans->data_available(trans, ncd->conn);
+	if (!ncd->ntd->cache_maps) {
+	    svc->return_data_buffer(trans->cm, ncd->read_buffer);
+	    NNTI_unregister_memory(&ncd->mr_pull);
+	    ncd->read_buffer = NULL;
+	}
+    }
+    return 0;
+#else
+
+    // instead of waiting for current Get operation to finish, go on to pull for any other requests
+    // add destination buffer to ntd->buf_list to wait
     if (ncd->ntd->buf_count == ncd->ntd->buf_size) {
         ncd->ntd->buf_size ++;
         ncd->ntd->buf_list = realloc(ncd->ntd->buf_list, sizeof(sizeof(ncd->ntd->buf_list[0]) * ncd->ntd->buf_size));
@@ -1447,6 +1489,7 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
     ncd->ntd->buf_list[ncd->ntd->buf_count-1] = &ncd->mr_pull;
     ncd->ntd->buf_count ++;
     return 0;
+#endif
 }
 
 
@@ -1579,10 +1622,10 @@ free_nnti_data(CManager cm, void *ntdv)
 {
     nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) ntdv;
     CMtrans_services svc = ntd->svc;
-    NNTI_unregister_memory(&ntd->mr_recvs);
     ntd->shutdown_listen_thread = 1;
     pthread_join(ntd->listen_thread, NULL);
     ntd->shutdown_listen_thread = 0;
+    NNTI_unregister_memory(&ntd->mr_recvs);
     svc->free_func(ntd->nnti_pull_sched_data);
     if (ntd->nnti_pull_sched_data != ntd->nnti_pull_completion_data) {
         svc->free_func(ntd->nnti_pull_completion_data);
