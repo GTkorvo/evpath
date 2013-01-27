@@ -2702,6 +2702,7 @@ internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
 	}
 	if (actual == 0) {
 	    /* fail */
+	    CMConnection_failed(conn);
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			"Writev failed\n");
 	    return 0;
