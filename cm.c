@@ -672,22 +672,6 @@ INT_CManager_close(CManager cm)
 
     CMtrace_out(cm, CMFreeVerbose, "CMControlList close CL=%lx current reference count will be %d\n", 
 		(long) cl, cl->reference_count - 1);
-    if (cm->shutdown_functions != NULL) {
-	int i = 0;
-	func_entry *shutdown_functions = cm->shutdown_functions;
-	cm->shutdown_functions = NULL;
-
-	while (shutdown_functions[i].func != NULL) {
-	    i++;
-	}
-	i--;
-	for ( ; i >= 0; i--) {
-	    CMtrace_out(cm, CMFreeVerbose, "CManager calling shutdown function %d, %lx\n", i, (long)shutdown_functions[i].func);
-	    shutdown_functions[i].func(cm, shutdown_functions[i].client_data);
-	    shutdown_functions[i].func = NULL;
-	}
-	INT_CMfree(shutdown_functions);
-    }
     CMControlList_close(cl);
     CMControlList_free(cl);
 
@@ -695,6 +679,22 @@ INT_CManager_close(CManager cm)
     CMtrace_out(cm, CMFreeVerbose, "CManager %p ref count now %d\n", 
 		cm, cm->reference_count);
     if (cm->reference_count == 0) {
+	if (cm->shutdown_functions != NULL) {
+	    int i = 0;
+	    func_entry *shutdown_functions = cm->shutdown_functions;
+	    cm->shutdown_functions = NULL;
+	    
+	    while (shutdown_functions[i].func != NULL) {
+		i++;
+	    }
+	    i--;
+	    for ( ; i >= 0; i--) {
+		CMtrace_out(cm, CMFreeVerbose, "CManager calling shutdown function %d, %lx\n", i, (long)shutdown_functions[i].func);
+		shutdown_functions[i].func(cm, shutdown_functions[i].client_data);
+		shutdown_functions[i].func = NULL;
+	    }
+	    INT_CMfree(shutdown_functions);
+	}
 	CMtrace_out(cm, CMFreeVerbose, "Freeing CManager %p\n", cm);
 	CManager_unlock(cm);
 	CManager_free(cm);
@@ -1076,6 +1076,8 @@ CMControlList_close(CMControlList cl)
     void *status;
     cl->reference_count--;
     cl->closed = 1;
+
+    (cl->stop_select)((void*)&CMstatic_trans_svcs, &cl->select_data);
     if ((cl->has_thread > 0) && (cl->server_thread != thr_thread_self())){
 	    (cl->wake_select)((void*)&CMstatic_trans_svcs,
 			      &cl->select_data);
@@ -1088,7 +1090,6 @@ CMControlList_close(CMControlList cl)
 			      &cl->select_data);
             thr_thread_join(cl->server_thread, &status);
 	}
-	cl->closed = 1;
     }
 }
 
