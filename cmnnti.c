@@ -26,6 +26,11 @@
 #include "cm_transport.h"
 #include <Trios_nnti.h>
 
+#ifdef DF_SHM_FOUND
+#include "df_shm.h"
+#include "df_shm_queue.h"
+#endif
+
 #if defined (__INTEL_COMPILER)
 #  pragma warning (disable: 869)
 #  pragma warning (disable: 310)
@@ -58,6 +63,43 @@ static atom_t CM_NNTI_TRANSPORT = -1;
 static atom_t CM_ENET_PORT = -1;
 static atom_t CM_ENET_ADDR = -1;
 static atom_t CM_TRANSPORT_RELIABLE = -1;
+
+#ifdef DF_SHM_FOUND
+static atom_t CM_SHM_PID = -1;
+static atom_t CM_SHM_NUM_SLOTS = -1;
+static atom_t CM_SHM_MAX_PAYLOAD = -1;
+
+/* Global default configuration parameters */
+int shm_default_num_slots = 10;
+int shm_default_max_payload_size = 1048576; /* 1M */
+enum DF_SHM_METHOD shm_default_method = DF_SHM_METHOD_SYSV;
+
+struct nnti_transport_data;
+struct nnti_connection_data;
+struct shm_connection_data;
+
+typedef struct shm_transport_data {
+    struct nnti_transport_data *ntd;
+    pid_t my_pid;                  /* local process's pid */
+    df_shm_method_t shm_method;    /* a handle to underlying shm method */
+    pthread_t listen_thread;       /* polling thread for shm connections */
+    int listen_thread_cmd;         /* 0: wait to start; 1: run; 2: stop */
+    struct shm_connection_data *connections;
+    pthread_mutex_t mutex;         /* protect concurrent access to connections */ 
+    pthread_mutex_t cond;          
+} *shm_transport_data_ptr;
+
+typedef struct shm_connection_data {
+    struct nnti_connection_data *ncd;
+    shm_transport_data_ptr shm_td;
+    pid_t peer_pid;                /* peer process's pid */
+    df_shm_region_t shm_region;    /* shm region for this connection */
+    df_shm_queue_ep_t send_ep;     /* sender endpoint handle for outgoing queue */
+    df_shm_queue_ep_t recv_ep;     /* receiver endpoint handle for incoming queue */
+    struct shm_connection_data *next;
+} *shm_conn_data_ptr;
+
+#endif
 
 char *NNTI_result_string[] = {
     "NNTI_OK",
@@ -120,6 +162,10 @@ typedef struct nnti_transport_data {
 #endif
     int enet_listen_port;
     attr_list characteristics;
+
+#ifdef DF_SHM_FOUND
+    shm_transport_data_ptr shm_td;
+#endif
 } *nnti_transport_data_ptr;
 
 typedef struct nnti_connection_data {
@@ -159,12 +205,223 @@ typedef struct nnti_connection_data {
     ENetPacket *packet;
 #endif
     NNTI_buffer_t mr_pull;
+
+#ifdef DF_SHM_FOUND
+    shm_conn_data_ptr shm_cd;
+#endif
 } *nnti_conn_data_ptr;
 
 #ifdef ENET_FOUND
 extern void
 enet_non_blocking_listen(CManager cm, CMtrans_services svc,
 			 transport_entry trans, attr_list listen_info);
+#endif
+
+#ifdef DF_SHM_FOUND
+static shm_conn_data_ptr
+create_shm_conn_data(svc)
+CMtrans_services svc;
+{
+    shm_conn_data_ptr shm_conn_data =
+    svc->malloc_func(sizeof(struct shm_connection_data));
+    memset(shm_conn_data, 0, sizeof(struct shm_connection_data));
+    return shm_conn_data;
+}
+
+static void
+shm_add_connection(shm_transport_data_ptr shm_td, shm_conn_data_ptr shm_cd)
+{
+    pthread_mutex_lock(&(shm_td->mutex));
+    shm_conn_data_ptr tmp = shm_td->connections;
+    shm_td->connections = shm_cd;
+    shm_cd->next = tmp;
+    pthread_cond_signal(&(shm_td->cond));
+    pthread_mutex_unlock(&(shm_td->mutex));
+}
+
+static void
+shm_unlink_connection(shm_transport_data_ptr utd, shm_conn_data_ptr ucd)
+{
+    pthread_mutex_lock(&(shm_td->mutex));
+    if (shm_td->connections == shm_cd) {
+        shm_td->connections = shm_cd->next;
+        shm_cd->next = NULL;
+    } 
+    else {
+        shm_conn_data_ptr tmp = shm_td->connections;
+        while (tmp != NULL) {
+            if (tmp->next == shm_cd) {
+                tmp->next = shm_cd->next;
+                shm_cd->next = NULL;
+                pthread_mutex_unlock(&(shm_td->mutex));
+                return;
+            }
+        }
+        printf("Serious internal error, shm unlink_connection, connection not found\n");
+    }
+    pthread_mutex_unlock(&(shm_td->mutex));
+}
+
+/* Make a shared memory connection to a peer process at the local node. 
+ * This function creates the shared memory region and initializes a queue pair in it.
+ * Information of the created shared memory rregion will be shipped to peer side
+ * via NNTI or ENET. The process should later call shm_wait_for_conn_ready() to wait
+ * for peer process to attach to the shared memory region.
+ */
+int
+initiate_shm_conn(cm, svc, trans, attrs, shm_conn_data, conn_attr_list)
+CManager cm;
+CMtrans_services svc;
+transport_entry trans;
+attr_list attrs;
+shm_conn_data_ptr shm_conn_data;
+attr_list conn_attr_list;
+{
+    int int_port_num;
+    nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) trans->trans_data;
+    shm_transport_data_ptr shm_td = ntd->shm_td;
+    uint32_t num_queue_slots;
+    size_t max_payload_size;
+
+    if (!query_attr(attrs, CM_SHM_NUM_SLOTS, /* type pointer */ NULL,
+    /* value pointer */ (attr_value *) (long) &num_queue_slots)) {
+        svc->trace_out(cm, "CMNNTI/SHM transport found no CM_SHM_NUM_SLOTS attribute");
+        num_queue_slots = shm_default_num_slots;
+    }
+    svc->trace_out(cm, "CMNNTI/SHM transport: number of slots in queue %ld", num_queue_slots);
+
+    if (!query_attr(attrs, CM_SHM_MAX_PAYLOAD, /* type pointer */ NULL,
+    /* value pointer */ (attr_value *) (long) &max_payload_size)) {
+        svc->trace_out(cm, "CMNNTI/SHM transport found no CM_SHM_MAX_PAYLOAD attribute");
+        max_payload_size = shm_default_max_payload_size;
+    }
+    svc->trace_out(cm, "CMNNTI/SHM transport max payload size %ld", max_payload_size);
+
+    /* create a shm region and two FIFO queues in the region
+     * size of each shm region is calculated according to the queue size 
+     */
+    size_t queue_size = df_calculate_queue_size(num_queue_slots, max_payload_size);
+    size_t region_size = 2 * queue_size + 3 * sizeof(uint64_t); /* meta-data at the beginning */
+    if (region_size % PAGE_SIZE) {
+        region_size += PAGE_SIZE - (region_size % PAGE_SIZE);
+    }
+    df_shm_region_t shm_region = df_create_shm_region(shm_td->shm_method, region_size, NULL);
+    if (!shm_region) {
+        return -1;
+    }
+
+    /* the shm region is laid out in memory as follows:
+     * starting addr:
+     * creator pid (8 byte)
+     * starting offset to the starting address of send queue (8 byte)
+     * starting offset to the starting address of recv queue (8 byte)
+     * peer pid (8 byte) (will be filled by peer process to notify connection establishment)
+     * send queue (starting address cacheline aligned)
+     * recv queue (starting address cacheline aligned)
+     */
+    char *ptr = (char *) shm_region->starting_addr; /* start of region, page-aligned */
+    *((uint64_t *) ptr) = (uint64_t) shm_region->creator_id;
+    ptr += sizeof(uint64_t);
+    char *send_q_start = (char *) shm_region->starting_addr + 4 * sizeof(uint64_t);
+    if ( send_q_start % CACHE_LINE_SIZE) {
+        send_q_start += CACHE_LINE_SIZE - (send_q_start % CACHE_LINE_SIZE);
+    }
+    *((uint64_t *) ptr) = (uint64_t) (send_q_start - (char *) shm_region->starting_addr);
+    ptr += sizeof(uint64_t);
+    char *recv_q_start = send_q_start + queue_size;
+    if (recv_q_start % CACHE_LINE_SIZE) {
+        recv_q_start += CACHE_LINE_SIZE - (recv_q_start % CACHE_LINE_SIZE);
+    }
+    *((uint64_t *) ptr) = (uint64_t) (recv_q_start - (char *) shm_region->starting_addr);
+    ptr += sizeof(uint64_t);
+    *((uint64_t *) ptr) = 0; /* we are not goint to connect to process 0 anyway */
+
+    /* send queue is for this process to send data to target process */
+    df_queue_t send_q = df_create_queue (send_q_start, num_queue_slots, max_payload_size);
+    df_queue_ep_t send_ep = df_get_queue_sender_ep(send_q);
+
+    /* recv queue is for this process to receive data sent by target process */
+    df_queue_t recv_q = df_create_queue (recv_q_start, num_queue_slots, max_payload_size);
+    df_queue_ep_t recv_ep = df_get_queue_receiver_ep(recv_q);
+
+    shm_conn_data->shm_region = shm_region;
+    shm_conn_data->send_ep = send_ep;
+    shm_conn_data->recv_ep = recv_ep;
+    shm_conn_data->filename = strdup(filename);
+    shm_conn_data->dest_addr = dest_addr;
+    shm_conn_data->shm_td = shm_td;
+    return 1;
+}
+
+/* wait for peer process to attach to shared memory region */
+void shm_wait_for_conn_ready(shm_conn_data_ptr shm_cd) {
+    uint64_t *peer_pid = ((uint64_t *) shm_cd->shm_region->starting_addr) + 3;
+    while(*peer_pid == 0) {
+        pthread_yield();
+    }
+    shm_cd->peer_pid = (pid_t) peer_pid;
+}
+
+/* the process being connected to call this function to attach to shared memory
+ * region and finish shared memory conneciton setup.
+ */
+shm_conn_data_ptr shm_passive_make_conn(ncd, shm_region_contact, contact_len)
+nnti_conn_data_ptr ncd;
+void *shm_region_contact;
+int contact_len;
+{
+    shm_transport_data_ptr shm_td = (shm_transport_data_ptr) ncd->ntd->shm_td;
+    shm_conn_data_ptr shm_cd;
+    pid_t peer_pid = 0;
+
+    /* locate and attach the shm region */
+    df_shm_region_t shm_region = df_attach_shm_region (shm_td->shm_method, peer_pid,
+        shm_region_contact, contact_len, NULL);
+    if (!shm_region) {
+        fprintf(stderr, "Cannot attach shm region. %s:%d\n", __FILE__, __LINE__);
+        return NULL;
+    }
+ 
+    /* locate queues in shm region */
+    uint64_t *sender_pid = (uint64_t *) shm_region->starting_addr;
+    uint64_t *send_q_start = ((uint64_t *) shm_region->starting_addr + 1);
+    uint64_t *recv_q_start = ((uint64_t *) shm_region->starting_addr + 2);
+    uint64_t *peer_response = ((uint64_t *) shm_region->starting_addr + 3);
+
+    /* setup local queue endpoints */
+    /* Note: the receiver is receving end of send queue and sending end of recv queue */
+    df_queue_t send_q = (df_queue_t)((char *)shm_region->starting_addr + *send_q_start);
+    df_queue_ep_t recv_ep = df_get_queue_receiver_ep(send_q);
+    df_queue_t recv_q = (df_queue_t)((char *)shm_region->starting_addr + *recv_q_start);
+    df_queue_ep_t send_ep = df_get_queue_sender_ep(recv_q);
+
+    shm_cd = create_shm_conn_data(shm_td->svc);
+    shm_cd->peer_pid = (pid_t) *sender_pid;
+    shm_cd->shm_region = shm_region;
+    shm_cd->send_ep = send_ep;
+    shm_cd->recv_ep = recv_ep;
+    shm_cd->shm_td = shm_td;
+    shm_cd->ncd = ncd;
+    shm_add_connection(shm_td, shm_cd);
+
+    /* notify the peer process that connection has been established */
+    *peer_response = (uint64_t) shm_td->my_pid;
+
+    return shm_cd;
+}
+
+void
+shm_shutdown_conn(svc, shm_cd)
+CMtrans_services svc;
+shm_conn_data_ptr shm_cd;
+{
+    /* if this process is the creator of the shm region, destroy it; 
+     * otherwise detach it */
+    df_detach_shm_region (shm_cd->shm_region);
+    shm_unlink_connection(shm_cd->shm_td, shm_cd);
+    free_attr_list(shm_cd->attrs);
+    free(shm_cd);
+}
 #endif
 
 static nnti_conn_data_ptr
@@ -219,6 +476,9 @@ struct connect_message {
     short nnti_port;
     short enet_port;
     uint32_t enet_ip;
+#ifdef DF_SHM_FOUND
+    uint32_t shm_contact_len;
+#endif
     uint32_t name_len;
     char name[1];
 };
@@ -275,6 +535,27 @@ attr_list conn_attr_list;
     }
 #endif
 
+#ifdef DF_SHM_FOUND
+    int is_shm_connection = 0;
+    /* make shm connection if the peer process and this process are on the same node */
+    if (strcmp(host_name, ntd->self_hostname) == 0) {
+        svc->trace_out(cm, "Connecting to local peer process. \n");
+   
+        shm_conn_data_ptr shm_conn_data = create_shm_conn_data(svc);
+        int rc = initiate_shm_conn(cm, svc, trans, attrs, shm_conn_data, conn_attr_list);
+        if (rc != 0) {
+            svc->trace_out(cm, "Error: cannot make shm connection. \n");
+            return -1;
+        } 
+        nnti_conn_data->shm_cd = shm_conn_data;
+        shm_conn_data->ncd = nnti_conn_data;
+        is_shm_connection = 1;
+    }
+    else {
+        nnti_conn_data->shm_cd = NULL;
+    }
+#endif
+
     int timeout = 500;
     ntd->svc->trace_out(trans->cm, "Connecting to URL \"%s\"", server_url);
     int err = NNTI_connect(&ntd->trans_hdl, server_url, timeout, 
@@ -307,6 +588,24 @@ attr_list conn_attr_list;
     cmsg->enet_ip = ntd->self_ip;
     cmsg->name_len = strlen(ntd->self_hostname);
     strcpy(&cmsg->name[0], ntd->self_hostname);
+
+#ifdef DF_SHM_FOUND
+    if (is_shm_connection) {
+        /* append the shm region after the hostname */
+        int contact_len;
+        void * shm_region_contact = df_shm_region_contact_info (ntd->shm_td->shm_method,
+            nnti_conn_data->shm_cd->shm_region, &contact_len);
+        char *position = cmsg->name + cmsg->name_len + 2;  
+        /* TODO: make sure it's within req_buf boundary */
+        memcpy(position, shm_region_contact, contact_len);
+        free(shm_region_contact);
+        cmsg->shm_contact_len = contact_len;
+    }
+    else {
+        cmsg->shm_contact_len = 0;
+    }
+#endif
+
     err = NNTI_send(&nnti_conn_data->peer_hdl, &nnti_conn_data->mr_send, NULL);
     if (err != NNTI_OK) {
         fprintf (stderr, "Error: NNTI_send() returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
@@ -334,6 +633,13 @@ attr_list conn_attr_list;
     }
     svc->trace_out(trans->cm, " NNTI_wait() of send request returned... ");
 
+#ifdef DF_SHM_FOUND
+    if (is_shm_connection) {
+        /* wait for peer process to attach to shared memory region */
+        shm_wait_for_conn_ready(nnti_conn_data->shm_cd);
+        shm_add_connection(ntd->shm_td, nnti_conn_data->shm_cd);
+    }
+#endif
 
     svc->trace_out(cm, "--> NNTI Connection established");
 
@@ -763,6 +1069,20 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	
 	ncd->send_buffer = &ntd->outbound[ncd->acks_offset];
 	ncd->piggyback_size_max = NNTI_REQUEST_BUFFER_SIZE;
+
+#ifdef DF_SHM_FOUND
+        if (cm->shm_contact_len != 0) {
+            /* attach to the shared memory region to complete connection setup */
+            void *shm_region_contact = (void *) (cm->name + cm->name_len + 2);
+            ncd->shm_cd = shm_passive_make_conn(ncd, shm_region_contact, cm->shm_contact_len);
+            if (!ncd->shm_cd) {
+                fprintf(stderr, "Error: cannot make connection.\n");  
+            }  
+        }
+        else {
+            ncd->shm_cd = NULL;
+        }
+#endif
     }
     break;
     case CMNNTI_PIGGYBACK:
@@ -835,6 +1155,71 @@ listen_thread_func(void *vlsp)
 
     }
 }
+
+#ifdef DF_SHM_FOUND
+void *
+shm_listen_thread_func(void *vlsp)
+{
+    int timeout = 10;
+    listen_struct_p lsp = vlsp;
+    nnti_transport_data_ptr shm_td = lsp->ntd;
+    shm_transport_data_ptr shm_td = ntd->shm_td;
+    CMtrans_services svc = lsp->svc;
+    transport_entry trans = lsp->trans;
+    int err;
+
+    while (shm_td->listen_thread_cmd == 0) {
+        pthread_yield();
+    }
+
+    while (shm_td->listen_thread_cmd == 1) {
+        /* poll for incoming data messages from shm queues 
+         * we use a simple fair polling policy
+         */
+        pthread_mutex_lock(&(shm_td->mutex));
+        while(shm_td->connections == NULL) {
+            if(shm_td->listen_thread_cmd == 2) {
+                pthread_mutex_unlock(&(shm_td->mutex));
+                pthread_exit(NULL);
+            }
+            pthread_cond_wait(&(shm_td->cond), &(shm_td->mutex)); 
+        }
+        struct shm_connection_data *conn = shm_td->connections;
+        while(1) {
+            void *data = NULL;
+            size_t length = 0;
+            int rc = df_try_dequeue(conn->recv_ep, &data, &length);
+            switch(rc) {
+                case 0: { /* dequeue succeeded */
+                    conn->read_buffer = shm_td->svc->get_data_buffer(trans->cm, length);
+
+                    /* copy the data from shm into a cm buffer */
+                    memcpy(&((char*)conn->read_buffer->buffer)[0], data, length);
+
+                    /* kick upstairs */
+                    trans->data_available(trans, conn->conn);
+                    shm_td->svc->return_data_buffer(trans->cm, conn->read_buffer);
+                    conn->read_buffer = NULL;
+                    break;
+                }
+                case -1: { /* no data available */
+                    break;
+                }
+                case 1: { /* dequeue failed */
+                    svc->trace_out(cm, "Error: dequeue returns error on shm connection.\n");
+                    break;
+                }
+                default:
+                    break;
+            }
+            conn = conn->next;
+        }
+        pthread_mutex_unlock(&(shm_td->mutex));
+    }
+    pthread_exit(NULL);
+}
+
+#endif
 
 #ifdef ENET_FOUND
 static void *
@@ -1132,6 +1517,11 @@ attr_list listen_info;
 #endif
     ntd->self_hostname = strdup(hostname);
     ntd->listen_attrs = listen_list;
+
+#ifdef DF_SHM_FOUND
+    ntd->shm_td->listen_thread_cmd = 1;
+    err = pthread_create(&ntd->shm_td->listen_thread, NULL, (void*(*)(void*))shm_listen_thread_func, lsp);
+#endif
     return listen_list;
 
 }
@@ -1597,6 +1987,21 @@ attr_list attrs;
     int client_header_size = ((int) (((char *) (&(((struct client_message *)NULL)->pig.payload[0]))) - ((char *) NULL)));
     for(i=0; i<iovcnt; i++) size+= iov[i].iov_len;
 
+#ifdef DF_SHM_FOUND
+    if (ncd->shm_cd) {
+        df_shm_queue_ep_t send_ep = ncd->shm_cd->send_ep;
+
+        svc->trace_out(ncd->ntd->cm, "CMNNTI/SHM writev of %d vectors", iovcnt);
+
+        /* put data to send queue. this is a blocking call. */
+        int rc = df_enqueue_vector (send_ep, iov, iovcnt);
+        if (rc != 0) {
+            return -1
+        }
+        return iovcnt;
+    }
+#endif
+
     if (size <= ncd->piggyback_size_max) {
         send_handle h;
 	struct client_message *m;
@@ -1630,6 +2035,16 @@ free_nnti_data(CManager cm, void *ntdv)
     if (ntd->nnti_pull_sched_data != ntd->nnti_pull_completion_data) {
         svc->free_func(ntd->nnti_pull_completion_data);
     }
+#ifdef DF_SHM_FOUND
+    ntd->shm_td->listen_thread_cmd = 2;
+    pthread_join(ntd->shm_td->listen_thread);
+    pthread_cond_destroy(&(ntd->shm_td->cond));
+    pthread_mutex_destroy(&(ntd->shm_td->mutex));
+
+    /* destory shm method handle and cleanup */
+    df_shm_finalize(ntd->shm_td->shm_method);
+    svc->free_func(ntd->shm_td);
+#endif
     svc->free_func(ntd);
 }
 
@@ -1659,6 +2074,10 @@ CMtrans_services svc;
 	CM_NNTI_TRANSPORT = attr_atom_from_string("CM_NNTI_TRANSPORT");
 	CM_PEER_IP = attr_atom_from_string("PEER_IP");
 	CM_TRANSPORT_RELIABLE = attr_atom_from_string("CM_TRANSPORT_RELIABLE");
+#ifdef DF_SHM_FOUND
+        CM_SHM_NUM_SLOTS = attr_atom_from_string("CM_SHM_NUM_SLOTS");
+        CM_SHM_MAX_PAYLOAD = attr_atom_from_string("CM_SHM_MAX_PAYLOAD");
+#endif
 	atom_init++;
     }
     nnti_data = svc->malloc_func(sizeof(struct nnti_transport_data));
@@ -1679,15 +2098,53 @@ CMtrans_services svc;
     nnti_data->pull_req_queue = NULL;
     nnti_data->ongoing_req_queue = NULL;
 
-    // hardcode to use rate limiting scheduler
+    /* hardcode to use rate limiting scheduler */
     struct rate_limit_sched_data *sched_data = (struct rate_limit_sched_data *)
         svc->malloc_func(sizeof(struct rate_limit_sched_data));
-    sched_data->max_ongoing_reqs = 5; // get this from outside environement
+    sched_data->max_ongoing_reqs = 5; /* get this from outside environement */
     sched_data->ongoing_req_count = 0;
     nnti_data->nnti_pull_scheduler = nnti_rate_limit_scheduler;
     nnti_data->nnti_pull_sched_data = sched_data;
     nnti_data->nnti_pull_completion = nnti_rate_limit_on_completion;
     nnti_data->nnti_pull_completion_data = sched_data;
+
+#ifdef DF_SHM_FOUND
+    shm_transport_data_ptr shm_data;
+    shm_data = svc->malloc_func(sizeof(struct shm_transport_data));
+    shm_data->my_pid = getpid();
+    shm_data->connections = NULL;
+    pthread_mutex_init(&(shm_data->mutex), NULL);   
+    pthread_cond_init(&(shm_data->cond), NULL);   
+
+    /* choose the underlying shm method to use
+     * pass this choice from envrioment variable CMSHM_METHOD
+     */
+    enum DF_SHM_METHOD shm_method;
+    char *temp_str = cercs_getenv("CMNNTI_SHM_METHOD");
+    if (!temp_str || strcasecmp(temp_str, "SYSV")) {    
+        shm_method = DF_SHM_METHOD_SYSV;
+    }
+    else if (strcasecmp(temp_str, "MMAP")) {
+        shm_method = DF_SHM_METHOD_MMAP;
+    }
+    else if (strcasecmp(temp_str, "POSIXSHM")) {
+        shm_method = DF_SHM_METHOD_POSIXSHM;
+    }
+    else {
+        fprintf(stderr, "Error: invalid CMSNNTI_HM_METHOD value: %s\n"
+                        "Valide options are: SYSV|MMAP|POSIXSHM\n"
+                        "Use SYSV by default\n", temp_str);
+        shm_method = shm_default_method;
+    }
+
+    shm_data->shm_method = df_shm_init(shm_method, NULL);
+    if (!shm_data->shm_method) {
+        svc->trace_out(cm, "Error in Initialize CMNNTI/SHM transport: cannot initialize shm method.");
+        svc->free_func(shm_data);
+        return NULL;
+    }
+    nnti_data->shm_td = shm_data;
+#endif
 
     return (void *) nnti_data;
 }
@@ -1697,6 +2154,11 @@ libcmnnti_LTX_shutdown_conn(svc, ncd)
 CMtrans_services svc;
 nnti_conn_data_ptr ncd;
 {
+#ifdef DF_SHM_FOUND 
+    if (ncd->shm_cd) {
+        shm_shutdown_conn(ncd->shm_cd);
+    }
+#endif
     unlink_connection(ncd->ntd, ncd);
     NNTI_unregister_memory(&ncd->mr_send);
     free(ncd->peer_hostname);
