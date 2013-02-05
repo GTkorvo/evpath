@@ -1162,7 +1162,7 @@ shm_listen_thread_func(void *vlsp)
 {
     int timeout = 10;
     listen_struct_p lsp = vlsp;
-    nnti_transport_data_ptr shm_td = lsp->ntd;
+    nnti_transport_data_ptr ntd = lsp->ntd;
     shm_transport_data_ptr shm_td = ntd->shm_td;
     CMtrans_services svc = lsp->svc;
     transport_entry trans = lsp->trans;
