@@ -86,7 +86,7 @@ typedef struct shm_transport_data {
     int listen_thread_cmd;         /* 0: wait to start; 1: run; 2: stop */
     struct shm_connection_data *connections;
     pthread_mutex_t mutex;         /* protect concurrent access to connections */ 
-    pthread_mutex_t cond;          
+    pthread_cond_t cond;          
 } *shm_transport_data_ptr;
 
 typedef struct shm_connection_data {
@@ -94,8 +94,8 @@ typedef struct shm_connection_data {
     shm_transport_data_ptr shm_td;
     pid_t peer_pid;                /* peer process's pid */
     df_shm_region_t shm_region;    /* shm region for this connection */
-    df_shm_queue_ep_t send_ep;     /* sender endpoint handle for outgoing queue */
-    df_shm_queue_ep_t recv_ep;     /* receiver endpoint handle for incoming queue */
+    df_queue_ep_t send_ep;     /* sender endpoint handle for outgoing queue */
+    df_queue_ep_t recv_ep;     /* receiver endpoint handle for incoming queue */
     struct shm_connection_data *next;
 } *shm_conn_data_ptr;
 
@@ -240,7 +240,7 @@ shm_add_connection(shm_transport_data_ptr shm_td, shm_conn_data_ptr shm_cd)
 }
 
 static void
-shm_unlink_connection(shm_transport_data_ptr utd, shm_conn_data_ptr ucd)
+shm_unlink_connection(shm_transport_data_ptr shm_td, shm_conn_data_ptr shm_cd)
 {
     pthread_mutex_lock(&(shm_td->mutex));
     if (shm_td->connections == shm_cd) {
@@ -323,14 +323,14 @@ attr_list conn_attr_list;
     *((uint64_t *) ptr) = (uint64_t) shm_region->creator_id;
     ptr += sizeof(uint64_t);
     char *send_q_start = (char *) shm_region->starting_addr + 4 * sizeof(uint64_t);
-    if ( send_q_start % CACHE_LINE_SIZE) {
-        send_q_start += CACHE_LINE_SIZE - (send_q_start % CACHE_LINE_SIZE);
+    if ( (uint64_t)send_q_start % CACHE_LINE_SIZE) {
+        send_q_start += CACHE_LINE_SIZE - ((uint64_t)send_q_start % CACHE_LINE_SIZE);
     }
     *((uint64_t *) ptr) = (uint64_t) (send_q_start - (char *) shm_region->starting_addr);
     ptr += sizeof(uint64_t);
     char *recv_q_start = send_q_start + queue_size;
-    if (recv_q_start % CACHE_LINE_SIZE) {
-        recv_q_start += CACHE_LINE_SIZE - (recv_q_start % CACHE_LINE_SIZE);
+    if ((uint64_t)recv_q_start % CACHE_LINE_SIZE) {
+        recv_q_start += CACHE_LINE_SIZE - ((uint64_t)recv_q_start % CACHE_LINE_SIZE);
     }
     *((uint64_t *) ptr) = (uint64_t) (recv_q_start - (char *) shm_region->starting_addr);
     ptr += sizeof(uint64_t);
@@ -347,8 +347,6 @@ attr_list conn_attr_list;
     shm_conn_data->shm_region = shm_region;
     shm_conn_data->send_ep = send_ep;
     shm_conn_data->recv_ep = recv_ep;
-    shm_conn_data->filename = strdup(filename);
-    shm_conn_data->dest_addr = dest_addr;
     shm_conn_data->shm_td = shm_td;
     return 1;
 }
@@ -395,7 +393,7 @@ int contact_len;
     df_queue_t recv_q = (df_queue_t)((char *)shm_region->starting_addr + *recv_q_start);
     df_queue_ep_t send_ep = df_get_queue_sender_ep(recv_q);
 
-    shm_cd = create_shm_conn_data(shm_td->svc);
+    shm_cd = create_shm_conn_data(shm_td->ntd->svc);
     shm_cd->peer_pid = (pid_t) *sender_pid;
     shm_cd->shm_region = shm_region;
     shm_cd->send_ep = send_ep;
@@ -419,7 +417,6 @@ shm_conn_data_ptr shm_cd;
      * otherwise detach it */
     df_detach_shm_region (shm_cd->shm_region);
     shm_unlink_connection(shm_cd->shm_td, shm_cd);
-    free_attr_list(shm_cd->attrs);
     free(shm_cd);
 }
 #endif
@@ -1191,22 +1188,22 @@ shm_listen_thread_func(void *vlsp)
             int rc = df_try_dequeue(conn->recv_ep, &data, &length);
             switch(rc) {
                 case 0: { /* dequeue succeeded */
-                    conn->read_buffer = shm_td->svc->get_data_buffer(trans->cm, length);
+                    conn->ncd->read_buffer = shm_td->ntd->svc->get_data_buffer(trans->cm, length);
 
                     /* copy the data from shm into a cm buffer */
-                    memcpy(&((char*)conn->read_buffer->buffer)[0], data, length);
+                    memcpy(&((char*)conn->ncd->read_buffer->buffer)[0], data, length);
 
                     /* kick upstairs */
-                    trans->data_available(trans, conn->conn);
-                    shm_td->svc->return_data_buffer(trans->cm, conn->read_buffer);
-                    conn->read_buffer = NULL;
+                    trans->data_available(trans, conn->ncd->conn);
+                    shm_td->ntd->svc->return_data_buffer(trans->cm, conn->ncd->read_buffer);
+                    conn->ncd->read_buffer = NULL;
                     break;
                 }
                 case -1: { /* no data available */
                     break;
                 }
                 case 1: { /* dequeue failed */
-                    svc->trace_out(cm, "Error: dequeue returns error on shm connection.\n");
+                    svc->trace_out(shm_td->ntd->cm, "Error: dequeue returns error on shm connection.\n");
                     break;
                 }
                 default:
@@ -1216,7 +1213,7 @@ shm_listen_thread_func(void *vlsp)
         }
         pthread_mutex_unlock(&(shm_td->mutex));
     }
-    pthread_exit(NULL);
+    return NULL;
 }
 
 #endif
@@ -1989,14 +1986,14 @@ attr_list attrs;
 
 #ifdef DF_SHM_FOUND
     if (ncd->shm_cd) {
-        df_shm_queue_ep_t send_ep = ncd->shm_cd->send_ep;
+        df_queue_ep_t send_ep = ncd->shm_cd->send_ep;
 
         svc->trace_out(ncd->ntd->cm, "CMNNTI/SHM writev of %d vectors", iovcnt);
 
         /* put data to send queue. this is a blocking call. */
         int rc = df_enqueue_vector (send_ep, iov, iovcnt);
         if (rc != 0) {
-            return -1
+            return -1;
         }
         return iovcnt;
     }
@@ -2037,7 +2034,7 @@ free_nnti_data(CManager cm, void *ntdv)
     }
 #ifdef DF_SHM_FOUND
     ntd->shm_td->listen_thread_cmd = 2;
-    pthread_join(ntd->shm_td->listen_thread);
+    pthread_join(ntd->shm_td->listen_thread, NULL);
     pthread_cond_destroy(&(ntd->shm_td->cond));
     pthread_mutex_destroy(&(ntd->shm_td->mutex));
 
@@ -2128,7 +2125,7 @@ CMtrans_services svc;
         shm_method = DF_SHM_METHOD_MMAP;
     }
     else if (strcasecmp(temp_str, "POSIXSHM")) {
-        shm_method = DF_SHM_METHOD_POSIXSHM;
+        shm_method = DF_SHM_METHOD_POSIX_SHM;
     }
     else {
         fprintf(stderr, "Error: invalid CMSNNTI_HM_METHOD value: %s\n"
