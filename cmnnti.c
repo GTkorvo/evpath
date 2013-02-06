@@ -259,6 +259,7 @@ shm_unlink_connection(shm_transport_data_ptr shm_td, shm_conn_data_ptr shm_cd)
         }
         printf("Serious internal error, shm unlink_connection, connection not found\n");
     }
+    pthread_cond_signal(&(shm_td->cond));
     pthread_mutex_unlock(&(shm_td->mutex));
 }
 
@@ -307,6 +308,7 @@ attr_list conn_attr_list;
     }
     df_shm_region_t shm_region = df_create_shm_region(shm_td->shm_method, region_size, NULL);
     if (!shm_region) {
+        svc->trace_out(cm, "CMNNTI/SHM: df_create_shm_region() failed");
         return -1;
     }
 
@@ -348,7 +350,7 @@ attr_list conn_attr_list;
     shm_conn_data->send_ep = send_ep;
     shm_conn_data->recv_ep = recv_ep;
     shm_conn_data->shm_td = shm_td;
-    return 1;
+    return 0;
 }
 
 /* wait for peer process to attach to shared memory region */
@@ -357,7 +359,7 @@ void shm_wait_for_conn_ready(shm_conn_data_ptr shm_cd) {
     while(*peer_pid == 0) {
         pthread_yield();
     }
-    shm_cd->peer_pid = (pid_t) peer_pid;
+    shm_cd->peer_pid = (pid_t) *peer_pid;
 }
 
 /* the process being connected to call this function to attach to shared memory
@@ -415,9 +417,9 @@ shm_conn_data_ptr shm_cd;
 {
     /* if this process is the creator of the shm region, destroy it; 
      * otherwise detach it */
-    df_detach_shm_region (shm_cd->shm_region);
     shm_unlink_connection(shm_cd->shm_td, shm_cd);
-    free(shm_cd);
+    df_destroy_shm_region(shm_cd->shm_region);
+    svc->free_func(shm_cd);
 }
 #endif
 
@@ -1182,7 +1184,7 @@ shm_listen_thread_func(void *vlsp)
             pthread_cond_wait(&(shm_td->cond), &(shm_td->mutex)); 
         }
         struct shm_connection_data *conn = shm_td->connections;
-        while(1) {
+        while(conn) {
             void *data = NULL;
             size_t length = 0;
             int rc = df_try_dequeue(conn->recv_ep, &data, &length);
@@ -1192,6 +1194,10 @@ shm_listen_thread_func(void *vlsp)
 
                     /* copy the data from shm into a cm buffer */
                     memcpy(&((char*)conn->ncd->read_buffer->buffer)[0], data, length);
+
+                    df_release(conn->recv_ep);
+
+                    conn->ncd->read_buf_len = length;
 
                     /* kick upstairs */
                     trans->data_available(trans, conn->ncd->conn);
@@ -2034,6 +2040,7 @@ free_nnti_data(CManager cm, void *ntdv)
     }
 #ifdef DF_SHM_FOUND
     ntd->shm_td->listen_thread_cmd = 2;
+    pthread_cond_signal(&(ntd->shm_td->cond));
     pthread_join(ntd->shm_td->listen_thread, NULL);
     pthread_cond_destroy(&(ntd->shm_td->cond));
     pthread_mutex_destroy(&(ntd->shm_td->mutex));
@@ -2141,6 +2148,7 @@ CMtrans_services svc;
         return NULL;
     }
     nnti_data->shm_td = shm_data;
+    shm_data->ntd = nnti_data;
 #endif
 
     return (void *) nnti_data;
@@ -2153,7 +2161,7 @@ nnti_conn_data_ptr ncd;
 {
 #ifdef DF_SHM_FOUND 
     if (ncd->shm_cd) {
-        shm_shutdown_conn(ncd->shm_cd);
+        shm_shutdown_conn(svc, ncd->shm_cd);
     }
 #endif
     unlink_connection(ncd->ntd, ncd);
