@@ -380,25 +380,32 @@ dfg_startup_ack_handler(CManager cm, CMConnection conn, void *vmsg,
 			void *client_data, attr_list attrs);
 
 static void
-dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg, 
-		  void *client_data, attr_list attrs)
+enable_auto_stones(CManager cm, EVdfg dfg)
 {
-    EVdfg dfg = client_data;
-    EVready_ptr msg =  vmsg;
-    auto_stone_list *auto_list;
     int i = 0;
-    (void) conn;
-    (void) attrs;
-    dfg->my_node_id = msg->node_id;
-    CManager_lock(cm);
+    auto_stone_list *auto_list;
     auto_list = (auto_stone_list *) INT_CMCondition_get_client_data(cm, dfg->ready_condition);
+    CMtrace_out(cm, EVdfgVerbose, "ENABLING AUTO STONES, list is %p\n", auto_list);
     while (auto_list && auto_list[i].period_secs != -1) {
         /* everyone is ready, enable auto stones */
 	INT_EVenable_auto_stone(cm, auto_list[i].stone, auto_list[i].period_secs, auto_list[i].period_usecs);
 	i++;
     }
     if (auto_list) free(auto_list);
-    CMtrace_out(cm, EVdfgVerbose, "Client DFG %p is ready, signalling %d\n", dfg, dfg->ready_condition);
+}
+
+static void
+dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg, 
+		  void *client_data, attr_list attrs)
+{
+    EVdfg dfg = client_data;
+    EVready_ptr msg =  vmsg;
+    (void) conn;
+    (void) attrs;
+    dfg->my_node_id = msg->node_id;
+    CManager_lock(cm);
+    enable_auto_stones(cm, dfg);
+    CMtrace_out(cm, EVdfgVerbose, "Client DFG %p Node id %d is ready, signalling %d\n", dfg, dfg->my_node_id, dfg->ready_condition);
     INT_CMCondition_signal(cm, dfg->ready_condition);
     CManager_unlock(cm);
 }
@@ -1645,10 +1652,13 @@ signal_ready(EVdfg dfg)
 		printf("Failure, no connection, not self, node %d\n", i);
 		exit(1);
 	    }
+	    CManager_unlock(dfg->cm);
+	    msg.node_id = i;
+	    CMtrace_out(cm, EVdfgVerbose, "Master DFG %p is ready, signalling %d\n", dfg, dfg->ready_condition);
+	    dfg_ready_handler(dfg->cm, NULL, &msg, dfg, NULL);
+	    CManager_lock(dfg->cm);
 	}
     }
-    CMtrace_out(cm, EVdfgVerbose, "Master DFG %p is ready, signalling %d\n", dfg, dfg->ready_condition);
-    INT_CMCondition_signal(dfg->cm, dfg->ready_condition);
 }
 
 static void
