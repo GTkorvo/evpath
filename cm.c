@@ -2379,7 +2379,8 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
 	}
 	start = 0;
     }
-    ((int*)full_vec[0].iov_base)[0] |= (unsigned char) checksum;
+    ((int*)full_vec[0].iov_base)[0] = 
+	(((int*)full_vec[0].iov_base)[0] & 0xffffff00) | (unsigned char) checksum;
     if (conn->do_non_blocking_write == 1 && !nowp) {
         int actual_bytes;
         actual_bytes = 
