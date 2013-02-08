@@ -1835,7 +1835,8 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
     //    conns[which%nc].status = 1; // failed status
         return -1;
     }
-#ifndef NO_IMMEDIATE_WAIT
+#define NO_SCHEDULER
+#ifdef NO_SCHEDULER
     int timeout = 500;
     err = NNTI_ETIMEDOUT;
     while ( (err == NNTI_ETIMEDOUT ) && (timeout < 520)) {
@@ -1900,9 +1901,14 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
     request->request = m->pull;
     request->state = GET_SCHED_QUEUED;
     request->num_errors = 0;
+
+#ifdef NO_SCHEDULER
+    int rc = perform_pull_request_message(ncd, svc, trans, &request->request);
+    free(request);
+#else
+
     request->next = ncd->ntd->pull_req_queue;
     ncd->ntd->pull_req_queue = request;
-
     // go over the request queue: schedule and pull requests
     struct pull_request_queue *req = ncd->ntd->pull_req_queue;
     struct pull_request_queue *prev_req = NULL;
@@ -1962,6 +1968,7 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
             req = req->next;
         }
     }
+#endif
 }
 
 static void
