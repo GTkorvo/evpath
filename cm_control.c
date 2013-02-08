@@ -324,6 +324,10 @@ INT_CMCondition_get_client_data(CManager cm, int condition)
     CMControlList cl = cm->control_list;
     set_debug_flag(cm);
     cond = CMCondition_find(cl, condition);
-    client_data = cond->client_data;
-    return client_data;
+    if (cond) {
+	client_data = cond->client_data;
+	return client_data;
+    } else {
+	return NULL;
+    }
 }
