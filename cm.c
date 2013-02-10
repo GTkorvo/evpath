@@ -90,7 +90,7 @@ static void CMControlList_close ARGS((CMControlList cl));
 static int CMcontrol_list_poll ARGS((CMControlList cl));
 int CMdo_non_CM_handler ARGS((CMConnection conn, int header,
 			      char *buffer, int length));
-void CMdo_performance_response ARGS((CMConnection conn, int length,
+void CMdo_performance_response ARGS((CMConnection conn, long length,
 					    int func, int byte_swap,
 					    char *buffer));
 
@@ -1541,7 +1541,7 @@ int (*cm_write_hook)(int) = (int (*)(int)) NULL;
 int (*cm_preread_hook)(int,char*) = (int (*)(int, char*)) NULL;
 void (*cm_postread_hook)(int,char*) = (void (*)(int, char*)) NULL;
 void (*cm_last_postread_hook)() = (void (*)()) NULL;
-static int CMact_on_data(CMConnection conn, char *buffer, int length);
+static int CMact_on_data(CMConnection conn, char *buffer, long length);
 
 extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 {
@@ -1755,7 +1755,7 @@ CMdo_handshake(CMConnection conn, int handshake_version, int byte_swap, char *ba
 }
 
 static int
-CMact_on_data(CMConnection conn, char *buffer, int length){
+CMact_on_data(CMConnection conn, char *buffer, long length){
     char *base = buffer;
     char *check_sum_base = buffer;
     int byte_swap = 0;
@@ -1765,7 +1765,8 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     int performance_func = 0, handshake_version = 0;
     CMbuffer cm_decode_buf = NULL, cm_data_buf;
     attr_list attrs = NULL;
-    int data_length, attr_length = 0, i, decoded_length;
+    long data_length, decoded_length;
+    int attr_length = 0, i;
     int header_len;
     int stone_id;
     char *decode_buffer = NULL, *data_buffer;
@@ -1774,6 +1775,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
     CMincoming_format_list cm_format = NULL;
     int message_key;
     unsigned char checksum;
+    int short_length = 1;
 
     if (length < 4) {
 	return 4 - length;
@@ -1798,6 +1800,7 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	byte_swap = 1;
     case 0x004d5000:  /* CMP\0 */
 	performance_msg = 1;
+	short_length = 0;
 	break;
     case 0x004c4d00: /* \0LMC reversed byte order */
 	byte_swap = 1;
@@ -1830,37 +1833,76 @@ CMact_on_data(CMConnection conn, char *buffer, int length){
 	    header_len = 16;
 	}
     } else {
-	header_len = 8; /* magic plus 4-byte size */
+	if (short_length) {
+	    header_len = 8; /* magic plus 4-byte size */
+	} else {
+	    header_len = 12; /* magic plus 8-byte size */
+	}
     }
 
     if (length < header_len) {
 	return header_len - length;
     }
     base = buffer + 4 + skip; /* skip used data */
-    if (byte_swap) {
-	checksum = (unsigned char) check_sum_base[3];
-	((char*)&data_length)[0] = base[3];
-	((char*)&data_length)[1] = base[2];
-	((char*)&data_length)[2] = base[1];
-	((char*)&data_length)[3] = base[0];
-	if (header_len != 8) {
-	    ((char*)&attr_length)[0] = base[7];
-	    ((char*)&attr_length)[1] = base[6];
-	    ((char*)&attr_length)[2] = base[5];
-	    ((char*)&attr_length)[3] = base[4];
+    if (short_length) {
+	if (byte_swap) {
+	    int tmp;
+	    checksum = (unsigned char) check_sum_base[3];
+	    ((char*)&tmp)[0] = base[3];
+	    ((char*)&tmp)[1] = base[2];
+	    ((char*)&tmp)[2] = base[1];
+	    ((char*)&tmp)[3] = base[0];
+	    data_length = tmp;
+	    if (header_len != 8) {
+		((char*)&attr_length)[0] = base[7];
+		((char*)&attr_length)[1] = base[6];
+		((char*)&attr_length)[2] = base[5];
+		((char*)&attr_length)[3] = base[4];
+	    }
+	} else {
+	    checksum = (unsigned char) check_sum_base[0];
+	    data_length = ((int *) base)[0];
+	    if (header_len != 8) {
+		attr_length = ((int *) base)[1];
+	    }
 	}
     } else {
-	checksum = (unsigned char) check_sum_base[0];
-	data_length = ((int *) base)[0];
-	if (header_len != 8) {
-	    attr_length = ((int *) base)[1];
+	if (byte_swap) {
+	    checksum = (unsigned char) check_sum_base[3];
+	    int tmp;
+	    ((char*)&tmp)[0] = base[3];
+	    ((char*)&tmp)[1] = base[2];
+	    ((char*)&tmp)[2] = base[1];
+	    ((char*)&tmp)[3] = base[0];
+	    data_length = ((long)tmp) << 32;
+	    ((char*)&tmp)[0] = base[7];
+	    ((char*)&tmp)[1] = base[6];
+	    ((char*)&tmp)[2] = base[5];
+	    ((char*)&tmp)[3] = base[4];
+	    if (header_len != 12) {
+		((char*)&attr_length)[0] = base[11];
+		((char*)&attr_length)[1] = base[10];
+		((char*)&attr_length)[2] = base[9];
+		((char*)&attr_length)[3] = base[8];
+	    }
+	} else {
+	    checksum = (unsigned char) check_sum_base[0];
+	    data_length = ((long)(((int *) base)[0])) << 32;
+	    data_length += ((int *) base)[1];
+	    if (header_len != 12) {
+		attr_length = ((int *) base)[1];
+	    }
 	}
     }
-
     if (performance_msg || evcontrol_msg) {
+#if SIZEOF_LONG == 4
 	performance_func = 0xff & (data_length >> 24);
 	data_length &= 0xffffff;
-	data_length -= 8;  /* subtract off header size */
+#else
+	performance_func = 0xff & (data_length >> 56);
+	data_length &= 0xffffffffffffff;
+#endif
+	data_length -= 12;  /* subtract off header size */
     }
     if (handshake) {
 	handshake_version = 0xff & (data_length >> 24);
@@ -2362,7 +2404,7 @@ wait_for_pending_write(CMConnection conn)
 /* Returns 1 if successful, -1 if deferred, 0 on error */
 int
 INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector data_vec,
-                int vec_count, int byte_count, attr_list attrs, int nowp, int data_vec_stack)
+                long vec_count, long byte_count, attr_list attrs, int nowp, int data_vec_stack)
 {
     int actual = 0;
     unsigned char checksum = 0;
@@ -2434,6 +2476,7 @@ extern int
 INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data, 
 		 attr_list attrs)
 {
+    /* GSE MUST FIX for LONG */
     int no_attr_header[2] = {0x434d4400, 0};  /* CMD\0 in first entry */
     int attr_header[4] = {0x434d4100, 0x434d4100, 0, 0};  /* CMA\0 in first entry */
     FFSEncodeVector vec;
@@ -2558,6 +2601,7 @@ extern int
 internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
 		     int path_len, event_item *event, attr_list attrs)
 {
+/* GSE MUST FIX for LONG */
     FFSEncodeVector vec;
     struct FFSEncodeVec preencoded_vec[2];
     int data_length = 0, vec_count = 0, actual, attr_len = 0;

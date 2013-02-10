@@ -46,23 +46,32 @@ extern atom_t CM_BW_MEASURE_SIZEINC;
 #define CMRegressivePerfBandwidthResult  (unsigned int) 0xf9
 
 void
-CMdo_performance_response(CMConnection conn, int length, int func,
+CMdo_performance_response(CMConnection conn, long length, int func,
 			  int byte_swap, char *buffer)
 {
     /* part of length was read already */
     length += 8;
+    CMtrace_out(conn->cm, CMControlVerbose, "CMDo_performance_response func %d \n", func);
     switch(func) {
     case CMPerfProbe:
 	/* first half of latency probe arriving */
 	{
 	    struct FFSEncodeVec tmp_vec[2];
-	    int header[2];
-	    int actual;
+	    int32_t header[3];
+	    long actual;
 	    tmp_vec[0].iov_base = &header;
 	    tmp_vec[0].iov_len = sizeof(header);
 	    header[0] = 0x434d5000;  /* CMP\0 */
-	    header[1] = length | (CMPerfProbeResponse << 24);
-	    tmp_vec[1].iov_len = length - 8;
+#if SIZEOF_LONG == 4
+	    header[1] = length & 0xffffff;
+	    header[2] = 0;
+#else
+	    header[1] = (length>>32) & 0xffffff;
+	    header[2] = length & 0xffffffff;
+#endif
+	    header[1] = header[1] | (CMPerfProbeResponse << 24);
+
+	    tmp_vec[1].iov_len = length - sizeof(header);
 	    tmp_vec[1].iov_base = buffer;
 
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - responding to latency probe of %d bytes\n", length);
@@ -86,24 +95,40 @@ CMdo_performance_response(CMConnection conn, int length, int func,
     case CMPerfBandwidthInit:
 	/* initiate bandwidth measure */
 	chr_timer_start(&conn->bandwidth_start_time);
+	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Starting bandwidth probe\n");
 	break;
     case CMPerfBandwidthBody:
 	/* no activity for inner packets */
+	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - bandwidth probe - body packet\n");
 	break;
     case CMPerfBandwidthEnd:
 	/* first half of latency probe arriving */
 	{
-	    int header[4];
+	    int header[6];
 	    int actual;
 	    struct FFSEncodeVec tmp_vec[1];
 	    chr_timer_stop(&conn->bandwidth_start_time);
+	    union {
+		double d;
+		float f;
+		int i[2];
+	    } t;
 
 	    header[0] = 0x434d5000;  /* CMP\0 */
-	    header[1] = sizeof(header) | (CMPerfBandwidthResult << 24);
-	    header[2] = *(int*)buffer;  /* first entry should be condition */
-	    header[3] = (int) 
-		chr_time_to_microsecs(&conn->bandwidth_start_time);
-	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completing bandwidth probe - %d microseconds to receive\n", header[2]);
+	    header[1] = 0 | (CMPerfBandwidthResult << 24);
+	    header[2] = sizeof(header);
+	    header[3] = *(int*)buffer;  /* first entry should be condition */
+	    t.d = chr_time_to_secs(&conn->bandwidth_start_time);
+	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completing bandwidth probe - %g seconds to receive\n", t.d);
+	    if (htonl(0xdeadbeef) == 0xdeadbeef) {
+		header[4] = htonl(t.i[0]);
+		header[5] = htonl(t.i[1]);
+		printf("Not Swapping\n");
+	    } else {
+		header[4] = htonl(t.i[1]);
+		header[5] = htonl(t.i[0]);
+		printf("Swapping\n");
+	    }
 	    tmp_vec[0].iov_base = &header;
 	    tmp_vec[0].iov_len = sizeof(header);
 	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, sizeof(header), NULL, 0, 0);
@@ -119,19 +144,21 @@ CMdo_performance_response(CMConnection conn, int length, int func,
 	    int cond = *(int*)buffer;  /* first entry should be condition */
 	    int time;
 	    char *chr_time, tmp;
-	    int *result_p = INT_CMCondition_get_client_data(conn->cm, cond);
-	    
-	    time = ((int*)buffer)[1];/* second entry should be condition */
-	    if (byte_swap) {
-		chr_time = (char*)&time;
-		tmp = chr_time[0];
-		chr_time[0] = chr_time[3];
-		chr_time[3] = tmp;
-		tmp = chr_time[1];
-		chr_time[1] = chr_time[2];
-		chr_time[2] = tmp;
+	    double *result_p = INT_CMCondition_get_client_data(conn->cm, cond);
+	    union {
+		double d;
+		float f;
+		int i[2];
+	    } t;
+
+	    if (htonl(0xdeadbeef) == 0xdeadbeef) {
+		t.i[0] = ntohl(((int*)buffer)[1]);
+		t.i[1] = ntohl(((int*)buffer)[2]);
+	    } else {
+		t.i[0] = ntohl(((int*)buffer)[2]);
+		t.i[1] = ntohl(((int*)buffer)[1]);
 	    }
-	    *result_p = time;
+	    if (result_p) *result_p = t.d;
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - bandwidth probe response, condition %d\n", cond);
 	    INT_CMCondition_signal(conn->cm, cond);
 	}
@@ -147,15 +174,16 @@ CMdo_performance_response(CMConnection conn, int length, int func,
     case CMRegressivePerfBandwidthEnd:
 	/* first half of latency probe arriving */
 	{
-	    int header[4];
+	    int header[5];
 	    int actual;
 	    struct FFSEncodeVec tmp_vec[1];
 	    chr_timer_stop(&conn->regressive_bandwidth_start_time);
 
 	    header[0] = 0x434d5000;  /* CMP\0 */
-	    header[1] = sizeof(header) | (CMRegressivePerfBandwidthResult << 24);
-	    header[2] = *(int*)buffer;  /* first entry should be condition */
-	    header[3] = (int) 
+	    header[1] = 0 | (CMRegressivePerfBandwidthResult << 24);
+	    header[2] = sizeof(header);
+	    header[3] = *(int*)buffer;  /* first entry should be condition */
+	    header[4] = (int) 
 		chr_time_to_microsecs(&conn->regressive_bandwidth_start_time);
             CMtrace_out(conn->cm, CMConnectionVerbose, "CM - received CM bw measure end, condition %d\n", *(int*)buffer);
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completing bandwidth probe - %d microseconds to receive\n", header[2]);
@@ -191,18 +219,19 @@ CMdo_performance_response(CMConnection conn, int length, int func,
 	    INT_CMCondition_signal(conn->cm, cond);
 	}
 	break;
-	
+    default:
+	printf("BAD!  unknown perf function %d\n", func);
     }
 }
 
 static long
-do_single_probe(CMConnection conn, int size, attr_list attrs)
+do_single_probe(CMConnection conn, long size, attr_list attrs)
 {
     int cond;
-    static int max_block_size = 0;
+    static long max_block_size = 0;
     static char *block = NULL;
     chr_time round_trip_time;
-    int actual;
+    long actual;
     struct FFSEncodeVec tmp_vec[1];
 
     (void)attrs;
@@ -226,8 +255,14 @@ do_single_probe(CMConnection conn, int size, attr_list attrs)
     /* CMP\0 in first entry for CMPerformance message */
     ((int*)block)[0] = 0x434d5000;
     /* size in second entry, high byte gives CMPerf operation */
-    ((int*)block)[1] = size | (CMPerfProbe<<24);
-    ((int*)block)[2] = cond;   /* condition value in third entry */
+#if SIZEOF_LONG == 4
+    ((int*)block)[1] = (size & 0xffffff) | (CMPerfProbe<<24);;
+    ((int*)block)[2] = 0;
+#else
+    ((int*)block)[1] = (size >>32) & 0xffffff;
+    ((int*)block)[2] = size;
+#endif
+    ((int*)block)[3] = cond;   /* condition value in fourth entry */
     
     INT_CMCondition_set_client_data( conn->cm, cond, &round_trip_time);
 
@@ -263,16 +298,16 @@ INT_CMprobe_latency(CMConnection conn, int size, attr_list attrs)
 }
 
 /* return units are Kbytes/sec */
-extern long
-INT_CMprobe_bandwidth(CMConnection conn, int size, attr_list attrs)
+extern double
+INT_CMprobe_bandwidth(CMConnection conn, long size, attr_list attrs)
 {
     int i;
     int cond;
     int repeat_count = 100000/size;  /* send about 100K */
-    static int max_block_size = 0;
+    static long max_block_size = 0;
     static char *block = NULL;
-    int microsecs_to_receive;
-    int actual;
+    double secs_to_receive;
+    long actual;
     double bandwidth;
     struct FFSEncodeVec tmp_vec[1];
 
@@ -298,10 +333,16 @@ INT_CMprobe_bandwidth(CMConnection conn, int size, attr_list attrs)
     /* CMP\0 in first entry for CMPerformance message */
     ((int*)block)[0] = 0x434d5000;
     /* size in second entry, high byte gives CMPerf operation */
-    ((int*)block)[1] = size | (CMPerfBandwidthInit<<24);
-    ((int*)block)[2] = cond;   /* condition value in third entry */
+#if SIZEOF_LONG == 4
+    ((int*)block)[1] = 0 | (CMPerfBandwidthInit<<24);
+    ((int*)block)[2] = size;
+#else
+    ((int*)block)[1] = ((size >> 32) &0xffffff) | (CMPerfBandwidthInit<<24);
+    ((int*)block)[2] = (size & 0xffffffff);
+#endif
+    ((int*)block)[3] = cond;   /* condition value in third entry */
     
-    INT_CMCondition_set_client_data( conn->cm, cond, &microsecs_to_receive);
+    INT_CMCondition_set_client_data( conn->cm, cond, &secs_to_receive);
 
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Initiating bandwidth probe of %d bytes, %d messages\n", size, repeat_count);
     tmp_vec[0].iov_base = &block[0];
@@ -311,26 +352,25 @@ INT_CMprobe_bandwidth(CMConnection conn, int size, attr_list attrs)
 	return -1;
     }
 
-    ((int*)block)[1] = size | (CMPerfBandwidthBody<<24);
+    ((int*)block)[1] = (((int*)block)[1]&0xffffff) | (CMPerfBandwidthBody<<24);
     for (i=0; i <(repeat_count-1); i++) {
 	actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0, 0);
 	if (actual != 1) {
 	    return -1;
 	}
     }
-    ((int*)block)[1] = size | (CMPerfBandwidthEnd <<24);
 
+    ((int*)block)[1] = (((int*)block)[1]&0xffffff) | (CMPerfBandwidthEnd<<24);
     actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0, 0);
     if (actual != 1) {
 	return -1;
     }
 
     INT_CMCondition_wait(conn->cm, cond);
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completed bandwidth probe - result %d microseconds\n", microsecs_to_receive);
-    bandwidth = ((double) size * (double)repeat_count * 1000.0) / 
-	(double)microsecs_to_receive;
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Estimated bandwidth - %g Mbytes/sec\n", bandwidth / 1000.0);
-    return (long) bandwidth;
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completed bandwidth probe - result %g seconds\n", secs_to_receive);
+    bandwidth = ((double) size * (double)repeat_count) / secs_to_receive;
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Estimated bandwidth - %g Mbytes/sec\n", bandwidth / 1024.0 * 1024.0);
+    return  bandwidth;
 }
 
 
@@ -514,19 +554,19 @@ Regression(CMConnection conn, DelaySizeMtx *inputmtx)
 
 /* return units are Mbps */
 extern double
-INT_CMregressive_probe_bandwidth(CMConnection conn, int size, attr_list attrs)
+INT_CMregressive_probe_bandwidth(CMConnection conn, long size, attr_list attrs)
 {
     int i, j;
     int cond;
     int N = 9; /* send out N tcp streams with varied length*/
     int repeat_count = 100000/size;  /* send about 100K */
     repeat_count = 100;
-    static int max_block_size = 0;
+    static long max_block_size = 0;
     static char *block = NULL;
     int microsecs_to_receive;
     int actual;
     double bandwidth;
-    int biggest_size;
+    long biggest_size;
     DelaySizeMtx dsm;
     double ave_delay=0.0, var_delay=0.0;
     double ave_size=0.0, var_size=0.0;
@@ -574,12 +614,21 @@ INT_CMregressive_probe_bandwidth(CMConnection conn, int size, attr_list attrs)
     
     for(i =0; i<N; i++){
 	cond = INT_CMCondition_get(conn->cm, conn);
-	((int*)block)[2] = cond;   /* condition value in third entry */
+	((int*)block)[3] = cond;   /* condition value in third entry */
 	INT_CMCondition_set_client_data( conn->cm, cond, &microsecs_to_receive);
 
 	/* size in second entry, high byte gives CMPerf operation */
-	((int*)block)[1] = size | (CMRegressivePerfBandwidthInit<<24);
-	((int*)block)[3] = size;
+#if SIZEOF_LONG == 8	
+	((int*)block)[1] = ((size>>32)&0xffffff) | (CMRegressivePerfBandwidthInit<<24);
+	((int*)block)[2] = (size & 0xffffffff);
+	((int*)block)[5] = size >> 32;
+	((int*)block)[6] = size & 0xffffff;
+#else
+	((int*)block)[1] = 0 | (CMRegressivePerfBandwidthInit<<24);
+	((int*)block)[2] = size;
+	((int*)block)[5] = size;
+	((int*)block)[6] = 0;
+#endif
 
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Initiating bandwidth probe of %d bytes, %d messages\n", size, repeat_count);
 	tmp_vec[0].iov_base = &block[0];

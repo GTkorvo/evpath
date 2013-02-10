@@ -54,6 +54,9 @@
 /* Define to 1 if you have the <netdb.h> header file. */
 #cmakedefine HAVE_NETDB_H
 
+/* Define to 1 if you have the <stdarg.h> header file. */
+#cmakedefine HAVE_STDARG_H
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #cmakedefine HAVE_STDINT_H
 
@@ -110,6 +113,12 @@
 
 /* Define to 1 if you have the <winsock.h> header file. */
 #cmakedefine HAVE_WINSOCK_H
+
+/* The size of `int', as computed by sizeof. */
+#define SIZEOF_INT @SIZEOF_INT@
+
+/* The size of `long', as computed by sizeof. */
+#cmakedefine SIZEOF_LONG @SIZEOF_LONG@
 
 /* Define to 1 if you have the `writev' function. */
 #cmakedefine HAVE_WRITEV

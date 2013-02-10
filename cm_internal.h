@@ -367,7 +367,7 @@ extern CMTaskHandle
 INT_CMadd_periodic_task ARGS((CManager cm, int period_sec, int period_usec, 
 			  CMPollFunc func, void *client_data));
 extern double
-INT_CMregressive_probe_bandwidth ARGS((CMConnection conn, int size, attr_list attrs));
+INT_CMregressive_probe_bandwidth ARGS((CMConnection conn, long size, attr_list attrs));
 extern CMTaskHandle
 INT_CMadd_delayed_task ARGS((CManager cm, int secs, int usecs, CMPollFunc func,
 			     void *client_data));
@@ -477,8 +477,8 @@ INT_CMConnection_set_character ARGS((CMConnection conn, attr_list attrs));
 extern void
 INT_CMremove_periodic ARGS((CMTaskHandle handle));
 extern void INT_CMfree_user_type_context ARGS((CManager cm, FMContext context));
-extern long
-INT_CMprobe_bandwidth ARGS((CMConnection conn, int size, attr_list attrs));
+extern double
+INT_CMprobe_bandwidth ARGS((CMConnection conn, long size, attr_list attrs));
 extern int INT_CMConnection_write_would_block ARGS((CMConnection conn));
 extern void INT_CMusleep ARGS((CManager cm, int usecs));
 extern void INT_CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
@@ -496,10 +496,10 @@ extern int CMtrace_val[];
 extern int CMtrace_init(CMTraceType t);
 #define CMtrace_on(cm, trace_type)  ((CMtrace_val[0] == -1) ? CMtrace_init(trace_type) : CMtrace_val[trace_type])
 #define CMtrace_out(cm, trace_type, ...) (CMtrace_on(cm,trace_type) ? (CMtrace_on(cm,CMLowLevelVerbose) ? printf("P%lxT%lx - ", (long) getpid(), (long)thr_thread_self()) : 0) , printf(__VA_ARGS__) : 0)
-extern void CMdo_performance_response(CMConnection conn, int length, int func,
+extern void CMdo_performance_response(CMConnection conn, long length, int func,
 				      int byte_swap, char *buffer);
 extern int
 INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector data_vec,
-                int vec_count, int byte_count, attr_list attrs, int nowp, int data_vec_stack);
+                long vec_count, long byte_count, attr_list attrs, int nowp, int data_vec_stack);
 extern void
 INT_CMConnection_dereference(CMConnection conn);

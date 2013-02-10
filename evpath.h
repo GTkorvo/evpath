@@ -67,7 +67,7 @@ typedef struct _CMTaskHandle *CMTaskHandle;
  * and a pointer to their locations.
  */
 typedef struct buf_entry {
-    int length;		/*!< length of the encoded buffer */
+    long length;	/*!< length of the encoded buffer */
     void *buffer;	/*!< base address of the encoded buffer */
 } *EVevent_list;
 
@@ -559,7 +559,7 @@ extern int CMtry_return_buffer ARGS((CManager cm, void *data));
 typedef void (*CMNonCMHandler) ARGS((CMConnection conn,
                                      CMTransport transport,
 				     char *buffer,
-				     int length));
+				     long length));
 
 /*!
  * register a handler for raw (non-CM) messages.
@@ -920,7 +920,7 @@ extern int CMCondition_has_failed ARGS((CManager cm, int condition));
  * \return a pointer to the new block
  */
 /*NOLOCK*/
-extern void* CMrealloc ARGS((void *ptr, int size));
+extern void* CMrealloc ARGS((void *ptr, long size));
 /*!
  * allocate a chunk of memory
  *
@@ -928,7 +928,7 @@ extern void* CMrealloc ARGS((void *ptr, int size));
  * \return a pointer to the new block
  */
 /*NOLOCK*/
-extern void* CMmalloc ARGS((int size));
+extern void* CMmalloc ARGS((long size));
 /*!
  * free a chunk of memory
  *
@@ -960,7 +960,7 @@ extern void CMfree ARGS((void *ptr));
  * time required for each.  The return value is the average of these final
  * operations. 
 */
-extern long CMprobe_latency ARGS((CMConnection conn, int msg_size,
+extern long CMprobe_latency ARGS((CMConnection conn, long msg_size,
 				  attr_list attrs));
 
 /*!
@@ -973,13 +973,13 @@ extern long CMprobe_latency ARGS((CMConnection conn, int msg_size,
  * varies dramatically with the message size.)
  * \param attrs Currently this parameter is ignored, but it *should* allow
  * control over the number of messages sent.
- * \return The return value is in units of KBytes per second.  
+ * \return The return value is in units of MBytes per second.  
  * \note In the current implementation, CM sends \f$N\f$ messages to probe
  * available bandwidth, where \f$N\f$ is calculated as \f$100000/size\f$.
  * That is, CMprobe_bandwidth sends about 100Kbytes of data.
 */
-extern long
-CMprobe_bandwidth ARGS((CMConnection conn, int size, attr_list attrs));
+extern double
+CMprobe_bandwidth ARGS((CMConnection conn, long size, attr_list attrs));
 
 /*!
  * Probe the available bandwidth on a particular connection by sending several streams
@@ -997,7 +997,7 @@ CMprobe_bandwidth ARGS((CMConnection conn, int size, attr_list attrs));
  * That is, CMprobe_bandwidth sends about 100Kbytes of data.
 */
 extern double
-CMregressive_probe_bandwidth ARGS((CMConnection conn, int size, attr_list attrs));
+CMregressive_probe_bandwidth ARGS((CMConnection conn, long size, attr_list attrs));
 
 /*@}*/
 /*!
