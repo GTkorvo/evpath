@@ -691,7 +691,16 @@ free_enet_data(CManager cm, void *sdv)
     (void)cm;
     if (sd->hostname != NULL)
 	svc->free_func(sd->hostname);
-/*    svc->free_func(sd);*/
+    svc->free_func(sd);
+}
+
+static void
+shutdown_enet_thread
+(CManager cm, void *sdv)
+{
+    enet_client_data_ptr sd = (enet_client_data_ptr) sdv;
+    CMtrans_services svc = sd->svc;
+    (void)cm;
     if (sd->server != NULL) {
 	ENetHost * server = sd->server;
 	svc->fd_remove_select(cm, enet_host_get_sock_fd (server));
@@ -733,7 +742,8 @@ libcmenet_LTX_initialize(CManager cm, CMtrans_services svc,
     enet_data->svc = svc;
     enet_data->server = NULL;
 
-    svc->add_shutdown_task(cm, free_enet_data, (void *) enet_data);
+    svc->add_shutdown_task(cm, shutdown_enet_thread, (void *) enet_data, SHUTDOWN_TASK);
+    svc->add_shutdown_task(cm, free_enet_data, (void *) enet_data, FREE_TASK);
     svc->add_periodic_task(cm, 1, 0, enet_service_network, (void*)trans);
     return (void *) enet_data;
 }

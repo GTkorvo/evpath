@@ -179,7 +179,7 @@ typedef struct nnti_connection_data {
     struct nnti_connection_data *next;
 
     NNTI_peer_t peer_hdl;
-    int size;
+    long size;
     uint64_t cksum;
     uint64_t raddr;
     int acks_offset;
@@ -189,10 +189,10 @@ typedef struct nnti_connection_data {
     NNTI_buffer_t buf_addr;
     int piggyback_size_max;
     void *outgoing_mapped_region;
-    int outgoing_mapped_size;
+    long outgoing_mapped_size;
     NNTI_buffer_t outgoing_mapped_mr;
     NNTI_buffer_t incoming_mapped_region;
-    int incoming_mapped_size;
+    long incoming_mapped_size;
     NNTI_buffer_t incoming_mapped_mr;
 
     /* enet support */
@@ -1672,7 +1672,7 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     char *data;
     int i, size = 0;
     int err;
-    int register_size;
+    long register_size;
     nnti_message_info local_message_info = malloc(sizeof(*local_message_info));
     NNTI_status_t               status;
 
@@ -2104,7 +2104,7 @@ CMtrans_services svc;
     nnti_data->characteristics = create_attr_list();
     nnti_data->cache_maps = 1;
     add_int_attr(nnti_data->characteristics, CM_TRANSPORT_RELIABLE, 1);
-    svc->add_shutdown_task(cm, free_nnti_data, (void *) nnti_data);
+    svc->add_shutdown_task(cm, free_nnti_data, (void *) nnti_data, FREE_TASK);
 
     nnti_data->pull_req_queue = NULL;
     nnti_data->ongoing_req_queue = NULL;

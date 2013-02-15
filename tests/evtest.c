@@ -215,6 +215,7 @@ main(int argc, char **argv)
 	}
 	if (contact_list) {
 	    string_list = attr_list_to_string(contact_list);
+	    free_attr_list(contact_list);
 	} else {
 	    /* must be multicast, hardcode a contact list */
 #define HELLO_PORT 12345
@@ -235,6 +236,7 @@ main(int argc, char **argv)
 	stone = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, stone, simple_format_list, simple_handler, NULL);
 	printf("Contact list \"%d:%s\"\n", stone, string_list);
+	free(string_list);
 	CMsleep(cm, 120);
     } else {
 	simple_rec data;
@@ -259,6 +261,7 @@ main(int argc, char **argv)
 	if (quiet <= 0) printf("submitting %d\n", data.integer_field);
 	EVsubmit(source_handle, &data, attrs);
 	CMsleep(cm, 1);
+	EVfree_source(source_handle);
 	free_attr_list(attrs);
     }
     CManager_close(cm);

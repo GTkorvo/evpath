@@ -17,39 +17,38 @@ typedef struct _CMbuffer {
     void *return_callback_data;
 } *CMbuffer;
 
-typedef void *(*CMTransport_malloc_func) ARGS((int));
-typedef void *(*CMTransport_realloc_func) ARGS((void*, int));
-typedef void (*CMTransport_free_func) ARGS((void*));
+typedef void *(*CMTransport_malloc_func)(int);
+typedef void *(*CMTransport_realloc_func)(void*, int);
+typedef void (*CMTransport_free_func)(void*);
 
-typedef void (*select_list_func) ARGS((void *, void*));
+typedef void (*select_list_func)(void *, void*);
 
-typedef void (*CMAddSelectFunc) ARGS((void *svcs, void *select_data, int fd,
-				      select_list_func func,
-				      void *param1, void *param2));
+typedef void (*CMAddSelectFunc)(void *svcs, void *select_data, int fd,
+				select_list_func func,
+				void *param1, void *param2);
 
-typedef void (*CMTransport_fd_add_select) ARGS((CManager cm, int fd, select_list_func handler_func,
-		       void *param1, void *param2));
-typedef void (*CMTransport_fd_remove_select) ARGS((CManager cm, int fd));
-typedef void (*CMTransport_trace) ARGS((CManager cm, char *format, ...));
-typedef CMConnection (*CMTransport_conn_create) ARGS((transport_entry trans,
-						      void *transport_data,
-						      attr_list conn_attrs));
-typedef void (*CMTransport_add_shut_task) ARGS((CManager cm, CMPollFunc func,
-						void *client_data));
-typedef CMTaskHandle (*CMTransport_add_period_task) ARGS((CManager cm, 
-						  int period_sec,
-						  int period_usec,
-						  CMPollFunc func,
-						  void *client_data));
-typedef void (*CMTransport_add_poll) ARGS((CManager cm, 
-					   CMPollFunc func,
-					   void *client_data));
-typedef CMbuffer (*CMTransport_get_data_buffer) ARGS((CManager cm, int length));
-typedef void (*CMTransport_return_data_buffer) ARGS((CManager cm, CMbuffer cmb));
-typedef void (*CMTransport_connection_close) ARGS((CMConnection conn));
-typedef void *(*CMTransport_get_transport_data) ARGS((CMConnection conn));
-typedef void (*CMTransport_action_pending_write) ARGS((CMConnection conn));
-typedef CMbuffer (*CMTransport_create_data_buffer) ARGS((CManager cm, void *buffer, int length));
+typedef void (*CMTransport_fd_add_select)(CManager cm, int fd, select_list_func handler_func,
+					  void *param1, void *param2);
+typedef void (*CMTransport_fd_remove_select)(CManager cm, int fd);
+typedef void (*CMTransport_trace)(CManager cm, char *format, ...);
+typedef CMConnection (*CMTransport_conn_create)(transport_entry trans,
+						void *transport_data,
+						attr_list conn_attrs);
+typedef void (*CMTransport_add_shut_task)(CManager cm, CMPollFunc func, 
+					  void *client_data, int task_type);
+typedef CMTaskHandle (*CMTransport_add_period_task)(CManager cm, 
+						    int period_sec,
+						    int period_usec,
+						    CMPollFunc func,
+						    void *client_data);
+typedef void (*CMTransport_add_poll)(CManager cm, CMPollFunc func,
+				     void *client_data);
+typedef CMbuffer (*CMTransport_get_data_buffer)(CManager cm, int length);
+typedef void (*CMTransport_return_data_buffer)(CManager cm, CMbuffer cmb);
+typedef void (*CMTransport_connection_close)(CMConnection conn);
+typedef void *(*CMTransport_get_transport_data)(CMConnection conn);
+typedef void (*CMTransport_action_pending_write)(CMConnection conn);
+typedef CMbuffer (*CMTransport_create_data_buffer)(CManager cm, void *buffer, int length);
 
 
 typedef struct CMtrans_services_s {
@@ -75,50 +74,50 @@ typedef struct CMtrans_services_s {
 } *CMtrans_services;
 
 
-typedef void *(*CMTransport_func) ARGS((CManager cm, CMtrans_services svc, transport_entry trans));
-typedef attr_list (*CMTransport_listen_func) ARGS((CManager cm,
-						   CMtrans_services svc,
-						   transport_entry trans,
-                                                   attr_list listen_info));
-typedef void *(*CMTransport_read_block_func) ARGS((CMtrans_services svc,
-						   void *conn_data,
- 						   int *actual));
-typedef int (*CMTransport_read_to_buffer_func) ARGS((CMtrans_services svc,
-						     void *conn_data,
-						     void *buffer,
-						     int len, int block_flag));
-typedef int (*CMTransport_writev_func) ARGS((CMtrans_services svc,
-						  void *transport_data,
-						  void *buffer, int len,
-						  attr_list attrs));
-typedef void (*CMTransport_shutdown_conn_func) ARGS((CMtrans_services svc,
-						     void *conn_data));
+typedef void *(*CMTransport_func)(CManager cm, CMtrans_services svc, transport_entry trans);
+typedef attr_list (*CMTransport_listen_func)(CManager cm,
+					     CMtrans_services svc,
+					     transport_entry trans,
+					     attr_list listen_info);
+typedef void *(*CMTransport_read_block_func)(CMtrans_services svc,
+					     void *conn_data,
+					     int *actual);
+typedef int (*CMTransport_read_to_buffer_func)(CMtrans_services svc,
+					       void *conn_data,
+					       void *buffer,
+					       int len, int block_flag);
+typedef int (*CMTransport_writev_func)(CMtrans_services svc,
+				       void *transport_data,
+				       void *buffer, int len,
+				       attr_list attrs);
+typedef void (*CMTransport_shutdown_conn_func)(CMtrans_services svc,
+					       void *conn_data);
 
-typedef CMConnection (*CMTransport_conn_func) ARGS((CManager cm, 
-						    CMtrans_services svc,
-						    transport_entry trans, 
-						    attr_list attrs));
+typedef CMConnection (*CMTransport_conn_func)(CManager cm, 
+					      CMtrans_services svc,
+					      transport_entry trans, 
+					      attr_list attrs);
 
-typedef int (*CMTransport_self_check_func) ARGS((CManager cm,
-						 CMtrans_services svc,
-						 transport_entry trans,
-						 attr_list attrs));
+typedef int (*CMTransport_self_check_func)(CManager cm,
+					   CMtrans_services svc,
+					   transport_entry trans,
+					   attr_list attrs);
 
-typedef int (*CMTransport_connection_eq_func) ARGS((CManager cm,
-						    CMtrans_services svc,
-						    transport_entry trans,
-						    attr_list attrs,
-						    void *conn_data));
+typedef int (*CMTransport_connection_eq_func)(CManager cm,
+					      CMtrans_services svc,
+					      transport_entry trans,
+					      attr_list attrs,
+					      void *conn_data);
 
 typedef int (*CMTransport_set_write_notify_func) 
-    ARGS((transport_entry, CMtrans_services svc, void *conn_data, int enable));
+   (transport_entry, CMtrans_services svc, void *conn_data, int enable);
 
 typedef attr_list (*CMTransport_get_transport_characteristics) 
-    ARGS((transport_entry, CMtrans_services svc, void *conn_data));
+   (transport_entry, CMtrans_services svc, void *conn_data);
 
 
-typedef void (*DataAvailableCallback) ARGS((transport_entry trans, CMConnection conn));
-typedef void (*WritePossibleCallback) ARGS((transport_entry trans, CMConnection conn));
+typedef void (*DataAvailableCallback)(transport_entry trans, CMConnection conn);
+typedef void (*WritePossibleCallback)(transport_entry trans, CMConnection conn);
 
 struct _transport_item {
     char *trans_name;
@@ -348,10 +347,12 @@ struct _transport_item {
  *    It is also employed when 'accepting' a new connection.  In this later
  *    case, the CMConnection value is not returned directly to any caller as
  *    accepting a connection is an asynchronous operation in CM.
- *  - void (*add_shutdown_task)(CManager cm, CMPollFunc func, void *data)
+ *  - void (*add_shutdown_task)(CManager cm, CMPollFunc func, void *data, int task_type)
  *    Add a function that will be called when the CManager is shutdown. The
  *    function is called with 'cm' and 'data' as its parameters.  Mostly
- *    useful for freeing transport data.
+ *    useful for freeing transport data.  Task type should be FREE_TASK or 
+ *    SHUTDOWN task.  SHUTDOWN tasks will be called at first close.  FREE tasks
+ *    will be called after ref counts go to zero.
  *  - void (*add_periodic_task)(CManager cm, int period_sec, 
  *                              int period_usec, CMPollFunc func, void *data)
  *    Add a function that will be called at regular intervals, specified by

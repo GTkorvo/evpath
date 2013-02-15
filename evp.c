@@ -3249,7 +3249,7 @@ EVPinit(CManager cm)
     first_evpinit = 0;
     cm->evp->queue_items_free_list = NULL;
     cm->evp->lock = thr_mutex_alloc();
-    internal_add_shutdown_task(cm, free_evp, NULL);
+    internal_add_shutdown_task(cm, free_evp, NULL, FREE_TASK);
     {
         char *backpressure_env;
         backpressure_env = cercs_getenv("EVBackpressure");

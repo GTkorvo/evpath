@@ -721,7 +721,7 @@ CMtrans_services svc;
     udp_data->connections = NULL;
     udp_data->characteristics = create_attr_list();
     add_int_attr(udp_data->characteristics, CM_TRANSPORT_RELIABLE, 0);
-    svc->add_shutdown_task(cm, free_udp_data, (void *) udp_data);
+    svc->add_shutdown_task(cm, free_udp_data, (void *) udp_data, FREE_TASK);
     return (void *) udp_data;
 }
 

@@ -1125,6 +1125,7 @@ deploy_to_node(EVdfg dfg, int node)
         dfg->deploy_ack_count++;
       	return;
     }
+    memset(&msg, 0, sizeof(msg));
     msg.canonical_name = dfg->nodes[node].canonical_name;
     msg.stone_count = stone_count;
     msg.stone_list = malloc(stone_count * sizeof(msg.stone_list[0]));

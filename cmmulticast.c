@@ -507,6 +507,6 @@ CMtrans_services svc;
     mcast_data = svc->malloc_func(sizeof(struct multicast_transport_data));
     mcast_data->cm = cm;
     mcast_data->svc = svc;
-    svc->add_shutdown_task(cm, free_mcast_data, (void *) mcast_data);
+    svc->add_shutdown_task(cm, free_mcast_data, (void *) mcast_data, FREE_TASK);
     return (void *) mcast_data;
 }

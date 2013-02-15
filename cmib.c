@@ -1822,7 +1822,7 @@ CMtrans_services svc;
     // 				     sizeof(socket_data->pad.pad), IBV_ACCESS_LOCAL_WRITE);
     
 
-    svc->add_shutdown_task(cm, free_ib_data, (void *) socket_data);
+    svc->add_shutdown_task(cm, free_ib_data, (void *) socket_data, FREE_TASK);
 
     //here we will add the first 4MB memory buffer
     LIST_INIT(&memlist);

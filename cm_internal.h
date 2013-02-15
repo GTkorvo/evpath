@@ -64,6 +64,7 @@ typedef struct func_entry {
     CMPollFunc func;
     CManager cm;
     void *client_data;
+    int task_type;
 } func_entry;
 
 #include "cm_transport.h"
@@ -111,7 +112,7 @@ typedef struct _CManager {
 
 typedef struct _CMCondition *CMCondition;
 
-typedef void (*INT_CMfree_func) ARGS((void *block));
+typedef void (*INT_CMfree_func)(void *block);
 
 typedef enum _CMControlStyle {
     CMSingleThreaded, CMDedicatedServerThread, CMOccasionalPolling
@@ -125,10 +126,10 @@ typedef struct free_block_rec {
     CManager locking_cm;
 } *free_block_rec_p;
 
-typedef void (*CMNetworkFunc) ARGS((void *svcs, void *client_data));
+typedef void (*CMNetworkFunc)(void *svcs, void *client_data);
 
 
-typedef void (*CMRemoveSelectFunc) ARGS((void *svcs, void *select_data, int fd));
+typedef void (*CMRemoveSelectFunc)(void *svcs, void *select_data, int fd);
 
 typedef struct _periodic_task *periodic_task_handle;
 
@@ -138,13 +139,13 @@ struct _CMTaskHandle {
 };
 
 typedef periodic_task_handle (*CMAddPeriodicFunc) 
-    ARGS((void *svcs, void *select_data, int period_sec, int period_usec,
-	  select_list_func func, void *param1, void *param2));
+   (void *svcs, void *select_data, int period_sec, int period_usec,
+	  select_list_func func, void *param1, void *param2);
 
-typedef void (*CMRemovePeriodicFunc) ARGS((void *svcs, void *select_data, 
-					   periodic_task_handle handle));
+typedef void (*CMRemovePeriodicFunc)(void *svcs, void *select_data, 
+					   periodic_task_handle handle);
 
-typedef void (*CMWakeSelectFunc) ARGS((void *svcs, void *select_data));
+typedef void (*CMWakeSelectFunc)(void *svcs, void *select_data);
 
 typedef struct _CMControlList {
     func_entry network_blocking_function;
@@ -255,20 +256,20 @@ struct _CMFormat {
 
 #define CManager_lock(cm) IntCManager_lock(cm, __FILE__, __LINE__)
 #define CManager_unlock(cm) IntCManager_unlock(cm, __FILE__, __LINE__)
-extern void IntCManager_lock ARGS((CManager cm, char *file, int line));
-extern void IntCManager_unlock ARGS((CManager cm, char *file, int line));
-extern int CManager_locked ARGS((CManager cm));
-extern void CMControlList_lock ARGS((CMControlList cl));
-extern void CMControlList_unlock ARGS((CMControlList cl));
-extern int CMControlList_locked ARGS((CMControlList cl));
+extern void IntCManager_lock(CManager cm, char *file, int line);
+extern void IntCManager_unlock(CManager cm, char *file, int line);
+extern int CManager_locked(CManager cm);
+extern void CMControlList_lock(CMControlList cl);
+extern void CMControlList_unlock(CMControlList cl);
+extern int CMControlList_locked(CMControlList cl);
 
 #define CMConn_write_lock(cm) IntCMConn_write_lock(cm, __FILE__, __LINE__)
 #define CMConn_write_unlock(cm) IntCMConn_write_unlock(cm, __FILE__, __LINE__)
-extern void IntCMConn_write_lock ARGS((CMConnection cl, char *file, 
-				       int line));
-extern void IntCMConn_write_unlock ARGS((CMConnection cl, char *file,
-					 int line));
-extern int CMConn_write_locked ARGS((CMConnection cl));
+extern void IntCMConn_write_lock(CMConnection cl, char *file, 
+				       int line);
+extern void IntCMConn_write_unlock(CMConnection cl, char *file,
+					 int line);
+extern int CMConn_write_locked(CMConnection cl);
 
 typedef enum _CMTraceType {
     CMAlwaysTrace, CMControlVerbose, CMConnectionVerbose, CMLowLevelVerbose, CMDataVerbose, CMTransportVerbose, CMFormatVerbose, CMFreeVerbose, CMAttrVerbose, EVerbose, EVWarning, CMIBTransportVerbose, EVdfgVerbose,
@@ -276,64 +277,64 @@ typedef enum _CMTraceType {
 } CMTraceType;
 
 extern void 
-CMtrace_out ARGS((CManager cm, CMTraceType trace_type, char *format, ...));
+CMtrace_out(CManager cm, CMTraceType trace_type, char *format, ...);
 
 extern int
-CMtrace_on ARGS((CManager cm, CMTraceType trace_type));
+CMtrace_on(CManager cm, CMTraceType trace_type);
 
 extern void 
-CMDataAvailable ARGS((transport_entry trans, CMConnection conn));
+CMDataAvailable(transport_entry trans, CMConnection conn);
 
 extern void 
-CMWriteQueuedData ARGS((transport_entry trans, CMConnection conn));
+CMWriteQueuedData(transport_entry trans, CMConnection conn);
 
 extern CMincoming_format_list
-CMidentify_CMformat ARGS((CManager cm, FFSTypeHandle format));
+CMidentify_CMformat(CManager cm, FFSTypeHandle format);
 
-extern void CMtransport_trace ARGS((CManager cm, char *format, ...));
-
-extern void
-CM_fd_add_select ARGS((CManager cm, int fd, select_list_func handler_func,
-		       void *param1, void *param2));
+extern void CMtransport_trace(CManager cm, char *format, ...);
 
 extern void
-CM_fd_write_select ARGS((CManager cm, int fd, select_list_func handler_func,
-			 void *param1, void *param2));
+CM_fd_add_select(CManager cm, int fd, select_list_func handler_func,
+		       void *param1, void *param2);
 
-extern void CM_fd_remove_select ARGS((CManager cm, int fd));
+extern void
+CM_fd_write_select(CManager cm, int fd, select_list_func handler_func,
+			 void *param1, void *param2);
+
+extern void CM_fd_remove_select(CManager cm, int fd);
 
 extern CMConnection
-CMConnection_create ARGS((transport_entry trans, void *transport_data,
-			  attr_list conn_attrs));
+CMConnection_create(transport_entry trans, void *transport_data,
+			  attr_list conn_attrs);
 
-extern void free_CMFormat ARGS((CMFormat format));
+extern void free_CMFormat(CMFormat format);
 
-extern void CMcomplete_format_registration ARGS((CMFormat format, int lock));
-extern int CMcontrol_list_wait ARGS((CMControlList cl));
-extern int load_transport ARGS((CManager cm, const char *trans_name, int quiet));
-extern transport_entry add_transport_to_cm ARGS((CManager cm, transport_entry trans));
+extern void CMcomplete_format_registration(CMFormat format, int lock);
+extern int CMcontrol_list_wait(CMControlList cl);
+extern int load_transport(CManager cm, const char *trans_name, int quiet);
+extern transport_entry add_transport_to_cm(CManager cm, transport_entry trans);
 
-extern int CMinternal_listen ARGS((CManager cm, attr_list listen_info, int try_others));
-extern CMConnection CMinternal_get_conn ARGS((CManager cm, attr_list attrs));
-extern void CMconn_fail_conditions ARGS((CMConnection conn));
-extern int CMpbio_send_format_preload ARGS((FMFormat ioformat, CMConnection conn));
-extern void CMformat_preload ARGS((CMConnection conn, CMFormat format));
-extern void CMinit_local_formats ARGS((CManager cm));
+extern int CMinternal_listen(CManager cm, attr_list listen_info, int try_others);
+extern CMConnection CMinternal_get_conn(CManager cm, attr_list attrs);
+extern void CMconn_fail_conditions(CMConnection conn);
+extern int CMpbio_send_format_preload(FMFormat ioformat, CMConnection conn);
+extern void CMformat_preload(CMConnection conn, CMFormat format);
+extern void CMinit_local_formats(CManager cm);
 
-extern CMbuffer cm_get_data_buf ARGS((CManager cm, int length));
-extern void cm_return_data_buf ARGS((CManager cm, CMbuffer cmb));
-extern CMbuffer cm_create_transport_buffer ARGS((CManager cmb, void* buffer, int length));
-extern CMbuffer cm_create_transport_and_link_buffer ARGS((CManager cmb, void* buffer, int length));
+extern CMbuffer cm_get_data_buf(CManager cm, int length);
+extern void cm_return_data_buf(CManager cm, CMbuffer cmb);
+extern CMbuffer cm_create_transport_buffer(CManager cmb, void* buffer, int length);
+extern CMbuffer cm_create_transport_and_link_buffer(CManager cmb, void* buffer, int length);
 
 extern CMincoming_format_list CMidentify_rollbackCMformat 
-	ARGS((CManager cm, char *data_buffer));
+(CManager cm, char *data_buffer);
 extern void
-CMcreate_conversion ARGS((CManager cm, CMincoming_format_list cm_format));
+CMcreate_conversion(CManager cm, CMincoming_format_list cm_format);
 extern int
-process_old_format_data ARGS((CManager cm, CMincoming_format_list cm_format,
-	   	char **decode_buff, CMbuffer *cm_decode_buffer));
+process_old_format_data(CManager cm, CMincoming_format_list cm_format,
+	   	char **decode_buff, CMbuffer *cm_decode_buffer);
 extern void
-internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data);
+internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data, int task_type);
 extern void
 internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf, 
 			   attr_list attrs, CMConnection conn, 
@@ -352,137 +353,137 @@ extern attr_list CMint_attr_copy_list(CManager cm, attr_list l, char *file, int 
 extern void CMint_attr_merge_lists(CManager cm, attr_list l1, attr_list l2, 
 					char *file, int line);
 extern attr_list CMint_decode_attr_from_xmit(CManager cm, void * buf, char *file, int line);
-extern void* INT_CMrealloc ARGS((void *ptr, int size));
-extern void* INT_CMmalloc ARGS((int size));
-extern void INT_CMfree ARGS((void *ptr));
-extern void INT_CMadd_shutdown_task ARGS((CManager cm, CMPollFunc func, void *client_data));
-extern void INT_CManager_close ARGS((CManager cm));
+extern void* INT_CMrealloc(void *ptr, int size);
+extern void* INT_CMmalloc(int size);
+extern void INT_CMfree(void *ptr);
+extern void INT_CMadd_shutdown_task(CManager cm, CMPollFunc func, void *client_data, int task_type);
+extern void INT_CManager_close(CManager cm);
 extern CManager INT_CManager_create ();
-extern int INT_CMlisten_specific ARGS((CManager cm, attr_list listen_info));
-extern void INT_CMConnection_close ARGS((CMConnection conn));
-extern void INT_CMremove_task ARGS((CMTaskHandle handle));
-extern CMTaskHandle INT_CMadd_periodic ARGS((CManager cm, long period, 
-					     CMPollFunc func, void *client_data));
+extern int INT_CMlisten_specific(CManager cm, attr_list listen_info);
+extern void INT_CMConnection_close(CMConnection conn);
+extern void INT_CMremove_task(CMTaskHandle handle);
+extern CMTaskHandle INT_CMadd_periodic(CManager cm, long period, 
+					     CMPollFunc func, void *client_data);
 extern CMTaskHandle
-INT_CMadd_periodic_task ARGS((CManager cm, int period_sec, int period_usec, 
-			  CMPollFunc func, void *client_data));
+INT_CMadd_periodic_task(CManager cm, int period_sec, int period_usec, 
+			  CMPollFunc func, void *client_data);
 extern double
-INT_CMregressive_probe_bandwidth ARGS((CMConnection conn, long size, attr_list attrs));
+INT_CMregressive_probe_bandwidth(CMConnection conn, long size, attr_list attrs);
 extern CMTaskHandle
-INT_CMadd_delayed_task ARGS((CManager cm, int secs, int usecs, CMPollFunc func,
-			     void *client_data));
+INT_CMadd_delayed_task(CManager cm, int secs, int usecs, CMPollFunc func,
+			     void *client_data);
 extern int
-INT_CMwrite_attr ARGS((CMConnection conn, CMFormat format, void *data, 
-		       attr_list attrs));
+INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data, 
+		       attr_list attrs);
 extern int
-INT_CMwrite_evcontrol ARGS((CMConnection conn, unsigned char type, int arg));
-int INT_CMCondition_get ARGS((CManager cm, CMConnection dep));
-void INT_CMCondition_signal ARGS((CManager cm, int condition));
-void INT_CMCondition_set_client_data ARGS((CManager cm, int condition,
-				       void *client_data));
-void *INT_CMCondition_get_client_data ARGS((CManager cm, int condition));
-int INT_CMCondition_wait ARGS((CManager cm, int condition));
-extern attr_list INT_CMget_contact_list ARGS((CManager cm));
-extern void INT_CMregister_non_CM_message_handler ARGS((int header, CMNonCMHandler handler));
-extern void *INT_CMtake_buffer ARGS((CManager cm, void *data));
-extern void INT_CMreturn_buffer ARGS((CManager cm, void *data));
-extern CMConnection INT_CMget_conn ARGS((CManager cm, attr_list contact_list));
-extern CMFormat INT_CMregister_format ARGS((CManager cm, FMStructDescList format_list));
-extern CMFormat INT_CMregister_simple_format ARGS((CManager cm, char *format_name, FMFieldList field_list, int struct_size));
+INT_CMwrite_evcontrol(CMConnection conn, unsigned char type, int arg);
+int INT_CMCondition_get(CManager cm, CMConnection dep);
+void INT_CMCondition_signal(CManager cm, int condition);
+void INT_CMCondition_set_client_data(CManager cm, int condition,
+				       void *client_data);
+void *INT_CMCondition_get_client_data(CManager cm, int condition);
+int INT_CMCondition_wait(CManager cm, int condition);
+extern attr_list INT_CMget_contact_list(CManager cm);
+extern void INT_CMregister_non_CM_message_handler(int header, CMNonCMHandler handler);
+extern void *INT_CMtake_buffer(CManager cm, void *data);
+extern void INT_CMreturn_buffer(CManager cm, void *data);
+extern CMConnection INT_CMget_conn(CManager cm, attr_list contact_list);
+extern CMFormat INT_CMregister_format(CManager cm, FMStructDescList format_list);
+extern CMFormat INT_CMregister_simple_format(CManager cm, char *format_name, FMFieldList field_list, int struct_size);
 extern void
 INT_EVforget_connection(CManager, CMConnection);
 extern void
 INT_EVhandle_control_message(CManager, CMConnection, unsigned char type, int arg);
 
 extern void
-INT_CMregister_handler ARGS((CMFormat format, CMHandlerFunc handler, 
-			void *client_data));
-extern long INT_CMprobe_latency ARGS((CMConnection conn, int msg_size,
-				  attr_list attrs));
+INT_CMregister_handler(CMFormat format, CMHandlerFunc handler, 
+			void *client_data);
+extern long INT_CMprobe_latency(CMConnection conn, int msg_size,
+				  attr_list attrs);
 extern int
-INT_CMwrite ARGS((CMConnection conn, CMFormat format, void *data));
+INT_CMwrite(CMConnection conn, CMFormat format, void *data);
 extern CMConnection
-INT_CMget_indexed_conn ARGS((CManager cm, int i));
+INT_CMget_indexed_conn(CManager cm, int i);
 extern int
-INT_CMcontact_self_check ARGS((CManager cm, attr_list attrs));
-extern int INT_CMtry_return_buffer ARGS((CManager cm, void *data));
-extern FMFormat INT_CMget_IOformat_by_name ARGS((CManager cm, FMContext context,
-					     char *name));
+INT_CMcontact_self_check(CManager cm, attr_list attrs);
+extern int INT_CMtry_return_buffer(CManager cm, void *data);
+extern FMFormat INT_CMget_IOformat_by_name(CManager cm, FMContext context,
+					     char *name);
 extern 
-void INT_CMpoll_network ARGS((CManager cm));
+void INT_CMpoll_network(CManager cm);
 extern 
-void INT_CMrun_network ARGS((CManager cm));
+void INT_CMrun_network(CManager cm);
 extern void*
-INT_CMget_transport_data ARGS((CMConnection conn));
+INT_CMget_transport_data(CMConnection conn);
 
-extern int INT_CMCondition_has_failed ARGS((CManager cm, int condition));
+extern int INT_CMCondition_has_failed(CManager cm, int condition);
 extern int
-INT_EVtake_event_buffer ARGS((CManager cm, void *event));
+INT_EVtake_event_buffer(CManager cm, void *event);
 extern void
 INT_EVPsubmit(CManager cm, int local_path_id, void *data, FMFormat format);
-extern int INT_CMlisten ARGS((CManager cm));
+extern int INT_CMlisten(CManager cm);
 extern char *
 INT_create_filter_action_spec(FMStructDescList format_list, char *function);
 extern char *
 INT_create_bridge_action_spec(int stone_id, char *contact_string);
 extern char *
 INT_create_router_action_spec(FMStructDescList format_list, char *function);
-extern int INT_CMfork_comm_thread ARGS((CManager cm));
+extern int INT_CMfork_comm_thread(CManager cm);
 extern int
-INT_CMregister_write_callback ARGS((CMConnection conn, 
+INT_CMregister_write_callback(CMConnection conn, 
 				CMWriteCallbackFunc handler,
-				void *client_data));
+				void *client_data);
 extern void
-INT_CMunregister_write_callback ARGS((CMConnection conn, int id));
+INT_CMunregister_write_callback(CMConnection conn, int id);
 extern void
-INT_CMadd_poll ARGS((CManager cm, CMPollFunc func, void *client_data));
+INT_CMadd_poll(CManager cm, CMPollFunc func, void *client_data);
 extern void
 INT_EVPsubmit_encoded(CManager cm, int local_path_id, void *data, int len);
-extern CMFormat INT_CMlookup_format ARGS((CManager cm, FMStructDescList format_list));
+extern CMFormat INT_CMlookup_format(CManager cm, FMStructDescList format_list);
 extern char *
 INT_create_transform_action_spec(FMStructDescList format_list, FMStructDescList out_format_list, char *function);
 extern char *
 INT_create_multityped_action_spec(FMStructDescList *input_format_lists, char *function);
 
-extern int INT_CMCondition_has_signaled ARGS((CManager cm, int condition));
+extern int INT_CMCondition_has_signaled(CManager cm, int condition);
 
 extern attr_list
-INT_CMget_specific_contact_list ARGS((CManager cm, attr_list attrs));
+INT_CMget_specific_contact_list(CManager cm, attr_list attrs);
 
 extern CMtrans_services
-INT_CMget_static_trans_services ARGS(());
+INT_CMget_static_trans_services();
 
-extern void INT_CMsleep ARGS((CManager cm, int secs));
+extern void INT_CMsleep(CManager cm, int secs);
 extern int INT_CMget_self_ip_addr();
-extern attr_list INT_CMConnection_get_attrs ARGS((CMConnection conn));
-extern void * INT_CMcreate_compat_info ARGS((CMFormat format, char *xform_code,
-			int *len_p));
-extern FMContext INT_CMget_user_type_context ARGS((CManager cm));
-extern FFSTypeHandle INT_CMget_format_app_IOcontext ARGS((CManager cm, FFSContext context,
-					     void *buffer, void *app_context));
-extern FFSTypeHandle INT_CMget_format_IOcontext ARGS((CManager cm, FFSContext context,
-					     void *buffer));
+extern attr_list INT_CMConnection_get_attrs(CMConnection conn);
+extern void * INT_CMcreate_compat_info(CMFormat format, char *xform_code,
+			int *len_p);
+extern FMContext INT_CMget_user_type_context(CManager cm);
+extern FFSTypeHandle INT_CMget_format_app_IOcontext(CManager cm, FFSContext context,
+					     void *buffer, void *app_context);
+extern FFSTypeHandle INT_CMget_format_IOcontext(CManager cm, FFSContext context,
+					     void *buffer);
 extern CMConnection
-INT_CMinitiate_conn ARGS((CManager cm, attr_list contact_list));
+INT_CMinitiate_conn(CManager cm, attr_list contact_list);
 extern void
-INT_CMconn_register_close_handler ARGS((CMConnection conn, 
+INT_CMconn_register_close_handler(CMConnection conn, 
 				    CMCloseHandlerFunc func, 
-				    void *client_data));
+				    void *client_data);
 extern void
-INT_EVreturn_event_buffer ARGS((CManager cm, void *event));
+INT_EVreturn_event_buffer(CManager cm, void *event);
 extern void
-INT_CMConnection_add_reference ARGS((CMConnection conn));
+INT_CMConnection_add_reference(CMConnection conn);
 extern int
-INT_CMConnection_set_character ARGS((CMConnection conn, attr_list attrs));
+INT_CMConnection_set_character(CMConnection conn, attr_list attrs);
 extern void
-INT_CMremove_periodic ARGS((CMTaskHandle handle));
-extern void INT_CMfree_user_type_context ARGS((CManager cm, FMContext context));
+INT_CMremove_periodic(CMTaskHandle handle);
+extern void INT_CMfree_user_type_context(CManager cm, FMContext context);
 extern double
-INT_CMprobe_bandwidth ARGS((CMConnection conn, long size, attr_list attrs));
-extern int INT_CMConnection_write_would_block ARGS((CMConnection conn));
-extern void INT_CMusleep ARGS((CManager cm, int usecs));
-extern void INT_CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
-extern void INT_CM_fd_add_select ARGS((CManager cm, int fd, select_func handler_func, void *param1, void *param2));
+INT_CMprobe_bandwidth(CMConnection conn, long size, attr_list attrs);
+extern int INT_CMConnection_write_would_block(CMConnection conn);
+extern void INT_CMusleep(CManager cm, int usecs);
+extern void INT_CM_insert_contact_info(CManager cm, attr_list attrs);
+extern void INT_CM_fd_add_select(CManager cm, int fd, select_func handler_func, void *param1, void *param2);
 extern void INT_CMstart_read_thread(CMConnection conn);
 #ifdef __COD__H__
 extern void INT_EVadd_standard_routines(CManager cm, char *extern_string, cod_extern_entry *externs);

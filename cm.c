@@ -621,20 +621,13 @@ CManager_free(CManager cm)
     INT_CMfree(cm->pbio_requests);
 
     INT_CMfree(cm->connections);
-    /*
-     * GSE why o why
-     * a bug a cannot find.  If I leave the free in place, bad things happen
-     * on linux in cm/tests/take_test, SOMETIMES.
-     * I.E. sometimes there's a seg fault.  If I run with MALLOC_CHECK_ or 
-     * much of anything else, the problem goes away.  So, for now, simply 
-     * don't do the thr_mutex_free().  Sigh.
-     */
-    /* thr_mutex_free(cm->exchange_lock);*/
+
+    thr_mutex_free(cm->exchange_lock);
 
     thr_mutex_free(cm->context_lock);
 
-    i = 0;
     if (cm->contact_lists != NULL) {
+	i = 0;
 	while(cm->contact_lists[i] != NULL) {
 	    INT_CMfree_attr_list(cm, cm->contact_lists[i]);
 	    i++;
@@ -670,6 +663,19 @@ INT_CManager_close(CManager cm)
 	INT_CMConnection_close(cm->connections[0]);
     }
 
+    if (cm->shutdown_functions != NULL) {
+	func_entry *shutdown_functions = cm->shutdown_functions;
+	int i = 0;
+	    
+	while (shutdown_functions[i].func != NULL) {
+	    if (shutdown_functions[i].task_type == SHUTDOWN_TASK) {
+		CMtrace_out(cm, CMFreeVerbose, "CManager calling shutdown function SHUTDOWN %d, %lx\n", i, (long)shutdown_functions[i].func);
+		shutdown_functions[i].func(cm, shutdown_functions[i].client_data);
+		shutdown_functions[i].task_type = NO_TASK;
+	    }
+	    i++;
+	}
+    }
     CMtrace_out(cm, CMFreeVerbose, "CMControlList close CL=%lx current reference count will be %d\n", 
 		(long) cl, cl->reference_count - 1);
     CMControlList_close(cl);
@@ -689,9 +695,11 @@ INT_CManager_close(CManager cm)
 	    }
 	    i--;
 	    for ( ; i >= 0; i--) {
-		CMtrace_out(cm, CMFreeVerbose, "CManager calling shutdown function %d, %lx\n", i, (long)shutdown_functions[i].func);
-		shutdown_functions[i].func(cm, shutdown_functions[i].client_data);
-		shutdown_functions[i].func = NULL;
+		if (shutdown_functions[i].task_type == FREE_TASK) {
+		    CMtrace_out(cm, CMFreeVerbose, "CManager calling shutdown function FREE %d, %lx\n", i, (long)shutdown_functions[i].func);
+		    shutdown_functions[i].func(cm, shutdown_functions[i].client_data);
+		    shutdown_functions[i].func = NULL;
+		}
 	    }
 	    INT_CMfree(shutdown_functions);
 	}
@@ -704,7 +712,7 @@ INT_CManager_close(CManager cm)
 }
 
 extern void
-internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data)
+internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data, int task_type)
 {
     int func_count = 0;
     if (cm->shutdown_functions == NULL) {
@@ -719,15 +727,16 @@ internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data)
 		      sizeof(cm->shutdown_functions[0]) * (func_count +2));
     }
     cm->shutdown_functions[func_count].func = func;
+    cm->shutdown_functions[func_count].task_type = task_type;
     cm->shutdown_functions[func_count].client_data = client_data;
     func_count++;
     cm->shutdown_functions[func_count].func = NULL;
 }
 
 extern void
-INT_CMadd_shutdown_task(CManager cm, CMPollFunc func, void *client_data)
+INT_CMadd_shutdown_task(CManager cm, CMPollFunc func, void *client_data, int task_type)
 {
-    internal_add_shutdown_task(cm, func, client_data);
+    internal_add_shutdown_task(cm, func, client_data, task_type);
 }
 
 static void
@@ -1006,6 +1015,7 @@ INT_CMConnection_dereference(CMConnection conn)
     thr_mutex_free(conn->read_lock);
     INT_CMfree(conn->downloaded_formats);
     conn->foreign_data_handler = NULL;
+    free_attr_list(conn->attrs);
     free_FFSBuffer(conn->io_out_buffer);
     free_AttrBuffer(conn->attr_encode_buffer);
 #ifdef EV_INTERNAL_H
@@ -1046,7 +1056,11 @@ CMConnection_failed(CMConnection conn)
 	    list = next;
 	}
     }
-    if (conn->closed != 0) INT_CMConnection_close(conn);
+    if (conn->closed != 0) {
+	INT_CMConnection_close(conn);
+    } else {
+	INT_CMConnection_dereference(conn);
+    }
 }
 
 void
@@ -2930,6 +2944,16 @@ select_shutdown(CManager cm, void *shutdown_funcv)
     shutdown_function(&CMstatic_trans_svcs, cm, &cm->control_list->select_data);
 }
 
+static void
+select_free(CManager cm, void *task_datav)
+{
+    void **task_data = (void**)task_datav;
+    SelectInitFunc select_free_function = (SelectInitFunc)task_data[0];
+    CMtrace_out(cm, CMFreeVerbose, "calling select FREE function\n");
+    select_free_function(&CMstatic_trans_svcs, cm, task_data[1]);
+    free(task_data);
+}
+
 
 static void
 CM_init_select(CMControlList cl, CManager cm)
@@ -2937,6 +2961,7 @@ CM_init_select(CMControlList cl, CManager cm)
     CMPollFunc blocking_function, polling_function;
     SelectInitFunc init_function;
     SelectInitFunc shutdown_function;
+    SelectInitFunc select_free_function;
     lt_dlhandle handle;	
     char *libname;
 #if !NO_DYNAMIC_LINKING
@@ -2970,7 +2995,8 @@ CM_init_select(CMControlList cl, CManager cm)
     blocking_function = (CMPollFunc)lt_dlsym(handle, "blocking_function");
     polling_function = (CMPollFunc)lt_dlsym(handle, "polling_function");
     init_function = (SelectInitFunc)lt_dlsym(handle, "select_initialize");
-    shutdown_function = (SelectInitFunc)lt_dlsym(handle, "select_shutdown");
+    shutdown_function = (SelectInitFunc)lt_dlsym(handle, "select_free");
+    select_free_function = (SelectInitFunc)lt_dlsym(handle, "select_shutdown");
     cl->stop_select = (CMWakeSelectFunc)lt_dlsym(handle, "select_stop");
 #else
     cl->add_select = (CMAddSelectFunc)libcmselect_LTX_add_select;
@@ -2985,6 +3011,7 @@ CM_init_select(CMControlList cl, CManager cm)
     polling_function = (CMPollFunc)libcmselect_LTX_polling_function;
     init_function = (SelectInitFunc)libcmselect_LTX_select_initialize;
     shutdown_function = (SelectInitFunc) libcmselect_LTX_select_shutdown;
+    select_free_function = (SelectInitFunc) libcmselect_LTX_select_free;
     cl->stop_select = (CMWakeSelectFunc) libcmselect_LTX_select_stop;
     
 
@@ -3001,7 +3028,7 @@ CM_init_select(CMControlList cl, CManager cm)
 				    (void*)&(cl->select_data));
     cl->select_initialized = 1;
     CMtrace_out(cm, CMFreeVerbose, "CManager adding select shutdown function, %lx\n",(long)shutdown_function);
-    internal_add_shutdown_task(cm, select_shutdown, (void*)shutdown_function);
+    internal_add_shutdown_task(cm, select_shutdown, (void*)shutdown_function, SHUTDOWN_TASK);
 }
 
 static void

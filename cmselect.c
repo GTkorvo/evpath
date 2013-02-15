@@ -1042,7 +1042,19 @@ void *client_data;
 	    sleep(1);
 	}
     }
-      
+}
+
+extern void
+libcmselect_LTX_select_free(svc, cm, client_data)
+CMtrans_services svc;
+CManager cm;
+void *client_data;
+{
+    select_data_ptr *sdp = client_data;
+    select_data_ptr sd = *sdp;
+
+    svc->trace_out(sd->cm, "CMSelect free task called");
+
     if (*((select_data_ptr *)client_data) != NULL) {
 	free_select_data(svc, sdp);
     }

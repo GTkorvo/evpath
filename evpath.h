@@ -678,12 +678,17 @@ CMremove_task ARGS((CMTaskHandle handle));
  * \param func The function to be called upon shutdown.
  * \param client_data An uninterpreted value that is passed to the function
  * when it is called.
+ * \param task_type Should be either SHUTDOWN_TASK or FREE_TASK
  *
  * Multiple shutdown tasks can be added to the same CM and they are called
  * in the order registered.  There is currently no API for removing them.
  */
 extern void
-CMadd_shutdown_task ARGS((CManager cm, CMPollFunc func, void *client_data));
+CMadd_shutdown_task ARGS((CManager cm, CMPollFunc func, void *client_data, int task_type));
+
+#define NO_TASK 0
+#define SHUTDOWN_TASK 1
+#define FREE_TASK 2
 
 /*!
  * add a task to be executed with a particular periodicity.

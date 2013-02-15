@@ -1651,7 +1651,7 @@ libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc, transport_entry t
     socket_data->svc = svc;
     socket_data->characteristics = create_attr_list();
     add_int_attr(socket_data->characteristics, CM_TRANSPORT_RELIABLE, 1);
-    svc->add_shutdown_task(cm, free_socket_data, (void *) socket_data);
+    svc->add_shutdown_task(cm, free_socket_data, (void *) socket_data, FREE_TASK);
     return (void *) socket_data;
 }
 
