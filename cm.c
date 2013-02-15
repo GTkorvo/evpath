@@ -1982,7 +1982,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	}
     }
     if (event_msg) {
-	CMtrace_out(cm, CMDataVerbose, "CM - Receiving event message data len %d, attr len %d, stone_id %x\n",
+	CMtrace_out(cm, CMDataVerbose, "CM - Receiving event message data len %ld, attr len %d, stone_id %x\n",
 		    data_length, attr_length, stone_id);
 	if (attrs == NULL){
 	    attrs = CMcreate_attr_list(cm);
@@ -2454,7 +2454,7 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
             conn->trans->set_write_notify(conn->trans, &CMstatic_trans_svcs, conn->transport_data, 1);
             conn->write_pending = 1;
             CMtrace_out(conn->cm, CMLowLevelVerbose, 
-                        "Partial write, queued %d bytes\n",
+                        "Partial write, queued %ld bytes\n",
                         byte_count - actual_bytes);
             return -1; /* XXX */
         }
