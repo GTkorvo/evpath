@@ -1,0 +1,81 @@
+{
+   Known DILL leak
+   Memcheck:Leak
+   fun:malloc
+   fun:alloc_dill_jump_table
+}
+{
+   cercs_env, not really
+   Memcheck:Value8
+   fun:init_env_table
+   fun:cercs_getenv
+}
+{
+   cercs_env, not really
+   Memcheck:Cond
+...
+   fun:cercs_getenv
+}
+{
+   Funky strcpy overlap in decode
+   Memcheck:Overlap
+   fun:strcpy
+...
+   fun:FFSconvert_record
+}
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   fun:*
+   fun:init_env_table
+}
+{
+   Unpleasant leak of string constant.  Generated code references this.  Bad.
+   Memcheck:Leak
+   fun:malloc
+   fun:strdup
+   fun:cg_expr
+}
+{
+   Less painful, but could be better.  Leak name of subroutine being called.
+   Memcheck:Leak
+   fun:malloc
+   fun:strdup
+   fun:cg_subroutine_call
+}
+{
+   This seems to be a Lex/Flex issue.  Possible non-reentrant.
+   Memcheck:Leak
+   fun:*
+   fun:cod_yyrealloc
+   fun:yyensure_buffer_stack
+}
+{
+   Anything under dlopen isn't our fault.
+   Memcheck:Leak
+   fun:*
+...
+   fun:CMdlopen
+}
+{
+   gen_threads always leaks
+   Memcheck:Leak
+   fun:malloc
+...
+   fun:gen_pthread_init
+   fun:main
+}
+{
+   Atl atoms are persistent and never cleaned up
+   Memcheck:Leak
+   fun:malloc
+...
+   fun:enter_atom_into_cache
+}
+{
+   Transports are not deallocated once loaded
+   Memcheck:Leak
+   fun:malloc
+   fun:INT_CMmalloc
+   fun:load_transport
+}
