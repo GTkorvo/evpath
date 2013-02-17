@@ -75,7 +75,6 @@
 {
    Transports are not deallocated once loaded
    Memcheck:Leak
-   fun:malloc
-   fun:INT_CMmalloc
+   fun:*
    fun:load_transport
 }
