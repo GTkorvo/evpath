@@ -135,7 +135,9 @@ CManager cm;
     sd->select_consistency_number = 0;
     sd->wake_read_fd = -1;
     sd->wake_write_fd = -1;
-    if (cm != NULL) sd->cm = cm;
+    if (cm != NULL) {
+	sd->cm = cm;
+    }
     setup_wake_mechanism(svc, sdp);
 }
 
@@ -219,6 +221,9 @@ int increment_usec;
 	time->tv_usec = (time->tv_usec % 1000000);
     }
 }
+
+static void
+shutdown_wake_mechanism(select_data_ptr sd);
 
 static void
 socket_select(svc, sd, timeout_sec, timeout_usec)
@@ -467,7 +472,7 @@ int timeout_usec;
 		    }
 		}
 		if (sd->closed) {
-		    sd->server_thread = NULL; 
+		    shutdown_wake_mechanism(sd);
 		    return;
 		}
 	    }
@@ -765,7 +770,6 @@ shutdown_wake_mechanism(sd)
 select_data_ptr sd;
 {
     if (sd->wake_read_fd == -1) return;
-    wake_server_thread(sd);
     close(sd->wake_read_fd);
     close(sd->wake_write_fd);
     sd->wake_read_fd = sd->wake_write_fd = -1;
@@ -1036,11 +1040,7 @@ void *client_data;
     if (sd->server_thread != thr_thread_self()) {
 	int count = 5;
 	sd->closed = 1;
-	shutdown_wake_mechanism(sd);  /* will wake server */
-	while ((sd->server_thread != NULL) && (count > 0)) {
-	    count--;
-	    sleep(1);
-	}
+	wake_server_thread(sd);
     }
 }
 

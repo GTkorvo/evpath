@@ -1647,11 +1647,11 @@ process_events_stone(CManager cm, int s, action_class c)
 		cm->evp->current_event_item = event;
 		stone->new_enqueue_flag = 0;
 		stone->is_processing = 1;
-		CManager_unlock(cm);
 		if ((p->data_state == Requires_Contig_Encoded) && 
 		    (event->event_encoded == 0)) {
 		    encode_event(cm, event);
 		}
+		CManager_unlock(cm);
 		if (event->event_encoded == 0) {
 		    out = (handler)(cm, event->decoded_event, client_data,
 				    event->attrs);
@@ -3212,8 +3212,9 @@ free_evp(CManager cm, void *not_used)
     if (evp == NULL) return;
     free(evp->stone_map);
     free(evp->as);
-    /* freed when CM frees it */
-    /*  free_FFSContext(evp->ffsc);*/
+
+    free_FFSContext(evp->ffsc);
+/*    free_FMcontext(evp->fmc);   unnecessary?*/
     while (evp->queue_items_free_list != NULL) {
 	queue_item *tmp = evp->queue_items_free_list->next;
 	free(evp->queue_items_free_list);
