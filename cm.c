@@ -86,7 +86,7 @@ struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, IN
 					       cm_set_pending_write,
 					       transport_wake_any_pending_write
 };
-static void CMControlList_close ARGS((CMControlList cl));
+static void INT_CMControlList_close ARGS((CMControlList cl));
 static int CMcontrol_list_poll ARGS((CMControlList cl));
 int CMdo_non_CM_handler ARGS((CMConnection conn, int header,
 			      char *buffer, int length));
@@ -100,7 +100,6 @@ static void CM_init_select ARGS((CMControlList cl, CManager cm));
 static void
 CMpoll_forever(CManager cm)
 {
-    /* don't hold locks while polling forever */
     CMControlList cl = cm->control_list;
     int should_exit = 0;
     CManager_lock(cm);
@@ -108,20 +107,38 @@ CMpoll_forever(CManager cm)
 	CM_init_select(cm->control_list, cm);
     }
     CManager_unlock(cm);
-    if (cl->has_thread > 0 && cl->server_thread == thr_thread_self())
+    if (cl->has_thread > 0 && cl->server_thread == thr_thread_self()) {
+	/* 
+	 * if we're actually the server thread here, do a thread exit when
+	 * we're done
+	 */
 	should_exit++;
+    }
     while(!cl->closed) {
 	CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Forever - thread %lx doing wait\n", (long)thr_thread_self());
 	if (CMcontrol_list_wait(cl) == -1) {
 	    CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Forever - doing close and exit\n");
-	    INT_CManager_close(cm);
+	    /* 
+	     * error.  others will free the CM too, add to the ref count 
+	     * here so we can close.
+	     */
+	    cm->reference_count++;
+	    CManager_close(cm);
 	    exit(1);
 	}
     }
     CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Forever - doing close\n");
-    CManager_lock(cm);
-    INT_CManager_close(cm);
+    CManager_close(cm);
     if (should_exit != 0) thr_thread_exit(NULL);
+}
+
+static void CManager_free(CManager cm);
+
+static void
+server_thread_func(CManager cm)
+{
+    CMpoll_forever(cm);
+    CManager_free(cm);
 }
 
 extern void
@@ -161,7 +178,7 @@ INT_CMfork_comm_thread(CManager cm)
 	if (cm->control_list->has_thread == 0) {
 	    if (cm->control_list->network_blocking_function.func) {
 		thr_thread_t server_thread = 
-		    thr_fork((void_arg_func)CMpoll_forever, 
+		    thr_fork((void_arg_func)server_thread_func, 
 			     (void*)cm);
 		CMtrace_out(cm, CMLowLevelVerbose,
 			    "CM - Forked comm thread %lx\n", (long)server_thread);
@@ -217,7 +234,7 @@ CMControlList_set_blocking_func(CMControlList cl, CManager cm,
     cl->network_polling_function.cm = NULL;
     if (cl->has_thread == -1) {
 	thr_thread_t server_thread = 
-	    thr_fork((void_arg_func)CMpoll_forever, 
+	    thr_fork((void_arg_func)server_thread_func, 
 		     (void*)cm);
 	if (server_thread == NULL) {
 	    return;
@@ -601,7 +618,7 @@ CManager_free(CManager cm)
 
     INT_CMfree(cm->transports);
     cm->transports = NULL;
-    free_FFSContext(cm->FFScontext);
+/*    free_FFSContext(cm->FFScontext);*/
     cm->FFScontext = NULL;
     INT_CMfree(cm->in_formats);
 
@@ -657,7 +674,8 @@ INT_CManager_close(CManager cm)
 {
     CMControlList cl = cm->control_list;
 
-    CMtrace_out(cm, CMFreeVerbose, "CManager %lx closing\n", (long) cm);
+    CMtrace_out(cm, CMFreeVerbose, "CManager %p closing, ref count %d\n", cm,
+		cm->reference_count);
     while (cm->connection_count != 0) {
 	/* connections are moved down as they are closed... */
 	INT_CMConnection_close(cm->connections[0]);
@@ -676,9 +694,15 @@ INT_CManager_close(CManager cm)
 	    i++;
 	}
     }
-    CMtrace_out(cm, CMFreeVerbose, "CMControlList close CL=%lx current reference count will be %d\n", 
-		(long) cl, cl->reference_count - 1);
-    CMControlList_close(cl);
+    CMtrace_out(cm, CMFreeVerbose, "CMControlList close CL=%lx current reference count will be %d, sdp = %p\n", 
+		(long) cl, cl->reference_count - 1, cl->select_data);
+    /* 
+     * unlock the CM briefly to allow the server thread to shut down 
+     * if it exists
+     */
+    CManager_unlock(cm);
+    INT_CMControlList_close(cl);
+    CManager_lock(cm);
     CMControlList_free(cl);
 
     cm->reference_count--;
@@ -1030,6 +1054,7 @@ CMConnection_failed(CMConnection conn)
     CMTaskHandle prior_task = NULL;
     if (conn->failed) return;
     conn->failed = 1;
+    assert(CManager_locked(conn->cm));
     CMtrace_out(conn->cm, CMFreeVerbose, "CMConnection failed conn=%lx\n", 
 		(long) conn);
     CMconn_fail_conditions(conn);
@@ -1085,7 +1110,7 @@ INT_CMconn_register_close_handler(CMConnection conn, CMCloseHandlerFunc func,
 }
 
 static void
-CMControlList_close(CMControlList cl)
+INT_CMControlList_close(CMControlList cl)
 {
     void *status;
     cl->reference_count--;
@@ -1096,14 +1121,14 @@ CMControlList_close(CMControlList cl)
 	    (cl->wake_select)((void*)&CMstatic_trans_svcs,
 			      &cl->select_data);
     }	
-    if (cl->reference_count == 0) {
-        if ((cl->has_thread > 0) && (cl->server_thread != thr_thread_self())){
-	    (cl->stop_select)((void*)&CMstatic_trans_svcs,
-			      &cl->select_data);
-	    (cl->wake_select)((void*)&CMstatic_trans_svcs,
-			      &cl->select_data);
-            thr_thread_join(cl->server_thread, &status);
-	}
+    if ((cl->has_thread > 0) && (cl->server_thread != thr_thread_self())){
+	(cl->stop_select)((void*)&CMstatic_trans_svcs,
+			  &cl->select_data);
+	
+	(cl->wake_select)((void*)&CMstatic_trans_svcs,
+			  &cl->select_data);
+	thr_thread_join(cl->server_thread, &status);
+	cl->has_thread = 0;
     }
 }
 
@@ -1572,6 +1597,7 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
     char *buffer = NULL;
     int length;
 
+    /* called from the transport, grab the locks */
     CManager_lock(cm);
     if (first) {
 	char *tmp;
@@ -2940,7 +2966,7 @@ static void
 select_shutdown(CManager cm, void *shutdown_funcv)
 {
     SelectInitFunc shutdown_function = (SelectInitFunc)shutdown_funcv;
-    CMtrace_out(cm, CMFreeVerbose, "calling select shutdown function\n");
+    CMtrace_out(cm, CMFreeVerbose, "calling select shutdown function sdp%p\n", cm->control_list->select_data);
     shutdown_function(&CMstatic_trans_svcs, cm, &cm->control_list->select_data);
 }
 
@@ -2995,8 +3021,8 @@ CM_init_select(CMControlList cl, CManager cm)
     blocking_function = (CMPollFunc)lt_dlsym(handle, "blocking_function");
     polling_function = (CMPollFunc)lt_dlsym(handle, "polling_function");
     init_function = (SelectInitFunc)lt_dlsym(handle, "select_initialize");
-    shutdown_function = (SelectInitFunc)lt_dlsym(handle, "select_free");
-    select_free_function = (SelectInitFunc)lt_dlsym(handle, "select_shutdown");
+    shutdown_function = (SelectInitFunc)lt_dlsym(handle, "select_shutdown");
+    select_free_function = (SelectInitFunc)lt_dlsym(handle, "select_free");
     cl->stop_select = (CMWakeSelectFunc)lt_dlsym(handle, "select_stop");
 #else
     cl->add_select = (CMAddSelectFunc)libcmselect_LTX_add_select;
