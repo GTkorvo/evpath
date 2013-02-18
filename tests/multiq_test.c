@@ -163,6 +163,8 @@ static char *trans = "{\n\
         b = EVdata_b_rec(0); ++found;\n\
     }\n\
     if (found == 2) {\n\
+	attr_list l = create_attr_list();\n\
+	set_int_attr(l, \"CMdemo_test_atom\", 56789);\n\
         c.c_field = a.a_field + b.b_field;\n\
 	c.sequence_a = a.sequence;\n\
 	c.sequence_b = b.sequence;\n\
@@ -172,7 +174,8 @@ static char *trans = "{\n\
         if (!EVpresent_b_rec(0))\n\
             printf(\"??? <2> not present (1)\\n\");\n\
         EVdiscard_b_rec(0);\n\
-        EVsubmit(0, c);\n\
+        EVsubmit_attr(0, c, l);\n\
+        free_attr_list(l);\n\
     }\n\
 }\0\0";
 
