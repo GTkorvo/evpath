@@ -1032,6 +1032,7 @@ INT_CMConnection_dereference(CMConnection conn)
 	return;
     }
     if (conn->ref_count < 0) return;   /*  BAD! */
+    conn->closed = 1;
     CMtrace_out(conn->cm, CMConnectionVerbose, "CM - Shut down connection %p\n",
 		(void*)conn);
     if (conn->failed == 0) {
@@ -1095,7 +1096,6 @@ INT_CMConnection_close(CMConnection conn)
 {
     CMtrace_out(conn->cm, CMFreeVerbose, "CMConnection close conn=%lx ref count will be %d\n", 
 		(long) conn, conn->ref_count - 1);
-    conn->closed = 1;
     INT_CMConnection_dereference(conn);
 }
 
