@@ -1350,7 +1350,7 @@ INT_EVadd_standard_structs(CManager cm, FMStructDescList *lists)
 }
 
 static void
-internal_cod_submit(cod_exec_context ec, int port, void *data, void *type_info)
+internal_cod_submit_attr(cod_exec_context ec, int port, void *data, void *type_info, attr_list attrs)
 {
     struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
     CManager cm = ev_state->cm;
@@ -1390,7 +1390,7 @@ internal_cod_submit(cod_exec_context ec, int port, void *data, void *type_info)
 /*	event->free_func = cod_free_wrapper;*/
 	event->free_func = NULL;
 	event->free_arg = event;
-	event->attrs = NULL;
+	event->attrs = add_ref_attr_list(attrs);
 	cod_encode_event(cm, event);  /* map to memory we trust */
 	event->event_encoded = 1;
 	event->decoded_event = NULL;  /* lose old data */
@@ -1399,6 +1399,11 @@ internal_cod_submit(cod_exec_context ec, int port, void *data, void *type_info)
     }
 }
 
+static void
+internal_cod_submit(cod_exec_context ec, int port, void *data, void *type_info)
+{
+    internal_cod_submit_attr(ec, port, data, type_info, NULL);
+}
 
 static void
 add_standard_routines(stone_type stone, cod_parse_context context)
@@ -1412,6 +1417,7 @@ add_standard_routines(stone_type stone, cod_parse_context context)
 		long lrand48();\n\
 		double drand48();\n\
 		void EVsubmit(cod_exec_context ec, int port, void* d, cod_type_spec dt);\n\
+		void EVsubmit_attr(cod_exec_context ec, int port, void* d, cod_type_spec dt, attr_list list);\n\
 		attr_list stone_attrs;\n";
 		//time_t time(time_t *timer);\n";
 
@@ -1424,6 +1430,7 @@ add_standard_routines(stone_type stone, cod_parse_context context)
 	{"drand48", (void *) 0},
 	{"stone_attrs", (void *) 0},
 	{"EVsubmit", (void *) 0},
+	{"EVsubmit_attr", (void *) 0},
 	{"sleep", (void*) 0},
 	{(void *) 0, (void *) 0}
     };
@@ -1442,7 +1449,8 @@ add_standard_routines(stone_type stone, cod_parse_context context)
     externs[5].extern_value = (void *) (long) drand48;
     externs[6].extern_value = (void *) (long) &stone->stone_attrs;
     externs[7].extern_value = (void *) (long) &internal_cod_submit;
-    externs[8].extern_value = (void *) (long) &sleep;
+    externs[8].extern_value = (void *) (long) &internal_cod_submit_attr;
+    externs[9].extern_value = (void *) (long) &sleep;
     //externs[9].extern_value = (void *) (long) time;
 
     cod_assoc_externs(context, externs);
@@ -1488,7 +1496,7 @@ add_typed_queued_routines(cod_parse_context context, int index, const char *fmt_
 
     sprintf(extern_string, extern_string_fmt,
 	    fmt_name, fmt_name, fmt_name, fmt_name,
-	    fmt_name, fmt_name);
+	    fmt_name, fmt_name, fmt_name);
     sprintf(data_extern_string, data_extern_string_fmt,
 	    fmt_name, fmt_name, fmt_name, fmt_name);
     externs = malloc(sizeof(externs_fmt));
