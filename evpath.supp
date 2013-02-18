@@ -60,7 +60,7 @@
 {
    gen_threads always leaks
    Memcheck:Leak
-   fun:malloc
+   fun:*
 ...
    fun:gen_pthread_init
    fun:main
@@ -68,13 +68,28 @@
 {
    Atl atoms are persistent and never cleaned up
    Memcheck:Leak
-   fun:malloc
+   fun:*
 ...
    fun:set_string_and_atom
+}
+{
+   Atl atoms are persistent and never cleaned up
+   Memcheck:Leak
+   fun:*
+...
+   fun:init_atom_server
 }
 {
    Transports are not deallocated once loaded
    Memcheck:Leak
    fun:*
+...   
    fun:load_transport
+}
+{
+   CMdladdsearchdir leaks everything under it
+   Memcheck:Leak
+   fun:*
+...
+   fun:CMdladdsearchdir
 }

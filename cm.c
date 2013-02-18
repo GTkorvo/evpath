@@ -2978,8 +2978,8 @@ select_free(CManager cm, void *task_datav)
 {
     void **task_data = (void**)task_datav;
     SelectInitFunc select_free_function = (SelectInitFunc)task_data[0];
-    CMtrace_out(cm, CMFreeVerbose, "calling select FREE function\n");
-    select_free_function(&CMstatic_trans_svcs, cm, task_data[1]);
+    CMtrace_out(cm, CMFreeVerbose, "calling select FREE function, %p\n", task_data[1]);
+    select_free_function(&CMstatic_trans_svcs, cm, &task_data[1]);
     free(task_data);
 }
 
@@ -3058,6 +3058,12 @@ CM_init_select(CMControlList cl, CManager cm)
     cl->select_initialized = 1;
     CMtrace_out(cm, CMFreeVerbose, "CManager adding select shutdown function, %lx\n",(long)shutdown_function);
     internal_add_shutdown_task(cm, select_shutdown, (void*)shutdown_function, SHUTDOWN_TASK);
+    {
+	void ** data = malloc(2 * sizeof(void*));
+	data[0] = select_free_function;
+	data[1] = cm->control_list->select_data;
+	internal_add_shutdown_task(cm, select_free, (void*)data, FREE_TASK);
+    }
 }
 
 static void
