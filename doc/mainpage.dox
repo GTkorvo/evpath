@@ -859,6 +859,10 @@ attributes from the source to the final destination.
 
 In order to operate on these attribute lists, the following
 routines are also made available:
+- attr_list create_attr_list();
+  - create a new attribute list
+- void free_attr_list(attr_list l);
+  - free an attribute list (actually, reduce reference count by 1)
 - int attr_set(attr_list l, string name);
   - returns boolean true if the named attribute is set, false otherwise
 - void set_long_attr(attr_list l, string name, long value);
@@ -948,6 +952,11 @@ void EVsubmit_full(int target, int index);
  target, without removing it from the queue
 void EVsubmit_<type>(int target, int index);
  // submit the index'th event of type <type> to output port \em target, without removing it from the queue
+
+void EVsubmit(int target, <any struct-type> data);
+ // submit as an event, data other than something from the event queue to output port target
+void EVsubmit_attr(int target, <any struct-type> data, attr_list l);
+ // submit as an event with attribute list \em l, data other than something from the event queue to output port \em target
 
 <type> *EVdata_<type>(int index);
 void *EVdata(int queue, int index);
