@@ -1932,6 +1932,7 @@ do_bridge_action(CManager cm, int s)
 /*	    }*/
 	}
 	event_item *event = dequeue_event(cm, stone, &action_id);
+	long event_length = 0;
 	if (act->o.bri.conn == NULL) {
 	    CMtrace_out(cm, EVerbose, "Bridge stone %x has closed connection\n", s);
 	} else {
@@ -1940,7 +1941,7 @@ do_bridge_action(CManager cm, int s)
 	    if (event->format) {
 		ret = internal_write_event(act->o.bri.conn, event->format,
 					   &act->o.bri.remote_stone_id, 4, 
-					   event, event->attrs);
+					   event, event->attrs, &event_length);
 		if (ret == 0) {
 		  printf("DETECTED FAILED EVENT WRITE\n");
 		}
@@ -1954,7 +1955,7 @@ do_bridge_action(CManager cm, int s)
 		    tmp_format.registration_pending = 0;
 		    ret = internal_write_event(act->o.bri.conn, &tmp_format,
 					       &act->o.bri.remote_stone_id, 4, 
-					       event, event->attrs);
+					       event, event->attrs, &event_length);
 		}
 	    }
 	}
@@ -1971,6 +1972,25 @@ do_bridge_action(CManager cm, int s)
 		INT_CMConnection_close(act->o.bri.conn);
 	    act->o.bri.conn_failed = 1;
 	    act->o.bri.conn = NULL;
+	} else {
+	    static atom_t EV_EVENT_COUNT = -1;
+	    static atom_t EV_EVENT_LSUM = -1;
+	    int length_sum = 0;
+	    int event_count = 0;
+	    if (EV_EVENT_COUNT == -1) {
+		EV_EVENT_COUNT = attr_atom_from_string("EV_EVENT_COUNT");
+		EV_EVENT_LSUM = attr_atom_from_string("EV_EVENT_LSUM");
+	    }
+	    if (!stone->stone_attrs) {
+		stone->stone_attrs = create_attr_list();
+	    } else {
+		get_int_attr(stone->stone_attrs, EV_EVENT_COUNT, &event_count);
+		get_int_attr(stone->stone_attrs, EV_EVENT_LSUM, &length_sum);
+	    }
+	    event_count++;
+	    length_sum += event_length;
+	    set_int_attr(stone->stone_attrs, EV_EVENT_COUNT, event_count);
+	    set_int_attr(stone->stone_attrs, EV_EVENT_LSUM, length_sum);
 	}
     }
     stone->is_outputting = 0;

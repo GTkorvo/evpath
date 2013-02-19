@@ -2642,12 +2642,11 @@ INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data,
 #ifdef EV_INTERNAL_H
 extern int
 internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
-		     int path_len, event_item *event, attr_list attrs)
+		     int path_len, event_item *event, attr_list attrs, long *event_len_p)
 {
-/* GSE MUST FIX for LONG */
     FFSEncodeVector vec;
     struct FFSEncodeVec preencoded_vec[2];
-    int data_length = 0, vec_count = 0, actual, attr_len = 0;
+    long data_length = 0, vec_count = 0, actual, attr_len = 0;
     int do_write = 1;
     void *encoded_attrs = NULL;
     int attrs_present = 0;
@@ -2797,6 +2796,7 @@ internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
 	    return 0;
 	}
     }
+    if (event_len_p) *event_len_p = data_length;
     CMtrace_out(conn->cm, CMLowLevelVerbose, "Writev success\n");
     return 1;
 }

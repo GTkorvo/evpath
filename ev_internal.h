@@ -308,7 +308,7 @@ extern void REVPinit(CManager cm);
 extern int
 internal_write_event(CMConnection conn, CMFormat format, 
 		     void *remote_path_id, int path_len, event_item *event,
-		     attr_list attrs);
+		     attr_list attrs, long *event_len_p);
 extern EVaction
 INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
 			       EVImmediateHandlerFunc func, void *client_data,
