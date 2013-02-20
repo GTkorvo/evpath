@@ -618,7 +618,7 @@ REVPlookup_handler(char *name)
     } 
 #if !NO_DYNAMIC_LINKING
     if (h == NULL) {
-	lt_dlinit();
+	(void) lt_dlinit();
 	h = lt_dlopen(NULL);
     }
     f = (EVSimpleHandlerFunc) lt_dlsym(h, name);
