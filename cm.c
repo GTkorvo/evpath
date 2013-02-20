@@ -2646,7 +2646,8 @@ internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
 {
     FFSEncodeVector vec;
     struct FFSEncodeVec preencoded_vec[2];
-    long data_length = 0, vec_count = 0, actual, attr_len = 0;
+    long data_length = 0, actual;
+    int vec_count = 0, attr_len = 0;
     int do_write = 1;
     void *encoded_attrs = NULL;
     int attrs_present = 0;
@@ -2733,7 +2734,7 @@ internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
 					     &attr_len);
 	attr_len = (attr_len +7) & -8;  /* round up to even 8 */
     }
-    CMtrace_out(conn->cm, CMDataVerbose, "CM - Total write size is %d bytes data + %d bytes attrs\n", data_length, attr_len);
+    CMtrace_out(conn->cm, CMDataVerbose, "CM - Total write size is %ld bytes data + %d bytes attrs\n", data_length, attr_len);
     if (cm_write_hook != NULL) {
 	do_write = cm_write_hook(data_length);
     }
