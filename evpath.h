@@ -686,8 +686,17 @@ CMremove_task ARGS((CMTaskHandle handle));
 extern void
 CMadd_shutdown_task ARGS((CManager cm, CMPollFunc func, void *client_data, int task_type));
 
+/*!
+ * task type for CMadd_shutdown_task.  NO_TASK is used internally 
+ */
 #define NO_TASK 0
+/*!
+ * task type for CMadd_shutdown_task.  SHUTDOWN_TASKs will be called at first close.
+ */
 #define SHUTDOWN_TASK 1
+/*!
+ * task type for CMadd_shutdown_task.  FREE_TASKs will be called when the CM reference count reaches zero.
+ */
 #define FREE_TASK 2
 
 /*!
@@ -772,8 +781,26 @@ void CMpoll_network ARGS((CManager cm));
 extern 
 void CMrun_network ARGS((CManager cm));
 
-typedef void (*select_func) ARGS((void *, void*));
+/*!
+ * The prototype for a CM select handling function.
+ *
+ * CM allows application-routines matching this prototype to be registered
+ * and called when a particular file descriptor has data available to read.
+ * \param param1 is the value specified as param1 in the CM_fd_add_select() call.
+ * \param param2 is the value specified as param2 in the CM_fd_add_select() call.
+ */
+typedef void (*select_func) (void *param1, void*param2);
 
+/*!
+ * Register an application routine to be called with a particular 
+ * file descriptor has data available for read.
+ *
+ * \param cm The CManager with which this handler is to be registered.
+ * \param fd The file descriptor to be monitored.
+ * \param handler_func The function to be called when data is available.
+ * \param param1 The value to be passed as param1 to the handler_func.
+ * \param param2 The value to be passed as param2 to the handler_func.
+ */
 extern void
 CM_fd_add_select ARGS((CManager cm, int fd, select_func handler_func,
 		       void *param1, void *param2));
