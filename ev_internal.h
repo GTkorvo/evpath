@@ -368,6 +368,9 @@ extern EVaction INT_EVassoc_store_action(CManager cm, EVstone stone, EVstone out
 extern EVaction INT_EVassoc_general_action(CManager cm, EVstone stone, char *action_spec, EVstone *target_list);
 extern EVaction
 INT_EVassoc_split_action(CManager cm, EVstone stone, EVstone *target_list);
+extern EVaction
+INT_EVassoc_anon_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
+			      EVMultiHandlerFunc func, void *client_data, FMFormat anon_target);
 extern EVsource
 INT_EVcreate_submit_handle(CManager cm, EVstone stone, FMStructDescList data_format);
 extern EVstone INT_EVcreate_stone_action(CManager cm, char *action_spec);
@@ -390,3 +393,4 @@ extern void ensure_ev_owned(CManager cm, event_item *event);
 extern int lookup_local_stone(event_path_data evp, int stone_num);
 extern action_value action_type(char *action_spec);
 extern void parse_bridge_action_spec(char *action_spec, int *target, char **contact);
+extern void fix_response_cache(stone_type stone);

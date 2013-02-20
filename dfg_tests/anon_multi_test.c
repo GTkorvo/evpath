@@ -278,7 +278,7 @@ be_test_master(int argc, char **argv)
     char *terminal_node = "c";
     atom_t index_atom;
 
-    argc; (void)argv;
+    (void)argc; (void)argv;
     cm = CManager_create();
     if (argc == 1) {
 	if (!sscanf(argv[0], "%d", &node_count)) printf("arg \"%s\" not understood\n", argv[0]);

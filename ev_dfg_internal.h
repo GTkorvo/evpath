@@ -139,6 +139,7 @@ struct _EVdfg {
 
 extern int INT_EVdfg_active_sink_count ( EVdfg dfg );
 extern void INT_EVdfg_add_action ( EVdfg_stone stone, char *action_spec );
+extern void INT_EVdfg_add_sink_action(EVdfg_stone stone, char *sink_name);
 extern void INT_EVdfg_assign_canonical_name ( EVdfg dfg, char *given_name, char *canonical_name );
 extern void INT_EVdfg_assign_node ( EVdfg_stone stone, char *node );
 extern EVdfg INT_EVdfg_create ( CManager cm );
