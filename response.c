@@ -68,7 +68,7 @@ struct filter_instance {
 };
 
 struct transform_instance {
-    int (*func_ptr)(void *, void*, attr_list);
+    int (*func_ptr)(void *, void*, attr_list, attr_list);
     cod_code code;
     cod_exec_context ec;
     int out_size;
@@ -633,9 +633,10 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
     response_instance instance = (response_instance)client_data;
     int ret;
     void *out_event = malloc(instance->u.transform.out_size);
-    int(*func)(cod_exec_context, void *, void*, attr_list) = NULL;
+    int(*func)(cod_exec_context, void *, void*, attr_list, attr_list) = NULL;
     cod_exec_context ec = instance->u.transform.ec;
     struct ev_state_data ev_state;
+    attr_list output_attrs = create_attr_list();
 
     ev_state.cm = cm;
     ev_state.cur_event = event;
@@ -654,12 +655,12 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
     }
     memset(out_event, 0, instance->u.transform.out_size);
     if (ec != NULL) {
-	func = (int(*)(cod_exec_context, void *, void*, attr_list))instance->u.transform.code->func;
+	func = (int(*)(cod_exec_context, void *, void*, attr_list, attr_list))instance->u.transform.code->func;
 	cod_assoc_client_data(ec, 0x34567890, (long)&ev_state);
-	ret = func(ec, event->decoded_event, out_event, attrs);
+	ret = func(ec, event->decoded_event, out_event, attrs, output_attrs);
     } else {
 	/* DLL-based handler */
-	ret = ((int(*)(void *, void *, attr_list))instance->u.transform.func_ptr)(event->decoded_event, out_event, attrs);
+	ret = ((int(*)(void *, void *, attr_list, attr_list))instance->u.transform.func_ptr)(event->decoded_event, out_event, attrs, output_attrs);
     }
 
     if (ret && (out_stones[0] == -1)) {
@@ -680,11 +681,12 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	s.free_func = transform_free_wrapper;
 	s.free_data = instance;
 	s.preencoded = 0;
-	INT_EVsubmit(&s, out_event, NULL);
+	INT_EVsubmit(&s, out_event, output_attrs);
     } else {
-	CMtrace_out(cm, EVerbose, "Filter function returned %d, NOT submitting\n", ret);
+	CMtrace_out(cm, EVerbose, "Transform function returned %d, NOT submitting\n", ret);
 	transform_free_wrapper(out_event, instance);
     }
+    free_attr_list(output_attrs);
     return ret;
 }
 
@@ -1827,6 +1829,7 @@ generate_filter_code(CManager cm, struct response_spec *mrd, stone_type stone,
 	    add_param(parse_context, "output", 2,
 		      mrd->u.transform.reference_output_format);
 	    cod_add_param("event_attrs", "attr_list", 3, parse_context);
+	    cod_add_param("output_attrs", "attr_list", 4, parse_context);
 	} else {
 	    cod_add_param("event_attrs", "attr_list", 2, parse_context);
 	}
@@ -1893,7 +1896,7 @@ generate_filter_code(CManager cm, struct response_spec *mrd, stone_type stone,
 		return NULL;
 	    }
 	    instance->u.transform.func_ptr =
-		(int(*)(void*,void*,attr_list)) load_dll_symbol(path, symbol_name);
+		(int(*)(void*,void*,attr_list,attr_list)) load_dll_symbol(path, symbol_name);
 	    if (instance->u.transform.func_ptr == NULL) {
 		fprintf(stderr, "Failed to load symbol \"%s\" from file \"%s\"\n",
 			symbol_name, path);
