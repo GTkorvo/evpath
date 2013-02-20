@@ -39,7 +39,7 @@
 /* Uses the Mac OS X style conventions for sysctl */
 #cmakedefine HAVE_MAC_SYSCTL
 
-/* Define if system uses LINUX-style sysctl
+/* Define if system uses LINUX-style sysctl */
 #cmakedefine HAVE_LINUX_SYSCTL 
 
 /* Define to 1 if you have the <malloc.h> header file. */
