@@ -107,6 +107,7 @@ sub gen_stub {
     print REVP "    CMFormat f = CMlookup_format(conn->cm, ${subr}_req_formats);\n";
     print REVP "    EV_${retsubtype}_response response;\n" unless ($return_type{$subr} eq "void");
     print REVP "    ${subr}_request request;\n";
+    print REVP "    memset(&request, 0, sizeof(request));\n";
     foreach $arg (split (", ", $args[1])) {
 	$_ = $arg;
 	if (/^\s*(.*\W+)(\w+)$\s*/) {
