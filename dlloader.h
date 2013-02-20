@@ -11,6 +11,6 @@
 #define lt_dlerror()  ""
 #define MODULE_EXT CMAKE_SHARED_MODULE_SUFFIX
 #endif
-extern void CMdladdsarchdir(char *dir);
+extern void CMdladdsearchdir(char *dir);
 extern void* CMdlopen(char *library, int mode);
 extern void* CMdlsym(void *handle, char *symbol);
