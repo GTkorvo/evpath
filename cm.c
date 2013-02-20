@@ -704,7 +704,6 @@ INT_CManager_close(CManager cm)
     CManager_unlock(cm);
     INT_CMControlList_close(cl);
     CManager_lock(cm);
-    CMControlList_free(cl);
 
     cm->reference_count--;
     CMtrace_out(cm, CMFreeVerbose, "CManager %p ref count now %d\n", 
@@ -729,6 +728,7 @@ INT_CManager_close(CManager cm)
 	    INT_CMfree(shutdown_functions);
 	}
 	CMtrace_out(cm, CMFreeVerbose, "Freeing CManager %p\n", cm);
+	CMControlList_free(cl);
 	CManager_unlock(cm);
 	CManager_free(cm);
     } else {
@@ -740,6 +740,9 @@ extern void
 internal_add_shutdown_task(CManager cm, CMPollFunc func, void *client_data, int task_type)
 {
     int func_count = 0;
+    if (!cm->control_list->select_initialized) {
+	CM_init_select(cm->control_list, cm);
+    }
     if (cm->shutdown_functions == NULL) {
 	cm->shutdown_functions = 
 	    INT_CMmalloc(sizeof(cm->shutdown_functions[0]) * 2);

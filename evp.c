@@ -3263,7 +3263,6 @@ EVPinit(CManager cm)
 	while (cm->evp->stone_base_num == 0) {
 	    cm->evp->stone_base_num = lrand48() & 0xffff;
 	}
-	
     }
     CMtrace_out(cm, EVerbose, "INITATED EVPATH, base stone num is %x\n", 
 		cm->evp->stone_base_num);
