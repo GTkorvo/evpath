@@ -1811,7 +1811,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
     int performance_func = 0, handshake_version = 0;
     CMbuffer cm_decode_buf = NULL, cm_data_buf;
     attr_list attrs = NULL;
-    long data_length, decoded_length;
+    int64_t data_length, decoded_length;
     int attr_length = 0, i;
     int header_len;
     int stone_id;
@@ -1920,7 +1920,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	    ((char*)&tmp)[1] = base[2];
 	    ((char*)&tmp)[2] = base[1];
 	    ((char*)&tmp)[3] = base[0];
-	    data_length = ((long)tmp) << 32;
+	    data_length = ((int64_t)tmp) << 32;
 	    ((char*)&tmp)[0] = base[7];
 	    ((char*)&tmp)[1] = base[6];
 	    ((char*)&tmp)[2] = base[5];
@@ -1933,7 +1933,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	    }
 	} else {
 	    checksum = (unsigned char) check_sum_base[0];
-	    data_length = ((long)(((int *) base)[0])) << 32;
+	    data_length = ((int64_t)(((int *) base)[0])) << 32;
 	    data_length += ((int *) base)[1];
 	    if (header_len != 12) {
 		attr_length = ((int *) base)[1];
