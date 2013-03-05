@@ -168,7 +168,7 @@ typedef struct _CMControlList {
      * CLs can be used by multiple DEs, close it when ref count reaches
      * zero 
      */
-    int reference_count;
+    int cl_reference_count;
     int free_reference_count;
 
     CMCondition condition_list;

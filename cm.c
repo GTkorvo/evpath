@@ -191,7 +191,7 @@ INT_CMfork_comm_thread(CManager cm)
 		cm->reference_count++;
 		CMtrace_out(cm, CMFreeVerbose, "Forked - CManager %lx ref count now %d\n", 
 			    (long) cm, cm->reference_count);
-		cm->control_list->reference_count++;
+		cm->control_list->cl_reference_count++;
 		cm->control_list->free_reference_count++;
 	    } else {
 		/*
@@ -243,7 +243,7 @@ CMControlList_set_blocking_func(CMControlList cl, CManager cm,
 	CMtrace_out(cm, CMLowLevelVerbose,
 		    "CM - Forked comm thread %lx\n", (long)server_thread);
 	cm->control_list->server_thread = server_thread;
-	cm->control_list->reference_count++;
+	cm->control_list->cl_reference_count++;
 	cm->control_list->free_reference_count++;
 	cl->has_thread = 1;
 	cm->reference_count++;
@@ -696,7 +696,7 @@ INT_CManager_close(CManager cm)
 	}
     }
     CMtrace_out(cm, CMFreeVerbose, "CMControlList close CL=%lx current reference count will be %d, sdp = %p\n", 
-		(long) cl, cl->reference_count - 1, cl->select_data);
+		(long) cl, cl->cl_reference_count - 1, cl->select_data);
     /* 
      * unlock the CM briefly to allow the server thread to shut down 
      * if it exists
@@ -728,6 +728,7 @@ INT_CManager_close(CManager cm)
 	    INT_CMfree(shutdown_functions);
 	}
 	CMtrace_out(cm, CMFreeVerbose, "Freeing CManager %p\n", cm);
+	cl->free_reference_count = 1;
 	CMControlList_free(cl);
 	CManager_unlock(cm);
 	CManager_free(cm);
@@ -811,7 +812,7 @@ CMControlList_create()
     new_list->network_polling_function.func = NULL;
     new_list->polling_function_list = NULL;
     new_list->cl_consistency_number = 1;
-    new_list->reference_count = 1;
+    new_list->cl_reference_count = 1;
     new_list->free_reference_count = 1;
     new_list->list_mutex = NULL;
     new_list->list_mutex = thr_mutex_alloc();
@@ -1119,7 +1120,7 @@ static void
 INT_CMControlList_close(CMControlList cl)
 {
     void *status;
-    cl->reference_count--;
+    cl->cl_reference_count--;
     cl->closed = 1;
 
     (cl->stop_select)((void*)&CMstatic_trans_svcs, &cl->select_data);
