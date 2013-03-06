@@ -316,6 +316,7 @@ void *void_conn_sock;
                            (void (*)(void *, void *)) trans->data_available,
                            (void *) trans, (void *) conn);
     }
+    free_attr_list(conn_attr_list);
 }
 
 extern void
