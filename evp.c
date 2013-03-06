@@ -3514,7 +3514,7 @@ INT_EVdestroy_stone(CManager cm, EVstone stone_id)
     while (stone->is_draining != 2);  
     empty_queue(stone->queue);
     free(stone->queue);
-    if (stone->response_cache) free(stone->response_cache);
+    stone->queue = NULL;
     INT_EVfree_stone(cm, stone_id);  
     return 1;      
 } 
