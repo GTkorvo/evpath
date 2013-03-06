@@ -380,7 +380,7 @@ do_regression_master_test()
     int ret;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
-    char *string_list, *transport, *postfix;
+    char *string_list, *transport, *postfix, *free_string;
     int message_counts[3], i;
     EVstone term0, term1, term2;
     struct _client_rec rec0, rec1, rec2;
@@ -455,6 +455,7 @@ do_regression_master_test()
     i = 2;
     if (!quiet) args[i++] = "-v";
     args[i] = malloc(20 + strlen(string_list));
+    free_string = args[i];
     sprintf(args[i++], "%d:%d:%d:%s", term0, term1, term2, string_list);
     subproc_proc = run_subprocess(args);
 
@@ -493,6 +494,7 @@ do_regression_master_test()
     }
 #endif
     free(string_list);
+    free(free_string);
     CManager_close(cm);
     ret = 0;
     if (message_counts[0] != 5) {
