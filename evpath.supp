@@ -93,3 +93,10 @@
 ...
    fun:CMdladdsearchdir
 }
+{
+   non CM handlers are leaked.
+   Memcheck:Leak
+   fun:*
+...
+   fun:INT_CMregister_non_CM_message_handler
+}
