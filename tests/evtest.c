@@ -296,12 +296,21 @@ run_subprocess(char **args)
 #else
     pid_t child;
     if (quiet <=0) {printf("Forking subprocess\n");}
+#ifdef NO_FORK
+    int i = 0;
+    printf("Would have run '%s ");
+    while(args[i]) {
+	printf("%s ", args[i++]);
+    }
+    printf("'\n");
+#else 
     child = fork();
     if (child == 0) {
 	/* I'm the child */
 	execv("./evtest", args);
     }
     return child;
+#endif
 #endif
 }
 
