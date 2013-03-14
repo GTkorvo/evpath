@@ -1464,7 +1464,6 @@ attr_list listen_info;
     ntd->shutdown_listen_thread = 0;
     ntd->listen_thread = 0;
     ntd->use_enet = use_enet;
-    svc->add_periodic_task(cm, 1, 0, nnti_enet_service_network, (void*)trans);
     err = pthread_create(&ntd->listen_thread, NULL, (void*(*)(void*))listen_thread_func, lsp);
 #ifdef ENET_FOUND
     if (use_enet) {
