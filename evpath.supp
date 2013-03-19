@@ -100,3 +100,18 @@
 ...
    fun:INT_CMregister_non_CM_message_handler
 }
+{
+   We leave this dill stream around for efficiency
+   Memcheck:Leak
+...
+   fun:dill_create_stream
+   fun:get_localized_formats
+}
+{
+   We leave this dill stream around for efficiency
+   Memcheck:Leak
+...
+   fun:dill_cross_init
+...
+   fun:generate_localized_subformat
+}

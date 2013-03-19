@@ -202,6 +202,36 @@ storage_queue_dequeue(CManager cm, storage_queue_ptr queue) {
 }
 /* }}} */
 
+static void
+free_response_cache(stone_type stone)
+{
+    int i;
+    for(i = 0; i < stone->response_cache_count; i++) {
+	response_cache_element *resp = &stone->response_cache[i];
+	switch(resp->action_type) {
+	case Action_Decode:
+	    if (resp->o.decode.context) {
+		free_FFSContext(resp->o.decode.context);
+		resp->o.decode.context = NULL;
+	    }
+	    break;
+	case Action_Immediate:
+	    if (resp->o.imm.free_func) {
+		(resp->o.imm.free_func)(resp->o.imm.client_data);
+	    }
+	    break;
+	case Action_Multi:
+	    if (resp->o.multi.free_func) {
+		(resp->o.multi.free_func)(resp->o.multi.client_data);
+	    }
+	    break;
+	default:
+	    break;
+	}
+    }
+    if (stone->response_cache) free(stone->response_cache);
+}
+
 void
 INT_EVfree_stone(CManager cm, EVstone stone_num)
 {
@@ -261,23 +291,8 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	}
     }
     if (stone->proto_actions != NULL) free(stone->proto_actions);
-    for(i = 0; i < stone->response_cache_count; i++) {
-	response_cache_element *resp = &stone->response_cache[i];
-	switch(resp->action_type) {
-	case Action_Decode:
-	    if (resp->o.decode.context) {
-		free_FFSContext(resp->o.decode.context);
-		resp->o.decode.context = NULL;
-	    }
-	    break;
-	case Action_Immediate:
-	    break;
-	default:
-	    break;
-	}
-    }
+    if (stone->response_cache != NULL) free_response_cache(stone);
     free(stone->queue);
-    if (stone->response_cache) free(stone->response_cache);
     /* XXX unsquelch senders */
     stone->queue = NULL;
     stone->local_id = -1;
@@ -310,7 +325,7 @@ clear_response_cache(stone_type stone)
 {
     stone->response_cache_count = 0;
     /* GSE  free response entitites */
-    if (stone->response_cache) free(stone->response_cache);
+    if (stone->response_cache) free_response_cache(stone);
     stone->response_cache = NULL;
 }
 
@@ -1015,7 +1030,7 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
      * don't search again.
      */
     if (stone->response_cache_count == 0) {
-	if (stone->response_cache != NULL) free(stone->response_cache);
+	if (stone->response_cache != NULL) free_response_cache(stone);
 	stone->response_cache = malloc(sizeof(stone->response_cache[0]));
     } else {
 	stone->response_cache = 
@@ -2026,7 +2041,7 @@ INT_EVset_store_limit(CManager cm, EVstone stone_num, EVaction action_num, int n
 extern EVaction
 INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
 			       EVImmediateHandlerFunc func, void *client_data, 
-			       FMFormat reference_format)
+			       FMFormat reference_format, int_free_func free_func)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
@@ -2043,6 +2058,7 @@ INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone_id, EVaction act_num,
     resp->proto_action_id = act_num;
     resp->o.imm.handler = func;
     resp->o.imm.client_data = client_data;
+    resp->o.imm.free_func = free_func;
     resp->reference_format = reference_format;
     resp->stage = cached_stage_for_action(&stone->proto_actions[act_num]);
     stone->response_cache_count++;
@@ -2087,7 +2103,7 @@ INT_EVassoc_anon_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
 extern EVaction
 INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
 				  EVMultiHandlerFunc func, void *client_data, 
-				  FMFormat *reference_formats)
+				 FMFormat *reference_formats, int_free_func free_func)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
@@ -2112,6 +2128,7 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
 	resp->proto_action_id = act_num;
 	resp->o.multi.handler = func;
 	resp->o.multi.client_data = client_data;
+	resp->o.multi.free_func = free_func;
         resp->stage = cached_stage_for_action(&stone->proto_actions[act_num]);
 	resp->reference_format = reference_formats[i];
 	if (CMtrace_on(cm, EVerbose)) {

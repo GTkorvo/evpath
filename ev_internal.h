@@ -66,14 +66,18 @@ typedef struct decode_action_struct {
     FFSContext context;
 } decode_action_vals;
 
+typedef void (*int_free_func)(void *client_data);
+
 typedef struct immediate_cache_vals {
     EVImmediateHandlerFunc handler;
     void *client_data;
+    int_free_func free_func;
 } immediate_cache_vals;
 
 typedef struct multi_cache_vals {
     EVMultiHandlerFunc handler;
     void *client_data;
+    int_free_func free_func;
 } multi_cache_vals;
 
 typedef struct immediate_action_struct {
@@ -289,8 +293,8 @@ extern EVstone INT_EVcreate_auto_stone(CManager cm, int period_sec,
 extern EVstone INT_EVcreate_store_action(CManager cm, EVstone out_tsone, int store_limit);
 extern EVaction
 INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
-				  EVMultiHandlerFunc func, void *client_data, 
-				  FMFormat *reference_formats);
+				 EVMultiHandlerFunc func, void *client_data, 
+				 FMFormat *reference_formats, int_free_func free_func);
 extern EVaction
 INT_EVassoc_congestion_action(CManager cm, EVstone stone_num, 
 			      char *action_spec, void *client_data);
@@ -312,7 +316,7 @@ internal_write_event(CMConnection conn, CMFormat format,
 extern EVaction
 INT_EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
 			       EVImmediateHandlerFunc func, void *client_data,
-			       FMFormat reference_format);
+			       FMFormat reference_format, int_free_func free_func);
 extern void
 INT_EVassoc_conversion_action(CManager cm, int stone_id, int stage, FMFormat target_format,
 			      FMFormat incoming_format);

@@ -2215,19 +2215,6 @@ typedef int (*EVImmediateHandlerFunc) ARGS((CManager cm,
 					    int out_count,
 					    int *out_stones));
 /*!
- * Associate a specific (mutated) immediate handler funcion.
- *
- * This function is used by the EVPath internal "response" interface.  At
- * some point, the response interface will likely become external so that
- * EVPath's response to unknown data can be customized.  However, at the
- * moment this is an internal interface.
- */
-extern EVaction
-EVassoc_mutated_imm_action(CManager cm, EVstone stone, EVaction act_num,
-			   EVImmediateHandlerFunc func, void *client_data,
-			   FMFormat reference_format);
-
-/*!
  * Associate a conversion action.
  *
  * This function is used by the EVPath internal "response" interface.  At

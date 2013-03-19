@@ -1040,13 +1040,30 @@ static response_instance
 generate_multityped_code(CManager cm, struct response_spec *mrd, stone_type stone,
 			  FMFormat *formats);
 
+extern
+void
+free_struct_list(list)
+FMStructDescList list;
+{
+    int format_count = 0;
+    int format;
+
+    while(list[format_count].format_name != NULL) format_count++;
+
+    for (format = 0; format < format_count; format++) {
+	free(list[format].format_name);
+	free_field_list(list[format].field_list);
+    }
+    free(list);
+}
+
 static FMFormat
 localize_format(CManager cm, FMFormat format)
 {
     FMFormat ret;
     FMStructDescList local_formats = get_localized_formats(format);
     ret = EVregister_format_set(cm, local_formats);
-    free(local_formats);
+    free_struct_list(local_formats);
     return ret;
 }
 
@@ -1104,6 +1121,23 @@ proto_action_in_stage(proto_action *act, action_class stage) {
 extern int
 FMformat_compat_cmp2(FMFormat format, FMFormat *formatList,
 		     int listSize, FMcompat_formats * older_format);
+
+static void
+free_multi_response(void *client_data)
+{}
+
+static void
+free_imm_response(void *client_data)
+{
+    response_instance resp = (response_instance) client_data;
+    switch (resp->response_type) {
+    case Response_Filter:
+	printf("Freeing filter response\n");
+	if (resp->u.filter.code) cod_code_free(resp->u.filter.code);
+	if (resp->u.filter.ec) cod_exec_context_free(resp->u.filter.ec);
+	break;
+    }
+}
 
 int
 response_determination(CManager cm, stone_type stone, action_class stage, event_item *event)
@@ -1213,17 +1247,17 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    case Response_Filter:
 		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action,
 					       filter_wrapper, instance,
-					       conversion_target_format);
+					       conversion_target_format, free_imm_response);
 		break;
 	    case Response_Router:
 		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action,
 					       router_wrapper, instance,
-					       conversion_target_format);
+					       conversion_target_format, free_imm_response);
 		break;
 	    case Response_Transform:
 		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action,
 					       transform_wrapper, instance,
-					       conversion_target_format);
+					       conversion_target_format, free_imm_response);
 		break;
             default:
 		assert(FALSE);
@@ -1245,8 +1279,8 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    instance->proto_action_id = nearest_proto_action;
 	    action_generated++;
 	    INT_EVassoc_mutated_multi_action(cm, stone->local_id, nearest_proto_action,
-					      queued_wrapper, instance,
-					      proto->matching_reference_formats);
+					     queued_wrapper, instance,
+					     proto->matching_reference_formats, free_multi_response);
 	    if (mrd->u.multityped.accept_anonymous && (conversion_target_format == NULL)) {
 		/* we're accepting this as an anonymous target */
 		INT_EVassoc_anon_multi_action(cm, stone->local_id, nearest_proto_action, queued_wrapper, instance,
