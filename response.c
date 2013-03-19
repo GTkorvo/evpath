@@ -624,6 +624,7 @@ transform_free_wrapper(void *data, void *free_data)
     response_instance instance = (response_instance)free_data;
     FMfree_var_rec_elements(instance->u.transform.out_format,
 			    data);
+    free(data);
 }
 
 static int
@@ -1132,9 +1133,13 @@ free_imm_response(void *client_data)
     response_instance resp = (response_instance) client_data;
     switch (resp->response_type) {
     case Response_Filter:
-	printf("Freeing filter response\n");
+    case Response_Router:
 	if (resp->u.filter.code) cod_code_free(resp->u.filter.code);
 	if (resp->u.filter.ec) cod_exec_context_free(resp->u.filter.ec);
+	break;
+    case Response_Transform:
+	if (resp->u.transform.code) cod_code_free(resp->u.transform.code);
+	if (resp->u.transform.ec) cod_exec_context_free(resp->u.transform.ec);
 	break;
     }
 }
@@ -1334,7 +1339,23 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 }
 
 void
-response_data_free(){}
+response_data_free(CManager cm, void *resp_void)
+{
+    struct response_spec *resp = (struct response_spec*)resp_void;
+    switch(resp->response_type) {
+    case Response_Filter:
+    case Response_Router:
+	free_struct_list(resp->u.filter.format_list);
+        free(resp->u.filter.function);
+	break;
+    case Response_Transform:
+	free_struct_list(resp->u.transform.in_format_list);
+	free_struct_list(resp->u.transform.out_format_list);
+        free(resp->u.transform.function);
+	break;
+    }
+    free(resp);
+}
 
 #ifdef NOT_DEF
 static void
@@ -1765,14 +1786,18 @@ extract_dll_path(char *filter)
 
     temp = strtok(copy, ":");
     if (strcmp(temp, "dll")) {
-    return NULL;
+	free(copy);
+	return NULL;
     }
     temp = strtok(NULL, ":");
 
-    if (temp == NULL)
-    return NULL;
+    if (temp == NULL) {
+	free(copy);
+	return NULL;
+    }
 
     path = strdup(temp);
+    free(copy);
 
     return path;
 }
@@ -1787,15 +1812,19 @@ extract_symbol_name(char *filter)
 
     temp = strtok(copy, ":");
     if (strcmp(temp, "dll")) {
-    return NULL;
+	free(copy);
+	return NULL;
     }
     temp = strtok(NULL, ":");
     temp = strtok(NULL, ":");
 
-    if (temp == NULL)
-    return NULL;
+    if (temp == NULL) {
+	free(copy);
+	return NULL;
+    }
 
     symbol = strdup(temp);
+    free(copy);
 
     return symbol;
 }
@@ -1903,8 +1932,12 @@ generate_filter_code(CManager cm, struct response_spec *mrd, stone_type stone,
 		fprintf(stderr, "Failed to load symbol \"%s\" from file \"%s\"\n",
 			symbol_name, path);
 		free(instance);
+		free(path);
+		free(symbol_name);
 		return NULL;
 	    }
+	    free(symbol_name);
+	    free(path);
 	    instance->u.filter.code = NULL;
 	} else {
 	    code = cod_code_gen(mrd->u.filter.function, parse_context);
@@ -1935,9 +1968,13 @@ generate_filter_code(CManager cm, struct response_spec *mrd, stone_type stone,
 		fprintf(stderr, "Failed to load symbol \"%s\" from file \"%s\"\n",
 			symbol_name, path);
 		free(instance);
+		free(path);
+		free(symbol_name);
 		return NULL;
 	    }
 	    instance->u.transform.code = NULL;
+	    free(path);
+	    free(symbol_name);
 	} else {
 	    code = cod_code_gen(mrd->u.transform.function, parse_context);
 	    instance->response_type = Response_Transform;

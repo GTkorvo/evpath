@@ -432,6 +432,8 @@ do_regression_master_test(int do_dll)
     /* give him time to start */
     CMsleep(cm, 10);
 /* stuff */
+    free(args[2]);
+    free(filter);
     if (quiet <= 0) {
 	printf("Waiting for remote....\n");
     }

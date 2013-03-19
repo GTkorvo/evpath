@@ -467,7 +467,6 @@ do_regression_master_test(int do_dll)
     args[2] = malloc(10 + strlen(string_list) + strlen(filter));
     sprintf(args[2], "%d:%s", fstone, string_list);
     subproc_proc = run_subprocess(args);
-
     /* give him time to start */
     CMsleep(cm, 10);
 /* stuff */
@@ -503,6 +502,8 @@ do_regression_master_test(int do_dll)
     }
 #endif
     free(string_list);
+    free(args[2]);
+    free(filter);
     CManager_close(cm);
     if (message_count != repeat_count) printf("Message count == %d\n", message_count);
     return !(message_count == repeat_count);

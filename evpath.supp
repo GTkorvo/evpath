@@ -51,6 +51,12 @@
    fun:yyensure_buffer_stack
 }
 {
+   This seems to be a Lex/Flex issue.  Possible non-reentrant.
+   Memcheck:Leak
+   fun:*
+   fun:yyensure_buffer_stack
+}
+{
    Anything under dlopen isn't our fault.
    Memcheck:Leak
    fun:*
