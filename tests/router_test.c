@@ -493,6 +493,7 @@ do_regression_master_test()
 	       WTERMSIG(exit_state));
     }
 #endif
+    free(args[2]);
     free(string_list);
     CManager_close(cm);
     if (message_counts[0] != 5) {
