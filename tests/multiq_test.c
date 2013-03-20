@@ -304,32 +304,38 @@ main(int argc, char **argv)
 	map = malloc(count);
 	memset(map, 0, count);
 	/* setup map so that it is half ones and half zeroes */
+	srand48(time(NULL));
 	for (i=0; i < count / 2 ; i++) {
-	    int j;
-	    int step = lrand48() % (count - i);
-	    int mark = 0;
-	    for (j = 0; j < step; j++) {
-		mark++;
-		while (map[mark] == 1) mark++;
+	    int try = lrand48() % count;
+	    if (map[try] == 0) {
+		map[try] = 1;
+	    } else {
+		i--;  /* try again */
 	    }
-	    map[mark] = 1;
 	}
+#ifdef NOT_DEF
+	printf("Map : ");
 	for (i=0; i < count ; i++) {
+	    printf("%1d", map[i]);
 	    if (map[i] == 1) {
 		a_count++;
 	    } else {
 		b_count++;
 	    }
 	}
+	printf("\n");
+#endif
 	if (a_count != b_count) printf("MAP FUNCTION FAILED TO GENERATE EQUAL MAP\n");
 	for (i=0; i < count ; i++) {
 	    if (map[i] == 1) {
 		rec_a_ptr a = malloc(sizeof(*a));
+		memset(a, 0, sizeof(*a));
 		generate_a_record(a);
 		if (quiet <=0) {printf("submitting a -> %d\n", a->a_field);}
 		EVsubmit(a_handle, a, attrs);
 	    } else {
 		rec_b_ptr b = malloc(sizeof(*b));
+		memset(b, 0, sizeof(*b));
 		generate_b_record(b);
 		if (quiet <=0) {printf("submitting b -> %d\n", b->b_field);}
 		EVsubmit(b_handle, b, attrs);
@@ -368,6 +374,11 @@ run_subprocess(char **args)
     }
     return child;
 #else
+#ifdef NOT_DEF
+    printf("Would have run with : %s %s\n", args[1], args[2]);
+    sleep(10);
+    return 0;
+#else
     pid_t child;
     if (quiet <=0) {printf("Forking subprocess\n");}
     child = fork();
@@ -376,6 +387,7 @@ run_subprocess(char **args)
 	execv("./multiq_test", args);
     }
     return child;
+#endif
 #endif
 }
 
@@ -498,6 +510,7 @@ do_regression_master_test()
     free(string_list);
     CManager_close(cm);
     if (message_count != repeat_count / 2) printf("Message count == %d\n", message_count);
+    if (a_map == NULL) return !(message_count == repeat_count / 2);
     for (i=0; i < repeat_count / 2 ; i++) {
 	if (a_map[i] != 1) printf("A_map[%d] = %d\n", i, a_map[i]);
 	if (b_map[i] != 1) printf("B_map[%d] = %d\n", i, b_map[i]);
