@@ -583,6 +583,8 @@ do_regression_master_test()
     }
 #endif
     free(string_list);
+    free(args[count]);
+    free(filter);
     CManager_close(cm);
     if (message_count != repeat_count) printf("Message count == %d\n", message_count);
     return !(message_count == repeat_count);

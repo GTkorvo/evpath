@@ -495,6 +495,7 @@ do_regression_master_test()
 #endif
     free(args[2]);
     free(string_list);
+    free(filter);
     CManager_close(cm);
     if (message_counts[0] != 5) {
 	printf("Message count[0] == %d\n", message_counts[0]);
