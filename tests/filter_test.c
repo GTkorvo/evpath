@@ -279,6 +279,7 @@ main(int argc, char **argv)
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
 	    EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
+	    free_attr_list(contact_list);
 	}
 	attrs = create_attr_list();
 	CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");
@@ -286,6 +287,7 @@ main(int argc, char **argv)
 	source_handle = EVcreate_submit_handle(cm, stone, simple_format_list);
 	count = repeat_count;
 	while (count != 0) {
+	    memset(&data, 0, sizeof(data));
 	    generate_record(&data);
 	    if (quiet <=0) {printf("submitting %ld\n", data.long_field);}
 	    EVsubmit(source_handle, &data, attrs);
@@ -294,6 +296,7 @@ main(int argc, char **argv)
 	    }
 	}
 	CMsleep(cm, 1);
+	EVfree_source(source_handle);
 	free_attr_list(attrs);
     }
     CManager_close(cm);
@@ -336,7 +339,7 @@ run_subprocess(char **args)
     }
     return child;
 #else
-    printf("nothing doing  %s %s\n", args[1], args[2]);
+    printf("would have run with:  %s %s\n", args[1], args[2]);
     sleep(20);
 #endif
 #endif
