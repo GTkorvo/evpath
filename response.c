@@ -1142,6 +1142,7 @@ free_imm_response(void *client_data)
 	if (resp->u.transform.ec) cod_exec_context_free(resp->u.transform.ec);
 	break;
     }
+    free(resp);
 }
 
 int
