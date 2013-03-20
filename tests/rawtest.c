@@ -143,11 +143,12 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     return 0;
 }
 
+static FFSContext c = NULL;
+
 static int
 raw_handler(CManager cm, void *vevent, int len, void *client_data,
 	    attr_list attrs)
 {
-    static FFSContext c = NULL;
     FFSTypeHandle f;
     simple_rec incoming;
     (void)len;
@@ -235,7 +236,9 @@ main(int argc, char **argv)
 	EVsubmit(source_handle, &data, attrs);
 	CMsleep(cm, 1);
 	free_attr_list(attrs);
+	EVfree_source(source_handle);
     }
+    if (c) free_FFSContext(c);
     CManager_close(cm);
     return 0;
 }
@@ -327,6 +330,7 @@ do_regression_master_test()
     if (quiet <= 0) printf("submitting %d\n", data.integer_field);
     EVsubmit(source_handle, &data, NULL);
     CMsleep(cm, 1);
+    EVfree_source(source_handle);
 
     args[2] = string_list;
     args[2] = malloc(10 + strlen(string_list));
@@ -368,8 +372,10 @@ do_regression_master_test()
     }
 #endif
     free(string_list);
+    free(args[2]);
     EVfree_stone(cm, handle);
     CManager_close(cm);
+    if (c) free_FFSContext(c);
     if (message_count != 2) printf("Message count == %d\n", message_count);
     return !(message_count == 2);
 }
