@@ -1248,6 +1248,7 @@ cached_stage_for_action(proto_action *act) {
     case Action_Thread_Bridge:
         return Immediate;
     default:
+	printf("Action_type in cached_stage_for_action is %d\n", act->action_type);
         assert(0);    
     }
     /*NOTREACHED*/
