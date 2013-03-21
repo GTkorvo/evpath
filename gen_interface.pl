@@ -108,6 +108,7 @@ sub gen_stub {
     print REVP "    EV_${retsubtype}_response response;\n" unless ($return_type{$subr} eq "void");
     print REVP "    ${subr}_request request;\n";
     print REVP "    memset(&request, 0, sizeof(request));\n";
+    $free_list = "";
     foreach $arg (split (", ", $args[1])) {
 	$_ = $arg;
 	if (/^\s*(.*\W+)(\w+)$\s*/) {
@@ -118,7 +119,7 @@ sub gen_stub {
 	    $argtype =~ s/(?!\W)\s+(?=\w)//;  #remove unnecessary white space
 	    $argright = $argname;
 	  switch:for ($argtype) {
-	      /attr_list/ && do {$argright = "attr_list_to_string($argname)"; last;};
+	      /attr_list/ && do {$argright = "attr_list_to_string($argname)"; $free_list .= "    free(request.$argname);\n"; last;};
 	      /FMStructDescList/ && do {$argright = "get_format_name(conn->cm, $argname)"; last;};
 	  }
 	}
@@ -134,6 +135,9 @@ sub gen_stub {
 	print REVP "    CMCondition_set_client_data(conn->cm, cond, &response);\n";
     }
     print REVP "    CMwrite(conn, f, &request);\n";
+    if ("$free_list" ne "") {
+	print REVP "$free_list";
+    }
     print REVP "    CMCondition_wait(conn->cm, cond);\n";
   switch:for ($return_type{$subr}) {
       /attr_list/ && do {print REVP "    return attr_list_from_string(response.ret);\n"; last;};
