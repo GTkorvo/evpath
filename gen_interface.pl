@@ -231,6 +231,9 @@ sub gen_handler {
   }
     print REVP "    response.condition_var = request->condition_var;\n";
     print REVP "    CMwrite(conn, f, &response);\n";
+  switch:for ($return_type{$subr}) {
+      /attr_list/ && do {print REVP "    free(response.ret);\n"; last;};
+  }
     print REVP "}\n";
 }
 
@@ -711,7 +714,6 @@ static void
 REV_response_handler(CManager cm, CMConnection conn, void *data,void *client_data,attr_list attrs)
 {
     EV_void_response *response = (EV_void_response*) data;
-    CMtake_buffer(cm, data);
     void **response_ptr = CMCondition_get_client_data(cm, response->condition_var);
     if (NULL != response_ptr) {
 	*response_ptr = data;
@@ -723,7 +725,6 @@ static void
 REV_int_response_handler(CManager cm, CMConnection conn, void *data,void *client_data,attr_list attrs)
 {
     EV_void_response *response = (EV_void_response*) data;
-    CMtake_buffer(cm, data);
     void **response_ptr = CMCondition_get_client_data(cm, response->condition_var);
     if (NULL != response_ptr) {
 	memcpy(response_ptr, data, sizeof(EV_int_response));
@@ -735,7 +736,6 @@ static void
 REV_string_response_handler(CManager cm, CMConnection conn, void *data,void *client_data,attr_list attrs)
 {
     EV_string_response *response = (EV_string_response*) data;
-    CMtake_buffer(cm, data);
     EV_string_response *stub_ptr = CMCondition_get_client_data(cm, response->condition_var);
     if (NULL != stub_ptr) {
 	memcpy(stub_ptr, data, sizeof(EV_string_response));
