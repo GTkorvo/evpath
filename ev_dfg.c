@@ -741,6 +741,28 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
     CManager_unlock(cm);
 }
 
+static void
+free_dfg(CManager cm, void *vdfg)
+{
+    EVdfg dfg = vdfg;
+    int i;
+    for (i=0; i < dfg->node_count; i++) {
+	free(dfg->nodes[i].name);
+	free(dfg->nodes[i].canonical_name);
+	if (dfg->nodes[i].str_contact_list) free(dfg->nodes[i].str_contact_list);
+	if (dfg->nodes[i].contact_list) free_attr_list(dfg->nodes[i].contact_list);
+    }
+    free(dfg->nodes);
+    for (i=0; i < dfg->stone_count; i++) {
+	if (dfg->stones[i]->out_links) free(dfg->stones[i]->out_links);
+	if (dfg->stones[i]->action) free(dfg->stones[i]->action);
+	free(dfg->stones[i]);
+    }
+    if (dfg->master_contact_str) free(dfg->master_contact_str);
+    free(dfg->stones);
+    free(dfg);
+}
+
 extern EVdfg
 INT_EVdfg_create(CManager cm)
 {
@@ -776,6 +798,7 @@ INT_EVdfg_create(CManager cm)
 			   dfg_shutdown_handler, dfg);
     INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_conn_shutdown_format_list),
 			   dfg_conn_shutdown_handler, dfg);
+    INT_CMadd_shutdown_task(cm, free_dfg, dfg, FREE_TASK);
     return dfg;
 }
 
@@ -790,6 +813,7 @@ extern char *INT_EVdfg_get_contact_list(EVdfg dfg)
     add_string_attr(listen_list, CM_TRANSPORT, strdup("enet"));
     contact_list = INT_CMget_specific_contact_list(cm, listen_list);
 
+    free_attr_list(listen_list);
     if (contact_list == NULL) {
 	contact_list = INT_CMget_contact_list(cm);
 	if (contact_list == NULL) {
@@ -798,6 +822,7 @@ extern char *INT_EVdfg_get_contact_list(EVdfg dfg)
 	}
     }
     dfg->master_command_contact_str = attr_list_to_string(contact_list);
+    free_attr_list(contact_list);
     return dfg->master_command_contact_str;
 }
 
@@ -1015,6 +1040,7 @@ INT_EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
     CManager cm = dfg->cm;
     event_path_data evp = cm->evp;
     attr_list master_attrs = attr_list_from_string(master_contact);
+    if (dfg->master_contact_str) free(dfg->master_contact_str);
     dfg->master_contact_str = strdup(master_contact);
     dfg->ready_condition = INT_CMCondition_get(cm, NULL);
     INT_CMCondition_set_client_data(cm, dfg->ready_condition, NULL);
@@ -1061,6 +1087,7 @@ INT_EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	dfg->master_connection = conn;
 	CMtrace_out(cm, EVdfgVerbose, "DFG %p node name %s\n", dfg, node_name);
     }
+    free_attr_list(master_attrs);
 }
 
 static EVdfg_stone
