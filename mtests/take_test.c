@@ -160,6 +160,7 @@ check_queue(CManager cm)
 	    bad++;
 	}
 	CMreturn_buffer(cm, queue[i]);
+	queue[i] = NULL;
     }
     if (!bad && (quiet <= -1)) {
 	printf("Records pass consistency check\n");
@@ -208,6 +209,7 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
 	    check_queue(cm);
 	}
 	for (i=0 ; i<QUEUE_SIZE; i++) {
+	    if (queue[i] != NULL )  CMreturn_buffer(cm, queue[i]);
 	    queue[i] = NULL;
 	    check_value[i] = -1;
 	}
@@ -229,6 +231,7 @@ main(int argc, char **argv)
     CMConnection conn = NULL;
     CMFormat format;
     int regression_master = 1;
+    int i;
 
     argv0 = argv[0];
     while (argv[1] && (argv[1][0] == '-')) {
@@ -328,6 +331,10 @@ main(int argc, char **argv)
 	}
 	free_attr_list(attrs);
     }
+    for (i=0 ; i<QUEUE_SIZE; i++) {
+        if (queue[i] != NULL )  CMreturn_buffer(cm, queue[i]);
+        queue[i] = NULL;
+    }
     CManager_close(cm);
     return 0;
 }
@@ -392,6 +399,7 @@ do_regression_master_test()
     int done = 0;
     char *transport = NULL;
     attr_list listen_list = NULL;
+    int i;
 
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
@@ -487,6 +495,10 @@ do_regression_master_test()
 	}
     }
     free(string_list);
+    for (i=0 ; i<QUEUE_SIZE; i++) {
+        if (queue[i] != NULL )  CMreturn_buffer(cm, queue[i]);
+        queue[i] = NULL;
+    }
     CManager_close(cm);
     if (message_count != expected_count) {
 	printf ("failure, received %d messages instead of %d\n",

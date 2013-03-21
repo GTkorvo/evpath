@@ -243,6 +243,7 @@ main(int argc, char **argv)
 	format = CMregister_format(cm, simple_format_list);
 	CMregister_handler(format, simple_handler, NULL);
 	CMsleep(cm, 120);
+	if (listen_list) free_attr_list(listen_list);
     } else {
 	simple_rec data;
 	attr_list attrs;
@@ -411,6 +412,7 @@ do_regression_master_test()
     }
 #endif
     free(string_list);
+    if (listen_list) free_attr_list(listen_list);
     CManager_close(cm);
     return !(message_count == 1);
 }
