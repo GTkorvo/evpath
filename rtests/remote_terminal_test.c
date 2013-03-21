@@ -164,7 +164,9 @@ handshake_with_parent(CManager cm, attr_list parent_contact_list)
     CMConnection conn = CMinitiate_conn(cm, parent_contact_list);
     alive_msg_t alive;
     CMFormat alive_format;
-    alive.contact = attr_list_to_string(CMget_contact_list(cm));
+    attr_list tmp_list;
+    alive.contact = attr_list_to_string(tmp_list = CMget_contact_list(cm));
+    free_attr_list(tmp_list);
     alive_format = CMregister_format(cm, alive_formats);
     CMwrite(conn, alive_format, &alive);
 }
@@ -267,6 +269,7 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
     EVstone stone, output_stone;
     EVaction action;
     EVstone local_stone;
+    attr_list tmp_list;
     
     char *action_spec = create_transform_action_spec(NULL, simple_format_list, ECL_generate);
     (void) alive_v; (void) client_data; (void) attrs;
@@ -277,7 +280,9 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
     local_stone = EValloc_stone(cm);
     EVassoc_terminal_action(cm, local_stone, simple_format_list, simple_handler, &message_count);
     
-    REVassoc_bridge_action(conn, output_stone, CMget_contact_list(cm), local_stone);
+    REVassoc_bridge_action(conn, output_stone, tmp_list = CMget_contact_list(cm), local_stone);
+    free_attr_list(tmp_list);
+    free(action_spec);
     REVenable_auto_stone(conn, stone, 1, 0);
 }
 
@@ -391,6 +396,7 @@ do_regression_master_test()
 #endif
     }
     free(string_list);
+    free(args[2]);
     CManager_close(cm);
     if (message_count != 1) printf("Message count == %d\n", message_count);
     return !(message_count == 1);

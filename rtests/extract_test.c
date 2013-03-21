@@ -171,8 +171,10 @@ handshake_with_parent(CManager cm, attr_list parent_contact_list)
 {
     CMConnection conn = CMinitiate_conn(cm, parent_contact_list);
     alive_msg_t alive;
+    attr_list tmp_list;
     CMFormat alive_format;
-    alive.contact = attr_list_to_string(CMget_contact_list(cm));
+    alive.contact = attr_list_to_string(tmp_list = CMget_contact_list(cm));
+    free_attr_list(tmp_list);
     alive_format = CMregister_format(cm, alive_formats);
     CMwrite(conn, alive_format, &alive);
 }
@@ -300,6 +302,7 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
     char *filter, *gen_spec;
     struct _client_rec rec0, rec1, rec2;
     int count;
+    attr_list self_list;
 
     message_counts[0] = message_counts[1] = message_counts[2] = 0;
     filter = create_router_action_spec(filter_format_list, router_func);
@@ -328,11 +331,13 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
 /* done with local stones */
 	
 	bridge0 = REValloc_stone(conn);
-	REVassoc_bridge_action(conn, bridge0, CMget_contact_list(cm), term0);
+	self_list = CMget_contact_list(cm);
+	REVassoc_bridge_action(conn, bridge0, self_list, term0);
 	bridge1 = REValloc_stone(conn);
-	REVassoc_bridge_action(conn, bridge1, CMget_contact_list(cm), term1);
+	REVassoc_bridge_action(conn, bridge1, self_list, term1);
 	bridge2 = REValloc_stone(conn);
-	REVassoc_bridge_action(conn, bridge2, CMget_contact_list(cm), term2);
+	REVassoc_bridge_action(conn, bridge2, self_list, term2);
+	free_attr_list(self_list);
 	REVfreeze_stone(conn, bridge1);
 	router_stone = REValloc_stone (conn);
 	faction = REVassoc_immediate_action (conn, router_stone, filter);
@@ -342,6 +347,8 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
 
 	source_stone = REValloc_stone (conn);
 	action = REVassoc_immediate_action (conn, source_stone, gen_spec);
+	free(gen_spec);
+	free(filter);
 	REVaction_set_output(conn, source_stone, action, 0, router_stone);
 
 	REVenable_auto_stone(conn, source_stone, 0, 50000);
@@ -465,6 +472,7 @@ do_regression_master_test()
 #endif
     }
     free(string_list);
+    free(args[2]);
     CManager_close(cm);
     ret = 0;
     if (message_counts[0] != 5) {
