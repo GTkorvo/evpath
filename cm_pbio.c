@@ -732,6 +732,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
 	    }
 #endif
 	}
+	free(format_ID);
 	break;
     }
     default: 
