@@ -274,6 +274,7 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
     (void)alive_v; (void)client_data; (void) attrs;
     stone = REValloc_stone (conn);
     action = REVassoc_immediate_action (conn, stone, action_spec);
+    free(action_spec);
     output_stone = REValloc_stone (conn);
     REVaction_set_output(conn, stone, action, 0, output_stone);
     local_stone = EValloc_stone(cm);
@@ -393,6 +394,7 @@ do_regression_master_test()
 #endif
     }
     free(string_list);
+    free(args[2]);
     CManager_close(cm);
     if (message_count != 1) printf("Message count == %d\n", message_count);
     return !(message_count == 1);
