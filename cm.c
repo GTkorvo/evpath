@@ -2097,7 +2097,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	printf("CM - record contents are:\n  ");
+	printf("CM - record type %s, contents are:\n  ", name_of_FMformat(FMFormat_of_original(cm_format->format)));
 	r = FMdump_data(FMFormat_of_original(cm_format->format), decode_buffer, dump_char_limit);
 	if (r && !warned) {
 	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
@@ -2572,7 +2572,7 @@ INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data,
 	    printf("CM - write attributes are:");
 	    dump_attr_list(attrs);
 	}
-	printf("CM - record contents are:\n  ");
+	printf("CM - record type %s, contents are:\n  ", name_of_FMformat(format->fmformat));
 	r = FMdump_data(format->fmformat, data, dump_char_limit);
 	if (r && !warned) {
 	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
@@ -2698,7 +2698,7 @@ internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
 	} else {
 	    printf("CM - write attrs NULL\n");
 	}
-	printf("CM - record contents ");
+	printf("CM - record type %s, contents ", name_of_FMformat(format->fmformat));
 	if (event->decoded_event) {
 	    printf("DECODED are:\n  ");
 	    r = FMdump_data(format->fmformat, event->decoded_event,

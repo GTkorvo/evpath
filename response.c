@@ -1167,11 +1167,13 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
         }
 	while (stone->proto_actions[i].matching_reference_formats &&
 	       (stone->proto_actions[i].matching_reference_formats[j] != NULL)) {
-	    formatList = (FMFormat *) realloc(formatList, (format_count + 2) * sizeof(FMFormat));
-	    format_map = realloc(format_map, (format_count + 2) * sizeof(int));
-	    formatList[format_count] = stone->proto_actions[i].matching_reference_formats[j];
-	    format_map[format_count] = i;
-	    format_count++;
+	    if (strcmp(name_of_FMformat(event->reference_format), name_of_FMformat(stone->proto_actions[i].matching_reference_formats[j])) == 0 ) {
+		formatList = (FMFormat *) realloc(formatList, (format_count + 2) * sizeof(FMFormat));
+		format_map = realloc(format_map, (format_count + 2) * sizeof(int));
+		formatList[format_count] = stone->proto_actions[i].matching_reference_formats[j];
+		format_map[format_count] = i;
+		format_count++;
+	    }
 	    j++;
 	}
     }
@@ -1199,8 +1201,8 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
         /* special case for accepting anything */
         for (i=0; i < stone->proto_action_count; i++) {
             if (!proto_action_in_stage(&stone->proto_actions[i], stage)) continue;
-            if (stone->proto_actions[i].matching_reference_formats
-                && stone->proto_actions[i].matching_reference_formats[0] == NULL
+            if (((stone->proto_actions[i].matching_reference_formats == NULL) ||
+		 (stone->proto_actions[i].matching_reference_formats[0] == NULL))
                 && stone->proto_actions[i].data_state != Requires_Decoded) {
                 nearest_proto_action = i;
             }
@@ -1299,7 +1301,10 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	} else {
 	    response_cache_element *resp;
 
-	    conversion_target_format = proto->matching_reference_formats[0];
+	    conversion_target_format = NULL;
+	    if (proto->matching_reference_formats)
+		conversion_target_format = proto->matching_reference_formats[0];
+
 	    /* we'll install the conversion later, first map the response */
 	    if (stone->response_cache_count == 0) {
 		if (stone->response_cache != NULL) free(stone->response_cache);
@@ -1311,7 +1316,11 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    }
 	    resp = &stone->response_cache[stone->response_cache_count++];
 	    proto_action *proto2 = &stone->proto_actions[nearest_proto_action];
-	    resp->reference_format = conversion_target_format;
+	    if (conversion_target_format) {
+		resp->reference_format = conversion_target_format;
+	    } else {
+		resp->reference_format = event->reference_format;
+	    }
 	    resp->proto_action_id = nearest_proto_action;
 	    resp->action_type = proto2->action_type;
 	    resp->requires_decoded = (proto2->data_state == Requires_Decoded);

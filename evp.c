@@ -3088,7 +3088,7 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	printf("CM - record contents are:\n  ");
+	printf("CM - record type %s, contents are:\n  ", name_of_FMformat(event->reference_format));
 	r = FMdump_encoded_data(event->reference_format,
 				event->encoded_event, dump_char_limit);
 	if (r && !warned) {
