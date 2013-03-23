@@ -504,3 +504,4 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
                 long vec_count, long byte_count, attr_list attrs, int nowp, int data_vec_stack);
 extern void
 INT_CMConnection_dereference(CMConnection conn);
+extern FMContext INT_CMget_FMcontext(CManager cm);

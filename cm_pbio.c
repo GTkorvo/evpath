@@ -461,6 +461,11 @@ CMpbio_send_format_preload(FMFormat ioformat, CMConnection conn)
 
 int CMself_hosted_formats = -1;
 
+extern FMContext INT_CMget_FMcontext(CManager cm)
+{
+    return FMContext_from_FFS(cm->FFScontext);
+}
+
 extern void
 CMinit_local_formats(CManager cm)
 {

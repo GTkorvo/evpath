@@ -420,6 +420,16 @@ CMregister_simple_format ARGS((CManager cm, char *format_name, FMFieldList field
 extern CMFormat CMlookup_format ARGS((CManager cm, FMStructDescList format_list));
 
 /*!
+ * return the FMContext value used by a CM.
+ *
+ * \param cm The CManager from which to return the FMcontext;
+ *
+ * CMget_FMcontext() returns the FMcontext value in use by the CManager
+ */
+/*NOLOCK*/
+extern FMContext CMget_FMcontext(CManager cm);
+
+/*!
  * send a message on a connection.
  *
  * \param conn The CMConnection upon which to send the message.
