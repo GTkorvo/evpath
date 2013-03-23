@@ -131,13 +131,13 @@ static FMStructDescRec simple_format_list[] =
 
 static FMStructDescRec filter_format_list[] =
 {
-    {"filter", filter_field_list, sizeof(int), NULL},
+    {"simple", filter_field_list, sizeof(int), NULL},
     {NULL, NULL}
 };
 
 static FMStructDescRec bigger_format_list[] =
 {
-    {"bigger", bigger_field_list, sizeof(bigger_rec), NULL},
+    {"simple", bigger_field_list, sizeof(bigger_rec), NULL},
     {"complex", complex_field_list, sizeof(complex), NULL},
     {"nested", nested_field_list, sizeof(nested), NULL},
     {NULL, NULL}
