@@ -92,7 +92,7 @@ create_enet_conn_data(CMtrans_services svc)
     svc->malloc_func(sizeof(struct enet_connection_data));
     enet_conn_data->remote_host = NULL;
     enet_conn_data->remote_contact_port = -1;
-    enet_conn_data->read_buffer = svc->malloc_func(1);
+    enet_conn_data->read_buffer = NULL;
     enet_conn_data->read_buffer_len = 1;
     return enet_conn_data;
 }
@@ -231,6 +231,7 @@ enet_accept_conn(enet_client_data_ptr sd, transport_entry trans,
     svc->trace_out(NULL, "Remote host (IP %x) is listening at port %d\n",
 		   enet_conn_data->remote_IP,
 		   enet_conn_data->remote_contact_port);
+    free_attr_list(conn_attr_list);
     return enet_conn_data;
 }
 

@@ -349,6 +349,7 @@ do_regression_master_test()
 		 (attr_value) strdup(postfix));
     }
     CMlisten_specific(cm, listen_list);
+    if (listen_list) free_attr_list(listen_list);
     contact_list = CMget_contact_list(cm);
     if (transport != NULL) {
       char *actual_transport = NULL;
