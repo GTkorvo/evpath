@@ -181,6 +181,7 @@ static atom_t CM_TRANSPORT;
 static atom_t CM_NETWORK_POSTFIX;
 static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
+char *transport = NULL;
 
 int
 main(int argc, char **argv)
@@ -214,6 +215,10 @@ main(int argc, char **argv)
 	} else if (argv[1][1] == 'n') {
 	    regression = 0;
 	    quiet = -1;
+	} else if (argv[1][1] == 't') {
+	    transport = argv[2];
+	    argv++;
+	    argc--;
 	}
 	argv++;
 	argc--;
@@ -242,11 +247,10 @@ main(int argc, char **argv)
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
-	char *transport = NULL;
 	char *postfix = NULL;
 	char *string_list;
 	EVstone stone;
-	if ((transport = getenv("CMTransport")) != NULL) {
+	if (transport || ((transport = getenv("CMTransport")) != NULL)) {
 	    if (listen_list == NULL) listen_list = create_attr_list();
 	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		     (attr_value) strdup(transport));
@@ -376,7 +380,7 @@ do_regression_master_test()
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
-    char *string_list, *transport, *postfix;
+    char *string_list, *postfix;
     char size_str[4];
     char vec_str[4];
     EVstone handle;
@@ -396,7 +400,7 @@ do_regression_master_test()
 #endif
     cm = CManager_create();
     forked = CMfork_comm_thread(cm);
-    if ((transport = getenv("CMTransport")) != NULL) {
+    if (transport || ((transport = getenv("CMTransport")) != NULL)) {
 	listen_list = create_attr_list();
 	add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		 (attr_value) strdup(transport));
