@@ -98,8 +98,6 @@ typedef struct socket_connection_data {
     int remote_IP;
     int remote_contact_port;
     int fd;
-    void *read_buffer;
-    int read_buffer_len;
     socket_client_data_ptr sd;
     socket_block_state block_state;
     CMConnection conn;
@@ -159,8 +157,6 @@ CMtrans_services svc;
     socket_conn_data->remote_host = NULL;
     socket_conn_data->remote_contact_port = -1;
     socket_conn_data->fd = 0;
-    socket_conn_data->read_buffer = svc->malloc_func(1);
-    socket_conn_data->read_buffer_len = 1;
     socket_conn_data->block_state = Block;
     return socket_conn_data;
 }
@@ -327,7 +323,6 @@ socket_conn_data_ptr scd;
     svc->fd_remove_select(scd->sd->cm, scd->fd);
     close(scd->fd);
     free(scd->remote_host);
-    free(scd->read_buffer);
     free(scd);
 }
 
