@@ -121,3 +121,19 @@
 ...
    fun:generate_localized_subformat
 }
+{
+   This is a uninit in enet.
+   Memcheck:Param
+   socketcall.sendmsg(msg.msg_iov[i])
+   obj:*
+   fun:enet_socket_send
+   fun:enet_protocol_send_outgoing_commands
+}
+{
+   Leaked packet in enet_host_service
+   Memcheck:Leak
+   fun:malloc
+   fun:enet_malloc
+   fun:enet_packet_create
+   fun:enet_host_service
+}
