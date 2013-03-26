@@ -1509,9 +1509,10 @@ cm_return_data_buf(CManager cm, CMbuffer cmb)
     if (cmb && cmb->return_callback != NULL) {
 	CMbuffer last = NULL, tmp = cm->cm_buffer_list;
 	/* UNLINK */
-	CMtrace_out(cm, CMLowLevelVerbose, "cm_return_data_buf --- Unlinking\n");
+	CMtrace_out(cm, CMLowLevelVerbose, "cm_return_data_buf --- Unlinking %p cmb\n", cmb);
 	while (tmp != NULL) {
 	    if (tmp != cmb) {
+		last = tmp;
 		tmp = tmp->next;
 		continue;
 	    }
@@ -1521,11 +1522,10 @@ cm_return_data_buf(CManager cm, CMbuffer cmb)
 	    } else {
 		last->next = tmp->next;
 	    }
-	    last = tmp;
 	    tmp = tmp->next;
 	    (cmb->return_callback)(cmb->return_callback_data);
-	    cmb->buffer = NULL;
-	    cmb->size = 0;
+	    free(cmb);
+	    break;
 	}
     }
 }
@@ -1734,10 +1734,6 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
     read_msg_count++;
     read_byte_count += length;
 
-    if (conn->partial_buffer) {
-	cm_return_data_buf(cm, conn->partial_buffer);
-	conn->partial_buffer = NULL;
-    }
     /* try read-ahead */
     if (cm->abort_read_ahead == 1) {
 	cm->abort_read_ahead = 0;
@@ -1971,9 +1967,16 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	return header_len + data_length + attr_length - 
 	    length;
     }
+    /* At this point, the message is accepted.  Determine processing */
+    cm_data_buf = conn->partial_buffer;
+    conn->partial_buffer = NULL;
+    conn->buffer_full_point = 0;
+    conn->buffer_data_end = 0;
+
     base = buffer + header_len;
     if (handshake) {
 	CMdo_handshake(conn, handshake_version, byte_swap, base);
+	cm_return_data_buf(cm, cm_data_buf);
 	return 0;
     }
     if (checksum != 0) {
@@ -1990,6 +1993,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
     if (performance_msg) {
 	CMdo_performance_response(conn, data_length, performance_func, byte_swap,
 				  base);
+	cm_return_data_buf(cm, cm_data_buf);
         return 0;
     } else if (evcontrol_msg) {
         int arg;
@@ -2004,6 +2008,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 #ifdef EV_INTERNAL_H
         INT_EVhandle_control_message(conn->cm, conn, (unsigned char) performance_func, arg);
 #endif
+	cm_return_data_buf(cm, cm_data_buf);
         return 0;
     }
     data_buffer = base + attr_length;
@@ -2022,15 +2027,10 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	}
 	set_int_attr(attrs, CM_EVENT_SIZE, data_length);
 
-	cm_data_buf = conn->partial_buffer;
-	conn->buffer_full_point = 0;
-	conn->buffer_data_end = 0;
-	conn->partial_buffer = NULL;
 #ifdef EV_INTERNAL_H	
 	internal_cm_network_submit(cm, cm_data_buf, attrs, conn, data_buffer,
 				   data_length, stone_id);
 #endif
-	cm_return_data_buf(cm, cm_data_buf);
 	free_attr_list(attrs);
 	return 0;
     }
@@ -2060,6 +2060,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
     if ((cm_format == NULL) || (cm_format->handler == NULL)) {
 	fprintf(stderr, "CM - No handler for incoming data of this version of format \"%s\"\n",
 		name_of_FMformat(FMFormat_of_original(format)));
+	cm_return_data_buf(cm, cm_data_buf);
 	return 0;
     }
     assert(FFShas_conversion(format));
@@ -2068,6 +2069,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	if (!FFSdecode_in_place(cm->FFScontext, data_buffer, 
 				       (void**) (long) &decode_buffer)) {
 	    printf("Decode failed\n");
+	    cm_return_data_buf(cm, cm_data_buf);
 	    return 0;
 	}
     } else {
@@ -2075,12 +2077,12 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	cm_decode_buf = cm_get_data_buf(cm, decoded_length);
 	decode_buffer = cm_decode_buf->buffer;
 	FFSdecode_to_buffer(cm->FFScontext, data_buffer, decode_buffer);
-	cm_return_data_buf(cm, conn->partial_buffer);
-	conn->partial_buffer = NULL;
+	cm_return_data_buf(cm, cm_data_buf);
     }
     if(cm_format->older_format) {
 #ifdef EVOL
 	if(!process_old_format_data(cm, cm_format, &decode_buffer, &cm_decode_buf)){
+	    cm_return_data_buf(cm, cm_data_buf);
 	    return 0;
 	}
 #endif
@@ -2115,11 +2117,6 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
     /* 
      *  Handler may recurse, so clear these structures first
      */
-    cm_data_buf = conn->partial_buffer;
-    conn->buffer_full_point = 0;
-    conn->buffer_data_end = 0;
-    conn->partial_buffer = NULL;
-
     INT_CMConnection_add_reference(conn);
     CManager_unlock(cm);
     cm_format->handler(cm, conn, decode_buffer, cm_format->client_data,
