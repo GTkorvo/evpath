@@ -65,7 +65,7 @@ join_handler(EVdfg dfg, char *identifier, void* available_sources, void *availab
 {
     static int client_count = 0;
     int i;
-    char *canon_name = malloc(20);
+    char *canon_name;
     EVdfg_stone last, tmp, sink;
     static EVdfg_stone src;
     static int graph_already_realized = 0;
@@ -114,6 +114,7 @@ join_handler(EVdfg dfg, char *identifier, void* available_sources, void *availab
 	char *filter;
 	EVdfg_stone middle_stone;
 	filter = create_filter_action_spec(NULL, filter_func);
+	canon_name = malloc(20);
 	sprintf(canon_name, "client%d", client_count-1);
 	EVdfg_assign_canonical_name(dfg, identifier, canon_name);
 
@@ -127,91 +128,6 @@ join_handler(EVdfg dfg, char *identifier, void* available_sources, void *availab
 	EVdfg_realize(dfg);
     }
 }
-#ifdef NOTDEF
-static void
-join_handler(EVdfg dfg, char *identifier, void* available_sources, void *available_sinks)
-{
-    static int client_count = 1;
-    static char *canon_name;
-	
-    static int joined_node_count;
-    static int stone_index = 1;
-	
-    EVdfg_stone sink = NULL;
-    EVdfg_stone middle_stone = NULL;
-    static EVdfg_stone last_stone = NULL;
-	
-    if (ned_node_count 
-    if (client_count < node_count) {
-	sprintf(canon_name, "client%d", client_count);
-    } else {
-	canon_name = strdup("terminal");
-    }
-    EVdfg_assign_canonical_name(dfg, identifier, canon_name);
-
-    
-    if (client_count < node_count) {
-	/* increment the count and wait for the others to join */
-	client_count++;
-	return;
-    }
-
-    /* the last node has joined, finish the DFG */
-    last = src;
-
-    EVdfg_assign_node(src, "origin");
-    for (i=1; i < node_count -1; i++) {
-	char str[10];
-	char *filter;
-	filter = create_filter_action_spec(NULL, filter_func);
-	tmp = EVdfg_create_stone(dfg, filter);
-	EVdfg_link_port(last, 0, tmp);
-	sprintf(str, "client%d", i);
-	EVdfg_assign_node(tmp, str);
-	last = tmp;
-    }
-    sink = EVdfg_create_sink_stone(dfg, "simple_handler");
-    EVdfg_link_port(last, 0, sink);
-    EVdfg_assign_node(sink, "terminal");
-
-    EVdfg_realize(dfg);
-}
-
-	if (joined_node_count == 1) {
-	    canon_name = strdup("terminal");
-	    EVdfg_assign_canonical_name(dfg, identifier, canon_name);
-	    sink = EVdfg_create_sink_stone(dfg, "simple_handler");
-	    EVdfg_link_port(last_stone, 0, sink);
-	    EVdfg_assign_node(sink, "terminal");
-	    ++joined_node_count;
-	    canon_name = malloc(20 * sizeof(char));
-	    EVdfg_realize(dfg);
-	} else {
-	    char *filter;
-	    filter = create_filter_action_spec(NULL, filter_func);
-	    sprintf(canon_name, "client%d", joined_node_count);
-	    EVdfg_assign_canonical_name(dfg, identifier, canon_name);
-	    middle_stone = EVdfg_create_stone(dfg, filter);
-	    EVdfg_assign_node(middle_stone, canon_name);
-		
-	    //      EVdfg_reconfig_link_port_to_stone(dfg, stone_index, 0, middle_stone, NULL);
-	    //      EVdfg_reconfig_link_port_from_stone(dfg, middle_stone, 0, 2, NULL);
-		
-	    EVdfg_reconfig_insert(dfg, stone_index, middle_stone, 2, NULL);
-	    if (joined_node_count == 3) {
-		stone_index+= 3;
-	    } else {
-		stone_index+= 1;
-	    }
-	    ++joined_node_count;
-	    fflush(stdout);
-	    if (joined_node_count == reconfig_node_count) {
-		EVdfg_realize(dfg);
-	    }
-	}
-    }
-}
-#endif
 
 extern int
 be_test_master(int argc, char **argv)
@@ -254,7 +170,7 @@ be_test_master(int argc, char **argv)
         reconfig_list[i] = strdup("client");
     }
     reconfig_list[reconfig_node_count + 1] = NULL;
-	
+
 	/* We're node 0 in the DFG */
     EVdfg_join_dfg(test_dfg, "origin", str_contact);
 	
@@ -294,7 +210,17 @@ be_test_master(int argc, char **argv)
     status = EVdfg_wait_for_shutdown(test_dfg);
 	
     wait_for_children(nodes);
+    for (i=1; i < static_node_count; i++) {
+	free(nodes[i]);
+    }
+    free(nodes);
+    for (i=1; i < reconfig_node_count; i++) {
+	free(reconfig_list[i]);
+    }
+    free(reconfig_list);
+    free(str_contact);
 	
+    EVfree_source(source_handle);
     CManager_close(cm);
     return status;
 }
@@ -328,11 +254,11 @@ be_test_child(int argc, char **argv)
     }
 	
     if (EVdfg_source_active(src)) {
-		simple_rec rec;
-		generate_simple_record(&rec);
-		/* submit would be quietly ignored if source is not active */
-		EVsubmit(src, &rec, NULL);
+	simple_rec rec;
+	generate_simple_record(&rec);
+	/* submit would be quietly ignored if source is not active */
+	EVsubmit(src, &rec, NULL);
     }
+    EVfree_source(src);
     return EVdfg_wait_for_shutdown(test_dfg);
-	//    }
 }

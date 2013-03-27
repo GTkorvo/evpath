@@ -756,6 +756,13 @@ free_dfg(CManager cm, void *vdfg)
     for (i=0; i < dfg->stone_count; i++) {
 	if (dfg->stones[i]->out_links) free(dfg->stones[i]->out_links);
 	if (dfg->stones[i]->action) free(dfg->stones[i]->action);
+	if (dfg->stones[i]->extra_actions) {
+	    int j;
+	    for (j=0; j < dfg->stones[i]->action_count-1; j++) {
+		free(dfg->stones[i]->extra_actions[j]);
+	    }
+	    free(dfg->stones[i]->extra_actions);
+	}
 	free(dfg->stones[i]);
     }
     if (dfg->master_contact_str) free(dfg->master_contact_str);

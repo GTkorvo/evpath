@@ -434,11 +434,9 @@ submit any remaining anon from bottom (oldest)
 	case 13:
 	case 17:
 	case 19:{
-	    attr_list attrs = create_attr_list();
 	    rec_a_ptr a = malloc(sizeof(*a));
 	    a->a_field = 1;
 	    generate_a_record(a);
-	    add_int_attr(attrs, index_atom, 1);
 	    
 	    if (quiet <=0) {printf("submitting a -> %d\n", a->a_field);}
 	    EVsubmit_general(a_handle, a, (EVFreeFunction)free, NULL);
@@ -450,11 +448,9 @@ submit any remaining anon from bottom (oldest)
 	case 14:
 	case 15:
 	case 18: {
-	    attr_list attrs = create_attr_list();
 	    rec_b_ptr b = malloc(sizeof(*b));
 	    b->b_field = 2;
 	    generate_b_record(b);
-	    add_int_attr(attrs, index_atom, 2);
 	    
 	    if (quiet <=0) {printf("submitting b -> %d\n", b->b_field);}
 	    EVsubmit_general(b_handle, b, (EVFreeFunction)free, NULL);
@@ -467,11 +463,9 @@ submit any remaining anon from bottom (oldest)
 	case 12:
 	case 16:
 	case 20: {
-	    attr_list attrs = create_attr_list();
 	    rec_c_ptr c = malloc(sizeof(*c));
 	    c->c_field = 3;
 	    generate_c_record(c);
-	    add_int_attr(attrs, index_atom, 3);
 	    
 	    if (quiet <=0) {printf("submitting c -> %d\n", c->c_field);}
 	    EVsubmit_general(c_handle, c, (EVFreeFunction)free, NULL);
@@ -501,7 +495,11 @@ submit any remaining anon from bottom (oldest)
     status = EVdfg_wait_for_shutdown(test_dfg);
 
     wait_for_children(nodes);
-
+    free(str_contact);
+    EVfree_source(command_handle);
+    EVfree_source(a_handle);
+    EVfree_source(b_handle);
+    EVfree_source(c_handle);
     CManager_close(cm);
     return status;
 }
