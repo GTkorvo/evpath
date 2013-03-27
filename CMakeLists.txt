@@ -45,6 +45,7 @@ FIND_CERCS_PROJECT (gen_thread LIBRARY gen_thread INCLUDES gen_thread.h REQUIRED
 FIND_CERCS_PROJECT (ffs LIBRARY ffs INCLUDES ffs.h REQUIRED ${CERCS_FIND_OPTIONS})
 FIND_CERCS_PROJECT (dill LIBRARY dill REQUIRED ${CERCS_FIND_OPTIONS})
 find_package (Threads)
+find_package (MPI)
 
 list (APPEND DEPLIBS "-L${CERCS_ENV_LIB_DIR}" "${CERCS_ENV_LIB_DIR}/libcercs_env.la")
 list (APPEND DEPLIBS "-L${ATL_LIB_DIR}" "${ATL_LIB_DIR}/libatl.la")
@@ -232,4 +233,8 @@ ADD_SUBDIRECTORY( tests )
 ADD_SUBDIRECTORY( rtests )
 ADD_SUBDIRECTORY( mtests )
 ADD_SUBDIRECTORY( dfg_tests )
+if (MPI_FOUND)
+    ADD_SUBDIRECTORY( mpi_tests )
+endif (MPI_FOUND)
+
 ADD_SUBDIRECTORY( examples )
