@@ -56,10 +56,12 @@ be_test_master(int argc, char **argv)
 	nodes[i] = malloc(5);
 	sprintf(nodes[i], "N%d", i);
     }
+    nodes[i] = NULL;
     cm = CManager_create();
     CMlisten(cm);
     contact_list = CMget_contact_list(cm);
     str_contact = attr_list_to_string(contact_list);
+    free_attr_list(contact_list);
 
 /*
 **  LOCAL DFG SUPPORT   Sources and sinks that might or might not be utilized.
@@ -119,12 +121,18 @@ be_test_master(int argc, char **argv)
 	generate_simple_record(&rec);
 	/* submit would be quietly ignored if source is not active */
 	EVsubmit(source_handle, &rec, attrs);
+	free_attr_list(attrs);
     }
 
+    EVfree_source(source_handle);
     status = EVdfg_wait_for_shutdown(test_dfg);
 
     wait_for_children(nodes);
-
+    free(str_contact);
+    for (i=0; i < node_count; i++) {
+	free(nodes[i]);
+    }
+    free(nodes);
     CManager_close(cm);
     return status;
 }
@@ -160,5 +168,6 @@ be_test_child(int argc, char **argv)
 	/* submit would be quietly ignored if source is not active */
 	EVsubmit(src, &rec, NULL);
     }
+    EVfree_source(src);
     return EVdfg_wait_for_shutdown(test_dfg);
 }

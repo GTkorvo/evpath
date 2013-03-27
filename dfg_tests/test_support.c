@@ -65,6 +65,7 @@ void
 generate_simple_record(simple_rec_ptr event)
 {
     long sum = 0;
+    memset(event, 0, sizeof(simple_rec));
     event->integer_field = (int) lrand48() % 100;
     sum += event->integer_field % 100;
     event->short_field = ((short) lrand48());

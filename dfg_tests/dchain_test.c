@@ -129,10 +129,15 @@ be_test_master(int argc, char **argv)
 	EVsubmit(source_handle, &rec, NULL);
     }
 
+    EVfree_source(source_handle);
     status = EVdfg_wait_for_shutdown(test_dfg);
 
     wait_for_children(nodes);
-
+    for (i=1; i < node_count; i++) {
+	free(nodes[i]);
+    }
+    free(nodes);
+    free(str_contact);
     CManager_close(cm);
     return status;
 }
@@ -168,5 +173,6 @@ be_test_child(int argc, char **argv)
 	/* submit would be quietly ignored if source is not active */
 	EVsubmit(src, &rec, NULL);
     }
+    EVfree_source(src);
     return EVdfg_wait_for_shutdown(test_dfg);
 }

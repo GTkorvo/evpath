@@ -22,11 +22,12 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 }
 
 
+static FFSContext c = NULL;
+
 static int
 raw_handler(CManager cm, void *vevent, int len, void *client_data,
 	    attr_list attrs)
 {
-    static FFSContext c = NULL;
     FFSTypeHandle f;
     simple_rec incoming;
     (void)len;
@@ -106,7 +107,10 @@ be_test_master(int argc, char **argv)
 
     wait_for_children(nodes);
 
+    EVfree_source(source_handle);
     CManager_close(cm);
+    free(str_contact);
+    if (c) free_FFSContext(c);
     return status;
 }
 
@@ -141,5 +145,8 @@ be_test_child(int argc, char **argv)
 	/* submit would be quietly ignored if source is not active */
 	EVsubmit(src, &rec, NULL);
     }
-    return EVdfg_wait_for_shutdown(test_dfg);
+    status = EVdfg_wait_for_shutdown(test_dfg);
+    EVfree_source(src);
+    if (c) free_FFSContext(c);
+    return status;
 }

@@ -759,6 +759,7 @@ free_dfg(CManager cm, void *vdfg)
 	free(dfg->stones[i]);
     }
     if (dfg->master_contact_str) free(dfg->master_contact_str);
+    if (dfg->shutdown_conditions) free(dfg->shutdown_conditions);
     free(dfg->stones);
     free(dfg);
 }
@@ -1156,6 +1157,7 @@ deploy_to_node(EVdfg dfg, int node)
     msg.canonical_name = dfg->nodes[node].canonical_name;
     msg.stone_count = stone_count;
     msg.stone_list = malloc(stone_count * sizeof(msg.stone_list[0]));
+    memset(msg.stone_list, 0, stone_count * sizeof(msg.stone_list[0]));
     j = 0;
     for (i=0; i< dfg->stone_count; i++) {
 	if (dfg->stones[i]->node == node) {

@@ -228,6 +228,9 @@ be_test_master(int argc, char **argv)
 
     wait_for_children(nodes);
 
+    EVfree_source(b_handle);
+    EVfree_source(a_handle);
+    free(str_contact);
     CManager_close(cm);
     return status;
 }
@@ -279,5 +282,8 @@ be_test_child(int argc, char **argv)
 	    EVsubmit(b_handle, b, NULL);
 	}
     }
-    return EVdfg_wait_for_shutdown(test_dfg);
+    status = EVdfg_wait_for_shutdown(test_dfg);
+    EVfree_source(b_handle);
+    EVfree_source(a_handle);
+    return status;
 }
