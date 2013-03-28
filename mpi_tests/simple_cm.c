@@ -132,7 +132,7 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
     message_count++;
     if (message_count == (np - 1)) {
 	printf("All messages received\n");
-	CMCondition_signal(cm, (int)client_data);
+	CMCondition_signal(cm, (int)(long)client_data);
     }
 }
 
@@ -201,7 +201,7 @@ main(int argc, char* argv[])
 	MPI_Bcast(master_contact,CONTACTLEN,MPI_CHAR,0,MPI_COMM_WORLD);
 	format = CMregister_format(cm, simple_format_list);
 	message_wait_condition = CMCondition_get(cm, NULL);
-	CMregister_handler(format, simple_handler, (void*)message_wait_condition);
+	CMregister_handler(format, simple_handler, (void*)(long)message_wait_condition);
 	CMCondition_wait(cm, message_wait_condition);
     } else { /* all other processes do this */
 	attr_list contact_list;
