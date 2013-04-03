@@ -860,7 +860,6 @@ CMConnection_create(transport_entry trans, void *transport_data,
     conn->remote_format_server_ID = 0;
     conn->remote_CManager_ID = 0;
     conn->handshake_condition = -1;
-    conn->foreign_data_handler = NULL;
     conn->io_out_buffer = create_FFSBuffer();
     conn->close_list = NULL;
     conn->write_callback_len = 0;
@@ -1046,7 +1045,6 @@ INT_CMConnection_dereference(CMConnection conn)
     thr_mutex_free(conn->write_lock);
     thr_mutex_free(conn->read_lock);
     INT_CMfree(conn->downloaded_formats);
-    conn->foreign_data_handler = NULL;
     INT_CMfree_attr_list(conn->cm, conn->attrs);
     free_FFSBuffer(conn->io_out_buffer);
     free_AttrBuffer(conn->attr_encode_buffer);
@@ -1632,11 +1630,6 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	CManager_unlock(cm);
 	return;
     }
-    if (conn->foreign_data_handler != NULL) {
-	CManager_unlock(cm);
-	((void(*)())conn->foreign_data_handler)(conn);
-	return;
-    }
     if ((trans->read_to_buffer_func) && (conn->partial_buffer == NULL)) {
 	conn->partial_buffer = cm_get_data_buf(cm, 4);
 	conn->buffer_full_point = 4;
@@ -1670,6 +1663,9 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	        non_blocking = 0;
                 CManager_unlock(cm);
             }
+	    if (len == 0) {
+	      printf("Seriously bad shit\n");
+	    }
             actual = trans->read_to_buffer_func(&CMstatic_trans_svcs, 
 						conn->transport_data, 
 						buf, len, non_blocking);
@@ -1861,11 +1857,19 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	/*  non CM message */
 	/*  lookup registered message prefixes and try to find handler */
 	/*  otherwise give up */
-	if (CMdo_non_CM_handler(conn, *(int*)buffer, buffer, length) == 0) {
+      {
+	int ret = CMdo_non_CM_handler(conn, *(int*)buffer, buffer, length);
+	if (ret == -1) {
 	    printf("Unknown message on connection %lx, failed %d, closed %d, %x\n", (long) conn, conn->failed, conn->closed, *(int*)buffer);
 	    CMConnection_failed(conn, 1);
-	}	    
+	}
+	cm_data_buf = conn->partial_buffer;
+	cm_return_data_buf(cm, cm_data_buf);
+	conn->partial_buffer = NULL;
+	conn->buffer_full_point = 0;
+	conn->buffer_data_end = 0;
 	return 0;
+      }
     }
 
     if (get_attrs == 1) {
@@ -3125,13 +3129,12 @@ CMdo_non_CM_handler(CMConnection conn, int header, char *buffer, int length)
     int i = 0;
     while (i < foreign_handler_count) {
 	if (foreign_handler_list[i].header == header) {
-	    foreign_handler_list[i].handler(conn, conn->trans, buffer, 
+	    return foreign_handler_list[i].handler(conn, conn->trans, buffer, 
 					    length);
-	    return 1;
 	}
 	i++;
     }
-    return 0;
+    return -1;
 }
 
 extern CMtrans_services

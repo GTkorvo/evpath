@@ -565,8 +565,10 @@ extern int CMtry_return_buffer ARGS((CManager cm, void *data));
  * CMregister_non_CM_message_handler().
  * \param conn The CMConnection on which the message is available.
  * \param header The first 4 bytes of the message, encoded as an integer.
+ * \return 0 if the message was completely handled.  
+ *   Otherwise return the number of additional bytes necessary.
  */
-typedef void (*CMNonCMHandler) ARGS((CMConnection conn,
+typedef int (*CMNonCMHandler) ARGS((CMConnection conn,
                                      CMTransport transport,
 				     char *buffer,
 				     long length));

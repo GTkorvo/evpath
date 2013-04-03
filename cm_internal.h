@@ -225,7 +225,6 @@ struct _CMConnection {
     CMConnHandlerList write_callbacks;
     FMContext IOsubcontext;
     AttrBuffer attr_encode_buffer;
-    void *foreign_data_handler;
 
     CMbuffer partial_buffer;	/* holds data from partial reads */
     int buffer_full_point;	/* data required for buffer to be full */

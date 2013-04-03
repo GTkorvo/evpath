@@ -126,8 +126,8 @@ inet_ntoa(struct in_addr ina)
 static int
 CMpbio_send_format_request ARGS((char *format_ID, int format_ID_length,
 				 CMConnection conn, int cond));
-static void CM_pbio_query ARGS((CMConnection conn, CMTransport trans,
-				char *buffer, long length));
+static int CM_pbio_query ARGS((CMConnection conn, CMTransport trans,
+			       char *buffer, long length));
 
 static int
 request_in_pending(CManager cm, void *format_ID, int format_id_length)
@@ -537,7 +537,7 @@ byte_swap(char *data, int size)
     }
 }
 
-static void
+static int
 CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
 {
     struct pbio_exchange_msg tmp_msg;
@@ -566,7 +566,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
 		CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d\n", actual);
 		INT_CMConnection_close(conn);
-		return;
+		return 0;
 	    }
 	    incoming_length = &tmp_length;
 	    length += 4;
@@ -593,7 +593,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
 		CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d\n", actual);
 		INT_CMConnection_close(conn);
-		return;
+		return 0;
 	    }
 	    msg = &tmp_msg;
 	} else {
@@ -616,7 +616,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
 		    "CMpbio Inconsistent length information, incoming %d, pay1 %d, pay2 %d\n", 
 		    *incoming_length, msg->payload1_length, msg->payload2_length);
 	INT_CMConnection_close(conn);
-	return;
+	return 0;
     }
     CMtrace_out(conn->cm, CMFormatVerbose, 
 		"CMpbio Msg incoming length = %d, type %d, cond %d, pay1 len %d, pay2 len %d\n", 
@@ -757,4 +757,5 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
 	    break;
 	}
     }
+    return 0;
 }
