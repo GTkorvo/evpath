@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-set (TESTS simple_cm )
+set (TESTS simple_cm bulk_cm )
 
 
 include_directories(${MPI_INCLUDE_PATH})
