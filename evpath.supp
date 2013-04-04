@@ -57,6 +57,31 @@
    fun:yyensure_buffer_stack
 }
 {
+   Intel compilers fool valgrind.
+   Memcheck:Cond
+   fun:__intel_sse2_strlen
+}
+{
+   Intel compilers fool valgrind.
+   Memcheck:Addr8
+   fun:__intel_sse2_strlen
+}
+{
+   Intel compilers fool valgrind.
+   Memcheck:Cond
+   fun:FMstr_to_data_type
+}
+{
+   Intel compilers fool valgrind.
+   Memcheck:Addr8
+   fun:FMstr_to_data_type
+}
+{
+   Intel compilers fool valgrind.
+   Memcheck:Value8
+   fun:FMstr_to_data_type
+}
+{
    Anything under dlopen isn't our fault.
    Memcheck:Leak
    fun:*
