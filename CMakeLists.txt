@@ -14,8 +14,13 @@ include(CheckLibraryExists)
 include(CheckTypeSize)
 include(CheckStructHasMember)
 include(CreateLibtoolFile)
+include(AddLibtoolLibrary)
 include(FindCERCSProject)
 include(CTest)
+
+option(BUILD_SHARED_STATIC "enable building the shared or the static library" "BOTH")
+option(NO_TRANSPORT_MODULES "build transports into EVPath, not as modules" "FALSE")
+option(TARGET_CNL "build for execution on compute node linux" "FALSE")
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -31,6 +36,8 @@ IF (TARGET_CNL)   # This should be set to true if compiling for compute note lin
   set (NO_DYNAMIC_LINKING 1)   # dummy dyn linking in cm.c and cm_transport.c
   list (APPEND EVPATH_SRC_LIST cmsockets.c cmselect.c)  # link sockets and select mechanisms in main lib
   list (APPEND CERCS_FIND_OPTIONS "STATIC")
+  set (NO_TRANSPORT_MODULES TRUE)
+  set (BUILD_SHARED_STATIC STATIC)
 ENDIF (TARGET_CNL)
 
 if (DEFINED CERCS_USE_INSTALLED) 
@@ -56,23 +63,22 @@ list (APPEND DEPLIBS "-L${DILL_LIB_DIR}" "${DILL_LIB_DIR}/libdill.la")
 list (APPEND INC_DIRS ${CERCS_ENV_INCLUDE_DIR} ${ATL_INCLUDE_DIR} ${GEN_THREAD_INCLUDE_DIR} ${FFS_INCLUDE_DIR})
 list (APPEND LIB_DIRS ${CMAKE_CURRENT_BINARY_DIR} ${CERCS_ENV_LIB_DIR} ${ATL_LIB_DIR} ${GEN_THREAD_LIB_DIR} ${FFS_LIB_DIR} ${DILL_LIB_DIR})
 list (APPEND BASE_LIBS m ${CERCS_ENV_LIBRARIES} ${ATL_LIBRARIES} ${GEN_THREAD_LIBRARIES} ${FFS_LIBRARIES} ${DILL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
-set (TARGETS evpath-static)
 
 INCLUDE_DIRECTORIES(${INC_DIRS} ${DL_INCLUDE_DIR})
 LINK_DIRECTORIES(${LIB_DIRS})
 
-if (NOT TARGET_CNL)
-add_library(cmsockets MODULE cmsockets.c)
-add_library(cmselect MODULE cmselect.c)
-add_library(cmudp MODULE cmudp.c)
-add_library(cmmulticast MODULE cmmulticast.c)
+if (NOT NO_TRANSPORT_MODULES)
+  add_library(cmsockets MODULE cmsockets.c)
+  add_library(cmselect MODULE cmselect.c)
+  add_library(cmudp MODULE cmudp.c)
+  add_library(cmmulticast MODULE cmmulticast.c)
 
-TARGET_LINK_LIBRARIES(cmselect ${BASE_LIBS})
-TARGET_LINK_LIBRARIES(cmsockets ${BASE_LIBS})
-TARGET_LINK_LIBRARIES(cmudp ${BASE_LIBS})
-TARGET_LINK_LIBRARIES(cmmulticast ${BASE_LIBS})
-list (APPEND TARGETS evpath cmselect cmsockets cmudp cmmulticast)
-endif ( NOT TARGET_CNL)
+  TARGET_LINK_LIBRARIES(cmselect ${BASE_LIBS})
+  TARGET_LINK_LIBRARIES(cmsockets ${BASE_LIBS})
+  TARGET_LINK_LIBRARIES(cmudp ${BASE_LIBS})
+  TARGET_LINK_LIBRARIES(cmmulticast ${BASE_LIBS})
+  list (APPEND TARGETS evpath cmselect cmsockets cmudp cmmulticast)
+endif (NOT NO_TRANSPORT_MODULES)
 
 FIND_CERCS_PROJECT (df_shm LIBRARY df_shm INCLUDES df_shm.h df_shm_queue.h ${CERCS_FIND_OPTIONS})
 IF (NOT DF_SHM_FOUND)
@@ -98,49 +104,33 @@ else (ENET_FOUND)
    set (ENET_LIBRARIES "")
 endif (ENET_FOUND)
 
-IF (ENET_FOUND AND NOT TARGET_CNL)
+IF (ENET_FOUND AND NOT NO_TRANSPORT_MODULES)
    add_library(cmenet MODULE cmenet.c)
    TARGET_LINK_LIBRARIES(cmenet ${ENET_LIBRARIES} ${BASE_LIBS})
-ENDIF (ENET_FOUND AND NOT TARGET_CNL)
+ENDIF (ENET_FOUND AND NOT NO_TRANSPORT_MODULES)
 
 CHECK_LIBRARY_EXISTS (ibverbs ibv_create_qp "" HAVE_IBVERBS)
 CHECK_LIBRARY_EXISTS (ugni GNI_CqCreate "" HAVE_UGNI)
-IF (HAVE_IBVERBS AND NOT TARGET_CNL)
+IF (HAVE_IBVERBS AND NOT NO_TRANSPORT_MODULES)
    add_library(cmib MODULE cmib.c)
    TARGET_LINK_LIBRARIES(cmib ibverbs ${BASE_LIBS})
-ENDIF (HAVE_IBVERBS AND NOT TARGET_CNL)
+ENDIF (HAVE_IBVERBS AND NOT NO_TRANSPORT_MODULES)
 
 IF (HAVE_IBVERBS OR HAVE_UGNI)
     FIND_CERCS_PROJECT (nnti LIBRARY trios_nnti INCLUDES Trios_nnti.h ${CERCS_FIND_OPTIONS})
     IF (NNTI_FOUND)
         INCLUDE_DIRECTORIES(${NNTI_INCLUDE_DIR})
 	LINK_DIRECTORIES(${NNTI_LIB_DIR})
-	IF (NOT TARGET_CNL)
+	IF (NOT NO_TRANSPORT_MODULES)
            add_library(cmnnti MODULE cmnnti.c)
 	   TARGET_LINK_LIBRARIES(cmnnti ${NNTI_LIBRARIES} ${ENET_LIBRARIES} ${DF_SHM_LIBRARIES} ${BASE_LIBS})
-	ELSE (NOT TARGET_CNL)
+	ELSE (NOT NO_TRANSPORT_MODULES)
 	   list (APPEND EVPATH_SRC_LIST cmnnti.c)  # link nnti in main lib
 	   list (APPEND NNTI_LIBRARIES trios_support)
 	   list (APPEND EVPATH_TRANSPORT_DEP_LIBS ${NNTI_LIBRARIES} ${ENET_LIBRARIES} ${DF_SHM_LIBRARIES})
-        ENDIF (NOT TARGET_CNL)
+        ENDIF (NOT NO_TRANSPORT_MODULES)
     ENDIF (NNTI_FOUND)
 ENDIF (HAVE_IBVERBS OR HAVE_UGNI)
-
-if (NOT TARGET_CNL)
-add_library(evpath SHARED ${EVPATH_SRC_LIST})
-SET_TARGET_PROPERTIES(evpath PROPERTIES LINKER_LANGUAGE C)
-TARGET_LINK_LIBRARIES(evpath ${DL_LIBRARIES} ${BASE_LIBS})
-SET_TARGET_PROPERTIES(evpath PROPERTIES STATIC_LIB "libevpath.a")
-SET_TARGET_PROPERTIES(evpath PROPERTIES LT_SHOULDNOTLINK "no")
-endif (NOT TARGET_CNL)
-add_library(evpath-static STATIC ${EVPATH_SRC_LIST})
-# The library target "evpath" already has a default OUTPUT_NAME of "evpath", so we don't need to change it.
-# The library target "evpath-static" has a default OUTPUT_NAME of "evpath-static", so change it.
-SET_TARGET_PROPERTIES(evpath-static PROPERTIES OUTPUT_NAME "evpath" )
-# Now the library target "foo-static" will be named "foo.lib" with MS tools.
-# This conflicts with the "foo.lib" import library corresponding to "foo.dll",
-# so we add a "lib" prefix (which is default on other platforms anyway):
-SET_TARGET_PROPERTIES(evpath-static PROPERTIES PREFIX "lib" LINKER_LANGUAGE C)
 
 add_custom_command(
   OUTPUT "cm_interface.c" "revp.c" "revpath.h"
@@ -148,8 +138,6 @@ add_custom_command(
   COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl ${CMAKE_CURRENT_SOURCE_DIR}/evpath.h ${CMAKE_CURRENT_SOURCE_DIR}/ev_dfg.h
 )
-
-TARGET_LINK_LIBRARIES(evpath-static ${DL_LIBRARIES} ${BASE_LIBS} ${EVPATH_TRANSPORT_DEP_LIBS})
 
 IF (Threads_FOUND AND CMAKE_USE_PTHREADS_INIT)
     set (USE_PTHREADS True)
@@ -187,14 +175,11 @@ CHECK_FUNCTION_EXISTS(gettimeofday HAVE_GETTIMEOFDAY)
 TRY_COMPILE(HAVE_MAC_SYSCTL ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_mac_sysctl.c)
 TRY_COMPILE(HAVE_LINUX_SYSCTL ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_mac_sysctl.c)
 
-if (NOT TARGET_CNL)
-   foreach(arg ${DEPLIBS})
-      set(DEP_STRING "${DEP_STRING} ${arg}")
-   endforeach(arg ${DEPLIBS})
+foreach(arg ${DEPLIBS})
+   set(DEP_STRING "${DEP_STRING} ${arg}")
+endforeach(arg ${DEPLIBS})
 
-  SET_TARGET_PROPERTIES(evpath PROPERTIES LT_DEPENDENCY_LIBS "${DEP_STRING}")
-  CREATE_LIBTOOL_FILE(evpath /lib)
-endif (NOT TARGET_CNL)
+add_libtool_library(NAME evpath SRC_LIST ${EVPATH_SRC_LIST} DEP_LIBS "${DEP_STRING}" LINK_LIBS  ${DL_LIBRARIES} ${BASE_LIBS} ${EVPATH_TRANSPORT_DEP_LIBS})
 
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/evpath.h DESTINATION include)
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/revpath.h DESTINATION include)
@@ -210,7 +195,7 @@ SET (EVPATH_LIBRARY_BUILD_DIR ${CMAKE_CURRENT_BINARY_DIR})
 SET (EVPATH_LIBRARY_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/lib)
 
 ADD_EXECUTABLE(cmprobe cmprobe.c)
-TARGET_LINK_LIBRARIES(cmprobe evpath-static ${BASE_LIBS})
+TARGET_LINK_LIBRARIES(cmprobe evpath ${BASE_LIBS})
 
 if (${CMAKE_C_COMPILER_ID} MATCHES "Intel") 
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -shared-intel")
@@ -223,6 +208,7 @@ MESSAGE( STATUS )
 MESSAGE( STATUS "-------------------------------------------------------------------------------" )
 MESSAGE( STATUS "CMAKE_INSTALL_PREFIX = ${CMAKE_INSTALL_PREFIX}" )
 MESSAGE( STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}  (options are: Debug,Release,RelWithDebInfo,MinSizeRel)")
+MESSAGE( STATUS "BUILD_SHARED_STATIC = ${BUILD_SHARED_STATIC}" )
 MESSAGE( STATUS "Change a value with: cmake -D<Variable>=<Value>" )
 MESSAGE( STATUS "    to use installed CERCS libraries specify -DCERCS_USE_INSTALLED=1" )
 MESSAGE( STATUS "-------------------------------------------------------------------------------" )
