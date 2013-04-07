@@ -282,7 +282,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
         svc->trace_out(cm, "CMEnet transport connect to port %d", int_port_num);
     }
 
-    /* INET socket connection, host_name is the machine name */
+    /* ENET connection, host_name is the machine name */
     ENetAddress address;
     ENetEvent event;
     ENetPeer *peer;
@@ -368,7 +368,7 @@ libcmenet_LTX_initiate_conn(CManager cm, CMtrans_services svc,
 /* 
  * Check to see that if we were to attempt to initiate a connection as
  * indicated by the attribute list, would we be connecting to ourselves?
- * For sockets, this involves checking to see if the host name is the 
+ * For enet, this involves checking to see if the host name is the 
  * same as ours and if the CM_ENET_PORT matches the one we are listening on.
  */
 extern int
@@ -450,15 +450,15 @@ libcmenet_LTX_connection_eq(CManager cm, CMtrans_services svc,
 		       requested_IP);
     }
 
-    svc->trace_out(cm, "Socket Conn_eq comparing IP/ports %x/%d and %x/%d",
+    svc->trace_out(cm, "ENET Conn_eq comparing IP/ports %x/%d and %x/%d",
 		   scd->remote_IP, scd->remote_contact_port,
 		   requested_IP, int_port_num);
     if ((scd->remote_IP == requested_IP) &&
 	(scd->remote_contact_port == int_port_num)) {
-	svc->trace_out(cm, "Socket Conn_eq returning TRUE");
+	svc->trace_out(cm, "ENET Conn_eq returning TRUE");
 	return 1;
     }
-    svc->trace_out(cm, "Socket Conn_eq returning FALSE");
+    svc->trace_out(cm, "ENET Conn_eq returning FALSE");
     return 0;
 }
 
@@ -682,7 +682,7 @@ libcmenet_LTX_writev_func(CMtrans_services svc, enet_conn_data_ptr ecd,
 }
 
 
-int socket_global_init = 0;
+static int enet_global_init = 0;
 
 static void
 free_enet_data(CManager cm, void *sdv)
@@ -720,7 +720,7 @@ libcmenet_LTX_initialize(CManager cm, CMtrans_services svc,
     (void)attrs;
     svc->trace_out(cm, "Initialize ENET reliable UDP transport built in %s",
 		   EVPATH_LIBRARY_BUILD_DIR);
-    if (socket_global_init == 0) {
+    if (enet_global_init == 0) {
 	if (enet_initialize () != 0) {
 	    fprintf (stderr, "An error occurred while initializing ENet.\n");
 	    //return EXIT_FAILURE;
@@ -747,4 +747,27 @@ libcmenet_LTX_initialize(CManager cm, CMtrans_services svc,
     svc->add_shutdown_task(cm, free_enet_data, (void *) enet_data, FREE_TASK);
     svc->add_periodic_task(cm, 1, 0, enet_service_network, (void*)trans);
     return (void *) enet_data;
+}
+
+extern transport_entry
+cmenet_add_static_transport(CManager cm, CMtrans_services svc)
+{
+    transport_entry transport;
+    transport = svc->malloc_func(sizeof(struct _transport_item));
+    transport->trans_name = strdup("enet");
+    transport->cm = cm;
+    transport->transport_init = (CMTransport_func)libcmenet_LTX_initialize;
+    transport->listen = (CMTransport_listen_func)libcmenet_LTX_non_blocking_listen;
+    transport->initiate_conn = (CMConnection(*)())libcmenet_LTX_initiate_conn;
+    transport->self_check = (int(*)())libcmenet_LTX_self_check;
+    transport->connection_eq = (int(*)())libcmenet_LTX_connection_eq;
+    transport->shutdown_conn = (CMTransport_shutdown_conn_func)libcmenet_LTX_shutdown_conn;
+    transport->read_block_func = (CMTransport_read_block_func)libcmenet_LTX_read_block_func;
+    transport->read_to_buffer_func = (CMTransport_read_to_buffer_func)NULL;
+    transport->writev_func = (CMTransport_writev_func)libcmenet_LTX_writev_func;
+    transport->get_transport_characteristics = NULL;
+    if (transport->transport_init) {
+	transport->trans_data = transport->transport_init(cm, svc, transport);
+    }
+    return transport;
 }

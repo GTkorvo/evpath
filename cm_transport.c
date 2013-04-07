@@ -149,6 +149,15 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 	(void) add_transport_to_cm(cm, transport);
     }
 #endif
+#ifdef ENET_FOUND
+    if (strcmp(trans_name, "enet") == 0) {
+	extern transport_entry cmenet_add_static_transport(CManager cm, CMtrans_services svc);
+	transport = cmenet_add_static_transport(cm, &CMstatic_trans_svcs);
+	transport->data_available = CMDataAvailable;  /* callback pointer */
+	transport->write_possible = CMWriteQueuedData;  /* callback pointer */
+	(void) add_transport_to_cm(cm, transport);
+    }
+#endif
     if (!transport) return 0;
 #endif
     CMtrace_out(cm, CMTransportVerbose, "Loaded transport %s.\n", trans_name);
