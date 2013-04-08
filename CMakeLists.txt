@@ -18,9 +18,12 @@ include(AddLibtoolLibrary)
 include(FindCERCSProject)
 include(CTest)
 
-option(BUILD_SHARED_STATIC "enable building the shared or the static library" "BOTH")
-option(NO_TRANSPORT_MODULES "build transports into EVPath, not as modules" "FALSE")
-option(TARGET_CNL "build for execution on compute node linux" "FALSE")
+IF(NOT DEFINED BUILD_SHARED_STATIC)
+  SET( BUILD_SHARED_STATIC "BOTH")
+ENDIF(NOT DEFINED BUILD_SHARED_STATIC)
+IF(NOT DEFINED NO_TRANSPORT_MODULES)
+  SET( NO_TRANSPORT_MODULES "FALSE")
+ENDIF(NOT DEFINED NO_TRANSPORT_MODULES)
 
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
