@@ -1,5 +1,5 @@
 #
-#  FIND_CERCS_PROJECT -  Tue Jul 17 15:00:09 EDT 2012
+#  FIND_CERCS_PROJECT -  Thu Apr 11 13:57:06 EDT 2013
 #
 #  Use this macro like this:
 # FIND_CERCS_PROJECT(project_name 
@@ -60,8 +60,8 @@ FUNCTION (FIND_CERCS_PROJECT ARG_PROJECT)
     endif (${ARG_DYNAMIC}) 
     if (NOT ${ARG_USE_INSTALLED} )
       if ( NOT ("${CercsArch}" STREQUAL ""))
-	list (APPEND LIB_SEARCH_PATH ../${PROJECT_NAME}/${CercsArch} ../../${PROJECT_NAME}/${CercsArch} $ENV{HOME}/${CercsArch}/lib )
-	list (APPEND INC_SEARCH_PATH ../${PROJECT_NAME}/${CercsArch} ../../${PROJECT_NAME}/${CercsArch} $ENV{HOME}/${CercsArch}/include )
+	list (APPEND LIB_SEARCH_PATH ../${PROJECT_NAME}/${CercsArch} ../../${PROJECT_NAME}/${CercsArch} $ENV{HOME}/${CercsArch}/${PROJECT_NAME}/lib $ENV{HOME}/${CercsArch}/lib )
+	list (APPEND INC_SEARCH_PATH ../${PROJECT_NAME}/${CercsArch} ../../${PROJECT_NAME}/${CercsArch} $ENV{HOME}/${CercsArch}/${PROJECT_NAME}/include $ENV{HOME}/${CercsArch}/include )
       endif()
       list (APPEND LIB_SEARCH_PATH ../${PROJECT_NAME}  ../../${PROJECT_NAME} ../${PROJECT_NAME}/build ../../${PROJECT_NAME}/build  $ENV{HOME}/lib  )
       list (APPEND INC_SEARCH_PATH ../${PROJECT_NAME}  ../../${PROJECT_NAME} ../${PROJECT_NAME}/build ../../${PROJECT_NAME}/build  $ENV{HOME}/include  )
