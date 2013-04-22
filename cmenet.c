@@ -271,8 +271,10 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
     } else {
         svc->trace_out(cm, "CMEnet transport connect to host_IP %lx", host_ip);
     }
-    if ((host_name == NULL) && (host_ip == 0))
+    if ((host_name == NULL) && (host_ip == 0)) {
+	printf("No host no IP\n");
 	return 0;
+    }
 
     if (!query_attr(attrs, CM_ENET_PORT, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & int_port_num)) {
@@ -327,7 +329,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
         /* had run out without any significant event.            */
         enet_peer_reset (peer);
 
-        printf ("Connection to %s:%d failed.", inet_ntoa(sin_addr), address.port);
+        printf ("Connection to %s:%d failed   type was %d.\n", inet_ntoa(sin_addr), address.port, event.type);
 	return 0;
     }
 
@@ -582,16 +584,19 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 	/* port num is free.  Constrain to range 26000 : 26100 */
 	int low_bound = 26000;
 	int high_bound = 26100;
-	int size = high_bound - low_bound;
-	int tries = 10;
+	int size;
+	int tries;
 	srand48(seedval);
+    restart:
+	size = high_bound - low_bound;
+	tries = 10;
 	while (tries > 0) {
 	    int target = low_bound + size * drand48();
 	    address.port = target;
 	    svc->trace_out(cm, "CMEnet trying to bind port %d", target);
 
 	    server = enet_host_create (& address /* the address to bind the server host to */, 
-				       0     /* allow up to 4095 clients and/or outgoing connections */,
+				       0     /* 0 means dynamic alloc clients and/or outgoing connnections */,
 				       1      /* allow up to 2 channels to be used, 0 and 1 */,
 				       0      /* assume any amount of incoming bandwidth */,
 				       0      /* assume any amount of outgoing bandwidth */);
@@ -603,8 +608,8 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 	    }
 	}
 	if (server == NULL) {
-	    fprintf(stderr, "Failed after 5 attempts to bind to a random port.  Lots of undead servers on this host?\n");
-	    return NULL;
+	    high_bound += 100;
+	    goto restart;
 	}
 	sd->server = server;
     }
