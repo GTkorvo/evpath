@@ -140,6 +140,13 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 	transport->write_possible = CMWriteQueuedData;  /* callback pointer */
 	(void) add_transport_to_cm(cm, transport);
     }
+    if (strcmp(trans_name, "udp") == 0) {
+	extern transport_entry cmudp_add_static_transport(CManager cm, CMtrans_services svc);
+	transport = cmudp_add_static_transport(cm, &CMstatic_trans_svcs);
+	transport->data_available = CMDataAvailable;  /* callback pointer */
+	transport->write_possible = CMWriteQueuedData;  /* callback pointer */
+	(void) add_transport_to_cm(cm, transport);
+    }
 #ifdef NNTI_FOUND
     if (strcmp(trans_name, "nnti") == 0) {
 	extern transport_entry cmnnti_add_static_transport(CManager cm, CMtrans_services svc);

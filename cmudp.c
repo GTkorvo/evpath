@@ -731,3 +731,27 @@ libcmudp_LTX_get_transport_characteristics(transport_entry trans, CMtrans_servic
 {
     return utd->characteristics;
 }
+extern transport_entry
+cmudp_add_static_transport(CManager cm, CMtrans_services svc)
+{
+    transport_entry transport;
+    transport = svc->malloc_func(sizeof(struct _transport_item));
+    transport->trans_name = strdup("udp");
+    transport->cm = cm;
+    transport->transport_init = (CMTransport_func)libcmudp_LTX_initialize;
+    transport->listen = (CMTransport_listen_func)libcmudp_LTX_non_blocking_listen;
+    transport->initiate_conn = (CMConnection(*)())libcmudp_LTX_initiate_conn;
+    transport->self_check = (int(*)())libcmudp_LTX_self_check;
+    transport->connection_eq = (int(*)())libcmudp_LTX_connection_eq;
+    transport->shutdown_conn = (CMTransport_shutdown_conn_func)libcmudp_LTX_shutdown_conn;
+    transport->read_to_buffer_func = (CMTransport_read_to_buffer_func)NULL;
+    transport->read_block_func = (CMTransport_read_block_func)libcmudp_LTX_read_block_func;;
+    transport->writev_func = (CMTransport_writev_func)libcmudp_LTX_writev_func;
+    transport->NBwritev_func = (CMTransport_writev_func)NULL;
+    transport->set_write_notify = (CMTransport_set_write_notify_func)NULL;
+    transport->get_transport_characteristics = (CMTransport_get_transport_characteristics) libcmudp_LTX_get_transport_characteristics;
+    if (transport->transport_init) {
+	transport->trans_data = transport->transport_init(cm, svc, transport);
+    }
+    return transport;
+}
