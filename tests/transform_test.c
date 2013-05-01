@@ -244,7 +244,9 @@ main(int argc, char **argv)
 
     if (regression && regression_master) {
 	int result = do_regression_master_test(0);
+#ifndef NO_DYNAMIC_LINKING
 	result |= do_regression_master_test(1);
+#endif
 	return result;
     }
     cm = CManager_create();
