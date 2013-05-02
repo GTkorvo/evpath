@@ -1389,12 +1389,14 @@ attr_list listen_info;
     char url[256];
     char *hostname;
     char *nnti_transport;
-    NNTI_transport_t trans_hdl;
+    static NNTI_transport_t trans_hdl;
+    static initialized = 0;
     nnti_transport_data_ptr ntd = trans->trans_data;
     int int_port_num = 0;
     attr_list listen_list;
     int nc = 100;
     int nclients = 100;
+    int incoming_size = 10;
     char *last_colon, *first_colon;
     int err;
     int use_enet = 0;
@@ -1412,7 +1414,10 @@ attr_list listen_info;
     /* hope to eliminate this at some point */
     setenv("TRIOS_NNTI_USE_RDMA_TARGET_ACK", "FALSE", 1);
 
-    NNTI_init(NNTI_DEFAULT_TRANSPORT, NULL, &trans_hdl);
+    if (!initialized) {
+	NNTI_init(NNTI_DEFAULT_TRANSPORT, NULL, &trans_hdl);
+	initialized++;
+    }
     NNTI_get_url(&trans_hdl, url, sizeof(url));
     last_colon = rindex(url, ':');
     *last_colon = 0;
@@ -1440,13 +1445,13 @@ attr_list listen_info;
 
     /* at most 100 clients (REALLY NEED TO FIX) */
     nc = (nclients < 100 ? 100 : nclients);
-    ntd->incoming  = malloc (nc * NNTI_REQUEST_BUFFER_SIZE);
+    ntd->incoming  = malloc (incoming_size * NNTI_REQUEST_BUFFER_SIZE);
     ntd->outbound  = malloc (nc * NNTI_REQUEST_BUFFER_SIZE);
-    memset (ntd->incoming, 0, nc * NNTI_REQUEST_BUFFER_SIZE);
+    memset (ntd->incoming, 0, incoming_size * NNTI_REQUEST_BUFFER_SIZE);
     memset (ntd->outbound, 0, nc * NNTI_REQUEST_BUFFER_SIZE);
     
     err = NNTI_register_memory(&trans_hdl, (char*)ntd->incoming, 
-			       NNTI_REQUEST_BUFFER_SIZE, nc,
+			       NNTI_REQUEST_BUFFER_SIZE, incoming_size,
 			       NNTI_RECV_QUEUE, &trans_hdl.me, &ntd->mr_recvs);
     if (err != NNTI_OK) {
       fprintf (stderr, "Error: NNTI_register_memory(NNTI_RECV_DST) for client messages returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
