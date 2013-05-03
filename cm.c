@@ -412,8 +412,8 @@ CMinternal_listen(CManager cm, attr_list listen_info, int try_others)
 					  listen_info);
 	    add_contact_list(cm, attrs);
 	    if (CMtrace_on(cm, CMConnectionVerbose)) {
-		printf("Adding contact list -> ");
-		dump_attr_list(attrs);
+		fprintf(CMTrace_file, "Adding contact list -> ");
+		fdump_attr_list(CMTrace_file, attrs);
 	    }
 	    if (attrs != NULL) {
 		success++;
@@ -1150,12 +1150,12 @@ CMControlList_free(CMControlList cl)
 {
     cl->free_reference_count--;
     if (CMtrace_val[CMFreeVerbose]) {
-	printf("CMControlList_free, %lx, ref count now %d\n", (long)cl,
+	fprintf(CMTrace_file, "CMControlList_free, %lx, ref count now %d\n", (long)cl,
 	       cl->free_reference_count);
     }
     if(cl->free_reference_count == 0) {
 	if (CMtrace_val[CMFreeVerbose]) {
-	    printf("CMControlList_free freeing %lx\n", (long)cl);
+	    fprintf(CMTrace_file, "CMControlList_free freeing %lx\n", (long)cl);
 	}
 	if (cl->polling_function_list != NULL) {
 	    INT_CMfree(cl->polling_function_list);
@@ -1305,18 +1305,24 @@ CMinternal_initiate_conn(CManager cm, attr_list attrs)
 }
 
 static void
-dump_CMConnection(CMConnection conn)
+fdump_CMConnection(FILE *out, CMConnection conn)
 {
     if (conn == NULL) {
-	printf("CMConnection NULL\n");
+	fprintf(out, "CMConnection NULL\n");
 	return;
     }
-    printf("CMConnection %lx, reference count %d, closed %d\n\tattrs : ", 
+    fprintf(out, "CMConnection %lx, reference count %d, closed %d\n\tattrs : ", 
 	   (long) conn, conn->ref_count, conn->closed);
-    dump_attr_list(conn->attrs);
-    printf("\tbuffer_full_point %d, current buffer_end %d\n", 
+    fdump_attr_list(out, conn->attrs);
+    fprintf(out, "\tbuffer_full_point %d, current buffer_end %d\n", 
 	   conn->buffer_full_point, conn->buffer_data_end);
-    printf("\twrite_pending %d\n", conn->write_pending);
+    fprintf(out, "\twrite_pending %d\n", conn->write_pending);
+}
+
+static void
+dump_CMConnection(CMConnection conn)
+{
+    fdump_CMConnection(stdout, conn);
 }
 
 CMConnection
@@ -1326,11 +1332,11 @@ INT_CMinitiate_conn(CManager cm, attr_list attrs)
     if (!cm->initialized) CMinitialize(cm);
     conn = CMinternal_initiate_conn(cm, attrs);
     if (CMtrace_on(cm, CMConnectionVerbose)) {
-	printf("CMinitiate_conn returning ");
+	fprintf(CMTrace_file, "CMinitiate_conn returning ");
 	if (conn != NULL) {
-	    dump_CMConnection(conn);
+	    fdump_CMConnection(CMTrace_file, conn);
 	} else {
-	    printf("NULL\n");
+	    fprintf(CMTrace_file, "NULL\n");
 	}
     }
     return conn;
@@ -1349,8 +1355,8 @@ CMinternal_get_conn(CManager cm, attr_list attrs)
     CMConnection conn = NULL;
     assert(CManager_locked(cm));
     if (CMtrace_on(cm, CMConnectionVerbose)) {
-	printf("In CMinternal_get_conn, attrs ");
-	if (attrs) dump_attr_list(attrs); else printf("\n");
+	fprintf(CMTrace_file, "In CMinternal_get_conn, attrs ");
+	if (attrs) fdump_attr_list(CMTrace_file, attrs); else fprintf(CMTrace_file, "\n");
     }
     for (i=0; i<cm->connection_count; i++) {
 	CMConnection tmp = cm->connections[i];
@@ -1368,11 +1374,11 @@ CMinternal_get_conn(CManager cm, attr_list attrs)
 	conn->ref_count++;
     }
     if (CMtrace_on(cm, CMConnectionVerbose)) {
-	printf("CMinternal_get_conn returning ");
+	fprintf(CMTrace_file, "CMinternal_get_conn returning ");
 	if (conn != NULL) {
-	    dump_CMConnection(conn);
+	    fdump_CMConnection(CMTrace_file, conn);
 	} else {
-	    printf("NULL\n");
+	    fprintf(CMTrace_file, "NULL\n");
 	}
     }
     return conn;
@@ -2019,8 +2025,8 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
     if (attr_length != 0) {
 	attrs = CMdecode_attr_from_xmit(conn->cm, base);
 	if (CMtrace_on(conn->cm, CMDataVerbose)) {
-	    fprintf(stderr, "CM - Incoming read attributes -> ");
-	    dump_attr_list(attrs);
+	    fprintf(CMTrace_file, "CM - Incoming read attributes -> ");
+	    fdump_attr_list(CMTrace_file, attrs);
 	}
     }
     if (event_msg) {
@@ -2103,7 +2109,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	printf("CM - record type %s, contents are:\n  ", name_of_FMformat(FMFormat_of_original(cm_format->format)));
+	fprintf(CMTrace_file, "CM - record type %s, contents are:\n  ", name_of_FMformat(FMFormat_of_original(cm_format->format)));
 	r = FMdump_data(FMFormat_of_original(cm_format->format), decode_buffer, dump_char_limit);
 	if (r && !warned) {
 	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
@@ -2567,17 +2573,17 @@ INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data,
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	printf("CM - Writing record of type %s\n",
+	fprintf(CMTrace_file, "CM - Writing record of type %s\n",
 	       name_of_FMformat(format->fmformat));
 	if (attrs != NULL) {
-	    printf("CM - write attributes are:");
-	    dump_attr_list(attrs);
+	    fprintf(CMTrace_file, "CM - write attributes are:");
+	    fdump_attr_list(CMTrace_file, attrs);
 	}
-	printf("CM - record type %s, contents are:\n  ", name_of_FMformat(format->fmformat));
+	fprintf(CMTrace_file, "CM - record type %s, contents are:\n  ", name_of_FMformat(format->fmformat));
 	r = FMdump_data(format->fmformat, data, dump_char_limit);
 	if (r && !warned) {
-	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
-	    printf("  To change size limits, set CMDumpSize environment variable.\n\n\n");
+	    fprintf(CMTrace_file, "\n\n  ****  Warning **** CM record dump truncated\n");
+	    fprintf(CMTrace_file, "  To change size limits, set CMDumpSize environment variable.\n\n\n");
 	    warned++;
 	}
     }
@@ -2691,27 +2697,27 @@ internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	printf("CM - Writing record %lx of type %s\n", (long)event,
+	fprintf(CMTrace_file, "CM - Writing record %lx of type %s\n", (long)event,
 	       name_of_FMformat(format->fmformat));
 	if (attrs != NULL) {
-	    printf("CM - write attributes are:");
-	    dump_attr_list(attrs);
+	    fprintf(CMTrace_file, "CM - write attributes are:");
+	    fdump_attr_list(CMTrace_file, attrs);
 	} else {
-	    printf("CM - write attrs NULL\n");
+	    fprintf(CMTrace_file, "CM - write attrs NULL\n");
 	}
-	printf("CM - record type %s, contents ", name_of_FMformat(format->fmformat));
+	fprintf(CMTrace_file, "CM - record type %s, contents ", name_of_FMformat(format->fmformat));
 	if (event->decoded_event) {
-	    printf("DECODED are:\n  ");
+	    fprintf(CMTrace_file, "DECODED are:\n  ");
 	    r = FMdump_data(format->fmformat, event->decoded_event,
 			    dump_char_limit);
 	} else {
-	    printf("ENCODED are:\n  ");
+	    fprintf(CMTrace_file, "ENCODED are:\n  ");
 	    r = FMdump_encoded_data(format->fmformat,
 				    event->encoded_event, dump_char_limit);
 	}	    
 	if (r && !warned) {
-	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
-	    printf("  To change size limits, set CMDumpSize environment variable.\n\n\n");
+	    fprintf(CMTrace_file, "\n\n  ****  Warning **** CM record dump truncated\n");
+	    fprintf(CMTrace_file, "  To change size limits, set CMDumpSize environment variable.\n\n\n");
 	    warned++;
 	}
     }

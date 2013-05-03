@@ -346,6 +346,9 @@ print INT<<EOF;
  *
  */
 #include "config.h"
+#include "stdio.h"
+#include "string.h"
+#include "stdlib.h"
 #include "ffs.h"
 #include "cod.h"
 #include "atl.h"
@@ -490,6 +493,7 @@ print REVP<<EOF;
 #include "ffs.h"
 #include "atl.h"
 #include "evpath.h"
+#include "stdio.h"
 #include "cm_internal.h"
 #ifdef LT_LIBPREFIX
 #include "ltdl.h"

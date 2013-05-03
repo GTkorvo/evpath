@@ -494,8 +494,10 @@ extern void INT_EVregister_close_handler(CManager cm, EVStoneCloseHandlerFunc ha
 extern void CMwake_server_thread(CManager cm);
 extern int CMtrace_val[];
 extern int CMtrace_init(CMTraceType t);
+extern void INT_CMTrace_file_id(int ID);
+extern FILE* CMTrace_file;
 #define CMtrace_on(cm, trace_type)  ((CMtrace_val[0] == -1) ? CMtrace_init(trace_type) : CMtrace_val[trace_type])
-#define CMtrace_out(cm, trace_type, ...) (CMtrace_on(cm,trace_type) ? (CMtrace_on(cm,CMLowLevelVerbose) ? printf("P%lxT%lx - ", (long) getpid(), (long)thr_thread_self()) : 0) , printf(__VA_ARGS__) : 0)
+#define CMtrace_out(cm, trace_type, ...) (CMtrace_on(cm,trace_type) ? (CMtrace_on(cm,CMLowLevelVerbose) ? fprintf(CMTrace_file, "P%lxT%lx - ", (long) getpid(), (long)thr_thread_self()) : 0) , fprintf(CMTrace_file, __VA_ARGS__) : 0)
 extern void CMdo_performance_response(CMConnection conn, long length, int func,
 				      int byte_swap, char *buffer);
 extern int

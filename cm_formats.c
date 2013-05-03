@@ -1,10 +1,5 @@
 #include "config.h"
 
-#include "ffs.h"
-#include "atl.h"
-#include "evpath.h"
-#include "gen_thread.h"
-#include "cm_internal.h"
 #ifndef MODULE
 #include <stdio.h>
 #include <string.h>
@@ -22,6 +17,11 @@
 #include "assert.h"
 
 #endif
+#include "ffs.h"
+#include "atl.h"
+#include "evpath.h"
+#include "gen_thread.h"
+#include "cm_internal.h"
 
 static void add_format_to_cm ARGS((CManager cm, CMFormat format));
 
@@ -379,9 +379,9 @@ preload_pbio_format(CMConnection conn, FMFormat ioformat)
 #ifndef MODULE
 	if (CMtrace_on(conn->cm, CMFormatVerbose)) {
 	    int junk;
-	    printf("CMpbio Preload is format ");
+	    fprintf(CMTrace_file, "CMpbio Preload is format ");
 	    print_server_ID((unsigned char *)get_server_ID_FMformat(ioformat, &junk));
-	    printf("\n");
+	    fprintf(CMTrace_file, "\n");
 	}
 #endif
 }

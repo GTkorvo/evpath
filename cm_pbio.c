@@ -1,10 +1,5 @@
 #include "config.h"
 
-#include "ffs.h"
-#include "gen_thread.h"
-#include "atl.h"
-#include "evpath.h"
-#include "cm_internal.h"
 #ifndef MODULE
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,6 +36,11 @@ inet_ntoa(struct in_addr ina)
 }
 #endif
 #include "assert.h"
+#include "ffs.h"
+#include "gen_thread.h"
+#include "atl.h"
+#include "evpath.h"
+#include "cm_internal.h"
 #include "cercs_env.h"
 
 /*
@@ -253,9 +253,9 @@ CMpbio_get_format_rep_callback(void *format_ID, int format_ID_length,
     CMtrace_out(cm, CMFormatVerbose, "CMpbio request for format from host %x, port %d\n", host_IP, host_port);
 #ifndef MODULE
     if (CMtrace_on(cm, CMFormatVerbose)) {
-	printf("CMpbio request is for format ");
+	fprintf(CMTrace_file, "CMpbio request is for format ");
 	print_server_ID(format_ID);
-	printf("\n");
+	fprintf(CMTrace_file, "\n");
     }
 #endif
 
@@ -731,9 +731,9 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
 	    CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio - loaded format\n");
 #ifndef MODULE
 	    if (CMtrace_on(conn->cm, CMFormatVerbose)) {
-		printf("CMpbio Preload is format ");
+		fprintf(CMTrace_file, "CMpbio Preload is format ");
 		print_server_ID((unsigned char*)format_ID);
-		printf("\n");
+		fprintf(CMTrace_file, "\n");
 	    }
 #endif
 	}

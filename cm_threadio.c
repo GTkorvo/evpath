@@ -1,12 +1,12 @@
 #include <atl.h>
 #include <gen_thread.h>
 #include <evpath.h>
-#include <cm_internal.h>
-#include <cm_transport.h>
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <cm_internal.h>
+#include <cm_transport.h>
 
 static transport_entry
 create_thread_read_transport(CManager cm, transport_entry original) {

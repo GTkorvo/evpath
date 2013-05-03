@@ -1465,7 +1465,7 @@ static void reconfig_deploy(EVdfg dfg)
     CManager_lock(dfg->cm);
     if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
 	for (i = 0; i < dfg->stone_count; ++i) {
-	    printf("Stone# %d : ", i);
+	    fprintf(CMTrace_file, "Stone# %d : ", i);
 	    dump_dfg_stone(dfg->stones[i]);
 	}
     }

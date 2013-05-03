@@ -18,13 +18,14 @@ static void reference_event(event_item *event);
 static void dump_action(stone_type stone, response_cache_element *resp, 
 			int a, const char *indent);
 static void dump_stone(stone_type stone);
+static void fdump_stone(FILE* out, stone_type stone);
 static int is_bridge_stone(CManager cm, EVstone stone_num);
 
 static const char *action_str[] = { "Action_NoAction","Action_Bridge", "Action_Thread_Bridge", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Encode_to_Buffer", "Action_Split", "Action_Store", "Action_Congestion", "Action_Source"};
 
 
 static void
-print_stone_identifier(event_path_data evp, int stone_num)
+fprint_stone_identifier(FILE *out, event_path_data evp, int stone_num)
 {
     int local_stone_num = -1;
     int global_stone_num = -1;
@@ -41,12 +42,17 @@ print_stone_identifier(event_path_data evp, int stone_num)
 	    }
 	}
     }
-    printf("local stone number %x", local_stone_num);
+    fprintf(out, "local stone number %x", local_stone_num);
     if (global_stone_num != -1) {
-	printf(" (global %x)", global_stone_num);
+	fprintf(out, " (global %x)", global_stone_num);
     }
 }
 
+static void
+print_stone_identifier(event_path_data evp, int stone_num)
+{
+    fprint_stone_identifier(stdout, evp, stone_num);
+}
 
 extern int
 lookup_local_stone(event_path_data evp, int stone_num)
@@ -417,10 +423,10 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone_num,
     stone->response_cache[action_num].proto_action_id = proto_action_num;
     stone->proto_action_count++;
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Adding Terminal action %d to ", action_num);
-	print_stone_identifier(evp, stone_num);
-	printf("\nStone dump->\n");
-	dump_stone(stone);
+	fprintf(CMTrace_file, "Adding Terminal action %d to ", action_num);
+	fprint_stone_identifier(CMTrace_file, evp, stone_num);
+	fprintf(CMTrace_file, "\nStone dump->\n");
+	fdump_stone(CMTrace_file, stone);
     }
     return action_num;
 }
@@ -543,9 +549,9 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
 
     action_num = add_proto_action(cm, stone, &act);
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Adding Immediate action %d to ", action_num);
-	print_stone_identifier(evp, stone_num);
-	printf("\naction value is \"%s\"\n", action_spec);
+	fprintf(CMTrace_file, "Adding Immediate action %d to ", action_num);
+	fprint_stone_identifier(CMTrace_file, evp, stone_num);
+	fprintf(CMTrace_file, "\naction value is \"%s\"\n", action_spec);
     }
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
@@ -579,9 +585,9 @@ INT_EVassoc_multi_action(CManager cm, EVstone stone_num,
     if (!stone) return -1;
     action_num = stone->proto_action_count;
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Adding Multi action %d to ", action_num);
-	print_stone_identifier(evp, stone_num);
-	printf("\nmulti action is \"%s\"\n", action_spec);
+	fprintf(CMTrace_file, "Adding Multi action %d to ", action_num);
+	fprint_stone_identifier(CMTrace_file, evp, stone_num);
+	fprintf(CMTrace_file, "\nmulti action is \"%s\"\n", action_spec);
     }
 
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
@@ -915,9 +921,9 @@ INT_EVassoc_conversion_action(CManager cm, int stone_id, int stage,
     if (CMtrace_on(cm, EVerbose)) {
 	char *target_tmp = global_name_of_FMFormat(target_format);
 	char *incoming_tmp = global_name_of_FMFormat(incoming_format);
-	printf("Adding Conversion action %d to ", a);
-	print_stone_identifier(cm->evp, stone_id);
-	printf("\n   Incoming format is %s, target %s\n", incoming_tmp, 
+	fprintf(CMTrace_file, "Adding Conversion action %d to ", a);
+	fprint_stone_identifier(CMTrace_file, cm->evp, stone_id);
+	fprintf(CMTrace_file, "\n   Incoming format is %s, target %s\n", incoming_tmp, 
 	       target_tmp);
     }
     stone->response_cache = realloc(stone->response_cache,
@@ -956,11 +962,11 @@ INT_EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num,
         assert((stone->proto_actions[act_num].action_type == Action_Immediate) ||
                (stone->proto_actions[act_num].action_type == Action_Multi));
 	if (CMtrace_on(cm, EVerbose)) {
-	    printf("Setting output %d on ", output_index);
-	    print_stone_identifier(cm->evp, stone_num);
-	    printf(" to forward to ");
-	    print_stone_identifier(cm->evp, output_stone);
-	    printf("\n");
+	    fprintf(CMTrace_file, "Setting output %d on ", output_index);
+	    fprint_stone_identifier(CMTrace_file, cm->evp, stone_num);
+	    fprintf(CMTrace_file, " to forward to ");
+	    fprint_stone_identifier(CMTrace_file, cm->evp, output_stone);
+	    fprintf(CMTrace_file, "\n");
 	}
         output_count = stone->proto_actions[act_num].o.imm.output_count;
         if (output_index >= output_count) {
@@ -1281,58 +1287,58 @@ cod_decode_event(CManager cm, int stone_num, int act_num, event_item *event) {
 }
 
 static void
-dump_proto_action(stone_type stone, int a, const char *indent)
+fdump_proto_action(FILE *out, stone_type stone, int a, const char *indent)
 {
     proto_action *proto = &stone->proto_actions[a];
     (void)indent;
-    printf(" Proto-Action %d - %s\n", a, action_str[proto->action_type]);
+    fprintf(out, " Proto-Action %d - %s\n", a, action_str[proto->action_type]);
 }
 
 static void
-dump_action(stone_type stone, response_cache_element *resp, int a, const char *indent)
+fdump_action(FILE* out, stone_type stone, response_cache_element *resp, int a, const char *indent)
 {
     proto_action *act;
     (void)indent;
     if ((resp != NULL) && (resp->action_type == Action_NoAction)) {
-	printf("NO ACTION REGISTERED\n");
+	fprintf(out, "NO ACTION REGISTERED\n");
 	return;
     }
     act = &stone->proto_actions[a];
-    printf(" Action %d - %s  ", a, action_str[act->action_type]);
+    fprintf(out, " Action %d - %s  ", a, action_str[act->action_type]);
     if (act->data_state == Accepts_All) {
-	printf("accepts any encode state\n");
+	fprintf(out, "accepts any encode state\n");
     } else if (act->data_state == Requires_Decoded) {
-	printf("requires decoded\n");
+	fprintf(out, "requires decoded\n");
     } else if (act->data_state == Requires_Contig_Encoded) {
-	printf("requires contiguous encoded\n");
+	fprintf(out, "requires contiguous encoded\n");
     } else if (act->data_state == Requires_Vector_Encoded) {
-	printf("requires vector encoded\n");
+	fprintf(out, "requires vector encoded\n");
     }
-    printf("  expects formats ");
+    fprintf(out, "  expects formats ");
     if (act->matching_reference_formats) {
 	int i = 0;
 	while (act->matching_reference_formats[i] != NULL) {
 	    char *tmp;
-	    printf("\"%s\" (%p), ", tmp = global_name_of_FMFormat(act->matching_reference_formats[i]), act->matching_reference_formats[i]);
+	    fprintf(out, "\"%s\" (%p), ", tmp = global_name_of_FMFormat(act->matching_reference_formats[i]), act->matching_reference_formats[i]);
 	    i++;
 	    free(tmp);
 	}
     } else {
-	printf(" NULL");
+	fprintf(out, " NULL");
     }
-    printf("\n");
+    fprintf(out, "\n");
     switch(act->action_type) {
     case Action_Bridge:
-	printf("  Target: %s: connection %lx, remote_stone_id %d\n",
+	fprintf(out, "  Target: %s: connection %lx, remote_stone_id %d\n",
 	       (act->o.bri.remote_path ? act->o.bri.remote_path : "NULL" ),
 	       (long)(void*)act->o.bri.conn, act->o.bri.remote_stone_id);
-	if (act->o.bri.conn != NULL) dump_attr_list(act->o.bri.conn->attrs);
-	if (act->o.bri.conn_failed) printf("Connection has FAILED!\n");
+	if (act->o.bri.conn != NULL) fdump_attr_list(out, act->o.bri.conn->attrs);
+	if (act->o.bri.conn_failed) fprintf(out, "Connection has FAILED!\n");
 	break;
     case Action_Thread_Bridge:
-	printf("  Target: CManager %p, stone_id %d\n",
+	fprintf(out, "  Target: CManager %p, stone_id %d\n",
 	       act->o.thr_bri.target_cm, act->o.thr_bri.target_stone_id);
-	if (act->o.thr_bri.target_cm_shutdown) printf("TARGET CM HAS SHUTDOWN!\n");
+	if (act->o.thr_bri.target_cm_shutdown) fprintf(out, "TARGET CM HAS SHUTDOWN!\n");
 	break;
     case Action_Terminal:
 	break;
@@ -1341,52 +1347,52 @@ dump_action(stone_type stone, response_cache_element *resp, int a, const char *i
 	act->proto_action_id);*/
 	break;
     case Action_Decode:
-	printf("   Decoding action\n");
+	fprintf(out, "   Decoding action\n");
 	break;
     case Action_Split:
-	printf("    Split target stones: ");
+	fprintf(out, "    Split target stones: ");
 	{
 	    int i = 0;
 	    while (act->o.split_stone_targets[i] != -1) {
-		printf(" %d", act->o.split_stone_targets[i]); i++;
+		fprintf(out, " %d", act->o.split_stone_targets[i]); i++;
 	    }
-	    printf("\n");
+	    fprintf(out, "\n");
 	}
 	break;
     case Action_Immediate: 
-	printf("   Immediate action\n");
-	printf("       Target Stones:");
+	fprintf(out, "   Immediate action\n");
+	fprintf(out, "       Target Stones:");
 	{
 	    int i;
 	    for(i = 0; i < act->o.imm.output_count; i++) {
 		if (i != act->o.imm.output_count - 1) {
-		    printf(" %d,", act->o.imm.output_stone_ids[i]);
+		    fprintf(out, " %d,", act->o.imm.output_stone_ids[i]);
 		} else {
-		    printf(" %d\n", act->o.imm.output_stone_ids[i]);
+		    fprintf(out, " %d\n", act->o.imm.output_stone_ids[i]);
 		}
 	    }
 	}
 	dump_mrd(act->o.imm.mutable_response_data);
 	break;
     case Action_Store:
-        printf("   Store action: %d/%d items\n", act->o.store.num_stored, 
+        fprintf(out, "   Store action: %d/%d items\n", act->o.store.num_stored, 
                     act->o.store.max_stored);
     case Action_NoAction:
-	printf("   NoAction\n");
+	fprintf(out, "   NoAction\n");
 	break;
     case Action_Multi:
-	printf("   Multi action\n");
-	printf("       Target Stones: ");
+	fprintf(out, "   Multi action\n");
+	fprintf(out, "       Target Stones: ");
 	{
 	    int i;
 	    for(i = 0; i < act->o.imm.output_count; i++) {
 		if (i != act->o.imm.output_count - 1) {
-		    printf(" %d,", act->o.imm.output_stone_ids[i]);
+		    fprintf(out, " %d,", act->o.imm.output_stone_ids[i]);
 		} else {
-		    printf(" %d", act->o.imm.output_stone_ids[i]);
+		    fprintf(out, " %d", act->o.imm.output_stone_ids[i]);
 		}
 	    }
-            printf("\n");
+            fprintf(out, "\n");
 	}
 	dump_mrd(act->o.imm.mutable_response_data);
 	break;
@@ -1398,25 +1404,37 @@ dump_action(stone_type stone, response_cache_element *resp, int a, const char *i
 static void
 dump_stone(stone_type stone)
 {
+    fdump_stone(stdout, stone);
+}
+
+static void
+fdump_stone(FILE* out, stone_type stone)
+{
     int i;
-    printf("Dump stone ID %d, local addr %lx, default action %d\n",
+    fprintf(out, "Dump stone ID %d, local addr %lx, default action %d\n",
 	   stone->local_id, (long)stone, stone->default_action);
-    printf("  proto_action_count %d:\n", stone->proto_action_count);
+    fprintf(out, "  proto_action_count %d:\n", stone->proto_action_count);
     for (i=0; i< stone->proto_action_count; i++) {
-	dump_proto_action(stone, i, "    ");
+	fdump_proto_action(out, stone, i, "    ");
     }
-    printf("  proto_action_count %d:\n", stone->proto_action_count);
+    fprintf(out, "  proto_action_count %d:\n", stone->proto_action_count);
     for (i=0; i< stone->proto_action_count; i++) {
-	dump_action(stone, NULL, i, "    ");
+	fdump_action(out, stone, NULL, i, "    ");
     }
-    printf("  response_cache_count %d:\n", stone->response_cache_count);
+    fprintf(out, "  response_cache_count %d:\n", stone->response_cache_count);
     for (i=0; i< stone->response_cache_count; i++) {
 	response_cache_element *resp = &stone->response_cache[i];
-	printf("Response cache item %d, reference format %p (%s)\n", i, resp->reference_format,
+	fprintf(out, "Response cache item %d, reference format %p (%s)\n", i, resp->reference_format,
 	       resp->reference_format ? name_of_FMformat(resp->reference_format) : "<none>");
-	printf("stage %d, action_type %s, proto_action_id %d, requires_decoded %d\n", resp->stage,
+	fprintf(out, "stage %d, action_type %s, proto_action_id %d, requires_decoded %d\n", resp->stage,
 	       action_str[resp->action_type], resp->proto_action_id, resp->requires_decoded);
     }
+}
+
+static void
+dump_action(stone_type stone, response_cache_element *resp, int a, const char *indent)
+{
+    fdump_action(stdout, stone, resp, a, indent);
 }
 
 void
@@ -1556,9 +1574,9 @@ process_events_stone(CManager cm, int s, action_class c)
     action_state as = evp->as;
 
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Considering events on ");
-	print_stone_identifier(evp, s);
-	printf("\n");
+	fprintf(CMTrace_file, "Considering events on ");
+	fprint_stone_identifier(CMTrace_file, evp, s);
+	fprintf(CMTrace_file, "\n");
     }
     if (s == -1) return 0;
     if (as->last_active_stone == s) as->last_active_stone = -1;
@@ -1573,9 +1591,9 @@ process_events_stone(CManager cm, int s, action_class c)
     if (is_bridge_stone(cm, s) && (c != Bridge) && (c != Congestion)) return 0;
     
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Process events ");
-	print_stone_identifier(evp, s);
-	printf("\n");
+	fprintf(CMTrace_file, "Process events ");
+	fprint_stone_identifier(CMTrace_file, evp, s);
+	fprintf(CMTrace_file, "\n");
     }
     item = stone->queue->queue_head;
     if (is_bridge_stone(cm, s) && (c == Bridge)) {
@@ -1631,11 +1649,11 @@ process_events_stone(CManager cm, int s, action_class c)
 		resp = &stone->response_cache[resp_id];
 	    }
 	    if (CMtrace_on(cm, EVerbose)) {
-		printf("next action event %lx on ", (long)event);
-		print_stone_identifier(evp, s);
-		printf(" action %lx\n", (long)resp);
+		fprintf(CMTrace_file, "next action event %lx on ", (long)event);
+		fprint_stone_identifier(CMTrace_file, evp, s);
+		fprintf(CMTrace_file, " action %lx\n", (long)resp);
 		
-		dump_action(stone, resp, resp->proto_action_id, "    ");
+		fdump_action(CMTrace_file, stone, resp, resp->proto_action_id, "    ");
 	    }
             act = &stone->response_cache[resp_id];
             if (c == Immediate_and_Multi && act->action_type != Action_NoAction) {
@@ -1979,10 +1997,10 @@ do_bridge_action(CManager cm, int s)
         backpressure_check(cm, s);
 	if (ret == 0) {
 	    if (CMtrace_on(cm, EVWarning)) {
-		printf("Warning!  Write failed for output action %d on stone %x, event likely not transmitted\n", a, s);
-		printf("   -  Bridge stone ");
-		print_stone_identifier(evp, s);
-		printf(" disabled\n");
+		fprintf(CMTrace_file, "Warning!  Write failed for output action %d on stone %x, event likely not transmitted\n", a, s);
+		fprintf(CMTrace_file, "   -  Bridge stone ");
+		fprint_stone_identifier(CMTrace_file, evp, s);
+		fprintf(CMTrace_file, " disabled\n");
 	    }
 	    if (act->o.bri.conn != NULL) 
 		INT_CMConnection_close(act->o.bri.conn);
@@ -2079,9 +2097,9 @@ INT_EVassoc_anon_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
     stone->response_cache = realloc(stone->response_cache, sizeof(stone->response_cache[0]) * (resp_num + 1));
     response_cache_element *resp;
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Installing anon action response for multi action %d on ", act_num);
-	print_stone_identifier(evp, stone_id);
-	printf("\n");
+	fprintf(CMTrace_file, "Installing anon action response for multi action %d on ", act_num);
+	fprint_stone_identifier(CMTrace_file, evp, stone_id);
+	fprintf(CMTrace_file, "\n");
     }
     resp = &stone->response_cache[stone->response_cache_count];
     resp->action_type = stone->proto_actions[act_num].action_type;
@@ -2093,7 +2111,7 @@ INT_EVassoc_anon_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
     resp->reference_format = anon_target;
     if (CMtrace_on(cm, EVerbose)) {
 	char *tmp;
-	printf("\tResponse %d for format \"%s\"(%p)", stone->response_cache_count, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
+	fprintf(CMTrace_file, "\tResponse %d for format \"%s\"(%p)", stone->response_cache_count, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
 	free(tmp);
     }
     stone->response_cache_count += 1;
@@ -2117,10 +2135,10 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
     stone->response_cache = realloc(stone->response_cache, sizeof(stone->response_cache[0]) * (resp_num + queue_count));
     response_cache_element *resp;
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Installing %d mutated action responses for multi action %d on ",
+	fprintf(CMTrace_file, "Installing %d mutated action responses for multi action %d on ",
 		queue_count, act_num);
-	print_stone_identifier(evp, stone_id);
-	printf("\n");
+	fprint_stone_identifier(CMTrace_file, evp, stone_id);
+	fprintf(CMTrace_file, "\n");
     }
     for (i=0; i < queue_count; i++) {
 	resp = &stone->response_cache[stone->response_cache_count + i];
@@ -2134,7 +2152,7 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
 	resp->reference_format = reference_formats[i];
 	if (CMtrace_on(cm, EVerbose)) {
 	    char *tmp;
-	    printf("\tResponse %d for format \"%s\"(%p)", i, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
+	    fprintf(CMTrace_file, "\tResponse %d for format \"%s\"(%p)", i, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
 	    i++;
 	    free(tmp);
 	}
@@ -2211,13 +2229,13 @@ INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list
     conn = INT_CMget_conn(cm, contact_list);
     if (conn == NULL) {
 	if (CMtrace_on(cm, EVWarning)) {
-	    printf("EVassoc_bridge_action - failed to contact host at contact point \n\t");
+	    fprintf(CMTrace_file, "EVassoc_bridge_action - failed to contact host at contact point \n\t");
 	    if (contact_list != NULL) {
-		dump_attr_list(contact_list);
+		fdump_attr_list(CMTrace_file, contact_list);
 	    } else {
-		printf("NULL\n");
+		fprintf(CMTrace_file, "NULL\n");
 	    }
-	    printf("Bridge action association failed for stone %x, outputting to remote stone %x\n",
+	    fprintf(CMTrace_file, "Bridge action association failed for stone %x, outputting to remote stone %x\n",
 		   stone_num, remote_stone);
 	}
 	return -1;
@@ -2225,9 +2243,9 @@ INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list
     INT_CMconn_register_close_handler(conn, stone_close_handler, 
 				      (void*)(long)stone_num);
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Adding bridge action %d to ", action_num);
-	print_stone_identifier(evp, stone_num);
-	printf(" remote stone target is %x\n", remote_stone);
+	fprintf(CMTrace_file, "Adding bridge action %d to ", action_num);
+	fprint_stone_identifier(CMTrace_file, evp, stone_num);
+	fprintf(CMTrace_file, " remote stone target is %x\n", remote_stone);
     }
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (action_num + 1) * 
@@ -2256,9 +2274,9 @@ INT_EVassoc_thread_bridge_action(CManager cm, EVstone stone_num,
 
     action_num = stone->proto_action_count;
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Adding thread bridge action %d to ", action_num);
-	print_stone_identifier(evp, stone_num);
-	printf("\n");
+	fprintf(CMTrace_file, "Adding thread bridge action %d to ", action_num);
+	fprint_stone_identifier(CMTrace_file, evp, stone_num);
+	fprintf(CMTrace_file, "\n");
     }
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (action_num + 1) * 
@@ -2306,13 +2324,13 @@ INT_EVassoc_split_action(CManager cm, EVstone stone_num,
 	target_count++;
     }
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Adding Split action %d to ", action_num);
-	print_stone_identifier(evp, stone_num);
-	printf(", %d target stones -> ", target_count);
+	fprintf(CMTrace_file, "Adding Split action %d to ", action_num);
+	fprint_stone_identifier(CMTrace_file, evp, stone_num);
+	fprintf(CMTrace_file, ", %d target stones -> ", target_count);
 	for (i=0; i < target_count; i++) {
-	    printf("%x, ", target_stone_list[i]);
+	    fprintf(CMTrace_file, "%x, ", target_stone_list[i]);
 	}
-	printf("\n");
+	fprintf(CMTrace_file, "\n");
     }
     stone->proto_actions[action_num].o.split_stone_targets = 
 	malloc((target_count + 1) * sizeof(EVstone));
@@ -2990,7 +3008,7 @@ INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec,
     }
     if (acceptable_action == 0) {
 	printf("Warning!  Enabling auto events on ");
-	print_stone_identifier(cm->evp, stone_num);
+	fprint_stone_identifier(CMTrace_file, cm->evp, stone_num);
 	printf(", but no acceptable actions found!\n");
     }
     handle = INT_CMadd_periodic_task(cm, period_sec, period_usec,
@@ -2998,9 +3016,9 @@ INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec,
 				     (void*)(long)stone_num);
     stone->periodic_handle = handle;
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Enabling auto events on ");
-	print_stone_identifier(cm->evp, stone_num);
-	printf("\n");
+	fprintf(CMTrace_file, "Enabling auto events on ");
+	fprint_stone_identifier(CMTrace_file, cm->evp, stone_num);
+	fprintf(CMTrace_file, "\n");
     }
 }
 
@@ -3072,9 +3090,9 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     event->attrs = CMadd_ref_attr_list(cm, attrs);
     event->format = NULL;
     if (CMtrace_on(cm, EVerbose)) {
-	printf("Event coming in from network to ");
-	print_stone_identifier(evp, stone_id);
-	printf("\n");
+	fprintf(CMTrace_file, "Event coming in from network to ");
+	fprint_stone_identifier(CMTrace_file, evp, stone_id);
+	fprintf(CMTrace_file, "\n");
     }
     if (CMtrace_on(conn->cm, EVerbose)) {
 	static int dump_char_limit = 256;
@@ -3088,12 +3106,12 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	printf("CM - record type %s, contents are:\n  ", name_of_FMformat(event->reference_format));
-	r = FMdump_encoded_data(event->reference_format,
+	fprintf(CMTrace_file, "CM - record type %s, contents are:\n  ", name_of_FMformat(event->reference_format));
+	r = FMfdump_encoded_data(CMTrace_file, event->reference_format,
 				event->encoded_event, dump_char_limit);
 	if (r && !warned) {
-	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
-	    printf("  To change size limits, set CMDumpSize environment variable.\n\n\n");
+	    fprintf(CMTrace_file, "\n\n  ****  Warning **** CM record dump truncated\n");
+	    fprintf(CMTrace_file, "  To change size limits, set CMDumpSize environment variable.\n\n\n");
 	    warned++;
 	}
     }

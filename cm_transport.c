@@ -1,9 +1,5 @@
 #include "config.h"
 
-#include <atl.h>
-#include <evpath.h>
-#include <cm_internal.h>
-#include <cm_transport.h>
 #ifndef MODULE
 #include <stdio.h>
 #include <string.h>
@@ -16,6 +12,10 @@
 /* don't pull in sys/types if MODULE is defined */
 #define _SYS_TYPES_H
 #endif
+#include <atl.h>
+#include <evpath.h>
+#include <cm_internal.h>
+#include <cm_transport.h>
 #include "dlloader.h"
 #include "assert.h"
 

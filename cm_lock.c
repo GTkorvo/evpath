@@ -1,10 +1,4 @@
 #include "config.h"
-#include "ffs.h"
-#include "gen_thread.h"
-#include "atl.h"
-#include "evpath.h"
-#include "cm_internal.h"
-#include "config.h"
 
 #ifndef MODULE
 #include <stdio.h>
@@ -14,6 +8,12 @@
 #include "kernel/kcm.h"
 #include "kernel/library.h"
 #endif
+#include "ffs.h"
+#include "gen_thread.h"
+#include "atl.h"
+#include "evpath.h"
+#include "cm_internal.h"
+#include "config.h"
 #include "assert.h"
 
 extern void

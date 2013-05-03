@@ -153,6 +153,16 @@ extern CManager CManager_create();
 extern void CManager_close ARGS((CManager cm));
 
 /*!
+ * specify a numerical identifier to be used as part of a trace output filename
+ *
+ * \param ID    the numerical identifier;
+ *
+ *
+ */
+/*NOLOCK*/
+extern void CMTrace_file_id ARGS((int ID));
+
+/*!
  * fork a thread to handle the network input operations of a CM.
  *
  * \param cm The CManager whose input should be handled by a new thread.

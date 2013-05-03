@@ -1,9 +1,4 @@
 #include "config.h"
-#include "atl.h"
-#include "gen_thread.h"
-#include "evpath.h"
-#include "cm_internal.h"
-#include "cercs_env.h"
 #ifndef MODULE
 
 #include <stdlib.h>
@@ -22,10 +17,24 @@
 #include "kernel/cm_kernel.h"
 #include "kernel/library.h"
 #endif
+#include "atl.h"
+#include "gen_thread.h"
+#include "evpath.h"
+#include "cm_internal.h"
+#include "cercs_env.h"
 
 int CMtrace_val[CMLastTraceType] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
-extern void EVprint_version();
+extern void EVfprint_version(FILE* out);
+
+FILE * CMTrace_file = NULL;
+
+static long CMTrace_file_num = -1;
+
+extern void INT_CMTrace_file_id(int ID)
+{
+    CMTrace_file_num = ID;
+}
 
 extern int CMtrace_init(CMTraceType trace_type)
 {
@@ -46,6 +55,20 @@ extern int CMtrace_init(CMTraceType trace_type)
     if ((str = cercs_getenv("EVWarning")) != NULL) {
 	sscanf(str, "%d", &CMtrace_val[EVWarning]);
     }
+    if (cercs_getenv("CMTraceFile") != NULL) {
+	CMTrace_file_num = getpid();
+    }
+    if (CMTrace_file_num != -1) {
+	char name[40];
+	sprintf(name, "CMTrace_output.%d", (int)CMTrace_file_num);
+	CMTrace_file = fopen(name, "w");
+	if (CMTrace_file == NULL) {
+	    printf("Failed to open trace file %s\n", name);
+	    CMTrace_file = stdout;
+	}
+    } else {
+	CMTrace_file = stdout;
+    }
     if (cercs_getenv("CMVerbose") != NULL) {
 	int j;
 	for (j=0; j<CMLastTraceType; j++)
@@ -57,7 +80,7 @@ extern int CMtrace_init(CMTraceType trace_type)
 	if (i!=EVWarning) trace |= CMtrace_val[i];
     }
     if (trace != 0) {
-	EVprint_version();
+	EVfprint_version(CMTrace_file);
     }
     return CMtrace_val[trace_type];
 }
@@ -87,9 +110,9 @@ CMtrace_out(CManager cm, CMTraceType trace_type, char *format, ...)
 #else
 	va_start(ap);
 #endif
-	vfprintf(stdout, format, ap);
+	vfprintf(CMTrace_file, format, ap);
 	va_end(ap);
-	printf("\n");
+	fprintf(CMTrace_file, "\n");
     }
 #endif
 }
@@ -105,10 +128,10 @@ CMtransport_trace(CManager cm, char *format, ...)
 #else
 	va_start(ap);
 #endif
-	vfprintf(stdout, format, ap);
+	vfprintf(CMTrace_file, format, ap);
 	va_end(ap);
 	(void)cm;
-	printf("\n");
+	fprintf(CMTrace_file, "\n");
     }
 #endif
 }
