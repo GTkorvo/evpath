@@ -187,7 +187,7 @@ INT_EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec,
 }
 
 
-static void dump_dfg_stone(EVdfg_stone s);
+static void fdump_dfg_stone(FILE* out, EVdfg_stone s);
 
 static void 
 reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events)
@@ -1466,7 +1466,7 @@ static void reconfig_deploy(EVdfg dfg)
     if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
 	for (i = 0; i < dfg->stone_count; ++i) {
 	    fprintf(CMTrace_file, "Stone# %d : ", i);
-	    dump_dfg_stone(dfg->stones[i]);
+	    fdump_dfg_stone(CMTrace_file, dfg->stones[i]);
 	}
     }
     dfg->deployed_stone_count = dfg->stone_count;
@@ -1476,19 +1476,25 @@ static void reconfig_deploy(EVdfg dfg)
 static void
 dump_dfg_stone(EVdfg_stone s)
 {
+    fdump_dfg_stone(stdout, s);
+}
+
+static void
+fdump_dfg_stone(FILE* out, EVdfg_stone s)
+{
     int i;
-    printf("stone %p, node %d, stone_id %x\n", s, s->node, s->stone_id);
-    if (s->bridge_stone) printf("      bridge_stone\n");
-    printf(" out_count %d : ", s->out_count);
+    fprintf(out, "stone %p, node %d, stone_id %x\n", s, s->node, s->stone_id);
+    if (s->bridge_stone) fprintf(out, "      bridge_stone\n");
+    fprintf(out, " out_count %d : ", s->out_count);
     for (i=0; i < s->out_count; i++) {
-	printf("%p, ", s->out_links[i]);
+	fprintf(out, "%p, ", s->out_links[i]);
     }
-    printf("\n action_count %d, action = \"%s\"\n", s->action_count, (s->action ? s->action : "NULL"));
-    printf("new_out_count %d : ", s->new_out_count);
+    fprintf(out, "\n action_count %d, action = \"%s\"\n", s->action_count, (s->action ? s->action : "NULL"));
+    fprintf(out, "new_out_count %d : ", s->new_out_count);
     for (i=0; i < s->new_out_count; i++) {
-	printf("(port %d) -> %p, ", s->new_out_ports[i], s->new_out_links[i]);
+	fprintf(out, "(port %d) -> %p, ", s->new_out_ports[i], s->new_out_links[i]);
     }
-    printf("\nbridge_target %p\n", s->bridge_target);
+    fprintf(out, "\nbridge_target %p\n", s->bridge_target);
 }
 
 static void

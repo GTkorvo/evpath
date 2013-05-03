@@ -2708,12 +2708,12 @@ internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
 	fprintf(CMTrace_file, "CM - record type %s, contents ", name_of_FMformat(format->fmformat));
 	if (event->decoded_event) {
 	    fprintf(CMTrace_file, "DECODED are:\n  ");
-	    r = FMdump_data(format->fmformat, event->decoded_event,
-			    dump_char_limit);
+	    r = FMfdump_data(CMTrace_file, format->fmformat, event->decoded_event,
+			     dump_char_limit);
 	} else {
 	    fprintf(CMTrace_file, "ENCODED are:\n  ");
-	    r = FMdump_encoded_data(format->fmformat,
-				    event->encoded_event, dump_char_limit);
+	    r = FMfdump_encoded_data(CMTrace_file, format->fmformat,
+				     event->encoded_event, dump_char_limit);
 	}	    
 	if (r && !warned) {
 	    fprintf(CMTrace_file, "\n\n  ****  Warning **** CM record dump truncated\n");
