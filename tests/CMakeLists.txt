@@ -13,6 +13,11 @@ foreach (TEST ${TESTS} )
     ADD_TEST(${TEST} "${TEST}")
 endforeach()
 
+ADD_TEST(evtest_SELF "evtest")
+set_property(TEST evtest_SELF PROPERTY
+    ENVIRONMENT "CMSelfFormats=1"
+  )
+
 ADD_EXECUTABLE(thin_client thin_client.c)
 TARGET_LINK_LIBRARIES(thin_client evpath ${BASE_LIBS})
 
