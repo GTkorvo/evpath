@@ -295,22 +295,33 @@ double dgettimeofday( void )
 
 /**************OS FUNCTIONS**************/
 char*  os_type() {
-  char* val=NULL;
-  struct utsname output;
-  if (!val)
-    uname(&output);
-  val = strdup(output.sysname);
-  return val;
+  static struct utsname *output=NULL;
+  if (!output) {
+    output = malloc(sizeof(struct utsname));
+    uname(output);
+  }
+  return strdup(output->sysname);
 }
 
 char*  os_release() {
-  char* val=NULL;
-  struct utsname output;
-  if (!val)
-    uname(&output);
-  val = strdup(output.release);
-  return val;
+  static struct utsname *output=NULL;
+  if (!output) {
+    output = malloc(sizeof(struct utsname));
+    uname(output);
+  }
+  return strdup(output->release);
 }
+
+/* Should probably test if gethostname & uname exist on box before using them.... */
+char* hostname() {
+  static char* val = NULL;
+  if (!val) {
+    val = malloc(256*sizeof(char));
+    gethostname(val,256);
+  }
+  return strdup(val);
+}
+    
 
 /**************Stat FUNCTIONS**************/
 double  stat_uptime() {
@@ -636,6 +647,8 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
        char*       os_type();              \n	\
 /* a string to identify the current release -- ie FC14 */  \n	\
        char*       os_release();          \n\
+/* a string to identify the hostname -- ie maquis1 */  \n	\
+       char*       hostname();          \n\
 /* time in seconds that the computer has been up  */  \n	\
        double    stat_uptime();           \n\
 /* load average over the last one minute  */ \n	\
@@ -661,14 +674,15 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
 	{"hw_cpu_curr_freq", (void *) 0},	// 4
 	{"os_type", (void *) 0},		// 5
 	{"os_release", (void *) 0},		// 6
-	{"stat_uptime", (void *) 0},		// 7
-	{"stat_loadavg_one", (void *) 0},	// 8
-	{"stat_loadavg_five", (void *) 0},	// 9
-	{"stat_loadavg_fifteen", (void *) 0},	// 10
-	{"vm_mem_total", (void *) 0},		// 11
-	{"vm_mem_free", (void *) 0},		// 12
-	{"vm_swap_total", (void *) 0},		// 13
-	{"vm_swap_free", (void*) 0},		// 14
+	{"hostname", (void *) 0},               // 7
+	{"stat_uptime", (void *) 0},		// 8
+	{"stat_loadavg_one", (void *) 0},	// 9
+	{"stat_loadavg_five", (void *) 0},	// 10
+	{"stat_loadavg_fifteen", (void *) 0},	// 11
+	{"vm_mem_total", (void *) 0},		// 12
+	{"vm_mem_free", (void *) 0},		// 13
+	{"vm_swap_total", (void *) 0},		// 14
+	{"vm_swap_free", (void*) 0},		// 15
 	{(void *) 0, (void *) 0}
     };
 
