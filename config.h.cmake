@@ -123,6 +123,9 @@
 /* Define to 1 if you have the `writev' function. */
 #cmakedefine HAVE_WRITEV
 
+/* Define to 1 if you have the `getifaddrs' function. */
+#cmakedefine HAVE_GETIFADDRS
+
 /* Define to 1 if you have the ANSI C header files. */
 #cmakedefine STDC_HEADERS
 

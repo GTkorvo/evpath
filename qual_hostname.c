@@ -1,6 +1,4 @@
-#ifndef PACKAGE
 #include "config.h"
-#endif
 
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
@@ -16,7 +14,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <net/if.h>
+#include <net/if_dl.h>
 #include <sys/ioctl.h>
+#include <ifaddrs.h>
 #endif
 
 #if defined (__INTEL_COMPILER)
@@ -48,8 +48,14 @@ static int
 get_self_ip_addr(CMtrans_services svc)
 {
     struct hostent *host;
-    char buf[256];
+    char hostname_buf[256];
     char **p;
+#ifdef HAVE_GETIFADDRS
+  struct ifaddrs *if_addrs = NULL;
+  struct ifaddrs *if_addr = NULL;
+  void *tmp = NULL;
+  char buf[INET6_ADDRSTRLEN];
+#endif
 #ifdef SIOCGIFCONF
     char *ifreqs;
     struct ifreq *ifr;
@@ -57,10 +63,79 @@ get_self_ip_addr(CMtrans_services svc)
     struct ifconf ifaces;
     int ifrn;
     int ss;
+    int ipv4_count = 0;
+    int ipv6_count = 0;
 #endif
     int rv = 0;
-    gethostname(buf, sizeof(buf));
-    host = gethostbyname(buf);
+#ifdef HAVE_GETIFADDRS
+    if (getifaddrs(&if_addrs) == 0) {    
+        char *interface;
+	// Print possible addresses
+	for (if_addr = if_addrs; if_addr != NULL; if_addr = if_addr->ifa_next) {
+	    int family = if_addr->ifa_addr->sa_family;
+	    if ((family != AF_INET) && (family != AF_INET6)) continue;
+	    if (if_addr->ifa_addr->sa_family == AF_INET) {
+	        tmp = &((struct sockaddr_in *)if_addr->ifa_addr)->sin_addr;
+		ipv4_count++;
+	    } else {
+	        tmp = &((struct sockaddr_in6 *)if_addr->ifa_addr)->sin6_addr;
+		ipv6_count++;
+	    }
+	    if (svc) {
+	        svc->trace_out(NULL, "CM<transport> IP possibility -> %s : %s",
+			       if_addr->ifa_name,
+			       inet_ntop(family, tmp, buf, sizeof(buf)));
+	    }
+	}
+	if ((interface = getenv("CM_INTERFACE")) != NULL) {
+	    for (if_addr = if_addrs; if_addr != NULL; if_addr = if_addr->ifa_next) {
+		int family = if_addr->ifa_addr->sa_family;
+		if (family != AF_INET) continue;  /* currently not looking for ipv6 */
+		if (strcmp(if_addr->ifa_name, interface) != 0) continue;
+		tmp = &((struct sockaddr_in *)if_addr->ifa_addr)->sin_addr;
+		if (svc) {
+		    svc->trace_out(NULL, "CM<transport> Interface specified, returning ->%s : %s",
+				   if_addr->ifa_name,
+				   inet_ntop(family, tmp, buf, sizeof(buf)));
+		}
+		return (ntohl(*(uint32_t*)tmp));
+	    }
+	    printf("Warning!  CM_INTERFACE specified as \"%s\", but no active interface by that name found\n", interface);
+	}
+	    
+	gethostname(hostname_buf, sizeof(hostname_buf));
+	host = gethostbyname(hostname_buf);
+	if (host != NULL) {
+	    for (p = host->h_addr_list; *p != 0; p++) {
+		struct in_addr *in = *(struct in_addr **) p;
+		if (!ipv4_is_loopback(ntohl(in->s_addr))) {
+		    if (svc)
+			svc->trace_out(NULL, "CM<transport> Prefer IP associated with hostname net -> %d.%d.%d.%d",
+				       *((unsigned char *) &in->s_addr),
+				       *(((unsigned char *) &in->s_addr) + 1),
+				       *(((unsigned char *) &in->s_addr) + 2),
+				       *(((unsigned char *) &in->s_addr) + 3));
+		    return (ntohl(in->s_addr));
+		}
+	    }
+	}
+	/* choose the first thing that's not a loopback interface */
+	for (if_addr = if_addrs; if_addr != NULL; if_addr = if_addr->ifa_next) {
+	    int family = if_addr->ifa_addr->sa_family;
+	    if (family != AF_INET) continue;  /* currently not looking for ipv6 */
+	    if ((if_addr->ifa_flags & IFF_LOOPBACK) != 0)  continue;
+	    tmp = &((struct sockaddr_in *)if_addr->ifa_addr)->sin_addr;
+	    if (svc) {
+		svc->trace_out(NULL, "CM<transport> get_self_ip_addr returning first avail -> %s : %s",
+			       if_addr->ifa_name,
+			       inet_ntop(family, tmp, buf, sizeof(buf)));
+	    }
+	    return (ntohl(*(uint32_t*)tmp));
+	}
+    }
+#endif	
+    gethostname(hostname_buf, sizeof(hostname_buf));
+    host = gethostbyname(hostname_buf);
     if (host != NULL) {
 	for (p = host->h_addr_list; *p != 0; p++) {
 	    struct in_addr *in = *(struct in_addr **) p;
