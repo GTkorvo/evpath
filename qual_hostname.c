@@ -14,7 +14,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <net/if.h>
-#include <net/if_dl.h>
 #include <sys/ioctl.h>
 #include <ifaddrs.h>
 #endif
