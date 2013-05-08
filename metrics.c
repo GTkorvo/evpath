@@ -701,14 +701,15 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
     externs[4].extern_value = (void *) (long) hw_cpu_curr_freq;
     externs[5].extern_value = (void *) (long) os_type;
     externs[6].extern_value = (void *) (long) os_release;
-    externs[7].extern_value = (void *) (long) stat_uptime;
-    externs[8].extern_value = (void *) (long) stat_loadavg_one;
-    externs[9].extern_value = (void *) (long) stat_loadavg_five;
-    externs[10].extern_value = (void *) (long) stat_loadavg_fifteen;
-    externs[11].extern_value = (void *) (long) vm_mem_total;
-    externs[12].extern_value = (void *) (long) vm_mem_free;
-    externs[13].extern_value = (void *) (long) vm_swap_total;
-    externs[14].extern_value = (void *) (long) vm_swap_free;
+    externs[7].extern_value = (void *) (long) hostname;
+    externs[8].extern_value = (void *) (long) stat_uptime;
+    externs[9].extern_value = (void *) (long) stat_loadavg_one;
+    externs[10].extern_value = (void *) (long) stat_loadavg_five;
+    externs[11].extern_value = (void *) (long) stat_loadavg_fifteen;
+    externs[12].extern_value = (void *) (long) vm_mem_total;
+    externs[13].extern_value = (void *) (long) vm_mem_free;
+    externs[14].extern_value = (void *) (long) vm_swap_total;
+    externs[15].extern_value = (void *) (long) vm_swap_free;
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
