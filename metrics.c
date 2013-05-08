@@ -295,31 +295,34 @@ double dgettimeofday( void )
 
 /**************OS FUNCTIONS**************/
 char*  os_type() {
-  static struct utsname *output=NULL;
-  if (!output) {
-    output = malloc(sizeof(struct utsname));
-    uname(output);
+  static struct utsname output;
+  int first = 1;
+  if (first) {
+    uname(&output);
+    first = 0;
   }
-  return strdup(output->sysname);
+  return strdup(output.sysname);
 }
 
 char*  os_release() {
-  static struct utsname *output=NULL;
-  if (!output) {
-    output = malloc(sizeof(struct utsname));
-    uname(output);
+  static struct utsname output;
+  static int first = 1;
+  if (first) {
+    uname(&output);
+    first = 0;
   }
-  return strdup(output->release);
+  return strdup(output.release);
 }
 
 /* Should probably test if gethostname & uname exist on box before using them.... */
 char* hostname() {
-  static char* val = NULL;
-  if (!val) {
-    val = malloc(256*sizeof(char));
-    gethostname(val,256);
+  static char val[256];
+  static int first = 1;
+  if (first) {
+    gethostname(&val[0],256);
+    first = 0;
   }
-  return strdup(val);
+  return strdup(&val[0]);
 }
     
 
