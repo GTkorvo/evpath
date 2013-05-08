@@ -296,7 +296,7 @@ double dgettimeofday( void )
 /**************OS FUNCTIONS**************/
 char*  os_type() {
   static struct utsname output;
-  int first = 1;
+  static int first = 1;
   if (first) {
     uname(&output);
     first = 0;
