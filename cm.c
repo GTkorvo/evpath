@@ -821,6 +821,7 @@ CMControlList_create()
     new_list->closed = 0;
     new_list->locked = 0;
     new_list->has_thread = 0;
+    new_list->cond_polling = 0;
     return new_list;
 }
 

@@ -179,6 +179,7 @@ typedef struct _CMControlList {
 
     int closed;
     int has_thread;
+    int cond_polling;
     thr_thread_t server_thread;
 } CMControlList_s;
 

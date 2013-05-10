@@ -115,7 +115,7 @@ CMconn_fail_conditions(CMConnection conn)
 	}
 	cond_list = cond_list->next;
     }
-    if (!cl->has_thread) {
+    if (cl->cond_polling) {
 	/* wake the server thread in case we're not him */
 	CMwake_server_thread(conn->cm);
     }
@@ -222,6 +222,7 @@ INT_CMCondition_wait(CManager cm, int condition)
     }
     if (!cl->has_thread) {
 	if ((cl->server_thread == NULL) || (cl->server_thread == thr_thread_self())) {
+	    cl->cond_polling = 1;
 	    while (!(cond->signaled || cond->failed)) {
 		if (cm_control_debug_flag) {
 		    printf("CMLowLevel  Polling for CMcondition %d\n", condition);
@@ -230,6 +231,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 		CMcontrol_list_wait(cl);
 		CManager_lock(cm);
 	    }
+	    cl->cond_polling = 0;
 	    if (cm_control_debug_flag) {
 		printf("CMLowLevel  after Polling for CMcondition %d\n", condition);
 	    }
@@ -261,6 +263,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 	}
     } else if (thr_thread_self() == cl->server_thread) {
 	/* we're the server thread */
+	cl->cond_polling = 1;
 	while (!(cond->signaled || cond->failed)) {
 	    if (cm_control_debug_flag) {
 		printf("CMLowLevel polling for CMcondition %d\n", condition);
@@ -269,6 +272,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 	    CMcontrol_list_wait(cl);
 	    CManager_lock(cm);
 	}
+	cl->cond_polling = 0;
     } else {
 	/* some other thread is the server thread */
 	if (!gen_thr_initialized()) {
@@ -308,7 +312,7 @@ INT_CMCondition_signal(CManager cm, int condition)
     cond->signaled = 1;
     CMCondition_trigger(cond, cl);
     if (cl->has_thread == 0) cm->abort_read_ahead = 1;
-    if (!cl->has_thread) {
+    if (cl->cond_polling) {
 	/* wake the server thread in case we're not him */
 	CMwake_server_thread(cm);
     }
