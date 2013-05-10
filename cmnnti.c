@@ -136,7 +136,6 @@ typedef struct nnti_transport_data {
     attr_list listen_attrs;
     char *self_hostname;
     char* incoming;
-    char* outbound;
     NNTI_buffer_t  mr_recvs;
     NNTI_transport_t trans_hdl;
     pthread_t listen_thread;
@@ -605,6 +604,7 @@ attr_list conn_attr_list;
     }
 #endif
 
+    svc->trace_out(cm, "CMNNTI initiate sending connect message to remote host");
     err = NNTI_send(&nnti_conn_data->peer_hdl, &nnti_conn_data->mr_send, NULL);
     if (err != NNTI_OK) {
         fprintf (stderr, "Error: NNTI_send() returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
@@ -630,7 +630,7 @@ attr_list conn_attr_list;
         fprintf (stderr, "Error: NNTI_wait() for sending returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
         return 1;
     }
-    svc->trace_out(trans->cm, " NNTI_wait() of send request returned... ");
+    svc->trace_out(trans->cm, " NNTI_wait() of send CONNECT request returned... ");
 
 #ifdef DF_SHM_FOUND
     if (is_shm_connection) {
@@ -683,7 +683,7 @@ enet_non_blocking_listen(CManager cm, CMtrans_services svc,
 	svc->trace_out(cm, "CMnnti trying to bind enet port %d", target);
 	
 	server = enet_host_create (& address /* the address to bind the server host to */, 
-				   0     /* allow up to 4095 clients and/or outgoing connections */,
+				   0     /* allow dynamic clients (This is supported by the GaTech mod ENET only) */,
 				   1      /* allow up to 2 channels to be used, 0 and 1 */,
 				   0      /* assume any amount of incoming bandwidth */,
 				   0      /* assume any amount of outgoing bandwidth */);
@@ -1057,8 +1057,9 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	ncd->conn = svc->connection_create(trans, ncd, conn_attr_list);
 	ncd->attrs = conn_attr_list;
 	add_connection(ntd, ncd);
+	ncd->send_buffer = malloc(NNTI_REQUEST_BUFFER_SIZE);
 	err = NNTI_register_memory (&ntd->trans_hdl,
-				    &ntd->outbound[ncd->acks_offset],
+				    ncd->send_buffer,
 				    NNTI_REQUEST_BUFFER_SIZE, 1, NNTI_SEND_SRC,
 				    &ncd->peer_hdl, &ncd->mr_send);
 	if (err != NNTI_OK) {
@@ -1066,7 +1067,6 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	    return;
 	}
 	
-	ncd->send_buffer = &ntd->outbound[ncd->acks_offset];
 	ncd->piggyback_size_max = NNTI_REQUEST_BUFFER_SIZE;
 
 #ifdef DF_SHM_FOUND
@@ -1145,9 +1145,9 @@ listen_thread_func(void *vlsp)
         }
 
         if (wait_status.result == NNTI_OK) {
-	  if (which == 0) {
+/*	  if (which == 0) { */
 	    handle_request_buffer_event(lsp, &wait_status);
-	  }
+/*	  } */
 	}
 
         // TODO: check if it's time to schedule Puts and check progress of outstanding requests
@@ -1238,7 +1238,10 @@ nnti_enet_service_network(CManager cm, void *void_trans)
     CMtrans_services svc = ntd->svc;
     ENetEvent event;
     
-    if (!ntd->enet_server) return;
+    if (!ntd->enet_server) {
+	printf("nnti_enet_service network returning\n");
+	return;
+    }
 
     /* Wait up to 1000 milliseconds for an event. */
     while (enet_host_service (ntd->enet_server, & event, 1) > 0) {
@@ -1394,8 +1397,6 @@ attr_list listen_info;
     nnti_transport_data_ptr ntd = trans->trans_data;
     int int_port_num = 0;
     attr_list listen_list;
-    int nc = 100;
-    int nclients = 100;
     int incoming_size = 10;
     char *last_colon, *first_colon;
     int err;
@@ -1438,17 +1439,8 @@ attr_list listen_info;
     add_attr(listen_list, CM_NNTI_TRANSPORT, Attr_String,
 	     (attr_value) strdup(url));
 
-    if (use_enet) {
-      /* setup for using NNTI_send() for control messages */
-      nclients = 10;
-    }
-
-    /* at most 100 clients (REALLY NEED TO FIX) */
-    nc = (nclients < 100 ? 100 : nclients);
     ntd->incoming  = malloc (incoming_size * NNTI_REQUEST_BUFFER_SIZE);
-    ntd->outbound  = malloc (nc * NNTI_REQUEST_BUFFER_SIZE);
     memset (ntd->incoming, 0, incoming_size * NNTI_REQUEST_BUFFER_SIZE);
-    memset (ntd->outbound, 0, nc * NNTI_REQUEST_BUFFER_SIZE);
     
     err = NNTI_register_memory(&trans_hdl, (char*)ntd->incoming, 
 			       NNTI_REQUEST_BUFFER_SIZE, incoming_size,
