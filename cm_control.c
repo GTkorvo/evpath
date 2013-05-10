@@ -115,6 +115,10 @@ CMconn_fail_conditions(CMConnection conn)
 	}
 	cond_list = cond_list->next;
     }
+    if (!cl->has_thread) {
+	/* wake the server thread in case we're not him */
+	CMwake_server_thread(conn->cm);
+    }
 }
 
 void
@@ -304,6 +308,10 @@ INT_CMCondition_signal(CManager cm, int condition)
     cond->signaled = 1;
     CMCondition_trigger(cond, cl);
     if (cl->has_thread == 0) cm->abort_read_ahead = 1;
+    if (!cl->has_thread) {
+	/* wake the server thread in case we're not him */
+	CMwake_server_thread(cm);
+    }
 }
 
 extern void
