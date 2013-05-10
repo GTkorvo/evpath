@@ -1228,6 +1228,7 @@ send_and_maybe_wait_for_handshake(CManager cm, CMConnection conn)
 	printf("handshake write failed\n");
     }
     if ((conn->remote_format_server_ID == 0) && reliable) {
+	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - waiting for handshake response\n");
 	INT_CMCondition_wait(cm, conn->handshake_condition);
     }
 }
@@ -1776,6 +1777,7 @@ CMdo_handshake(CMConnection conn, int handshake_version, int byte_swap, char *ba
 	remote_CManager_ID = ((int *) base)[1];
     }
 
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Received CONN handshake message\n");
     if ((remote_CManager_ID & 0x80000000) == 0x80000000) {
 	/* the other fellow already has our ID */
 	do_send = 0;
@@ -1789,13 +1791,17 @@ CMdo_handshake(CMConnection conn, int handshake_version, int byte_swap, char *ba
     } else {
 	conn->remote_format_server_ID = remote_format_server_ID;
 	conn->remote_CManager_ID = remote_CManager_ID;
+	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - CONN handshake condition %d\n", conn->handshake_condition);
 	if (conn->handshake_condition != -1) {
 	    INT_CMCondition_signal(conn->cm, conn->handshake_condition);
 	    conn->handshake_condition = -1;
 	}
     }
     if (do_send) {
+	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Sending CONN handshake message\n");
 	send_and_maybe_wait_for_handshake(conn->cm, conn);
+    } else {
+	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - *NOT* Sending CONN handshake message\n");
     }
 }
 
