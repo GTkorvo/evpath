@@ -47,15 +47,16 @@ CMdlopen(char *in_lib, int mode)
 	lib = strdup(in_lib);
     }
     char **list = search_list;
-    if ((handle = dlopen(lib, RTLD_LAZY)) == NULL) {
-	while(list && (list[0] != NULL)) {
-	    char *tmp = malloc(strlen(list[0]) + strlen(lib) + 2);
-	    sprintf(tmp, "%s/%s", list[0], lib);
-	    handle = dlopen(tmp, RTLD_LAZY);
-	    char *err = dlerror();
-	    list++;
-	    if (handle) list = NULL; // fall out
-	}
+    while(list && (list[0] != NULL)) {
+        char *tmp = malloc(strlen(list[0]) + strlen(lib) + 2);
+	sprintf(tmp, "%s/%s", list[0], lib);
+	handle = dlopen(tmp, RTLD_LAZY);
+	char *err = dlerror();
+	list++;
+	if (handle) list = NULL; // fall out
+    }
+    if (!handle) {
+        handle = dlopen(lib, RTLD_LAZY);
     }
     if (!handle) return NULL;
     dlh = malloc(sizeof(*dlh));
