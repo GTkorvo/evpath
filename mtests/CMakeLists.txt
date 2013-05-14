@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-set (TESTS cmtest cmping bulktest take_test cmcontrol)
+set (TESTS cmtest cmping bulktest take_test)
 
 ENABLE_TESTING()
 
