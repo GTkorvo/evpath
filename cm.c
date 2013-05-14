@@ -549,6 +549,9 @@ CMcontrol_list_wait(CMControlList cl)
 
 static CMControlList CMControlList_create();
 
+static thr_mutex_t atl_mutex;
+static int atl_mutex_initialized = 0;
+
 extern
 CManager
 INT_CManager_create()
@@ -556,6 +559,12 @@ INT_CManager_create()
     CManager cm = (CManager) INT_CMmalloc(sizeof(CManager_s));
     int atom_init = 0;
 
+    if (!atl_mutex_initialized) {
+	atl_mutex_initialized++;
+	thr_mutex_init(atl_mutex);
+	atl_install_mutex_funcs((atl_lock_func)pthread_mutex_lock, (atl_lock_func)pthread_mutex_unlock, 
+				&atl_mutex);
+    }
     if (cm == NULL)
 	return NULL;
 
