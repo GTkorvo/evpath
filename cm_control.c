@@ -12,7 +12,6 @@
 #include <ffs.h>
 #include <atl.h>
 #include "evpath.h"
-#include "gen_thread.h"
 #include "cm_internal.h"
 
 typedef struct _CMCondition {
@@ -72,10 +71,7 @@ INT_CMCondition_get(CManager cm, CMConnection conn)
     cond->waiting = 0;
     cond->signaled = 0;
     cond->failed = 0;
-    cond->cond_condition = NULL;
-    if (gen_thr_initialized()) {
-	cond->cond_condition = thr_condition_alloc();
-    }
+    thr_condition_init(cond->cond_condition);
     return cond->condition_num;
 }
 
@@ -87,13 +83,11 @@ CMCondition_trigger(CMCondition cond, CMControlList cl)
 	printf("CMLowLevel Triggering CMcondition %d\n", cond->condition_num);
     }
     if (cond->waiting) {
-	if (gen_thr_initialized()) {
-	    if (cm_control_debug_flag) {
-		printf("CMLowLevel Triggering CMcondition %d, thr_cond %lx\n", 
-		       cond->condition_num, (long)cond->cond_condition);
-	    }
-	    thr_condition_signal(cond->cond_condition);
+	if (cm_control_debug_flag) {
+	    printf("CMLowLevel Triggering CMcondition %d\n", 
+		   cond->condition_num);
 	}
+	thr_condition_signal(cond->cond_condition);
     }
     if (cm_control_debug_flag) {
 	printf("CMLowLevel After trigger for CMcondition %d\n", 
@@ -149,10 +143,7 @@ CMCondition_destroy(CMControlList cl, int condition)
 	fprintf(stderr, "Serious internal error.  Use of condition %d, no longer in control list\n", condition);
     } else {
 	/* free internal elements */
-	if (cond->cond_condition) {
-	    thr_condition_free(cond->cond_condition);
-	    cond->cond_condition = NULL;
-	}
+	thr_condition_free(cond->cond_condition);
 	INT_CMfree(cond);
     }
 }
@@ -245,20 +236,16 @@ INT_CMCondition_wait(CManager cm, int condition)
 	    /* some other thread is servicing the network here 
 	       hopefully they'll keep doing it */
 	    /* some other thread is the server thread */
-	    if (!gen_thr_initialized()) {
-		fprintf(stderr, "Gen_Thread library not initialized.\n");
-		return 0;
-	    }
 	    if (cm_control_debug_flag) {
-		printf("CMLowLevel Waiting for CMcondition %d, thr_cond %lx\n", 
-		       condition, (long)cond->cond_condition);
+		printf("CMLowLevel Waiting for CMcondition %d\n", 
+		       condition);
 	    }
 	    cm->locked--;
 	    thr_condition_wait(cond->cond_condition, cm->exchange_lock);
 	    cm->locked++;
 	    if (cm_control_debug_flag) {
-		printf("CMLowLevel After wait for CMcondition %d, thr_cond %lx\n", 
-		       condition, (long)cond->cond_condition);
+		printf("CMLowLevel After wait for CMcondition %d\n", 
+		       condition);
 	    }
 	}
     } else if (thr_thread_self() == cl->server_thread) {
@@ -275,20 +262,16 @@ INT_CMCondition_wait(CManager cm, int condition)
 	cl->cond_polling = 0;
     } else {
 	/* some other thread is the server thread */
-	if (!gen_thr_initialized()) {
-	    fprintf(stderr, "Gen_Thread library not initialized.\n");
-	    return 0;
-	}
 	if (cm_control_debug_flag) {
-	    printf("CMLowLevel Waiting for CMcondition %d, thr_cond %lx\n", 
-		   condition, (long)cond->cond_condition);
+	    printf("CMLowLevel Waiting for CMcondition %d\n", 
+		   condition);
 	}
 	cm->locked--;
 	thr_condition_wait(cond->cond_condition, cm->exchange_lock);
 	cm->locked++;
 	if (cm_control_debug_flag) {
-	    printf("CMLowLevel After wait for CMcondition %d, thr_cond %lx\n", 
-		   condition, (long)cond->cond_condition);
+	    printf("CMLowLevel After wait for CMcondition %d\n", 
+		   condition);
 	}
     }
     result = cond->signaled;

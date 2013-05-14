@@ -1,5 +1,4 @@
 #include <atl.h>
-#include <gen_thread.h>
 #include <evpath.h>
 #include <assert.h>
 #include <string.h>
@@ -32,14 +31,29 @@ create_thread_read_transport(CManager cm, transport_entry original) {
 }
 
 static
-int read_thread_func(void *conn_raw) {
+void* read_thread_func(void *conn_raw) {
     CMConnection conn = conn_raw;
     transport_entry trans = conn->trans;
     while (!conn->closed && !conn->failed) {
         CMDataAvailable(trans, conn);
     }
-    return 0;
+    return NULL;
 }
+
+static thr_thread_t 
+thr_fork(func, arg)
+void*(*func)(void*);
+void *arg;
+{
+    pthread_t new_thread = 0;
+    int err = pthread_create(&new_thread, NULL, (void*(*)(void*))func, arg);
+    if (err != 0) {
+	return NULL;
+    } else {
+	return (thr_thread_t) new_thread;
+    }
+}
+
 void
 INT_CMstart_read_thread(CMConnection conn) {
     thr_thread_t thread;

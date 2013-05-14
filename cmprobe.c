@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "evpath.h"
-#include "gen_thread.h"
 #include <errno.h>
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
@@ -129,9 +128,6 @@ main(argc, argv)
     static int atom_init = 0;
 
     srand48(getpid());
-#ifdef USE_PTHREADS
-    gen_pthread_init();
-#endif
     cm = CManager_create();
     (void) CMfork_comm_thread(cm);
 

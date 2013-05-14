@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "cm.h"
-#include "gen_thread.h"
 #include "libltdl/ltdl.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
@@ -156,9 +155,6 @@ char **argv;
 
     LTDL_SET_PRELOADED_SYMBOLS();
     srand48(getpid());
-#ifdef USE_PTHREADS
-    gen_pthread_init();
-#endif
     cm = CManager_create();
     (void) CMfork_comm_thread(cm);
 

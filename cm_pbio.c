@@ -37,7 +37,6 @@ inet_ntoa(struct in_addr ina)
 #endif
 #include "assert.h"
 #include "ffs.h"
-#include "gen_thread.h"
 #include "atl.h"
 #include "evpath.h"
 #include "cm_internal.h"

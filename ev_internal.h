@@ -1,6 +1,4 @@
-#ifndef GEN_THREAD_H
-#include "gen_thread.h"
-#endif
+
 #define EV_INTERNAL_H
 
 typedef enum { Event_App_Owned,  Event_Freeable, Event_CM_Owned } event_pkg_contents;

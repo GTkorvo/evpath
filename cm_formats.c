@@ -20,7 +20,6 @@
 #include "ffs.h"
 #include "atl.h"
 #include "evpath.h"
-#include "gen_thread.h"
 #include "cm_internal.h"
 
 static void add_format_to_cm ARGS((CManager cm, CMFormat format));

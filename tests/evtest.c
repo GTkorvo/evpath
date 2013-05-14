@@ -10,7 +10,6 @@
 #include <signal.h>
 #include <arpa/inet.h>
 #include "evpath.h"
-#include "gen_thread.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -179,9 +178,6 @@ main(int argc, char **argv)
 	argc--;
     }
     srand48(getpid());
-#ifdef USE_PTHREADS
-    gen_pthread_init();
-#endif
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
     CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
     CM_MCAST_PORT = attr_atom_from_string("MCAST_PORT");
@@ -191,7 +187,7 @@ main(int argc, char **argv)
 	return do_regression_master_test();
     }
     cm = CManager_create();
-/*    (void) CMfork_comm_thread(cm);*/
+    (void) CMfork_comm_thread(cm);
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
@@ -246,7 +242,7 @@ main(int argc, char **argv)
 	CMsleep(cm, 120);
     } else {
 	simple_rec data;
-	attr_list attrs;
+	attr_list attrs, stone_attrs;
 	atom_t CMDEMO_TEST_ATOM;
 	int remote_stone, stone = 0;
 	EVsource source_handle;
@@ -266,6 +262,8 @@ main(int argc, char **argv)
 	source_handle = EVcreate_submit_handle(cm, stone, simple_format_list);
 	if (quiet <= 0) printf("submitting %d\n", data.integer_field);
 	EVsubmit(source_handle, &data, attrs);
+	stone_attrs = EVextract_attr_list(cm, stone);
+	dump_attr_list(stone_attrs);
 	CMsleep(cm, 1);
 	EVfree_source(source_handle);
 	free_attr_list(attrs);

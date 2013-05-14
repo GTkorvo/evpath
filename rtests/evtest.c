@@ -11,7 +11,6 @@
 #include <arpa/inet.h>
 #include "evpath.h"
 #include "revpath.h"
-#include "gen_thread.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -194,9 +193,6 @@ main(int argc, char **argv)
 	argc--;
     }
     srand48(getpid());
-#ifdef USE_PTHREADS
-    gen_pthread_init();
-#endif
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
     CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
     CM_MCAST_PORT = attr_atom_from_string("MCAST_PORT");

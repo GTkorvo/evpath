@@ -9,7 +9,6 @@
 #include <string.h>
 #include <time.h>
 #include "mpi.h"
-#include "gen_thread.h"
 #include "evpath.h"
 #define MAXPROC 8    /* Max number of procsses */
 #define NAMELEN 80   /* Max length of machine name */
@@ -38,13 +37,11 @@ FMField bulk_fields[] =
 
 static int msg_count = MSG_COUNT;
 static int msg_size = MSG_SIZE;
-static int msgs_received = 0;
 
 static
 void 
 generate_record(bulk_rec_ptr event)
 {
-    long sum = 0;
     memset(event, 0, sizeof(*event));
     event->len = msg_size/sizeof(event->buf[0]);
     event->buf = malloc(event->len * sizeof(event->buf[0]));
@@ -55,7 +52,6 @@ void
 bulk_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
 	       attr_list attrs)
 {
-    bulk_rec_ptr event = vevent;
     long sum = 0, scan_sum = 0;
     static int message_count = 0;
     int np;
@@ -74,14 +70,9 @@ bulk_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
 int
 main(int argc, char* argv[]) 
 {
-    int i, j, np, me;
-    const int nametag  = 42;    /* Tag value for sending name */
-    const int datatag  = 43;    /* Tag value for sending data */
-    const int root = 0;         /* Root process in scatter */
-    MPI_Status status;          /* Status object for receive */
+    int i, np, me;
 
     char master_contact[CONTACTLEN];             /* Local host name string */
-    char hostname[MAXPROC][NAMELEN];  /* Received host names */
     char *transport = NULL;
     attr_list listen_list = NULL, contact_list;
     char *string_list;
@@ -128,7 +119,6 @@ main(int argc, char* argv[])
 	add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		 (attr_value) strdup(transport));
     }
-    gen_pthread_init();
     cm = CManager_create();
     CMfork_comm_thread(cm);
     CMlisten_specific(cm, listen_list);
@@ -160,7 +150,7 @@ main(int argc, char* argv[])
 	CMregister_handler(format, bulk_handler, (void*)message_wait_condition);
 	printf("Master waiting on Barrier\n");
 	MPI_Barrier(MPI_COMM_WORLD);
-	start = time(NULL);
+ 	start = time(NULL);
 	CMCondition_wait(cm, message_wait_condition);
 	end = time(NULL);
 	if (start == end) end++;
@@ -171,8 +161,6 @@ main(int argc, char* argv[])
 	CMConnection conn = NULL;
 	CMFormat format;
 	bulk_rec data;
-	attr_list attrs;
-	atom_t CMDEMO_TEST_ATOM;
 	MPI_Bcast(master_contact,CONTACTLEN,MPI_CHAR,0,MPI_COMM_WORLD);
 	if (quiet <= 0) {
 	    printf("Node %d thinks master contact is %s\n", me, master_contact);
@@ -194,7 +182,6 @@ main(int argc, char* argv[])
 	    CMwrite(conn, format, &data);
 	}
 	CMsleep(cm, 1);
-	free_attr_list(attrs);
     }
 
     MPI_Finalize();

@@ -89,14 +89,6 @@
    fun:CMdlopen
 }
 {
-   gen_threads always leaks
-   Memcheck:Leak
-   fun:*
-...
-   fun:gen_pthread_init
-   fun:main
-}
-{
    Atl atoms are persistent and never cleaned up
    Memcheck:Leak
    fun:*

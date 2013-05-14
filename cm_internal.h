@@ -5,12 +5,26 @@
 #include <cercs_env.h>
 #endif
 
+#include <pthread.h>
+#define thr_mutex_t pthread_mutex_t
+#define thr_thread_t pthread_t
+#define thr_condition_t pthread_cond_t
+#define thr_thread_self() pthread_self()
+#define thr_thread_exit(status) pthread_exit(status);
+#define thr_thread_detach(thread) pthread_detach(thread);
+#define thr_thread_yield() pthread_yield();
+#define thr_thread_join(t, s) pthread_join(t, s)
+#define thr_mutex_init(m) pthread_mutex_init(&m, NULL);
+#define thr_mutex_lock(m) pthread_mutex_lock(&m);
+#define thr_mutex_unlock(m) pthread_mutex_unlock(&m);
+#define thr_mutex_free(m) pthread_mutex_destroy(&m);
+#define thr_condition_init(c) pthread_cond_init(&c, NULL);
+#define thr_condition_wait(c, m) pthread_cond_wait(&c, &m);
+#define thr_condition_signal(c) pthread_cond_broadcast(&c);
+#define thr_condition_free(c) pthread_cond_destroy(&c);
+
 #include <ev_internal.h>
 
-#ifndef GEN_THREAD_H
-#define thr_mutex_t void*
-#define thr_thread_t void *
-#endif
 
 #if defined (__INTEL_COMPILER)
 //  Allow extern declarations with no prior decl
@@ -209,8 +223,6 @@ struct _CMConnection {
     transport_entry trans;
     void *transport_data;
     int ref_count;
-    thr_mutex_t write_lock;
-    thr_mutex_t read_lock;
     FFSBuffer io_out_buffer;
     int closed;
     int failed;

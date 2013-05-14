@@ -272,7 +272,7 @@ be_test_master(int argc, char **argv)
     EVdfg_stone srca, srcb, srcc, srccommand, multiq, sink;
     EVsource a_handle, b_handle, c_handle, command_handle;
     char * q_action_spec;
-    int count, i;
+    int i;
     int node_count = 3;
     char *queue_node = "b";
     char *terminal_node = "c";
@@ -510,7 +510,7 @@ be_test_child(int argc, char **argv)
 {
     CManager cm;
     EVsource a_handle, b_handle;
-    int count, i;
+    int count;
 
     cm = CManager_create();
     if (argc != 3) {

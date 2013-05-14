@@ -21,7 +21,6 @@
 #include <ffs.h>
 #include <atl.h>
 #include "evpath.h"
-#include "gen_thread.h"
 #include "cercs_env.h"
 #include "cm_internal.h"
 #include "cm_transport.h"
@@ -167,6 +166,20 @@ CM_test_thread_func()
     return 1;
 }
 
+static thr_thread_t 
+thr_fork(func, arg)
+void*(*func)(void*);
+void *arg;
+{
+    pthread_t new_thread = 0;
+    int err = pthread_create(&new_thread, NULL, (void*(*)(void*))func, arg);
+    if (err != 0) {
+	return NULL;
+    } else {
+	return (thr_thread_t) new_thread;
+    }
+}
+
 int
 INT_CMfork_comm_thread(CManager cm)
 {
@@ -175,49 +188,44 @@ INT_CMfork_comm_thread(CManager cm)
     if (!cm->control_list->select_initialized) {
 	CM_init_select(cm->control_list, cm);
     }
-    if (gen_thr_is_kernel()) {
-	if (cm->control_list->has_thread == 0) {
-	    if (cm->control_list->network_blocking_function.func) {
-		thr_thread_t server_thread = 
-		    thr_fork((void_arg_func)server_thread_func, 
-			     (void*)cm);
-		CMtrace_out(cm, CMLowLevelVerbose,
-			    "CM - Forked comm thread %lx\n", (long)server_thread);
-		if (server_thread == NULL) {
-		    return 0;
-		}
-		cm->control_list->server_thread = server_thread;
-		cm->control_list->has_thread = 1;
-		cm->reference_count++;
-		CMtrace_out(cm, CMFreeVerbose, "Forked - CManager %lx ref count now %d\n", 
-			    (long) cm, cm->reference_count);
-		cm->control_list->cl_reference_count++;
-		cm->control_list->free_reference_count++;
-	    } else {
-		/*
-		 *  Can't start a server thread yet, but lets see 
-		 *  if we can fork anything successfully.
-		 */
-		thr_thread_t test_thread = 
-		    thr_fork((void_arg_func)CM_test_thread_func, 
-			     (void*)cm);
-		if (test_thread == NULL) {
-		    /* No.  Say we can't. */
-		    CMtrace_out(cm, CMLowLevelVerbose,
-				"CM - Test fork failed, no comm thread\n");
-		    return 0;
-		}
-		/* OK, we'll fork it later. */
-		CMtrace_out(cm, CMLowLevelVerbose,
-			    "CM - Will fork comm thread later\n");
-		cm->control_list->has_thread = -1; /* should fork one */
+    if (cm->control_list->has_thread == 0) {
+	if (cm->control_list->network_blocking_function.func) {
+	    thr_thread_t server_thread = 
+		thr_fork((void*(*)(void*))server_thread_func, 
+			 (void*)cm);
+	    CMtrace_out(cm, CMLowLevelVerbose,
+			"CM - Forked comm thread %lx\n", (long)server_thread);
+	    if (server_thread == NULL) {
+		return 0;
 	    }
+	    cm->control_list->server_thread = server_thread;
+	    cm->control_list->has_thread = 1;
+	    cm->reference_count++;
+	    CMtrace_out(cm, CMFreeVerbose, "Forked - CManager %lx ref count now %d\n", 
+			(long) cm, cm->reference_count);
+	    cm->control_list->cl_reference_count++;
+	    cm->control_list->free_reference_count++;
+	} else {
+	    /*
+	     *  Can't start a server thread yet, but lets see 
+	     *  if we can fork anything successfully.
+	     */
+	    thr_thread_t test_thread = 
+		thr_fork((void*(*)(void*))CM_test_thread_func, 
+			 (void*)cm);
+	    if (test_thread == NULL) {
+		/* No.  Say we can't. */
+		CMtrace_out(cm, CMLowLevelVerbose,
+			    "CM - Test fork failed, no comm thread\n");
+		return 0;
+	    }
+	    /* OK, we'll fork it later. */
+	    CMtrace_out(cm, CMLowLevelVerbose,
+			"CM - Will fork comm thread later\n");
+	    cm->control_list->has_thread = -1; /* should fork one */
 	}
-	return 1;
     }
-    CMtrace_out(cm, CMLowLevelVerbose,
-		"CM - No threads package for comm thread\n");
-    return 0;
+    return 1;
 }
 
 extern
@@ -235,7 +243,7 @@ CMControlList_set_blocking_func(CMControlList cl, CManager cm,
     cl->network_polling_function.cm = NULL;
     if (cl->has_thread == -1) {
 	thr_thread_t server_thread = 
-	    thr_fork((void_arg_func)server_thread_func, 
+	    thr_fork((void*(*)(void*))server_thread_func, 
 		     (void*)cm);
 	if (server_thread == NULL) {
 	    return;
@@ -573,13 +581,13 @@ INT_CManager_create()
     cm->reference_count = 1;
 
     cm->control_list = CMControlList_create();
-    cm->exchange_lock = thr_mutex_alloc();
+    thr_mutex_init(cm->exchange_lock);
 
     cm->locked = 0;
     cm->closed = 0;
     cm->abort_read_ahead = 0;
     CMinit_local_formats(cm);
-    cm->context_lock = thr_mutex_alloc();
+    thr_mutex_init(cm->context_lock);
 
     cm->in_format_count = 0;
     cm->in_formats = INT_CMmalloc(1);
@@ -814,8 +822,7 @@ CMControlList_create()
     new_list->cl_consistency_number = 1;
     new_list->cl_reference_count = 1;
     new_list->free_reference_count = 1;
-    new_list->list_mutex = NULL;
-    new_list->list_mutex = thr_mutex_alloc();
+    thr_mutex_init(new_list->list_mutex);
     new_list->condition_list = NULL;
     new_list->next_condition_num = 1;
     new_list->closed = 0;
@@ -853,8 +860,6 @@ CMConnection_create(transport_entry trans, void *transport_data,
     conn->trans = trans;
     conn->transport_data = transport_data;
     conn->ref_count = 1;
-    conn->write_lock = thr_mutex_alloc();
-    conn->read_lock = thr_mutex_alloc();
     conn->closed = 0;
     conn->failed = 0;
     conn->downloaded_formats = NULL;
@@ -1043,8 +1048,6 @@ INT_CMConnection_dereference(CMConnection conn)
 	CMConnection_failed(conn, 0);
     }
     if (conn->write_callbacks) INT_CMfree(conn->write_callbacks);
-    thr_mutex_free(conn->write_lock);
-    thr_mutex_free(conn->read_lock);
     INT_CMfree(conn->downloaded_formats);
     INT_CMfree_attr_list(conn->cm, conn->attrs);
     free_FFSBuffer(conn->io_out_buffer);
@@ -2038,7 +2041,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
     }
     if (event_msg) {
 	CMtrace_out(cm, CMDataVerbose, "CM - Receiving event message data len %ld, attr len %d, stone_id %x\n",
-		    data_length, attr_length, stone_id);
+		    (long)data_length, attr_length, stone_id);
 	if (attrs == NULL){
 	    attrs = CMcreate_attr_list(cm);
 	}

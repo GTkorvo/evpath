@@ -49,10 +49,14 @@
 #include <memory.h>
 #endif
 
-#include "gen_thread.h"
 #include <atl.h>
 #include "evpath.h"
 #include "cm_transport.h"
+#include <pthread.h>
+#include <sched.h>
+#define thr_thread_t pthread_t
+#define thr_thread_self() pthread_self()
+#define thr_thread_yield() sched_yield()
 
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1

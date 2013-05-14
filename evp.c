@@ -728,8 +728,6 @@ INT_EVclear_stored(CManager cm, EVstone stone_num, EVaction action_num)
     storage_queue_empty(cm, queue);
 }
 
-static int evpath_locked(){return 1;}
-
 typedef struct action_tracking_state {
     int last_active_stone;
     int events_in_play;
@@ -3143,7 +3141,6 @@ reassign_memory_event(CManager cm, event_item *event)
      *       has a reference count of 1 (so that return_event() does what it needs to do).
      */
     event_item *tmp_event = get_free_event(cm->evp);
-    int i;
     FFSContext tmp_context;
     FFSTypeHandle format;
     void *decode_buffer;
@@ -3307,7 +3304,7 @@ EVPinit(CManager cm)
 		cm->evp->stone_base_num);
     first_evpinit = 0;
     cm->evp->queue_items_free_list = NULL;
-    cm->evp->lock = thr_mutex_alloc();
+    thr_mutex_init(cm->evp->lock);
     internal_add_shutdown_task(cm, free_evp, NULL, FREE_TASK);
     {
         char *backpressure_env;

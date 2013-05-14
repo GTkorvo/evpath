@@ -13,7 +13,6 @@
 #include <signal.h>
 #include <arpa/inet.h>
 #include "evpath.h"
-#include "gen_thread.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -193,9 +192,6 @@ main(int argc, char **argv)
 	argc--;
     }
     srand48(getpid());
-#ifdef USE_PTHREADS
-    gen_pthread_init();
-#endif
     if (regression && regression_master) {
 	return do_regression_master_test();
     }

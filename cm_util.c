@@ -18,7 +18,6 @@
 #include "kernel/library.h"
 #endif
 #include "atl.h"
-#include "gen_thread.h"
 #include "evpath.h"
 #include "cm_internal.h"
 #include "cercs_env.h"

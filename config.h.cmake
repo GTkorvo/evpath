@@ -21,9 +21,6 @@
 /* Define if fd_set has element fds_bits */
 #cmakedefine HAVE_FDS_BITS
 
-/* Define to 1 if you have the <gen_thread.h> header file. */
-#cmakedefine HAVE_GEN_THREAD_H
-
 /* Define to 1 if you have the `getdomainname' function. */
 #cmakedefine HAVE_GETDOMAINNAME
 

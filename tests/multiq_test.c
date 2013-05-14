@@ -13,7 +13,6 @@
 #include <signal.h>
 #include <arpa/inet.h>
 #include "evpath.h"
-#include "gen_thread.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -157,6 +156,7 @@ static char *trans = "{\n\
     b_rec *b;\n\
     c_rec c;\n\
     if (EVpresent(a_rec_ID, 0)) {\n\
+	int seq = EVdata_a_rec(0).sequence;\n\
         a = EVdata_a_rec(0); ++found;\n\
     }\n\
     if (EVpresent(b_rec_ID, 0)) {\n\
@@ -211,9 +211,6 @@ main(int argc, char **argv)
 	argv++;
 	argc--;
     }
-#ifdef USE_PTHREADS
-    gen_pthread_init();
-#endif
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
     CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
     CM_MCAST_PORT = attr_atom_from_string("MCAST_PORT");

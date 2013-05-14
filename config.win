@@ -46,9 +46,6 @@
 /* Define if fd_set has element fds_bits */
 #define HAVE_FDS_BITS 1
 
-/* Define to 1 if you have the <gen_thread.h> header file. */
-/* #undef HAVE_GEN_THREAD_H */
-
 /* Define to 1 if you have the <hostLib.h> header file. */
 /* #undef HAVE_HOSTLIB_H */
 

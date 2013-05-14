@@ -1053,7 +1053,7 @@ FMStructDescList list;
 
     for (format = 0; format < format_count; format++) {
 	free(list[format].format_name);
-	free_field_list(list[format].field_list);
+	free_FMfield_list(list[format].field_list);
     }
     free(list);
 }
@@ -1140,6 +1140,8 @@ free_imm_response(void *client_data)
     case Response_Transform:
 	if (resp->u.transform.code) cod_code_free(resp->u.transform.code);
 	if (resp->u.transform.ec) cod_exec_context_free(resp->u.transform.ec);
+	break;
+    default:
 	break;
     }
     free(resp);
@@ -1362,6 +1364,8 @@ response_data_free(CManager cm, void *resp_void)
 	free_struct_list(resp->u.transform.in_format_list);
 	free_struct_list(resp->u.transform.out_format_list);
         free(resp->u.transform.function);
+	break;
+    default:
 	break;
     }
     free(resp);
@@ -2012,7 +2016,7 @@ verify_multityped_code(CManager cm, struct response_spec *mrd, stone_type stone,
     FMFormat *cur_format;
     int ret;
 
-    cod_code code;
+/*    cod_code code;*/
     cod_parse_context parse_context = new_cod_parse_context();
     /*    sm_ref conn_info_data_type, conn_info_param;*/
 
