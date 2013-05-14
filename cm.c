@@ -174,7 +174,7 @@ void *arg;
     pthread_t new_thread = 0;
     int err = pthread_create(&new_thread, NULL, (void*(*)(void*))func, arg);
     if (err != 0) {
-	return NULL;
+	return (thr_thread_t) NULL;
     } else {
 	return (thr_thread_t) new_thread;
     }
@@ -195,7 +195,7 @@ INT_CMfork_comm_thread(CManager cm)
 			 (void*)cm);
 	    CMtrace_out(cm, CMLowLevelVerbose,
 			"CM - Forked comm thread %lx\n", (long)server_thread);
-	    if (server_thread == NULL) {
+	    if (server_thread ==  (thr_thread_t) NULL) {
 		return 0;
 	    }
 	    cm->control_list->server_thread = server_thread;
@@ -213,7 +213,7 @@ INT_CMfork_comm_thread(CManager cm)
 	    thr_thread_t test_thread = 
 		thr_fork((void*(*)(void*))CM_test_thread_func, 
 			 (void*)cm);
-	    if (test_thread == NULL) {
+	    if (test_thread ==  (thr_thread_t) NULL) {
 		/* No.  Say we can't. */
 		CMtrace_out(cm, CMLowLevelVerbose,
 			    "CM - Test fork failed, no comm thread\n");
@@ -245,7 +245,7 @@ CMControlList_set_blocking_func(CMControlList cl, CManager cm,
 	thr_thread_t server_thread = 
 	    thr_fork((void*(*)(void*))server_thread_func, 
 		     (void*)cm);
-	if (server_thread == NULL) {
+	if (server_thread ==  (thr_thread_t) NULL) {
 	    return;
 	}
 	CMtrace_out(cm, CMLowLevelVerbose,
@@ -824,7 +824,7 @@ CMControlList_create()
     new_list->select_data = NULL;
     new_list->add_select = NULL;
     new_list->remove_select = NULL;
-    new_list->server_thread = NULL;
+    new_list->server_thread =  (thr_thread_t) NULL;
     new_list->network_blocking_function.func = NULL;
     new_list->network_polling_function.func = NULL;
     new_list->polling_function_list = NULL;

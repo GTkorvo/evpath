@@ -212,7 +212,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 	       (long)cl->server_thread);
     }
     if (!cl->has_thread) {
-	if ((cl->server_thread == NULL) || (cl->server_thread == thr_thread_self())) {
+	if ((cl->server_thread ==  (thr_thread_t) NULL) || (cl->server_thread == thr_thread_self())) {
 	    cl->cond_polling = 1;
 	    while (!(cond->signaled || cond->failed)) {
 		if (cm_control_debug_flag) {
@@ -227,7 +227,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 		printf("CMLowLevel  after Polling for CMcondition %d\n", condition);
 	    }
 	    /* the poll and handle will set cl->server_thread, restore it */
-	    cl->server_thread = NULL;
+	    cl->server_thread =  (thr_thread_t) NULL;
 	    if (cm_control_debug_flag) {
 		printf("CMLowLevel  In condition wait, reset server thread = %lx\n", 
 		       (long)cl->server_thread);

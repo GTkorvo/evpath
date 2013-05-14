@@ -123,7 +123,7 @@ CManager cm;
     FD_ZERO((fd_set *) sd->fdset);
     sd->write_set = svc->malloc_func(sizeof(fd_set));
     FD_ZERO((fd_set *) sd->write_set);
-    sd->server_thread = NULL;
+    sd->server_thread =  (thr_thread_t) NULL;
     sd->closed = 0;
     sd->sel_item_max = 0;
     sd->select_items = (FunctionListElement *) svc->malloc_func(sizeof(FunctionListElement));
@@ -242,11 +242,11 @@ int timeout_usec;
     int tmp_select_consistency_number = sd->select_consistency_number;
 
     if (sd->closed) {
-	sd->server_thread = NULL; 
+	sd->server_thread =  (thr_thread_t) NULL; 
 	return;
     }
 
-    if (sd->server_thread == NULL) {
+    if (sd->server_thread ==  (thr_thread_t) NULL) {
 	/* no server thread set, must be this one */
 	sd->server_thread = thr_thread_self();
     }
@@ -290,7 +290,7 @@ int timeout_usec;
                      (fd_set *) NULL, NULL);
     }
     if (sd->closed) {
-	sd->server_thread = NULL; 
+	sd->server_thread =  (thr_thread_t) NULL; 
 	return;
     }
 #ifndef HAVE_WINDOWS_H
@@ -336,7 +336,7 @@ int timeout_usec;
 		}
 	    }
 	    if (sd->closed) {
-		sd->server_thread = NULL; 
+		sd->server_thread =  (thr_thread_t) NULL; 
 		return;
 	    }
 /* if (found_one == 0) { fprintf(stderr, "Bad file descriptor in select
@@ -408,7 +408,7 @@ int timeout_usec;
     if (res != 0) {
 	for (i = 0; i <= sd->sel_item_max; i++) {
 	    if (sd->closed) {
-		sd->server_thread = NULL; 
+		sd->server_thread =  (thr_thread_t) NULL; 
 		return;
 	    }
 	    if (FD_ISSET(i, &wr_set)) {
