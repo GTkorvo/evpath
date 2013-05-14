@@ -1447,42 +1447,7 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
 {
     event_item *event_to_submit = event;
 
-    assert(evpath_locked());
     assert(CManager_locked(cm));
-/*    stone =     stone = stone_struct(cm->evp, stone_num);
-    resp_id = determine_action(cm, stone, event, 0);
-    if (stone->response_cache[resp_id].action_type == Action_NoAction) {
-	char *tmp = NULL;
-	if (event->reference_format)
-	    tmp = global_name_of_IOformat(event->reference_format);
-	printf("No action found for event %lx submitted to stone %x\n",
-	       (long)event, local_path_id);
-	if (tmp != NULL) {
-	    static int first = 1;
-	    printf("    Unhandled incoming event format was \"%s\"\n", tmp);
-	    if (first) {
-		first = 0;
-		printf("\n\t** use \"format_info <format_name>\" to get full format information ** \n\n");
-	    }
-	} else {
-	    printf("    Unhandled incoming event format was NULL\n");
-	}
-	free(tmp);
-	return 0;
-    }
-    resp = &stone->response_cache[resp_id];
-    if (resp->action_type == Action_Decode) {
-	CMtrace_out(cm, EVerbose, "Decoding event, action id %d", resp_id);
-	event_to_submit = decode_action(cm, event, resp);
-	resp_id = determine_action(cm, stone, event_to_submit, 0);
-	resp = &stone->response_cache[resp_id];
-    }
-    if (CMtrace_on(cm, EVerbose)) {
-	printf("Enqueueing event %lx on stone %x, action %lx\n",
-	       (long)event_to_submit, local_path_id, (long)resp);
-	
-	dump_action(stone, resp, resp->proto_action_id, "    ");
-	}*/
     enqueue_event(cm, local_path_id, -1, event_to_submit);
     return 1;
 }
