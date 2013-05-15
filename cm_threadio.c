@@ -58,7 +58,7 @@ void
 INT_CMstart_read_thread(CMConnection conn) {
     thr_thread_t thread;
     conn->trans = create_thread_read_transport(conn->cm, conn->trans);
-    thread = thr_fork(read_thread_func, conn);
+    thread = thr_fork(read_thread_func, (void*)conn);
     assert(thread);
     thr_thread_detach(thread);
 }

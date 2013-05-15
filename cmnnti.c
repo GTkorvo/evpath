@@ -1393,7 +1393,7 @@ attr_list listen_info;
     char *hostname;
     char *nnti_transport;
     static NNTI_transport_t trans_hdl;
-    static initialized = 0;
+    static int initialized = 0;
     nnti_transport_data_ptr ntd = trans->trans_data;
     int int_port_num = 0;
     attr_list listen_list;

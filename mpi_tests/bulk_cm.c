@@ -63,7 +63,7 @@ bulk_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
     message_count++;
     if (message_count == (np - 1) * msg_count) {
 	printf("All messages received\n");
-	CMCondition_signal(cm, (int)client_data);
+	CMCondition_signal(cm, (int)(long)client_data);
     }
 }
 
