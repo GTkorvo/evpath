@@ -20,7 +20,8 @@
 #define thr_mutex_free(m) pthread_mutex_destroy(&m);
 #define thr_condition_init(c) pthread_cond_init(&c, NULL);
 #define thr_condition_wait(c, m) pthread_cond_wait(&c, &m);
-#define thr_condition_signal(c) pthread_cond_broadcast(&c);
+#define thr_condition_signal(c) pthread_cond_signal(&c);
+#define thr_condition_broadcast(c) pthread_cond_broadcast(&c);
 #define thr_condition_free(c) pthread_cond_destroy(&c);
 
 #include <ev_internal.h>
