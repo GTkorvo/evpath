@@ -147,7 +147,7 @@ main(int argc, char* argv[])
 	MPI_Bcast(master_contact,CONTACTLEN,MPI_CHAR,0,MPI_COMM_WORLD);
 	format = CMregister_simple_format(cm, "bulk", bulk_fields, sizeof(bulk_rec));
 	message_wait_condition = CMCondition_get(cm, NULL);
-	CMregister_handler(format, bulk_handler, (void*)message_wait_condition);
+	CMregister_handler(format, bulk_handler, (void*)(long)message_wait_condition);
 	printf("Master waiting on Barrier\n");
 	MPI_Barrier(MPI_COMM_WORLD);
  	start = time(NULL);
