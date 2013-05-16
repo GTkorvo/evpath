@@ -840,6 +840,11 @@ check_connectivity(EVdfg dfg)
     int i;
     for (i=0; i< dfg->stone_count; i++) {
 	CMtrace_out(dfg->cm, EVdfgVerbose, "Stone %d - assigned to node %s, action %s\n", i, dfg->nodes[dfg->stones[i]->node].canonical_name, (dfg->stones[i]->action ? dfg->stones[i]->action : "NULL"));
+	if (dfg->stones[i]->node == -1) {
+	    printf("Warning, stone %d has not been assigned to any node.  This stone will not be deployed.\n", i);
+	    printf("    This stones particulars are:\n");
+	    fdump_dfg_stone(stdout, dfg->stones[i]);
+	}
 	if (dfg->stones[i]->action_count == 0) {
 	    printf("Warning, stone %d (assigned to node %s) has no actions registered", i, dfg->nodes[dfg->stones[i]->node].canonical_name);
 	    continue;
@@ -852,8 +857,8 @@ check_connectivity(EVdfg dfg)
 		break;
 	    default:
 		printf("Warning, stone %d (assigned to node %s) has no outputs connected to other stones\n", i, dfg->nodes[dfg->stones[i]->node].canonical_name);
-		printf("	This stone's first registered action is \"%s\"\n",
-		       action_spec);
+		printf("    This stones particulars are:\n");
+		fdump_dfg_stone(stdout, dfg->stones[i]);
 		break;
 	    }
 	}
@@ -1483,6 +1488,9 @@ static void
 fdump_dfg_stone(FILE* out, EVdfg_stone s)
 {
     int i;
+
+    (void)dump_dfg_stone;   /* stop warning aboud dump_dfg_stone, handy to keep around for debugging */
+
     fprintf(out, "stone %p, node %d, stone_id %x\n", s, s->node, s->stone_id);
     if (s->bridge_stone) fprintf(out, "      bridge_stone\n");
     fprintf(out, " out_count %d : ", s->out_count);
