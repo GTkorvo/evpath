@@ -55,6 +55,7 @@ struct nnti_connection_data;
 static atom_t CM_PEER_IP = -1;
 static atom_t CM_PEER_LISTEN_PORT = -1;
 static atom_t CM_NNTI_PORT = -1;
+static atom_t CM_NNTI_PARAMS = -1;
 static atom_t CM_NNTI_ADDR = -1;
 static atom_t CM_NNTI_ENET_CONTROL = -1;
 static atom_t CM_IP_HOSTNAME = -1;
@@ -170,6 +171,7 @@ typedef struct nnti_transport_data {
 typedef struct nnti_connection_data {
     char *peer_hostname;
     int nnti_port;
+    char* nnti_params;
     CMbuffer read_buffer;
     int read_buf_len;
     nnti_transport_data_ptr ntd;
@@ -492,7 +494,7 @@ attr_list conn_attr_list;
 {
     int int_port_num;
     nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) trans->trans_data;
-    char *host_name, *nnti_transport;
+    char *host_name, *nnti_transport, *params;
     char server_url[256];
     struct connect_message *cmsg;
 
@@ -514,14 +516,23 @@ attr_list conn_attr_list;
 	svc->trace_out(cm, "CMNNTI transport connect to port %d", int_port_num);
     }
 
+    if (!query_attr(attrs, CM_NNTI_PARAMS, /* type pointer */ NULL,
+    /* value pointer */ (attr_value *) (long) &params)) {
+	svc->trace_out(cm, "CMNNTI transport found no NNTI_PARAMS attribute");
+	return -1;
+    } else {
+	svc->trace_out(cm, "CMNNTI transport connect with params %s", params);
+    }
+
     if (!get_string_attr(attrs, CM_NNTI_TRANSPORT, &nnti_transport)) {
 	svc->trace_out(cm, "NNTI transport found no NNTI_TRANSPORT attribute");
-	nnti_transport = NULL;
+
+	params = strdup("");
     } else {
         svc->trace_out(cm, "NNTI transport connect using transport %s", nnti_transport);
     }
 
-    sprintf(server_url, "%s://%s:%d/", nnti_transport, host_name, int_port_num);
+    sprintf(server_url, "%s://%s:%d/%s", nnti_transport, host_name, int_port_num, params);
 
     if (ntd->self_port == -1) {
         libcmnnti_LTX_non_blocking_listen(cm, svc, trans, NULL);
@@ -643,6 +654,7 @@ attr_list conn_attr_list;
     svc->trace_out(cm, "--> NNTI Connection established");
 
     nnti_conn_data->nnti_port = int_port_num;
+    nnti_conn_data->nnti_params = params;
     nnti_conn_data->ntd = ntd;
     nnti_conn_data->send_buffer = req_buf;
     return 1;
@@ -848,6 +860,8 @@ attr_list attrs;
 	     (attr_value) strdup(nnti_conn_data->peer_hostname));
     add_attr(conn_attr_list, CM_NNTI_PORT, Attr_Int4,
 	     (attr_value) (long)nnti_conn_data->nnti_port);
+    add_attr(conn_attr_list, CM_NNTI_PARAMS, Attr_String,
+	     (attr_value) (long)nnti_conn_data->nnti_params);
 
     nnti_conn_data->piggyback_size_max = NNTI_REQUEST_BUFFER_SIZE;
     conn = svc->connection_create(trans, nnti_conn_data, conn_attr_list);
@@ -1398,7 +1412,7 @@ attr_list listen_info;
     int int_port_num = 0;
     attr_list listen_list;
     int incoming_size = 10;
-    char *last_colon, *first_colon;
+    char *last_colon, *first_colon, *last_slash;
     int err;
     int use_enet = 0;
     char *enet = getenv("NNTI_ENET");
@@ -1426,14 +1440,18 @@ attr_list listen_info;
     *first_colon = 0;
     hostname = (first_colon + 1);
     while(hostname[0] == '/') hostname++;
-
-    sscanf((last_colon + 1), "%d/", &int_port_num);
+    last_slash = index(last_colon+1, '/');
+    *(last_slash++) = 0;
+    sscanf((last_colon + 1), "%d", &int_port_num);
 
     listen_list = create_attr_list();
     add_attr(listen_list, CM_IP_HOSTNAME, Attr_String,
 	     (attr_value) strdup(hostname));
     add_attr(listen_list, CM_NNTI_PORT, Attr_Int4,
 	     (attr_value) (long) int_port_num);
+    if (strlen(last_slash)) {
+	add_string_attr(listen_list, CM_NNTI_PARAMS, strdup(last_slash));
+    }
     add_attr(listen_list, CM_TRANSPORT, Attr_String,
 	     (attr_value) strdup("nnti"));
     add_attr(listen_list, CM_NNTI_TRANSPORT, Attr_String,
@@ -2073,6 +2091,7 @@ CMtrans_services svc;
     if (atom_init == 0) {
 	CM_NNTI_PORT = attr_atom_from_string("NNTI_PORT");
 	CM_NNTI_ADDR = attr_atom_from_string("NNTI_ADDR");
+	CM_NNTI_PARAMS = attr_atom_from_string("NNTI_PARAMS");
 	CM_NNTI_ENET_CONTROL = attr_atom_from_string("NNTI_ENET_CONTROL");
 	CM_IP_HOSTNAME = attr_atom_from_string("IP_HOST");
 	CM_ENET_ADDR = attr_atom_from_string("CM_ENET_ADDR");
