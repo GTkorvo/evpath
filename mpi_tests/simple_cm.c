@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "mpi.h"
 #include "evpath.h"
 #define MAXPROC 8    /* Max number of procsses */
@@ -131,7 +132,7 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
     }
     message_count++;
     if (message_count == (np - 1)) {
-	printf("All messages received\n");
+	printf("All %d messages received\n", np - 1);
 	CMCondition_signal(cm, (int)(long)client_data);
     }
 }
@@ -195,14 +196,18 @@ main(int argc, char* argv[])
     if (me == 0) {    /* Process 0 does this */
 	CMFormat format;
 	int message_wait_condition;
+	time_t start, end;
 	if (quiet <= 0) {
 	    printf("Master contact is %s\n", master_contact);
 	}
-	MPI_Bcast(master_contact,CONTACTLEN,MPI_CHAR,0,MPI_COMM_WORLD);
 	format = CMregister_format(cm, simple_format_list);
 	message_wait_condition = CMCondition_get(cm, NULL);
 	CMregister_handler(format, simple_handler, (void*)(long)message_wait_condition);
+	MPI_Bcast(master_contact,CONTACTLEN,MPI_CHAR,0,MPI_COMM_WORLD);
+ 	start = time(NULL);
 	CMCondition_wait(cm, message_wait_condition);
+	end = time(NULL);
+	printf("Elapsed time was %d\n", (end - start));
     } else { /* all other processes do this */
 	attr_list contact_list;
 	CMConnection conn = NULL;
