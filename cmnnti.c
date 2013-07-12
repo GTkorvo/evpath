@@ -497,6 +497,7 @@ attr_list conn_attr_list;
     char *host_name, *nnti_transport, *params;
     char server_url[256];
     struct connect_message *cmsg;
+    int use_shm = 0;
 
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
@@ -519,7 +520,7 @@ attr_list conn_attr_list;
     if (!query_attr(attrs, CM_NNTI_PARAMS, /* type pointer */ NULL,
     /* value pointer */ (attr_value *) (long) &params)) {
 	svc->trace_out(cm, "CMNNTI transport found no NNTI_PARAMS attribute");
-	return -1;
+	params = strdup("");
     } else {
 	svc->trace_out(cm, "CMNNTI transport connect with params %s", params);
     }
@@ -527,7 +528,7 @@ attr_list conn_attr_list;
     if (!get_string_attr(attrs, CM_NNTI_TRANSPORT, &nnti_transport)) {
 	svc->trace_out(cm, "NNTI transport found no NNTI_TRANSPORT attribute");
 
-	params = strdup("");
+	return -1;
     } else {
         svc->trace_out(cm, "NNTI transport connect using transport %s", nnti_transport);
     }
@@ -547,7 +548,7 @@ attr_list conn_attr_list;
 #ifdef DF_SHM_FOUND
     int is_shm_connection = 0;
     /* make shm connection if the peer process and this process are on the same node */
-    if (strcmp(host_name, ntd->self_hostname) == 0) {
+    if ((use_shm) && (strcmp(host_name, ntd->self_hostname) == 0)) {
         svc->trace_out(cm, "Connecting to local peer process. \n");
    
         shm_conn_data_ptr shm_conn_data = create_shm_conn_data(svc);
@@ -1392,40 +1393,81 @@ enet_accept_conn(nnti_transport_data_ptr ntd, transport_entry trans,
 		   ncd->remote_contact_port);
     return ncd;
 }
+
+static void
+setup_enet_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr_list listen_list)
+{
+    nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) trans->trans_data;
+    static int socket_global_init = 0;
+
+    ENetAddress address;
+    ENetHost * server;
+    long seedval = time(NULL) + getpid();
+    /* port num is free.  Constrain to range 26000 : 26100 */
+    int low_bound = 26000;
+    int high_bound = 26100;
+    int size = high_bound - low_bound;
+    int tries = 10;
+
+    if (socket_global_init++ == 0) {
+	if (enet_initialize () != 0) {
+	    fprintf (stderr, "An error occurred while initializing ENet.\n");
+	    //return EXIT_FAILURE;
+	}
+    }
+    svc->add_periodic_task(cm, 1, 0, nnti_enet_service_network, (void*)trans);
+    svc->trace_out(cm, "CMNNTI begin ENET listen\n");
+
+    srand48(seedval);
+    address.host = ENET_HOST_ANY;
+    while (tries > 0) {
+	int target = low_bound + size * drand48();
+	address.port = target;
+	svc->trace_out(cm, "Cmnnti/Enet trying to bind port %d", target);
+	
+	server = enet_host_create (& address /* the address to bind the server host to */, 
+				   0     /* allow up to 4095 clients and/or outgoing connections */,
+				   1      /* allow up to 2 channels to be used, 0 and 1 */,
+				   0      /* assume any amount of incoming bandwidth */,
+				   0      /* assume any amount of outgoing bandwidth */);
+	tries--;
+	if (server != NULL) tries = 0;
+	if (tries == 5) {
+	    /* try reseeding in case we're in sync with another process */
+	    srand48(time(NULL) + getpid());
+	}
+    }
+    if (server == NULL) {
+	fprintf(stderr, "Failed after 5 attempts to bind to a random port.  Lots of undead servers on this host?\n");
+	return;
+    }
+    ntd->enet_server = server;
+    ntd->enet_listen_port = address.port;
+    svc->trace_out(cm, "CMNNTI  ENET listen at port %d, server %p\n", address.port, server);
+    svc->fd_add_select(cm, enet_host_get_sock_fd (server), 
+		       (select_list_func) nnti_enet_service_network, (void*)cm, (void*)trans);
+    add_attr(listen_list, CM_ENET_PORT, Attr_Int4,
+	     (attr_value) (long)address.port);
+}
+#else
+static void
+setup_enet_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr_list listen_list) {}
 #endif
 
-static int socket_global_init;
-
-extern attr_list
-libcmnnti_LTX_non_blocking_listen(cm, svc, trans, listen_info)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list listen_info;
+static void
+setup_nnti_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr_list listen_list)
 {
-    char url[256];
-    char *hostname;
-    char *nnti_transport;
     static NNTI_transport_t trans_hdl;
-    static int initialized = 0;
     nnti_transport_data_ptr ntd = trans->trans_data;
-    int int_port_num = 0;
-    attr_list listen_list;
-    int incoming_size = 10;
+    static int initialized = 0;
+    char url[256];
     char *last_colon, *first_colon, *last_slash;
+    char *hostname;
+    int incoming_size = 10;
+    char *nnti_transport;
+    int int_port_num = 0;
     int err;
-    int use_enet = 0;
-    char *enet = getenv("NNTI_ENET");
 
-    if (ntd->listen_attrs != NULL) {
-	return ntd->listen_attrs;
-    }
-    if (enet) {
-      sscanf(enet, "%d", &use_enet);
-    }
-    if (listen_info) {
-	get_int_attr(listen_info, CM_NNTI_ENET_CONTROL, &use_enet);
-    }
     /* hope to eliminate this at some point */
     setenv("TRIOS_NNTI_USE_RDMA_TARGET_ACK", "FALSE", 1);
 
@@ -1444,7 +1486,6 @@ attr_list listen_info;
     *(last_slash++) = 0;
     sscanf((last_colon + 1), "%d", &int_port_num);
 
-    listen_list = create_attr_list();
     add_attr(listen_list, CM_IP_HOSTNAME, Attr_String,
 	     (attr_value) strdup(hostname));
     add_attr(listen_list, CM_NNTI_PORT, Attr_Int4,
@@ -1465,7 +1506,7 @@ attr_list listen_info;
 			       NNTI_RECV_QUEUE, &trans_hdl.me, &ntd->mr_recvs);
     if (err != NNTI_OK) {
       fprintf (stderr, "Error: NNTI_register_memory(NNTI_RECV_DST) for client messages returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
-      return NULL;
+      return;
     } else {
       ntd->svc->trace_out(trans->cm, "Successfully registered memory on listen side incoming %p", ntd->incoming);
     }
@@ -1478,66 +1519,49 @@ attr_list listen_info;
     lsp->ntd = ntd;
     ntd->shutdown_listen_thread = 0;
     ntd->listen_thread = 0;
-    ntd->use_enet = use_enet;
-    err = pthread_create(&ntd->listen_thread, NULL, (void*(*)(void*))listen_thread_func, lsp);
-#ifdef ENET_FOUND
-    if (use_enet) {
-	ENetAddress address;
-	ENetHost * server;
-	long seedval = time(NULL) + getpid();
-	/* port num is free.  Constrain to range 26000 : 26100 */
-	int low_bound = 26000;
-	int high_bound = 26100;
-	int size = high_bound - low_bound;
-	int tries = 10;
-
-	if (socket_global_init == 0) {
-	    if (enet_initialize () != 0) {
-		fprintf (stderr, "An error occurred while initializing ENet.\n");
-		//return EXIT_FAILURE;
-	    }
-	}
-	svc->add_periodic_task(cm, 1, 0, nnti_enet_service_network, (void*)trans);
-	svc->trace_out(cm, "CMNNTI begin ENET listen\n");
-
-	srand48(seedval);
-	address.host = ENET_HOST_ANY;
-	while (tries > 0) {
-	    int target = low_bound + size * drand48();
-	    address.port = target;
-	    svc->trace_out(cm, "Cmnnti/Enet trying to bind port %d", target);
-
-	    server = enet_host_create (& address /* the address to bind the server host to */, 
-				       0     /* allow up to 4095 clients and/or outgoing connections */,
-				       1      /* allow up to 2 channels to be used, 0 and 1 */,
-				       0      /* assume any amount of incoming bandwidth */,
-				       0      /* assume any amount of outgoing bandwidth */);
-	    tries--;
-	    if (server != NULL) tries = 0;
-	    if (tries == 5) {
-	      /* try reseeding in case we're in sync with another process */
-	      srand48(time(NULL) + getpid());
-	    }
-	}
-	if (server == NULL) {
-	    fprintf(stderr, "Failed after 5 attempts to bind to a random port.  Lots of undead servers on this host?\n");
-	    return NULL;
-	}
-	ntd->enet_server = server;
-	ntd->enet_listen_port = address.port;
-	svc->trace_out(cm, "CMNNTI  ENET listen at port %d, server %p\n", address.port, server);
-	svc->fd_add_select(cm, enet_host_get_sock_fd (server), 
-			   (select_list_func) nnti_enet_service_network, (void*)cm, (void*)trans);
-	add_attr(listen_list, CM_ENET_PORT, Attr_Int4,
-		 (attr_value) (long)address.port);
-    }
-#endif
     ntd->self_hostname = strdup(hostname);
+    err = pthread_create(&ntd->listen_thread, NULL, (void*(*)(void*))listen_thread_func, lsp);
+}
+
+extern attr_list
+libcmnnti_LTX_non_blocking_listen(cm, svc, trans, listen_info)
+CManager cm;
+CMtrans_services svc;
+transport_entry trans;
+attr_list listen_info;
+{
+    attr_list listen_list;
+    nnti_transport_data_ptr ntd = trans->trans_data;
+    int use_enet = 0;
+    char *enet = getenv("NNTI_ENET");
+    int use_nnti = 1;
+    if (ntd->listen_attrs != NULL) {
+	return ntd->listen_attrs;
+    }
+    if (enet) {
+      sscanf(enet, "%d", &use_enet);
+    }
+    if (listen_info) {
+	get_int_attr(listen_info, CM_NNTI_ENET_CONTROL, &use_enet);
+    }
+
+    listen_list = create_attr_list();
+    if (use_nnti) {
+	setup_nnti_listen(cm, svc, trans, listen_list);
+    }
+    if (use_enet) {
+	setup_enet_listen(cm, svc, trans, listen_list);
+    }
     ntd->listen_attrs = listen_list;
+    ntd->use_enet = use_enet;
 
 #ifdef DF_SHM_FOUND
     ntd->shm_td->listen_thread_cmd = 1;
-    err = pthread_create(&ntd->shm_td->listen_thread, NULL, (void*(*)(void*))shm_listen_thread_func, lsp);
+    listen_struct_p lsp = malloc(sizeof(*lsp));
+    lsp->svc = svc;
+    lsp->trans = trans;
+    lsp->ntd = ntd;
+    (void) pthread_create(&ntd->shm_td->listen_thread, NULL, (void*(*)(void*))shm_listen_thread_func, lsp);
 #endif
     return listen_list;
 
