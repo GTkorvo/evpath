@@ -189,23 +189,31 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	{
 	    int header[6];
 	    int actual;
-	    int upcall_result;
-	    struct FFSEncodeVec tmp_vec[1];
+	    attr_list upcall_result;
+	    struct FFSEncodeVec tmp_vec[2];
 	    chr_timer_stop(&conn->bandwidth_start_time);
 
 	    header[0] = 0x434d5000;  /* CMP\0 */
-	    header[1] = 0 | (CMPerfBandwidthResult << 24);
+	    header[1] = 0 | (CMPerfTestResult << 24);
 	    header[2] = sizeof(header);
 	    header[3] = *(int*)buffer;  /* first entry should be condition */
-	    header[4] = 1;
+	    header[4] = 0;
 	    tmp_vec[0].iov_base = &header;
 	    tmp_vec[0].iov_len = sizeof(header);
+	    tmp_vec[1].iov_base = NULL;
+	    tmp_vec[1].iov_len = 0;
 	    if (conn->cm->perf_upcall)  {
 		upcall_result = conn->cm->perf_upcall(conn->cm, buffer, 2, NULL);
-		header[4] = upcall_result;
+		if (upcall_result) {
+		    char *str_list = attr_list_to_string(upcall_result);
+		    tmp_vec[1].iov_len = header[4] = strlen(str_list) + 1;
+		    tmp_vec[1].iov_base = str_list;
+		    printf("Attr string was %s\n", str_list);
+		    header[2] += header[4];
+		}
 	    }
-	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - transport test response %d sent\n", upcall_result);
-	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, sizeof(header), NULL, 0, 0);
+	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - transport test response sent:");
+	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 2, sizeof(header) + tmp_vec[1].iov_len, NULL, 0, 0);
 
 	    if (actual != 1) {
 		printf("perf write failed\n");
@@ -218,10 +226,14 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	    int cond = *(int*)buffer;  /* first entry should be condition */
 	    int time;
 	    char *chr_time, tmp;
-	    int *result_p = INT_CMCondition_get_client_data(conn->cm, cond);
+	    attr_list *result_p = INT_CMCondition_get_client_data(conn->cm, cond);
 
-	    int upcall_result = ntohl(((int*)buffer)[1]);
-	    if (result_p) *result_p = upcall_result;
+	    if (ntohl(((int*)buffer)[1]) != 0) {
+		char *attr_string = (char*)&((int*)buffer)[3];
+		printf("Attr string was %s\n", attr_string);
+		attr_list upcall_result = attr_list_from_string(attr_string);
+		if (result_p) *result_p = upcall_result;
+	    }
 	    CMtrace_out(conn->cm, CMConnectionVerbose, "CM - transport test response, condition %d\n", cond);
 	    INT_CMCondition_signal(conn->cm, cond);
 	}
@@ -442,12 +454,12 @@ static atom_t CM_TRANS_TEST_VERBOSE = -1;
 static atom_t CM_TRANS_TEST_REPEAT = -1;
 static atom_t CM_TRANS_TEST_REUSE_WRITE_BUFFER = -1;
 
-extern int
+extern attr_list
 INT_CMtest_transport(CMConnection conn, attr_list how)
 {
     int i;
     int cond;
-    int result;
+    attr_list result;
     long actual;
     struct FFSEncodeVec *tmp_vec;
     int header[6];
@@ -503,7 +515,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     tmp_vec[1].iov_len = strlen(attr_str) + 1; /* send NULL */
     actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 2, tmp_vec[0].iov_len + tmp_vec[1].iov_len, NULL, 0, 1);
     if (actual != 1) { 
-	return -1;
+	return NULL;
     }
 
     tmp_vec[0].iov_base = NULL;
@@ -529,10 +541,9 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	((int*)tmp_vec[0].iov_base)[1] = ((size >> 32) &0xffffff) | (CMPerfTestBody<<24);
 	((int*)tmp_vec[0].iov_base)[2] = (size & 0xffffffff);
 	tmp_vec[vecs-1].iov_len = size - (each * (vecs-1));
-	printf("Doing body write %x %x %x\n", ((int*)tmp_vec[0].iov_base)[0], ((int*)tmp_vec[0].iov_base)[1], ((int*)tmp_vec[0].iov_base)[2], ((int*)tmp_vec[0].iov_base)[3]);
 	actual = INT_CMwrite_raw(conn, tmp_vec, NULL, vecs, size, NULL, 0, 0);
 	if (actual != 1) {
-	    return -1;
+	    return NULL;
 	}
 	if (!reuse_write_buffer) {
 	    for (count = 0; count < vecs; count++) {
@@ -549,12 +560,12 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     tmp_vec[0].iov_len = sizeof(header);
     actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, sizeof(header), NULL, 0, 0);
     if (actual != 1) {
-	return -1;
+	return NULL;
     }
 
     printf("Waiting for result\n");
     INT_CMCondition_wait(conn->cm, cond);
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completed transport test - result %d \n", result);
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completed transport test - result %p \n", result);
     return result;
 }
 

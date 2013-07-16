@@ -10,13 +10,44 @@
 #include "evpath.h"
 #include <errno.h>
 
-int
+static atom_t CM_TRANS_TEST_SIZE = -1;
+static atom_t CM_TRANS_TEST_VECS = -1;
+static atom_t CM_TRANS_TEST_VERBOSE = -1;
+static atom_t CM_TRANS_TEST_REPEAT = -1;
+static atom_t CM_TRANS_TEST_REUSE_WRITE_BUFFER = -1;
+static atom_t CM_TRANSPORT = -1;
+static atom_t CM_TRANS_TEST_RECEIVED_COUNT = -1;
+
+static int received_count = 0;
+
+attr_list
 trans_test_upcall(CManager cm, void *buffer, int type, attr_list list)
 {
-    printf("Upcall happend %d- ", type);
+    printf("Upcall happened %d- ", type);
     if (list) dump_attr_list(list);
     printf(" - \n");
-    return 0;
+    switch(type) {
+    case 0:
+	/* test init */
+	received_count = 0;
+	return NULL;
+	break;
+    case 1:
+	/* body message */
+	received_count++;
+	return NULL;
+	break;
+    case 2: {
+	/* test finalize */
+	attr_list ret = create_attr_list();
+	set_int_attr(ret, CM_TRANS_TEST_RECEIVED_COUNT, received_count);
+	return ret;
+	break;
+    }
+    default:
+	printf("Bad type in trans_test_upcall, %d\n", type);
+	return NULL;
+    }
 }
 
 int
@@ -33,19 +64,13 @@ main(argc, argv)
     CMinstall_perf_upcall(cm, trans_test_upcall);
     (void) CMfork_comm_thread(cm);
 
-    static atom_t CM_TRANS_TEST_SIZE = -1;
-    static atom_t CM_TRANS_TEST_VECS = -1;
-    static atom_t CM_TRANS_TEST_VERBOSE = -1;
-    static atom_t CM_TRANS_TEST_REPEAT = -1;
-    static atom_t CM_TRANS_TEST_REUSE_WRITE_BUFFER = -1;
-    static atom_t CM_TRANSPORT = -1;
-
     if (atom_init == 0) {
 	CM_TRANS_TEST_SIZE = attr_atom_from_string("CM_TRANS_TEST_SIZE");
 	CM_TRANS_TEST_VECS = attr_atom_from_string("CM_TRANS_TEST_VECS");
 	CM_TRANS_TEST_VERBOSE = attr_atom_from_string("CM_TRANS_TEST_VERBOSE");
 	CM_TRANS_TEST_REPEAT = attr_atom_from_string("CM_TRANS_TEST_REPEAT");
 	CM_TRANS_TEST_REUSE_WRITE_BUFFER = attr_atom_from_string("CM_TRANS_TEST_REUSE_WRITE_BUFFER");
+	CM_TRANS_TEST_RECEIVED_COUNT = attr_atom_from_string("CM_TRANS_TEST_RECEIVED_COUNT");
 	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
 	atom_init++;
     }
@@ -70,7 +95,7 @@ main(argc, argv)
 	int bw_long, bw_cof; /*measured values*/
 
 	attr_list contact_list = NULL;
-	attr_list list, result_list;
+	attr_list list, result;
 
 	for (i = 1; i < argc; i++) {
 	    char *final;
@@ -104,7 +129,8 @@ main(argc, argv)
 	add_int_attr(list, CM_TRANS_TEST_VECS, 4); 
 	add_int_attr(list, CM_TRANS_TEST_REPEAT, 4); 
 		
-	CMtest_transport(conn, list);
+	result = CMtest_transport(conn, list);
+	dump_attr_list(result);
     }
     CManager_close(cm);
     return 0;
