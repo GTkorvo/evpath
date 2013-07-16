@@ -14,3 +14,5 @@ endforeach()
 
 ADD_TEST (mtests_cmtest_UDP mtests_cmtest -t udp)
 ADD_TEST (mtests_cmping_UDP mtests_cmping -t udp)
+ADD_EXECUTABLE (trans_test trans_test.c)
+TARGET_LINK_LIBRARIES(trans_test evpath ${BASE_LIBS})

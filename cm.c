@@ -620,6 +620,7 @@ INT_CManager_create()
 
     cm->contact_lists = NULL;
     cm->shutdown_functions = NULL;
+    cm->perf_upcall = NULL;
 #ifdef EV_INTERNAL_H
     EVPinit(cm);
 #endif
@@ -685,6 +686,12 @@ CManager_free(CManager cm)
     }
     if (cm->shutdown_functions) INT_CMfree(cm->shutdown_functions);
     INT_CMfree(cm);
+}
+
+extern void
+INT_CMinstall_perf_upcall(CManager cm, CMperf_upcall upcall)
+{
+    cm->perf_upcall = upcall;
 }
 
 extern void
@@ -2481,7 +2488,8 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
 {
     int actual = 0;
     unsigned char checksum = 0;
-    int i, j, start, count = 0;
+    int i, j, start;
+    long count = 0;
     assert(!conn->closed && !conn->failed);
     if (conn->write_pending) {
 	wait_for_pending_write(conn);
@@ -2502,7 +2510,7 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
             conn->trans->NBwritev_func(&CMstatic_trans_svcs, 
                                             conn->transport_data, 
                                             full_vec, vec_count, attrs);
-        if (actual_bytes < byte_count) {
+        if (actual_bytes < count) {
             /* copy remaining and send it later */
             if (actual_bytes < 0 ) actual_bytes = 0;
             if (data_vec_stack) {
@@ -2514,7 +2522,7 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
             conn->write_pending = 1;
             CMtrace_out(conn->cm, CMLowLevelVerbose, 
                         "Partial write, queued %ld bytes\n",
-                        byte_count - actual_bytes);
+                        count - actual_bytes);
             return -1; /* XXX */
         }
         actual = vec_count;  /* set actual for success */

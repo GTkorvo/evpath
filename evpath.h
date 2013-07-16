@@ -2248,6 +2248,14 @@ extern void
 EVassoc_conversion_action(CManager cm, int stone_id, int stage, FMFormat target_format,
 			  FMFormat incoming_format);
 
+extern int
+CMtest_transport(CMConnection conn, attr_list how);
+
+typedef int (*CMperf_upcall)(CManager cm, void *buffer, int type, attr_list list);
+
+extern void
+CMinstall_perf_upcall(CManager cm, CMperf_upcall upcall);
+
 /* @}*/
 
 #ifdef	__cplusplus

@@ -121,6 +121,7 @@ typedef struct _CManager {
     attr_list *contact_lists;
 
     func_entry *shutdown_functions;
+    CMperf_upcall perf_upcall;
 
     struct _event_path_data *evp;
 } CManager_s;
@@ -520,3 +521,5 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
 extern void
 INT_CMConnection_dereference(CMConnection conn);
 extern FMContext INT_CMget_FMcontext(CManager cm);
+extern void INT_CMinstall_perf_upcall(CManager cm, CMperf_upcall upcall);
+extern int INT_CMtest_transport(CMConnection conn, attr_list how);
