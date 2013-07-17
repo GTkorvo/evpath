@@ -2251,7 +2251,7 @@ EVassoc_conversion_action(CManager cm, int stone_id, int stage, FMFormat target_
 extern attr_list
 CMtest_transport(CMConnection conn, attr_list how);
 
-typedef attr_list (*CMperf_upcall)(CManager cm, void *buffer, int type, attr_list list);
+typedef attr_list (*CMperf_upcall)(CManager cm, void *buffer, long length, int type, attr_list list);
 
 extern void
 CMinstall_perf_upcall(CManager cm, CMperf_upcall upcall);
