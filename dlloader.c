@@ -37,12 +37,15 @@ CMdlopen(char *in_lib, int mode)
     void *handle;
     char *tmp;
     char *lib;
+    int verbose = getenv("CMTransportVerbose") != NULL;
     tmp = rindex(in_lib, '.');
+    if (verbose) printf("Trying to dlopen %s\n", in_lib);
     if (tmp && (strcmp(tmp, ".la") == 0)) {
 	/* can't open .la files */
 	lib = malloc(strlen(in_lib) + strlen(MODULE_EXT) + 8);
 	strcpy(lib, in_lib);
 	strcpy(rindex(lib, '.'), MODULE_EXT);
+	if (verbose) printf("Dlopen module name replaced, now %s\n", lib);
     } else {
 	lib = strdup(in_lib);
     }
@@ -52,11 +55,26 @@ CMdlopen(char *in_lib, int mode)
 	sprintf(tmp, "%s/%s", list[0], lib);
 	handle = dlopen(tmp, RTLD_LAZY);
 	char *err = dlerror();
-	list++;
+	if (verbose) {
+	    if (err) {
+		printf("Failed to dlopen %s, error is %s\n", tmp, err);
+	    } else {
+		printf("DLopen of %s succeeded\n", tmp);
+	    }
+	}
+ 	list++;
 	if (handle) list = NULL; // fall out
     }
     if (!handle) {
         handle = dlopen(lib, RTLD_LAZY);
+	char *err = dlerror();
+	if (verbose) {
+	    if (err) {
+		printf("Failed to dlopen %s, error is %s\n", tmp, err);
+	    } else {
+		printf("DLopen of %s succeeded\n", tmp);
+	    }
+	}
     }
     if (!handle) return NULL;
     dlh = malloc(sizeof(*dlh));
