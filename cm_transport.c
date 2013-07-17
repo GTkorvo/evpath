@@ -24,6 +24,17 @@ extern struct CMtrans_services_s CMstatic_trans_svcs;
 
 static transport_entry *global_transports = NULL;
 
+int
+find_transport_in_cm(CManager cm, const char *trans_name)
+{
+    int i = 0;
+    if (cm->transports == NULL) return 0;
+    while(cm->transports[i] != NULL) {
+	if (strcmp(cm->transports[i]->trans_name, trans_name) == 0) return 1;
+    }
+    return 0;
+}
+
 transport_entry
 add_transport_to_cm(CManager cm, transport_entry transport)
 {
@@ -57,6 +68,8 @@ load_transport(CManager cm, const char *trans_name, int quiet)
     lt_dlhandle handle;	
 #endif
 
+
+    if (find_transport_in_cm(cm, trans_name)) return 1;
 
     while ((trans_list != NULL) && (*trans_list != NULL)) {
 	if (strcmp((*trans_list)->trans_name, trans_name) == 0) {
