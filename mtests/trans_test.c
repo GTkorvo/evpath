@@ -10,30 +10,59 @@
 #include "evpath.h"
 #include <errno.h>
 
-static atom_t CM_TRANS_TEST_SIZE = -1;
-static atom_t CM_TRANS_TEST_VECS = -1;
+static atom_t CM_TRANS_TEST_SIZE = 10240;
+static atom_t CM_TRANS_TEST_VECS = 4;
 static atom_t CM_TRANS_TEST_VERBOSE = -1;
-static atom_t CM_TRANS_TEST_REPEAT = -1;
+static atom_t CM_TRANS_TEST_REPEAT = 10;
 static atom_t CM_TRANS_TEST_REUSE_WRITE_BUFFER = -1;
 static atom_t CM_TRANSPORT = -1;
 static atom_t CM_TRANS_TEST_RECEIVED_COUNT = -1;
 
+static int vec_count = 4;
+static int size = 10240;
+static int msg_count = 10;
+
 static int received_count = 0;
+static int expected_count = -1;
+static int write_size = -1;
+static int verbose = 0;
+static int size_error = 0;
+static int global_exit_condition = -1;
+static attr_list global_test_result = NULL;
 
 attr_list
-trans_test_upcall(CManager cm, void *buffer, int type, attr_list list)
+trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list list)
 {
-    printf("Upcall happened %d- ", type);
-    if (list) dump_attr_list(list);
-    printf(" - \n");
     switch(type) {
     case 0:
 	/* test init */
+	if (verbose) {
+	    printf("Transport test init - attributes :  ");
+	    dump_attr_list(list);
+	    printf("\n");
+	}
 	received_count = 0;
+	if (list) {
+	    get_int_attr(list, CM_TRANS_TEST_REPEAT, &expected_count);
+	    get_int_attr(list, CM_TRANS_TEST_SIZE, &write_size);
+	    get_int_attr(list, CM_TRANS_TEST_VERBOSE, &verbose);
+	}
 	return NULL;
 	break;
     case 1:
 	/* body message */
+	if (verbose) printf("Body message %d received, length %ld\n", *(int*)buffer, length);
+	if (length != (write_size - 12 /* test protocol swallows a little as header */)) {
+	    if (verbose) printf("Error in body delivery size, expected %d, got %ld\n", write_size - 12, length);
+	    size_error++;
+	}
+	if (*(int*)buffer != received_count) {
+	    static int warned = 0;
+	    if (verbose && !warned) {
+		printf("Data missing or out of order, expected msg %d and got %d\n", received_count, *(int*)buffer);
+		warned++;
+	    }
+	}
 	received_count++;
 	return NULL;
 	break;
@@ -41,6 +70,10 @@ trans_test_upcall(CManager cm, void *buffer, int type, attr_list list)
 	/* test finalize */
 	attr_list ret = create_attr_list();
 	set_int_attr(ret, CM_TRANS_TEST_RECEIVED_COUNT, received_count);
+	global_test_result = ret;
+	if (global_exit_condition != -1) {
+	    CMCondition_signal(cm, global_exit_condition);
+	}
 	return ret;
 	break;
     }
@@ -48,6 +81,37 @@ trans_test_upcall(CManager cm, void *buffer, int type, attr_list list)
 	printf("Bad type in trans_test_upcall, %d\n", type);
 	return NULL;
     }
+}
+
+static char *argv0;
+
+static
+pid_t
+run_subprocess(char **args)
+{
+#ifdef HAVE_WINDOWS_H
+    int child;
+    child = _spawnv(_P_NOWAIT, args[0], args);
+    if (child == -1) {
+	printf("failed for cmtest\n");
+	perror("spawnv");
+    }
+    return child;
+#else
+    pid_t child = fork();
+    if (child == 0) {
+	/* I'm the child */
+	execv(args[0], args);
+    }
+    return child;
+#endif
+}
+
+static void
+usage()
+{
+    printf("USAGE STUFF\n");
+    exit(1);
 }
 
 int
@@ -59,6 +123,44 @@ main(argc, argv)
     CMConnection conn = NULL;
     CMFormat format;
     static int atom_init = 0;
+    int start_subprocess = 1;
+    argv0 = argv[0];
+    int start_subproc_arg_count = 4; /* leave a few open at the beginning */
+    char **subproc_args = malloc((argc + start_subproc_arg_count + 2)*sizeof(argv[0]));
+    int cur_subproc_arg = start_subproc_arg_count;
+    while (argv[1] && (argv[1][0] == '-')) {
+	subproc_args[cur_subproc_arg++] = strdup(argv[1]);
+	if (argv[1][1] == 'c') {
+	    start_subprocess = 0;
+	} else if (strcmp(&argv[1][1], "q") == 0) {
+	    verbose--;
+	} else if (strcmp(&argv[1][1], "v") == 0) {
+	    verbose++;
+	} else if (strcmp(&argv[1][1], "vectors") == 0) {
+	    if (!argv[2] || (sscanf("%d", argv[2], &vec_count) != 1)) {
+		printf("Bad -vectors argument \"%s\"\n", argv[2]);
+		usage();
+	    }
+	    argv++; argc--;
+	} else if (strcmp(&argv[1][1], "size") == 0) {
+	    if (!argv[2] || (sscanf("%d", argv[2], &size) != 1)) {
+		printf("Bad -size argument \"%s\"\n", argv[2]);
+		usage();
+	    }
+	    argv++; argc--;
+	} else if (strcmp(&argv[1][1], "msg_count") == 0) {
+	    if (!argv[2] || (sscanf("%d", argv[2], &msg_count) != 1)) {
+		printf("Bad -msg_count argument \"%s\"\n", argv[2]);
+		usage();
+	    }
+	    argv++; argc--;
+	} else if (strcmp(&argv[1][1], "n") == 0) {
+	    start_subprocess = 0;
+	    verbose = 1;
+	}
+	argv++;
+	argc--;
+    }
 
     cm = CManager_create();
     CMinstall_perf_upcall(cm, trans_test_upcall);
@@ -86,31 +188,32 @@ main(argc, argv)
 	}
 	CMlisten_specific(cm, listen_list);
 	contact_list = CMget_contact_list(cm);
-	printf("Contact list \"%s\"\n", attr_list_to_string(contact_list));
-	CMsleep(cm, 1200);
+	if (start_subprocess) {
+	    subproc_args[cur_subproc_arg++] = attr_list_to_string(contact_list);
+	    subproc_args[cur_subproc_arg] = NULL;
+	    subproc_args[--start_subproc_arg_count] = argv0;
+	    global_exit_condition = CMCondition_get(cm, NULL);
+	    run_subprocess(&subproc_args[start_subproc_arg_count]);
+	    CMCondition_wait(cm, global_exit_condition);
+	    if (global_test_result) dump_attr_list(global_test_result);
+	} else {
+	    global_exit_condition = CMCondition_get(cm, NULL);
+	    printf("Contact list \"%s\"\n", attr_list_to_string(contact_list));
+	    CMCondition_wait(cm, global_exit_condition);
+	    printf("Return from condition wait\n");
+	}
     } else {
-	int size = 100;
-	int i,j;
-	int N, repeat_time, size_inc;
-	int bw_long, bw_cof; /*measured values*/
+	int i;
 
 	attr_list contact_list = NULL;
-	attr_list list, result;
+	attr_list test_list, result;
 
 	for (i = 1; i < argc; i++) {
-	    char *final;
-	    long value;
-	    errno = 0;
-	    value = strtol(argv[i], &final, 10);
-	    if ((errno == 0) && (final == (argv[i] + strlen(argv[i])))) {
-		/* valid number as an argument, must be byte size */
-		size = (int) value;
-	    } else {
-		contact_list = attr_list_from_string(argv[i]);
-		if (contact_list == NULL) {
-		    printf("Argument \"%s\" not recognized as size or contact list\n",
-			   argv[i]);
-		}
+	    contact_list = attr_list_from_string(argv[i]);
+	    if (contact_list == NULL) {
+		printf("Remaining Argument \"%s\" not recognized as size or contact list\n",
+		       argv[i]);
+		usage();
 	    }
 	}
 	if (contact_list == NULL) {
@@ -123,14 +226,13 @@ main(argc, argv)
 	}
 
 
-	list = create_attr_list();	    
+	test_list = create_attr_list();	    
 	    
-	add_int_attr(list, CM_TRANS_TEST_SIZE, 10240); 
-	add_int_attr(list, CM_TRANS_TEST_VECS, 4); 
-	add_int_attr(list, CM_TRANS_TEST_REPEAT, 4); 
+	add_int_attr(test_list, CM_TRANS_TEST_SIZE, size); 
+	add_int_attr(test_list, CM_TRANS_TEST_VECS, vec_count); 
+	add_int_attr(test_list, CM_TRANS_TEST_REPEAT, msg_count); 
 		
-	result = CMtest_transport(conn, list);
-	dump_attr_list(result);
+	result = CMtest_transport(conn, test_list);
     }
     CManager_close(cm);
     return 0;
