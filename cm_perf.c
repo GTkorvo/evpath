@@ -126,11 +126,9 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	    if (htonl(0xdeadbeef) == 0xdeadbeef) {
 		header[4] = htonl(t.i[0]);
 		header[5] = htonl(t.i[1]);
-		printf("Not Swapping\n");
 	    } else {
 		header[4] = htonl(t.i[1]);
 		header[5] = htonl(t.i[0]);
-		printf("Swapping\n");
 	    }
 	    tmp_vec[0].iov_base = &header;
 	    tmp_vec[0].iov_len = sizeof(header);
@@ -166,22 +164,28 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	    INT_CMCondition_signal(conn->cm, cond);
 	}
 	break;
-    case CMPerfTestInit:
-	/* initiate bandwidth measure */
-	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Starting transport test\n");
-	int cond = ((int*)buffer)[0];  /* first entry should be condition */
-	int header_size = ((int*)buffer)[1];  /* first entry should be condition */
-	char *attr_string = buffer + header_size - 12;
-	attr_list list = attr_list_from_string(attr_string);
-	if (conn->cm->perf_upcall)  {
-	    (void)conn->cm->perf_upcall(conn->cm, buffer, 0, list);
+    case CMPerfTestInit: 
+        {
+	    /* initiate bandwidth measure */
+	    int cond = ((int*)buffer)[0];  /* first entry should be condition */
+	    int header_size = ((int*)buffer)[1];  /* first entry should be condition */
+	    char *attr_string = buffer + header_size - 12;
+	    attr_list list = attr_list_from_string(attr_string);
+	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Starting transport test\n");
+	    if (conn->cm->perf_upcall)  {
+		CManager_unlock(conn->cm);
+		(void)conn->cm->perf_upcall(conn->cm, buffer, length - 8, 0, list);
+		CManager_lock(conn->cm);
+	    }
+	    break;
 	}
-	break;
     case CMPerfTestBody:
 	/* no activity for inner packets */
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - transport test - body packet\n");
 	if (conn->cm->perf_upcall)  {
-	    (void)conn->cm->perf_upcall(conn->cm, buffer, 1, NULL);
+	    CManager_unlock(conn->cm);
+	    (void)conn->cm->perf_upcall(conn->cm, buffer, length - 8, 1, NULL);
+	    CManager_lock(conn->cm);
 	}
 	break;
     case CMPerfTestEnd:
@@ -203,12 +207,13 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	    tmp_vec[1].iov_base = NULL;
 	    tmp_vec[1].iov_len = 0;
 	    if (conn->cm->perf_upcall)  {
-		upcall_result = conn->cm->perf_upcall(conn->cm, buffer, 2, NULL);
+		CManager_unlock(conn->cm);
+		upcall_result = conn->cm->perf_upcall(conn->cm, buffer, length - 8, 2, NULL);
+		CManager_lock(conn->cm);
 		if (upcall_result) {
 		    char *str_list = attr_list_to_string(upcall_result);
 		    tmp_vec[1].iov_len = header[4] = strlen(str_list) + 1;
 		    tmp_vec[1].iov_base = str_list;
-		    printf("Attr string was %s\n", str_list);
 		    header[2] += header[4];
 		}
 	    }
@@ -230,7 +235,6 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 
 	    if (ntohl(((int*)buffer)[1]) != 0) {
 		char *attr_string = (char*)&((int*)buffer)[3];
-		printf("Attr string was %s\n", attr_string);
 		attr_list upcall_result = attr_list_from_string(attr_string);
 		if (result_p) *result_p = upcall_result;
 	    }
@@ -484,11 +488,11 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     }
     get_int_attr(how, CM_TRANS_TEST_VECS, &vecs);
     if (vecs < 1) {
-	printf("Stupid vecs value in CMtest_transport\n");
+	printf("Stupid vecs value in CMtest_transport, %d\n", vecs);
 	return 0;
     }
-    if (((float)size / (float) vecs) < 8.0) {
-	size = vecs * 8;  /* minimum */
+    if (((float)size / (float) vecs) < 16.0) {
+	size = vecs * 16;  /* minimum */
     }
     get_int_attr(how, CM_TRANS_TEST_VERBOSE, &verbose);
     get_int_attr(how, CM_TRANS_TEST_REPEAT, &repeat_count);
@@ -540,6 +544,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     /* size in second entry, high byte gives CMPerf operation */
 	((int*)tmp_vec[0].iov_base)[1] = ((size >> 32) &0xffffff) | (CMPerfTestBody<<24);
 	((int*)tmp_vec[0].iov_base)[2] = (size & 0xffffffff);
+	((int*)tmp_vec[0].iov_base)[3] = i;   /* sequence number */
 	tmp_vec[vecs-1].iov_len = size - (each * (vecs-1));
 	actual = INT_CMwrite_raw(conn, tmp_vec, NULL, vecs, size, NULL, 0, 0);
 	if (actual != 1) {
@@ -553,7 +558,6 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	}
     }
 
-    printf("Writing test end\n");
     ((int*)header)[1] = 0 | (CMPerfTestEnd<<24);
     ((int*)header)[2] = sizeof(header);
     tmp_vec[0].iov_base = &header[0];
@@ -563,7 +567,6 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	return NULL;
     }
 
-    printf("Waiting for result\n");
     INT_CMCondition_wait(conn->cm, cond);
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completed transport test - result %p \n", result);
     return result;
