@@ -468,8 +468,8 @@ unlink_connection(nnti_transport_data_ptr ntd, nnti_conn_data_ptr ncd)
 
 #include "qual_hostname.c"
 
-enum {CMNNTI_CONNECT=1, CMNNTI_PIGGYBACK=2, CMNNTI_PULL_REQUEST=3, CMNNTI_PULL_COMPLETE=4};
-char *msg_type_name[] = {"NO MESSAGE", "CMNNTI_CONNECT", "CMNNTI_PIGGYBACK", "CMNNTI_PULL_REQUEST", "CMNNTI_PULL_COMPLETE"};
+enum {CMNNTI_CONNECT=1, CMNNTI_PIGGYBACK=2, CMNNTI_PULL_REQUEST=3, CMNNTI_PULL_COMPLETE=4, CMNNTI_PULL_SHM_REQUEST=5};
+char *msg_type_name[] = {"NO MESSAGE", "CMNNTI_CONNECT", "CMNNTI_PIGGYBACK", "CMNNTI_PULL_REQUEST", "CMNNTI_PULL_COMPLETE", "CMNNTI_PULL_SHM_REQUEST"};
 
 struct connect_message {
     short message_type;
@@ -1717,8 +1717,32 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     for(i=0; i<iovcnt; i++) size+= iov[i].iov_len;
 
     h = get_control_message_buffer(ncd, &m, sizeof(*m));
+
+#ifdef DF_SHM_FOUND
+    if (ncd->shm_cd) {
+        /* put data to shared memory send queue. this is a blocking call. */
+        df_queue_ep_t send_ep = ncd->shm_cd->send_ep;
+        int rc = df_enqueue_vector (send_ep, iov, iovcnt);
+        if (rc != 0) {
+            return -1;
+        }
+
+        m->message_type = CMNNTI_PULL_SHM_REQUEST;
+        m->pull.size = size;
+        m->pull.addr = NULL;
+        //m->pull.buf_addr;
+        m->pull.msg_info = NULL;
+
+        svc->trace_out(ncd->ntd->cm, "CMNNTI/SHM copied %d bytes and sending pull request", size);
+        if (send_control_message(h) == 0) return 0;
+        svc->set_pending_write(ncd->conn);
+        return 1;
+    }
+#endif
+
     write_buffer = svc->get_data_buffer(ncd->ntd->cm, size);
     data = write_buffer->buffer;
+
     /* 
      * register_size might be bigger than needed, map it all 'cause we 
      * might use it later 
@@ -2037,14 +2061,34 @@ attr_list attrs;
 
 #ifdef DF_SHM_FOUND
     if (ncd->shm_cd) {
-        df_queue_ep_t send_ep = ncd->shm_cd->send_ep;
-
         svc->trace_out(ncd->ntd->cm, "CMNNTI/SHM writev of %d vectors", iovcnt);
 
-        /* put data to send queue. this is a blocking call. */
-        int rc = df_enqueue_vector (send_ep, iov, iovcnt);
-        if (rc != 0) {
-            return -1;
+        /* send out small message directly */
+        if(size <= ncd->piggyback_size_max) {
+            send_handle h;
+            struct client_message *m;
+            h = get_control_message_buffer(ncd, &m, size + client_header_size);
+            m->message_type = CMNNTI_PIGGYBACK;
+            m->pig.size = size;
+            size = 0;
+            for(i=0; i<iovcnt; i++) {
+                memcpy(&m->pig.payload[size], iov[i].iov_base, iov[i].iov_len);
+                size += iov[i].iov_len;
+            }
+            svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET outbound piggybacking %d bytes of data in control message", size);
+            if (send_control_message(h) == 0) return 0;
+        }
+        else {
+            /* put data to shared memory send queue. this is a blocking call. */
+            df_queue_ep_t send_ep = ncd->shm_cd->send_ep;
+            int rc = df_enqueue_vector (send_ep, iov, iovcnt);
+            if (rc != 0) {
+                return -1;
+            }
+
+            /* send out a control message */
+            if (copy_full_buffer_and_send_pull_request(svc, ncd, iov, iovcnt, attrs) == 0)
+            return 0;
         }
         return iovcnt;
     }
