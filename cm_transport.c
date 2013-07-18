@@ -31,6 +31,7 @@ find_transport_in_cm(CManager cm, const char *trans_name)
     if (cm->transports == NULL) return 0;
     while(cm->transports[i] != NULL) {
 	if (strcmp(cm->transports[i]->trans_name, trans_name) == 0) return 1;
+	i++;
     }
     return 0;
 }
