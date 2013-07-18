@@ -1323,14 +1323,59 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 }
 #endif
 
+#ifdef DF_SHM_FOUND
+static void
+handle_pull_shm_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
+                       struct client_message *m)
+{
+    /* copy data from shm queue */
+    shm_transport_data_ptr shm_td = ncd->shm_cd->shm_td;
+    struct shm_connection_data *conn = ncd->shm_cd;
+    void *data = NULL;
+    size_t length = 0;
+    int rc = df_try_dequeue(conn->recv_ep, &data, &length);
+    switch(rc) {
+        case 0: { /* dequeue succeeded */
+            ncd->read_buffer = shm_td->ntd->svc->get_data_buffer(trans->cm, length);
+
+            /* copy the data from shm into a cm buffer */
+            memcpy(&((char*)conn->ncd->read_buffer->buffer)[0], data, length);
+
+            df_release(conn->recv_ep);
+
+            conn->ncd->read_buf_len = length;
+
+            /* kick upstairs */
+            trans->data_available(trans, conn->ncd->conn);
+            shm_td->ntd->svc->return_data_buffer(trans->cm, conn->ncd->read_buffer);
+            conn->ncd->read_buffer = NULL;
+            break;
+        }
+        case -1: { /* no data available */
+            break;
+        }
+        case 1: { /* dequeue failed */
+            svc->trace_out(shm_td->ntd->cm, "Error: dequeue returns error on shm connection.\n");
+            break;
+        }
+        default:
+            break;
+    } 
+}
+#endif
+
 static void
 handle_control_request(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
 		       struct client_message *m)
 {
 
   switch (m->message_type) {
-  case CMNNTI_PULL_REQUEST: {
+  case CMNNTI_PULL_REQUEST:{ 
       handle_pull_request_message(ncd, svc, trans, m);
+      break;
+  }
+  case CMNNTI_PULL_SHM_REQUEST:{
+      handle_pull_shm_request_message(ncd, svc, trans, m);
       break;
   }
   case CMNNTI_PULL_COMPLETE:{
