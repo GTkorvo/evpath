@@ -1780,7 +1780,6 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
 
         svc->trace_out(ncd->ntd->cm, "CMNNTI/SHM copied %d bytes and sending pull request", size);
         if (send_control_message(h) == 0) return 0;
-        svc->set_pending_write(ncd->conn);
         return 1;
     }
 #endif
