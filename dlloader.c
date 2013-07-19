@@ -37,7 +37,7 @@ CMdlopen(char *in_lib, int mode)
     void *handle;
     char *tmp;
     char *lib;
-    int verbose = getenv("CMTransportVerbose") != NULL;
+    int verbose = (getenv("CMTransportVerbose") != NULL);
     tmp = rindex(in_lib, '.');
     if (verbose) printf("Trying to dlopen %s\n", in_lib);
     if (tmp && (strcmp(tmp, ".la") == 0)) {
