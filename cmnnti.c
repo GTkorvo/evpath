@@ -568,6 +568,7 @@ attr_list conn_attr_list;
 
     int timeout = 500;
     ntd->svc->trace_out(trans->cm, "Connecting to URL \"%s\"", server_url);
+    printf("Trying connetion to server_URL %s\n", server_url);
     int err = NNTI_connect(&ntd->trans_hdl, server_url, timeout, 
 			   &nnti_conn_data->peer_hdl);
     if (err != NNTI_OK) {
@@ -1362,6 +1363,10 @@ handle_pull_shm_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, tr
             break;
     } 
 }
+#else
+static void
+handle_pull_shm_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
+				struct client_message *m){}
 #endif
 
 static void
@@ -2198,7 +2203,7 @@ CMtrans_services svc;
         extern int logger_init(const int debug_level, const char *file);
         char nnti_log_filename[256];
 	sprintf(nnti_log_filename, "nnti_log_%x", getpid());
-        logger_init(6, nnti_log_filename);
+        logger_init(4, nnti_log_filename);
     }
     if (atom_init == 0) {
 	CM_NNTI_PORT = attr_atom_from_string("NNTI_PORT");
