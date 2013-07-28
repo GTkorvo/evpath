@@ -7,6 +7,7 @@
 #endif
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include "evpath.h"
 #include <errno.h>
 
@@ -135,6 +136,18 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
 }
 
 static char *argv0;
+static pid_t subproc_proc = 0;
+
+static void
+fail_and_die(int signal)
+{
+    (void)signal;
+    fprintf(stderr, "CMtest failed to complete in reasonable time\n");
+    if (subproc_proc != 0) {
+	kill(subproc_proc, 9);
+    }
+    exit(1);
+}
 
 static
 pid_t
@@ -175,10 +188,13 @@ main(argc, argv)
     CMFormat format;
     static int atom_init = 0;
     int start_subprocess = 1;
+    int timeout = 60;
+    int ret, actual_count;
     argv0 = argv[0];
     int start_subproc_arg_count = 4; /* leave a few open at the beginning */
     char **subproc_args = malloc((argc + start_subproc_arg_count + 2)*sizeof(argv[0]));
     int cur_subproc_arg = start_subproc_arg_count;
+    char *transport = NULL;
     while (argv[1] && (argv[1][0] == '-')) {
 	subproc_args[cur_subproc_arg++] = strdup(argv[1]);
 	if (argv[1][1] == 'c') {
@@ -199,6 +215,14 @@ main(argc, argv)
 		printf("Bad -size argument \"%s\"\n", argv[2]);
 		usage();
 	    }
+	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
+	    argv++; argc--;
+	} else if (strcmp(&argv[1][1], "transport") == 0) {
+	    if (!argv[2]) {
+		printf("missing -transport\n");
+		usage();
+	    }
+	    transport = strdup(argv[2]);
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
 	    argv++; argc--;
 	} else if (strcmp(&argv[1][1], "msg_count") == 0) {
@@ -225,10 +249,22 @@ main(argc, argv)
 	} else if (strcmp(&argv[1][1], "n") == 0) {
 	    start_subprocess = 0;
 	    verbose = 1;
+	    timeout = 600;
+	} else {
+	    printf("Argument not recognized, \"%s\"\n", argv[1]);
+	    usage();
 	}
 	argv++;
 	argc--;
     }
+
+    struct sigaction sigact;
+    sigact.sa_flags = 0;
+    sigact.sa_handler = fail_and_die;
+    sigemptyset(&sigact.sa_mask);
+    sigaddset(&sigact.sa_mask, SIGALRM);
+    sigaction(SIGALRM, &sigact, NULL);
+    alarm(timeout);
 
     cm = CManager_create();
     CMinstall_perf_upcall(cm, trans_test_upcall);
@@ -250,7 +286,6 @@ main(argc, argv)
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
-	char *transport = NULL;
 	if ((transport = getenv("CMTransport")) != NULL) {
 
 	    listen_list = create_attr_list();
@@ -263,7 +298,7 @@ main(argc, argv)
 	    subproc_args[cur_subproc_arg] = NULL;
 	    subproc_args[--start_subproc_arg_count] = argv0;
 	    global_exit_condition = CMCondition_get(cm, NULL);
-	    run_subprocess(&subproc_args[start_subproc_arg_count]);
+	    subproc_proc = run_subprocess(&subproc_args[start_subproc_arg_count]);
 	    CMCondition_wait(cm, global_exit_condition);
 	    if (global_test_result) dump_attr_list(global_test_result);
 	} else {
@@ -291,7 +326,7 @@ main(argc, argv)
 	}
 	conn = CMinitiate_conn(cm, contact_list);
 	if (conn == NULL) {
-	    printf("No connection\n");
+	    printf("No connection using contact list %s\n", argv[1]);
 	    exit(1);
 	}
 
@@ -306,7 +341,14 @@ main(argc, argv)
 	add_int_attr(test_list, CM_TRANS_TEST_VERBOSE, verbose);
 		
 	result = CMtest_transport(conn, test_list);
+	global_test_result = result;
     }
+    CMsleep(cm, 2);
     CManager_close(cm);
-    return 0;
+    if (!global_test_result) return 1;
+    ret = 0;
+    if (!get_int_attr(global_test_result, CM_TRANS_TEST_RECEIVED_COUNT, &actual_count)) ret = 1;
+    if (actual_count != msg_count) ret = 1;
+    return ret;
 }
+
