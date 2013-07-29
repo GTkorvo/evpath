@@ -177,6 +177,8 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 		(void)conn->cm->perf_upcall(conn->cm, buffer, length - 8, 0, list);
 		CManager_lock(conn->cm);
 	    }
+	    free_attr_list(list);
+	    chr_timer_start(&conn->bandwidth_start_time);
 	    break;
 	}
     case CMPerfTestBody:
@@ -194,6 +196,7 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	    int header[6];
 	    int actual;
 	    attr_list upcall_result;
+	    char *str_list = NULL;
 	    struct FFSEncodeVec tmp_vec[2];
 	    chr_timer_stop(&conn->bandwidth_start_time);
 
@@ -202,6 +205,7 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	    header[2] = sizeof(header);
 	    header[3] = *(int*)buffer;  /* first entry should be condition */
 	    header[4] = 0;
+	    header[5] = 0;
 	    tmp_vec[0].iov_base = &header;
 	    tmp_vec[0].iov_len = sizeof(header);
 	    tmp_vec[1].iov_base = NULL;
@@ -211,7 +215,8 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 		upcall_result = conn->cm->perf_upcall(conn->cm, buffer, length - 8, 2, NULL);
 		CManager_lock(conn->cm);
 		if (upcall_result) {
-		    char *str_list = attr_list_to_string(upcall_result);
+		    str_list = attr_list_to_string(upcall_result);
+		    free_attr_list(upcall_result);
 		    tmp_vec[1].iov_len = header[4] = strlen(str_list) + 1;
 		    tmp_vec[1].iov_base = str_list;
 		    header[2] += header[4];
@@ -219,7 +224,7 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	    }
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - transport test response sent:");
 	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 2, sizeof(header) + tmp_vec[1].iov_len, NULL, 0, 0);
-
+	    if (str_list) free(str_list);
 	    if (actual != 1) {
 		printf("perf write failed\n");
 	    }
@@ -465,6 +470,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     int cond;
     attr_list result;
     long actual;
+    struct FFSEncodeVec *write_vec;
     struct FFSEncodeVec *tmp_vec;
     int header[6];
     long size;
@@ -508,7 +514,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     ((int*)header)[2] = (start_size & 0xffffffff);
     ((int*)header)[3] = cond;   /* condition value in third entry */
     ((int*)header)[4] = sizeof(header);   /* header size 4th entry */
-    
+    ((int*)header)[5] = 0;
     INT_CMCondition_set_client_data( conn->cm, cond, &result);
 
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Initiating transport test of %ld bytes, %d messages\n", size, repeat_count);
@@ -518,7 +524,9 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     tmp_vec[1].iov_base = attr_str;
     tmp_vec[1].iov_len = strlen(attr_str) + 1; /* send NULL */
     actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 2, tmp_vec[0].iov_len + tmp_vec[1].iov_len, NULL, 0, 1);
+    free(attr_str);
     if (actual != 1) { 
+	free(tmp_vec);
 	return NULL;
     }
 
@@ -529,7 +537,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	if (tmp_vec[0].iov_base == NULL) {
 	    /* alloc */
 	    for (count = 0; count < vecs; count++) {
-		tmp_vec[count].iov_base = malloc(each);
+		tmp_vec[count].iov_base = calloc(each, 1);
 		tmp_vec[count].iov_len = each;
 	    }
 	}
@@ -546,8 +554,12 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	((int*)tmp_vec[0].iov_base)[2] = (size & 0xffffffff);
 	((int*)tmp_vec[0].iov_base)[3] = i;   /* sequence number */
 	tmp_vec[vecs-1].iov_len = size - (each * (vecs-1));
-	actual = INT_CMwrite_raw(conn, tmp_vec, NULL, vecs, size, NULL, 0, 0);
+	write_vec = malloc(sizeof(write_vec[0]) * (vecs + 1));  /* at least 2 */
+	memcpy(write_vec, tmp_vec, sizeof(write_vec[0]) * (vecs + 1));
+	actual = INT_CMwrite_raw(conn, write_vec, NULL, vecs, size, NULL, 0, 0);
+	free(write_vec);
 	if (actual != 1) {
+	    free(tmp_vec);
 	    return NULL;
 	}
 	if (!reuse_write_buffer) {
@@ -560,9 +572,14 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 
     ((int*)header)[1] = 0 | (CMPerfTestEnd<<24);
     ((int*)header)[2] = sizeof(header);
+    for (count = 0; count < vecs; count++) {
+	free(tmp_vec[count].iov_base);
+	tmp_vec[count].iov_base = NULL;
+    }
     tmp_vec[0].iov_base = &header[0];
     tmp_vec[0].iov_len = sizeof(header);
     actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, sizeof(header), NULL, 0, 0);
+    free(tmp_vec);
     if (actual != 1) {
 	return NULL;
     }
