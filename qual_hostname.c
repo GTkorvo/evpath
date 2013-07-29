@@ -97,6 +97,7 @@ get_self_ip_addr(CMtrans_services svc)
 				   if_addr->ifa_name,
 				   inet_ntop(family, tmp, buf, sizeof(buf)));
 		}
+		free(if_addrs);
 		return (ntohl(*(uint32_t*)tmp));
 	    }
 	    printf("Warning!  CM_INTERFACE specified as \"%s\", but no active interface by that name found\n", interface);
@@ -114,6 +115,7 @@ get_self_ip_addr(CMtrans_services svc)
 				       *(((unsigned char *) &in->s_addr) + 1),
 				       *(((unsigned char *) &in->s_addr) + 2),
 				       *(((unsigned char *) &in->s_addr) + 3));
+		    free(if_addrs);
 		    return (ntohl(in->s_addr));
 		}
 	    }
@@ -129,6 +131,7 @@ get_self_ip_addr(CMtrans_services svc)
 			       if_addr->ifa_name,
 			       inet_ntop(family, tmp, buf, sizeof(buf)));
 	    }
+	    free(if_addrs);
 	    return (ntohl(*(uint32_t*)tmp));
 	}
     }
