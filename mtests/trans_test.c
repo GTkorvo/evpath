@@ -123,6 +123,7 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
 	    set_int_attr(ret, CM_TRANS_TEST_TAKEN_CORRUPT, taken_corrupt);
 	}
 	global_test_result = ret;
+	add_ref_attr_list(ret);
 	if (global_exit_condition != -1) {
 	    CMCondition_signal(cm, global_exit_condition);
 	}
@@ -192,7 +193,7 @@ main(argc, argv)
     int ret, actual_count;
     argv0 = argv[0];
     int start_subproc_arg_count = 4; /* leave a few open at the beginning */
-    char **subproc_args = malloc((argc + start_subproc_arg_count + 2)*sizeof(argv[0]));
+    char **subproc_args = calloc((argc + start_subproc_arg_count + 2), sizeof(argv[0]));
     int cur_subproc_arg = start_subproc_arg_count;
     char *transport = NULL;
     while (argv[1] && (argv[1][0] == '-')) {
@@ -286,27 +287,34 @@ main(argc, argv)
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
-	if ((transport = getenv("CMTransport")) != NULL) {
-
+	if (transport == NULL) {
+	    transport = getenv("CMTransport");
+	}
+	if (transport != NULL) {
 	    listen_list = create_attr_list();
 	    add_string_attr(listen_list, CM_TRANSPORT, strdup(transport));
 	}
 	CMlisten_specific(cm, listen_list);
+	free_attr_list(listen_list);
 	contact_list = CMget_contact_list(cm);
+	subproc_args[cur_subproc_arg++] = attr_list_to_string(contact_list);
+	subproc_args[cur_subproc_arg] = NULL;
+	subproc_args[--start_subproc_arg_count] = strdup(argv0);
+	global_exit_condition = CMCondition_get(cm, NULL);
 	if (start_subprocess) {
-	    subproc_args[cur_subproc_arg++] = attr_list_to_string(contact_list);
-	    subproc_args[cur_subproc_arg] = NULL;
-	    subproc_args[--start_subproc_arg_count] = argv0;
-	    global_exit_condition = CMCondition_get(cm, NULL);
 	    subproc_proc = run_subprocess(&subproc_args[start_subproc_arg_count]);
 	    CMCondition_wait(cm, global_exit_condition);
 	    if (global_test_result) dump_attr_list(global_test_result);
 	} else {
-	    global_exit_condition = CMCondition_get(cm, NULL);
-	    printf("Contact list \"%s\"\n", attr_list_to_string(contact_list));
+	    int i;
+	    printf("Would have run: \n");
+	    for (i=start_subproc_arg_count; i<cur_subproc_arg; i++) {
+		printf(" %s", subproc_args[i]);
+	    }
+	    printf("\n");
 	    CMCondition_wait(cm, global_exit_condition);
-	    printf("Return from condition wait\n");
 	}
+	free_attr_list(contact_list);
     } else {
 	int i;
 
@@ -325,6 +333,7 @@ main(argc, argv)
 	    exit(1);
 	}
 	conn = CMinitiate_conn(cm, contact_list);
+	free_attr_list(contact_list);
 	if (conn == NULL) {
 	    printf("No connection using contact list %s\n", argv[1]);
 	    exit(1);
@@ -342,13 +351,26 @@ main(argc, argv)
 		
 	result = CMtest_transport(conn, test_list);
 	global_test_result = result;
+	free_attr_list(test_list);
     }
     CMsleep(cm, 2);
     CManager_close(cm);
+    if (transport) free(transport);
+    {
+	int i;
+	for (i=0; i < cur_subproc_arg; i++) {
+	    if (subproc_args[i]) {
+		free(subproc_args[i]);
+	    }
+	}
+    }
+    free(subproc_args);
+
     if (!global_test_result) return 1;
     ret = 0;
     if (!get_int_attr(global_test_result, CM_TRANS_TEST_RECEIVED_COUNT, &actual_count)) ret = 1;
     if (actual_count != msg_count) ret = 1;
+    free_attr_list(global_test_result);
     return ret;
 }
 
