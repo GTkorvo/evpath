@@ -1642,7 +1642,12 @@ process_events_stone(CManager cm, int s, action_class c)
 		void *client_data = term->client_data;
 		CMtrace_out(cm, EVerbose, "Executing terminal/filter event\n");
 		update_event_length_sum(cm, p, event);
-		cm->evp->current_event_item = event;
+		{
+		    queue_item *new = malloc(sizeof(queue_item));
+		    new->item = event;
+		    new->next = cm->evp->current_event_list;
+		    cm->evp->current_event_list = new;
+		}
 		stone->new_enqueue_flag = 0;
 		stone->is_processing = 1;
 		if ((p->data_state == Requires_Contig_Encoded) && 
@@ -1661,7 +1666,28 @@ process_events_stone(CManager cm, int s, action_class c)
 		CManager_lock(cm);
 		stone = stone_struct(cm->evp, s);
 		stone->is_processing = 0;
-		cm->evp->current_event_item = NULL;
+		{
+		    if (cm->evp->current_event_list->item == event) {
+			queue_item *tmp = cm->evp->current_event_list;
+			cm->evp->current_event_list = tmp->next;
+			free(tmp);
+		    } else {
+			queue_item *tmp = cm->evp->current_event_list;
+			queue_item *last;
+			while(tmp->item != event) {
+			    last = tmp;
+			    tmp = tmp->next;
+			    if (tmp == NULL) break;
+			}
+			if (tmp == NULL) {
+			    printf("Failed to dequeue item from executing events list!\n");
+			} else {
+			    last->next = tmp->next;
+			    free(tmp);
+			}
+		    }
+		}
+
 		if (act->action_type == Action_Filter) {
 		    if (out) {
 			CMtrace_out(cm, EVerbose, "Filter passed event to stone %x, submitting\n", term->target_stone_id);
@@ -3296,7 +3322,8 @@ extern int
 INT_EVtake_event_buffer(CManager cm, void *event)
 {
     queue_item *item;
-    event_item *cur = cm->evp->current_event_item;
+    event_item *cur;
+    queue_item *running_events = cm->evp->current_event_list;
     event_path_data evp = cm->evp;
 
     if (cur == NULL) {
@@ -3304,15 +3331,25 @@ INT_EVtake_event_buffer(CManager cm, void *event)
 		"No event handler with takeable buffer executing on this CM.\n");
 	return 0;
     }
-    if (!(((cur->decoded_event <= event) &&
-	   ((char *) event <= ((char *) cur->decoded_event + cur->event_len))) ||
-	  ((cur->encoded_event <= event) &&
-	   ((char *) event <= ((char *) cur->encoded_event + cur->event_len))))) {
+    while(running_events != NULL) {
+	cur = running_events->item;
+	if (!(((cur->decoded_event <= event) &&
+	       ((char *) event <= ((char *) cur->decoded_event + cur->event_len))) ||
+	      ((cur->encoded_event <= event) &&
+	       ((char *) event <= ((char *) cur->encoded_event + cur->event_len))))) {
+	    cur = NULL;
+	} else {
+	    break;
+	}
+	running_events = running_events->next;
+    }
+    if (cur == NULL) {
 	fprintf(stderr,
 		"Event address (%lx) in INT_EVtake_event_buffer does not match currently executing event on this CM.\n",
 		(long) event);
 	return 0;
     }
+
 /*    if (cur->block_rec == NULL) {
 	static int take_event_warning = 0;
 	if (take_event_warning == 0) {
@@ -3330,7 +3367,7 @@ INT_EVtake_event_buffer(CManager cm, void *event)
 	evp->queue_items_free_list = item->next;
     }
     item->item = cur;
-    reference_event(cm->evp->current_event_item);
+    reference_event(cur);
     item->next = evp->taken_events_list;
     evp->taken_events_list = item;
     return 1;

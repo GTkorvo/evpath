@@ -241,7 +241,7 @@ typedef struct _event_path_data {
     FMContext fmc;
     FFSContext ffsc;
     queue_item *queue_items_free_list;
-    event_item *current_event_item;
+    queue_item *current_event_list;
     queue_item *taken_events_list;
     thr_mutex_t lock;
     int use_backpressure;
