@@ -1035,7 +1035,7 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	    
     nnti_conn_data_ptr ncd = ntd->connections;
     while (ncd != NULL) {
-	if (memcmp(&wait_status->src, &ncd->peer_hdl, sizeof(wait_status->src)) == 0) {
+	if (memcmp(&wait_status->src.url, &ncd->peer_hdl.url, sizeof(wait_status->src.url)) == 0) {
 	    ntd->svc->trace_out(trans->cm, "NNTI data available on existing connection, from host %s, type %s (%d)", 
 				ncd->peer_hostname, msg_type_name[cm->message_type], cm->message_type);
 	    break;
@@ -1102,7 +1102,10 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
     break;
     case CMNNTI_PIGGYBACK:
     {
-	struct client_message *m = (struct client_message *)(wait_status->start+wait_status->offset);
+	struct client_message *m = (struct client_message *)cm;
+	if (ncd == NULL) {
+	    printf("Incoing message failed to match connection!\n");
+	}
 	ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
 	
 	memcpy(&((char*)ncd->read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
@@ -1117,6 +1120,9 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
     default:
     {
 	struct client_message *m = (struct client_message *)(wait_status->start+wait_status->offset);
+	if (ncd == NULL) {
+	    printf("Incoing message failed to match connection!\n");
+	}
 	handle_control_request(ncd, svc, trans, m);
     }
     }
@@ -2203,7 +2209,7 @@ CMtrans_services svc;
         extern int logger_init(const int debug_level, const char *file);
         char nnti_log_filename[256];
 	sprintf(nnti_log_filename, "nnti_log_%x", getpid());
-        logger_init(4, nnti_log_filename);
+        logger_init(6, nnti_log_filename);
     }
     if (atom_init == 0) {
 	CM_NNTI_PORT = attr_atom_from_string("NNTI_PORT");
