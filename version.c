@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include "config.h"
 
-static char *EVPath_version = "EVPath Version 3.3.24 rev. 15159  -- 2013-08-13 16:58:00 -0400 (Tue, 13 Aug 2013)\n";
+static char *EVPath_version = "EVPath Version 3.3.25 rev. 15197  -- 2013-08-20 11:04:29 -0400 (Tue, 20 Aug 2013)\n";
 
 #if defined (__INTEL_COMPILER)
 //  Allow extern declarations with no prior decl
