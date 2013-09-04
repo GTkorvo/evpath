@@ -207,7 +207,7 @@ main(int argc, char* argv[])
  	start = time(NULL);
 	CMCondition_wait(cm, message_wait_condition);
 	end = time(NULL);
-	printf("Elapsed time was %d\n", (end - start));
+	printf("Elapsed time was %d\n", (int)(end - start));
     } else { /* all other processes do this */
 	attr_list contact_list;
 	CMConnection conn = NULL;
