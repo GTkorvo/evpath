@@ -1848,13 +1848,9 @@ load_dll_symbol(char *path, char *symbol_name)
 {
     lt_dlhandle handle;
 
-	if(lt_dlinit() != 0) {
-		fprintf(stderr, "Error in init: %s\n", lt_dlerror());
-		return NULL;
-	}
     handle = lt_dlopen(path);
     if (!handle) {
-    	fprintf(stderr, "failed opening %s  %s\n", path, lt_dlerror());
+    	fprintf(stderr, "failed opening %s\n", path);
 	    return NULL;
     }
     return lt_dlsym(handle, symbol_name);

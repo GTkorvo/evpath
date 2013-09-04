@@ -92,23 +92,14 @@ load_transport(CManager cm, const char *trans_name, int quiet)
     strcat(libname, MODULE_EXT);
 
 #if !NO_DYNAMIC_LINKING 
-    if (lt_dlinit() != 0) {
-	if (!quiet) fprintf (stderr, "error during initialization: %s\n", lt_dlerror());
-	return 0;
-    }
-
     lt_dladdsearchdir(EVPATH_LIBRARY_BUILD_DIR);
     lt_dladdsearchdir(EVPATH_LIBRARY_INSTALL_DIR);
     handle = lt_dlopen(libname);
     if (!handle) {
-	if (!quiet) fprintf(stderr, "Failed to load required '%s' dll.  Error \"%s\".\n",
-			    trans_name, lt_dlerror());
+	if (!quiet) fprintf(stderr, "Failed to load required '%s' dll.\n", trans_name);
 	if (!quiet) fprintf(stderr, "Search path includes '.', '%s', '%s' and any default search paths supported by ld.so\n", 
 			    EVPATH_LIBRARY_BUILD_DIR, 
 			    EVPATH_LIBRARY_INSTALL_DIR);
-    } else {
-	CMtrace_out(cm, CMTransportVerbose, "Loading local or staticly linked version of \"%s\" transport\n",
-		    trans_name);
     }
     if (!handle) {
 	return 0;

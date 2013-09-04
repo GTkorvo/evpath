@@ -26,6 +26,14 @@ typedef struct {
     char *lib_prefix;
 } *dlhandle;
 
+static int dlopen_verbose = -1;
+
+void
+CMset_dlopen_verbose(int verbose)
+{
+    dlopen_verbose = verbose;
+}
+
 void *
 CMdlopen(char *in_lib, int mode)
 {
@@ -37,15 +45,17 @@ CMdlopen(char *in_lib, int mode)
     void *handle;
     char *tmp;
     char *lib;
-    int verbose = (getenv("CMTransportVerbose") != NULL);
+    if (dlopen_verbose == -1) {
+	dlopen_verbose = (getenv("CMTransportVerbose") != NULL);
+    }
     tmp = rindex(in_lib, '.');
-    if (verbose) printf("Trying to dlopen %s\n", in_lib);
+    if (dlopen_verbose) printf("Trying to dlopen %s\n", in_lib);
     if (tmp && (strcmp(tmp, ".la") == 0)) {
 	/* can't open .la files */
 	lib = malloc(strlen(in_lib) + strlen(MODULE_EXT) + 8);
 	strcpy(lib, in_lib);
 	strcpy(rindex(lib, '.'), MODULE_EXT);
-	if (verbose) printf("Dlopen module name replaced, now %s\n", lib);
+	if (dlopen_verbose) printf("Dlopen module name replaced, now %s\n", lib);
     } else {
 	lib = strdup(in_lib);
     }
@@ -55,7 +65,7 @@ CMdlopen(char *in_lib, int mode)
 	sprintf(tmp, "%s/%s", list[0], lib);
 	handle = dlopen(tmp, RTLD_LAZY);
 	char *err = dlerror();
-	if (verbose) {
+	if (dlopen_verbose) {
 	    if (err) {
 		printf("Failed to dlopen %s, error is %s\n", tmp, err);
 	    } else {
@@ -68,7 +78,7 @@ CMdlopen(char *in_lib, int mode)
     if (!handle) {
         handle = dlopen(lib, RTLD_LAZY);
 	char *err = dlerror();
-	if (verbose) {
+	if (dlopen_verbose) {
 	    if (err) {
 		printf("Failed to dlopen %s, error is %s\n", tmp, err);
 	    } else {

@@ -3033,11 +3033,6 @@ CM_init_select(CMControlList cl, CManager cm)
     lt_dlhandle handle;	
     char *libname;
 #if !NO_DYNAMIC_LINKING
-
-    if (lt_dlinit() != 0) {
-	fprintf (stderr, "error during initialization: %s\n", lt_dlerror());
-	return;
-    }
     lt_dladdsearchdir(EVPATH_LIBRARY_BUILD_DIR);
     lt_dladdsearchdir(EVPATH_LIBRARY_INSTALL_DIR);
     libname = malloc(strlen("libcmselect") + strlen(MODULE_EXT) + 1);
@@ -3046,8 +3041,7 @@ CM_init_select(CMControlList cl, CManager cm)
     handle = lt_dlopen(libname);
     free(libname);
     if (!handle) {
-	fprintf(stderr, "Failed to load required select dll.  Error \"%s\".\n",
-		lt_dlerror());
+	fprintf(stderr, "Failed to load required select dll.\n");
 	fprintf(stderr, "Search path includes '.', '%s', '%s' and any default search paths supported by ld.so\n", EVPATH_LIBRARY_BUILD_DIR, 
 		EVPATH_LIBRARY_INSTALL_DIR);
 	exit(1);

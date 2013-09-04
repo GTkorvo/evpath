@@ -25,6 +25,7 @@
 int CMtrace_val[CMLastTraceType] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 extern void EVfprint_version(FILE* out);
+extern void CMset_dlopen_verbose(int verbose);
 
 FILE * CMTrace_file = NULL;
 
@@ -78,6 +79,10 @@ extern int CMtrace_init(CMTraceType trace_type)
     for (i = 0; i < sizeof(CMtrace_val)/sizeof(CMtrace_val[0]); i++) {
 	if (i!=EVWarning) trace |= CMtrace_val[i];
     }
+    if (CMtrace_val[CMTransportVerbose]) {
+	CMset_dlopen_verbose(1);
+    }
+
     if (trace != 0) {
 	EVfprint_version(CMTrace_file);
     }
