@@ -3322,15 +3322,10 @@ extern int
 INT_EVtake_event_buffer(CManager cm, void *event)
 {
     queue_item *item;
-    event_item *cur;
+    event_item *cur = NULL;
     queue_item *running_events = cm->evp->current_event_list;
     event_path_data evp = cm->evp;
 
-    if (cur == NULL) {
-	fprintf(stderr,
-		"No event handler with takeable buffer executing on this CM.\n");
-	return 0;
-    }
     while(running_events != NULL) {
 	cur = running_events->item;
 	if (!(((cur->decoded_event <= event) &&
