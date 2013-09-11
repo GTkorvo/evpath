@@ -200,7 +200,7 @@ INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/evpath.h DESTINATION include)
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/revpath.h DESTINATION include)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/ev_dfg.h DESTINATION include)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/cm_transport.h DESTINATION include)
-INSTALL(TARGETS ${TARGETS}
+INSTALL(TARGETS ${TARGETS} EXPORT EVPathExport
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
@@ -239,3 +239,47 @@ if (MPI_FOUND)
 endif (MPI_FOUND)
 
 ADD_SUBDIRECTORY( examples )
+
+get_target_property_with_default(EVPATH_VERSION_MAJOR evpath LT_VERSION_CURRENT "0")
+get_target_property_with_default(EVPATH_VERSION_MINOR evpath LT_VERSION_AGE "0")
+get_target_property_with_default(EVPATH_VERSION_PATCH evpath LT_VERSION_REVISION "0")
+
+set(EVPATH_VERSION ${EVPATH_VERSION_MAJOR}.${EVPATH_VERSION_MINOR}.${EVPATH_VERSION_PATCH} )
+
+# set up install directories. INCLUDE_INSTALL_DIR and LIB_INSTALL_DIR must not be absolute paths
+set(LIB_INSTALL_DIR_SUFFIX "" CACHE STRING "The directories where to install libraries to")
+set(LIB_INSTALL_DIR lib${LIB_INSTALL_DIR_SUFFIX} )
+set(CMAKECONFIG_INSTALL_DIR ${LIB_INSTALL_DIR}/cmake/EVPath ) 
+
+# Use a versioned install directory for the headers so multiple versions can be installed in parallel
+set(INCLUDE_INSTALL_DIR include )
+
+# not changable, but we set a variable anyway for consistency
+set(BIN_INSTALL_DIR bin)
+
+# This "exports" all targets which have been put into the export set "EVPathExport".
+# This means that cmake generates a file with the given filename, which can later on be loaded
+# by projects using this package.
+# This file contains add_library(EVPath IMPORTED) statements for each target in the export set, so
+# when loaded later on cmake will create "imported" library targets from these, which can be used
+# in many ways in the same way as a normal library target created via a normal add_library().
+install(EXPORT EVPathExport DESTINATION ${CMAKECONFIG_INSTALL_DIR} FILE EVPathTargets.cmake )
+
+# figure out the relative path from the installed Config.cmake file to the install prefix (which may be at
+# runtime different from the chosen CMAKE_INSTALL_PREFIX if under Windows the package was installed anywhere)
+# This relative path will be configured into the EVPathConfig.cmake
+file(RELATIVE_PATH relInstallDir ${CMAKE_INSTALL_PREFIX}/${CMAKECONFIG_INSTALL_DIR} ${CMAKE_INSTALL_PREFIX} )
+
+# Create a EVPathConfig.cmake file. <name>Config.cmake files are searched by find_package()
+# automatically. We configure that file so that we can put any information we want in it,
+# e.g. version numbers, include directories, etc.
+configure_file(EVPathConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/EVPathConfig.cmake @ONLY )
+
+# Additionally, when cmake has found a EVPathConfig.cmake, it can check for a EVPathConfigVersion.cmake
+# in the same directory when figuring out the version of the package when a version
+# has been specified in the find_package() call, e.g. find_package(EVPath 1.0)
+configure_file(EVPathConfigVersion.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/EVPathConfigVersion.cmake @ONLY )
+
+# Install these two files into the same directory as the generated exports-file.
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/EVPathConfig.cmake ${CMAKE_CURRENT_BINARY_DIR}/EVPathConfigVersion.cmake
+        DESTINATION ${CMAKECONFIG_INSTALL_DIR} )

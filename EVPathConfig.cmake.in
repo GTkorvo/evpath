@@ -1,0 +1,18 @@
+get_filename_component(myDir ${CMAKE_CURRENT_LIST_FILE} PATH) # get the directory where I myself am
+get_filename_component(rootDir ${myDir}/@relInstallDir@ ABSOLUTE) # get the chosen install prefix
+
+# set the version of myself
+set(EVPATH_VERSION_MAJOR @EVPATH_VERSION_MAJOR@)
+set(EVPATH_VERSION_MINOR @EVPATH_VERSION_MINOR@)
+set(EVPATH_VERSION_PATCH @EVPATH_VERSION_PATCH@)
+set(EVPATH_VERSION ${EVPATH_VERSION_MAJOR}.${EVPATH_VERSION_MINOR}.${EVPATH_VERSION_PATCH} )
+
+# what is my include directory
+set(EVPATH_INCLUDES "${rootDir}/@INCLUDE_INSTALL_DIR@")
+
+# import the exported targets
+include(${myDir}/EVPathTargets.cmake)
+
+# set the expected library variable
+set(EVPATH_LIBRARIES evpath atl ffs cercs_env )
+
