@@ -34,6 +34,8 @@ CMset_dlopen_verbose(int verbose)
     dlopen_verbose = verbose;
 }
 
+extern FILE * CMTrace_file;
+
 void *
 CMdlopen(char *in_lib, int mode)
 {
@@ -49,13 +51,13 @@ CMdlopen(char *in_lib, int mode)
 	dlopen_verbose = (getenv("CMTransportVerbose") != NULL);
     }
     tmp = rindex(in_lib, '.');
-    if (dlopen_verbose) printf("Trying to dlopen %s\n", in_lib);
+    if (dlopen_verbose) fprintf(CMTrace_file, "Trying to dlopen %s\n", in_lib);
     if (tmp && (strcmp(tmp, ".la") == 0)) {
 	/* can't open .la files */
 	lib = malloc(strlen(in_lib) + strlen(MODULE_EXT) + 8);
 	strcpy(lib, in_lib);
 	strcpy(rindex(lib, '.'), MODULE_EXT);
-	if (dlopen_verbose) printf("Dlopen module name replaced, now %s\n", lib);
+	if (dlopen_verbose) fprintf(CMTrace_file, "Dlopen module name replaced, now %s\n", lib);
     } else {
 	lib = strdup(in_lib);
     }
@@ -67,9 +69,9 @@ CMdlopen(char *in_lib, int mode)
 	char *err = dlerror();
 	if (dlopen_verbose) {
 	    if (err) {
-		printf("Failed to dlopen %s, error is %s\n", tmp, err);
+		fprintf(CMTrace_file, "Failed to dlopen %s, error is %s\n", tmp, err);
 	    } else {
-		printf("DLopen of %s succeeded\n", tmp);
+		fprintf(CMTrace_file, "DLopen of %s succeeded\n", tmp);
 	    }
 	}
  	list++;
@@ -80,9 +82,9 @@ CMdlopen(char *in_lib, int mode)
 	char *err = dlerror();
 	if (dlopen_verbose) {
 	    if (err) {
-		printf("Failed to dlopen %s, error is %s\n", tmp, err);
+		fprintf(CMTrace_file, "Failed to dlopen %s, error is %s\n", tmp, err);
 	    } else {
-		printf("DLopen of %s succeeded\n", tmp);
+		fprintf(CMTrace_file, "DLopen of %s succeeded\n", tmp);
 	    }
 	}
     }
