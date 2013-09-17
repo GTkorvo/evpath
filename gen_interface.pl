@@ -127,7 +127,7 @@ sub gen_stub {
     }
     print REVP "    request.condition_var = cond;\n";
     print REVP "    if (f == NULL) {\n";
-    print REVP "        f = CMregister_format(conn->cm, ${subr}_req_formats);\n";
+    print REVP "        f = INT_CMregister_format(conn->cm, ${subr}_req_formats);\n";
     print REVP "    }\n";
     if ($return_type{$subr} eq "void") {
 	print REVP "    CMCondition_set_client_data(conn->cm, cond, NULL);\n";
@@ -157,8 +157,8 @@ sub gen_handler {
     print REVP "\nstatic void\n";
     print REVP "R${subr}_handler(CManager cm, CMConnection conn, void *data,void *client_data,attr_list message_attrs)\n";
     $handler_register_string = "$handler_register_string\
-    tmp_format = CMregister_format(cm, ${subr}_req_formats);\
-    CMregister_handler(tmp_format, R${subr}_handler, cm->evp);\n";
+    tmp_format = INT_CMregister_format(cm, ${subr}_req_formats);\
+    INT_CMregister_handler(tmp_format, R${subr}_handler, cm->evp);\n";
 
     print REVP "{\n";
     $_ = $return_type{$subr};
@@ -179,7 +179,7 @@ sub gen_handler {
     print REVP "    (void) message_attrs;\n";
     print REVP "    (void) client_data;\n";
     print REVP "    if (f == NULL) {\n";
-    print REVP "        f = CMregister_format(conn->cm, EV_${retsubtype}_response_formats);\n";
+    print REVP "        f = INT_CMregister_format(conn->cm, EV_${retsubtype}_response_formats);\n";
     print REVP "    }\n";
     foreach $arg (split (", ", $args[1])) {
 	$_ = $arg;
@@ -765,17 +765,17 @@ REVPinit(CManager cm)
 {
     CMFormat tmp_format;
 $handler_register_string
-    tmp_format = CMregister_format(cm, EV_int_response_formats);
-    CMregister_handler(tmp_format, REV_int_response_handler, cm->evp);
+    tmp_format = INT_CMregister_format(cm, EV_int_response_formats);
+    INT_CMregister_handler(tmp_format, REV_int_response_handler, cm->evp);
 
-    tmp_format = CMregister_format(cm, EV_void_response_formats);
-    CMregister_handler(tmp_format, REV_response_handler, cm->evp);
+    tmp_format = INT_CMregister_format(cm, EV_void_response_formats);
+    INT_CMregister_handler(tmp_format, REV_response_handler, cm->evp);
 
-    tmp_format = CMregister_format(cm, EV_string_response_formats);
-    CMregister_handler(tmp_format, REV_string_response_handler, cm->evp);
+    tmp_format = INT_CMregister_format(cm, EV_string_response_formats);
+    INT_CMregister_handler(tmp_format, REV_string_response_handler, cm->evp);
 
-    tmp_format = CMregister_format(cm, EV_EVevent_list_response_formats);
-    CMregister_handler(tmp_format, REV_EVevent_list_response_handler, cm->evp);
+    tmp_format = INT_CMregister_format(cm, EV_EVevent_list_response_formats);
+    INT_CMregister_handler(tmp_format, REV_EVevent_list_response_handler, cm->evp);
 }
 EOF
 print REVPH<<EOF;

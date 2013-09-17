@@ -93,7 +93,7 @@ struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, IN
 					       return_CM_lock_status
 						 
 };
-static void INT_CMControlList_close ARGS((CMControlList cl));
+static void INT_CMControlList_close ARGS((CMControlList cl, CManager cm));
 static int CMcontrol_list_poll ARGS((CMControlList cl));
 int CMdo_non_CM_handler ARGS((CMConnection conn, int header,
 			      char *buffer, int length));
@@ -106,8 +106,9 @@ static void CM_init_select ARGS((CMControlList cl, CManager cm));
 
 static int drop_CM_lock(CManager cm, char *file, int line)
 {
+    int ret = cm->locked;
     IntCManager_unlock(cm, file, line);
-    return cm->locked;
+    return ret;
 }
 
 static int acquire_CM_lock(CManager cm, char *file, int line)
@@ -752,13 +753,7 @@ INT_CManager_close(CManager cm)
     }
     CMtrace_out(cm, CMFreeVerbose, "CMControlList close CL=%lx current reference count will be %d, sdp = %p\n", 
 		(long) cl, cl->cl_reference_count - 1, cl->select_data);
-    /* 
-     * unlock the CM briefly to allow the server thread to shut down 
-     * if it exists
-     */
-    CManager_unlock(cm);
-    INT_CMControlList_close(cl);
-    CManager_lock(cm);
+    INT_CMControlList_close(cl, cm);
 
     cm->reference_count--;
     CMtrace_out(cm, CMFreeVerbose, "CManager %p ref count now %d\n", 
@@ -1166,7 +1161,7 @@ INT_CMconn_register_close_handler(CMConnection conn, CMCloseHandlerFunc func,
 }
 
 static void
-INT_CMControlList_close(CMControlList cl)
+INT_CMControlList_close(CMControlList cl, CManager cm)
 {
     void *status;
     cl->cl_reference_count--;
@@ -1183,7 +1178,9 @@ INT_CMControlList_close(CMControlList cl)
 	
 	(cl->wake_select)((void*)&CMstatic_trans_svcs,
 			  &cl->select_data);
+	CManager_unlock(cm);
 	thr_thread_join(cl->server_thread, &status);
+	CManager_lock(cm);
 	cl->has_thread = 0;
     }
 }
