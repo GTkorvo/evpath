@@ -108,6 +108,7 @@ thin_data_available(void *cmv, void * conn_datav)
     CManager cm = (CManager) cmv;
     int i;
 
+    CManager_unlock(cm);
     switch(FFSnext_record_type(cd->ffsfile)) {
     case FFSindex:
 	break;
@@ -194,6 +195,7 @@ thin_data_available(void *cmv, void * conn_datav)
 	break;
     }
     }
+    CManager_lock(cm);
 }
 
 static void
@@ -253,7 +255,7 @@ socket_accept_thin_client(void *cmv, void * sockv)
     cd->fd = sock;
     cd->src_list = malloc(sizeof(cd->src_list[0]));
     cd->src_list[0] = NULL;
-    CM_fd_add_select(cm, sock,
+    INT_CM_fd_add_select(cm, sock,
 		     (void (*)(void *, void *)) thin_data_available,
 		       (void *) cm, (void *) cd);
 }

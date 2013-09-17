@@ -3307,7 +3307,7 @@ EVPinit(CManager cm)
             cm->evp->use_backpressure = 0;
         }
     }
-    CMadd_poll(cm, deferred_process_actions, NULL);
+    INT_CMadd_poll(cm, deferred_process_actions, NULL);
     REVPinit(cm);
 }
 

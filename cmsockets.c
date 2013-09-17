@@ -225,8 +225,12 @@ void *void_conn_sock;
     int delay_value = 1;
 #endif
     CMConnection conn;
-    attr_list conn_attr_list = NULL;;
+    attr_list conn_attr_list = NULL;
 
+    if (sd->cm) {
+	/* assert CM is locked */
+	assert(CM_LOCKED(svc, sd->cm));
+    }
     svc->trace_out(NULL, "Trying to accept something, socket %d\n", conn_sock);
     linger_val.l_onoff = 1;
     linger_val.l_linger = 60;
@@ -601,6 +605,10 @@ int no_more_redirect;
     struct sockaddr sock_addr;
     struct sockaddr_in *sock_addri = (struct sockaddr_in *) &sock_addr;
 
+    if (sd->cm) {
+	/* assert CM is locked */
+	assert(CM_LOCKED(svc, sd->cm));
+    }
     int redirect_needed = 0;	/* set to true if we should try the
 				 * redirect server instead of making a
 				 * direct connection */
@@ -823,7 +831,12 @@ attr_list attrs;
     attr_list conn_attr_list = create_attr_list();
     CMConnection conn;
     int sock;
+    socket_client_data_ptr sd = trans->trans_data;
 
+    if (sd->cm) {
+	/* assert CM is locked */
+	assert(CM_LOCKED(svc, sd->cm));
+    }
     if ((sock = initiate_conn(cm, svc, trans, attrs, socket_conn_data, conn_attr_list, 0)) < 0)
 	return NULL;
 
@@ -1123,6 +1136,10 @@ attr_list listen_info;
 	fprintf(stderr, "Cannot open INET socket\n");
 	return NULL;
     }
+    if (sd->cm) {
+	/* assert CM is locked */
+	assert(CM_LOCKED(svc, sd->cm));
+    }
     /* 
      *  Check to see if a bind to a specific port was requested
      */
@@ -1353,7 +1370,9 @@ int non_blocking;
 		       scd->fd);
 	set_block_state(svc, scd, Non_Block);
     }
+    DROP_CM_LOCK(svc, scd->sd->cm);
     iget = read(scd->fd, (char *) buffer, requested_len);
+    ACQUIRE_CM_LOCK(svc, scd->sd->cm);
     if (iget == -1) {
 	int lerrno = errno;
 	if ((lerrno != EWOULDBLOCK) &&
@@ -1380,8 +1399,10 @@ int non_blocking;
     left = requested_len - iget;
     while (left > 0) {
 	int lerrno;
+	DROP_CM_LOCK(svc, scd->sd->cm);
 	iget = read(scd->fd, (char *) buffer + requested_len - left,
 		    left);
+	ACQUIRE_CM_LOCK(svc, scd->sd->cm);
 	lerrno = errno;
 	if (iget == -1) {
 	    if ((lerrno != EWOULDBLOCK) &&
@@ -1474,6 +1495,7 @@ attr_list attrs;
 
     svc->trace_out(scd->sd->cm, "CMSocket writev of %d bytes on fd %d",
 		   left, fd);
+    DROP_CM_LOCK(svc, scd->sd->cm);
     while (left > 0) {
 	int write_count = iovleft;
 	if (write_count > IOV_MAX)
@@ -1484,6 +1506,7 @@ attr_list attrs;
 	    svc->trace_out(scd->sd->cm, "	writev failed, errno was %d", errno);
 	    if ((errno != EWOULDBLOCK) && (errno != EAGAIN)) {
 		/* serious error */
+		ACQUIRE_CM_LOCK(svc, scd->sd->cm);
 		return (iovcnt - iovleft);
 	    } else {
 		if (errno == EWOULDBLOCK) {
@@ -1495,6 +1518,7 @@ attr_list attrs;
 	    }
 	}
 	if (iget == left) {
+	    ACQUIRE_CM_LOCK(svc, scd->sd->cm);
 	    return iovcnt;
 	}
 	svc->trace_out(scd->sd->cm, "	writev partial success, %d bytes written", iget);
@@ -1519,6 +1543,7 @@ attr_list attrs;
 		(char *) (iov[iovcnt - iovleft].iov_base) + iget;
 	}
     }
+    ACQUIRE_CM_LOCK(svc, scd->sd->cm);
     return iovcnt;
 }
 

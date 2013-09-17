@@ -67,6 +67,9 @@ static void wait_for_pending_write(CMConnection conn);
 static void cm_wake_any_pending_write(CMConnection conn);
 static void transport_wake_any_pending_write(CMConnection conn);
 static void cm_set_pending_write(CMConnection conn);
+static int drop_CM_lock(CManager cm, char *file, int line);
+static int acquire_CM_lock(CManager cm, char *file, int line);
+static int return_CM_lock_status(CManager cm, char *file, int line);
 
 struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, INT_CMfree, 
 					       INT_CM_fd_add_select, 
@@ -84,7 +87,11 @@ struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, IN
 					       cm_create_transport_and_link_buffer,
 					       INT_CMget_transport_data,
 					       cm_set_pending_write,
-					       transport_wake_any_pending_write
+					       transport_wake_any_pending_write,
+					       drop_CM_lock,
+					       acquire_CM_lock,
+					       return_CM_lock_status
+						 
 };
 static void INT_CMControlList_close ARGS((CMControlList cl));
 static int CMcontrol_list_poll ARGS((CMControlList cl));
@@ -97,6 +104,25 @@ void CMdo_performance_response ARGS((CMConnection conn, long length,
 void CMhttp_handler ARGS((CMConnection conn, char* buffer, int length));
 static void CM_init_select ARGS((CMControlList cl, CManager cm));
 
+static int drop_CM_lock(CManager cm, char *file, int line)
+{
+    IntCManager_unlock(cm, file, line);
+    return cm->locked;
+}
+
+static int acquire_CM_lock(CManager cm, char *file, int line)
+{
+    IntCManager_lock(cm, file, line);
+    return cm->locked;
+}
+
+static int return_CM_lock_status(CManager cm, char *file, int line)
+{
+    (void) file;
+    (void) line;
+    return cm->locked;
+}
+
 static void
 CMpoll_forever(CManager cm)
 {
@@ -106,7 +132,6 @@ CMpoll_forever(CManager cm)
     if (!cm->control_list->select_initialized) {
 	CM_init_select(cm->control_list, cm);
     }
-    CManager_unlock(cm);
     if (cl->has_thread > 0 && cl->server_thread == thr_thread_self()) {
 	/* 
 	 * if we're actually the server thread here, do a thread exit when
@@ -123,11 +148,13 @@ CMpoll_forever(CManager cm)
 	     * here so we can close.
 	     */
 	    cm->reference_count++;
+	    CManager_unlock(cm);
 	    CManager_close(cm);
 	    exit(1);
 	}
     }
     CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Forever - doing close\n");
+    CManager_unlock(cm);
     CManager_close(cm);
     if (should_exit != 0) thr_thread_exit(NULL);
 }
@@ -475,7 +502,9 @@ CMcontrol_list_poll(CMControlList cl)
     while ((poll_list != NULL) && (poll_list->func != NULL)){
 	int consistency_number = cl->cl_consistency_number;
 
+	CManager_unlock(poll_list->cm);
 	poll_list->func(poll_list->cm, poll_list->client_data);
+	CManager_lock(poll_list->cm);
 	/* do function */
 	if (consistency_number != cl->cl_consistency_number) {
 	    return 1;
@@ -530,7 +559,7 @@ extern
 int
 CMcontrol_list_wait(CMControlList cl)
 {
-    /* associated CM should *not* be locked */
+    /* associated CM should be locked */
     if ((cl->server_thread != 0) &&
 	(cl->server_thread != thr_thread_self())) {
 	/* What?  We're polling, but we're not the server thread? */
@@ -622,7 +651,9 @@ INT_CManager_create()
     cm->shutdown_functions = NULL;
     cm->perf_upcall = NULL;
 #ifdef EV_INTERNAL_H
+    CManager_lock(cm);
     EVPinit(cm);
+    CManager_unlock(cm);
 #endif
     return cm;
 }
@@ -1630,7 +1661,6 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
     int length;
 
     /* called from the transport, grab the locks */
-    CManager_lock(cm);
     if (first) {
 	char *tmp;
 	first = 0;
@@ -1654,7 +1684,6 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 
  start_read:
     if (conn->closed) {
-	CManager_unlock(cm);
 	return;
     }
     if ((trans->read_to_buffer_func) && (conn->partial_buffer == NULL)) {
@@ -1703,7 +1732,6 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 		CMtrace_out(cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d, failing connection %p\n", actual, conn);
 		CMConnection_failed(conn, 1);
-		CManager_unlock(cm);
 		return;
 	    }
 	    conn->buffer_data_end += actual;
@@ -1711,7 +1739,6 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 		/* partial read */
 		CMtrace_out(cm, CMLowLevelVerbose, 
 			    "CMdata read partial, got %d\n", actual);
-		CManager_unlock(cm);
 		return;
 	    }
 	    buffer = conn->partial_buffer->buffer;
@@ -1728,17 +1755,14 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 		CMtrace_out(cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d, failing connection %p\n", length, conn);
 		CMConnection_failed(conn, 1);
-		CManager_unlock(cm);
 		return;
 	    }
 	    if (length == 0) {
-		CManager_unlock(cm);
 		return;
 	    }
 	    if (buffer == NULL) {
 		CMtrace_out(cm, CMLowLevelVerbose, "CMdata read_block failed, failing connection %p\n", conn);
 		CMConnection_failed(conn, 1);
-		CManager_unlock(cm);
 		return;
 	    }
 	    CMtrace_out(cm, CMLowLevelVerbose, "CMdata read_block returned %d bytes of data\n", length);
@@ -1762,7 +1786,6 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	cm->abort_read_ahead = 0;
 	CMtrace_out(cm, CMDataVerbose, 
 		    "CM - readahead not tried, aborted for condition signal\n");
-	CManager_unlock(cm);
 	return;
     }	
     if ((read_msg_count > read_ahead_msg_limit) || 
@@ -1770,7 +1793,6 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	CMtrace_out(cm, CMDataVerbose, 
 		    "CM - readahead not tried, fairness, read %d msgs, %d bytes\n",
 		    read_msg_count, read_byte_count);
-	CManager_unlock(cm);
 	return;
     } else {
 	goto start_read;

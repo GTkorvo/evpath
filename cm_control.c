@@ -218,9 +218,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 		if (cm_control_debug_flag) {
 		    printf("CMLowLevel  Polling for CMcondition %d\n", condition);
 		}
-		CManager_unlock(cm);
 		CMcontrol_list_wait(cl);
-		CManager_lock(cm);
 	    }
 	    cl->cond_polling = 0;
 	    if (cm_control_debug_flag) {
@@ -240,6 +238,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 		printf("CMLowLevel Waiting for CMcondition %d\n", 
 		       condition);
 	    }
+	    assert(CManager_locked(cm));
 	    cm->locked--;
 	    thr_condition_wait(cond->cond_condition, cm->exchange_lock);
 	    cm->locked++;
@@ -255,9 +254,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 	    if (cm_control_debug_flag) {
 		printf("CMLowLevel polling for CMcondition %d\n", condition);
 	    }
-	    CManager_unlock(cm);
 	    CMcontrol_list_wait(cl);
-	    CManager_lock(cm);
 	}
 	cl->cond_polling = 0;
     } else {
@@ -266,6 +263,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 	    printf("CMLowLevel Waiting for CMcondition %d\n", 
 		   condition);
 	}
+	assert(CManager_locked(cm));
 	cm->locked--;
 	thr_condition_wait(cond->cond_condition, cm->exchange_lock);
 	cm->locked++;
