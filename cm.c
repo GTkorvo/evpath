@@ -2155,7 +2155,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	    }
 	}
 	fprintf(CMTrace_file, "CM - record type %s, contents are:\n  ", name_of_FMformat(FMFormat_of_original(cm_format->format)));
-	r = FMdump_data(FMFormat_of_original(cm_format->format), decode_buffer, dump_char_limit);
+	r = FMfdump_data(CMTrace_file, FMFormat_of_original(cm_format->format), decode_buffer, dump_char_limit);
 	if (r && !warned) {
 	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
 	    printf("  To change size limits, set CMDumpSize environment variable.\n\n\n");
@@ -2626,7 +2626,7 @@ INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data,
 	    fdump_attr_list(CMTrace_file, attrs);
 	}
 	fprintf(CMTrace_file, "CM - record type %s, contents are:\n  ", name_of_FMformat(format->fmformat));
-	r = FMdump_data(format->fmformat, data, dump_char_limit);
+	r = FMfdump_data(CMTrace_file, format->fmformat, data, dump_char_limit);
 	if (r && !warned) {
 	    fprintf(CMTrace_file, "\n\n  ****  Warning **** CM record dump truncated\n");
 	    fprintf(CMTrace_file, "  To change size limits, set CMDumpSize environment variable.\n\n\n");

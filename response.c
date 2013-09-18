@@ -649,7 +649,7 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
     if (CMtrace_on(cm, EVerbose)) {
 	fprintf(CMTrace_file, "Input Transform Event is :\n");
 	if (event->reference_format) {
-	    FMdump_data(event->reference_format, event->decoded_event, 10240);
+	    FMfdump_data(CMTrace_file, event->reference_format, event->decoded_event, 10240);
 	} else {
 	    fprintf(CMTrace_file, "       ****  UNFORMATTED  ****\n");
 	}
@@ -673,7 +673,7 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	if (CMtrace_on(cm, EVerbose)) {
 	    FMFormat f = instance->u.transform.out_format;
 	    fprintf(CMTrace_file, " Transform function returned %d, submitting further\n", ret);
-	    FMdump_data(f, out_event, 10240);
+	    FMfdump_data(CMTrace_file, f, out_event, 10240);
 	}
 	s.local_stone_id = out_stones[0];
 	s.cm = cm;
