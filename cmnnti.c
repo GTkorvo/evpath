@@ -497,7 +497,12 @@ attr_list conn_attr_list;
     char *host_name, *nnti_transport, *params;
     char server_url[256];
     struct connect_message *cmsg;
-    int use_shm = 0;
+
+    /* 
+     *TODO: config this in a better way. e.g., first make sure the receiving
+     * side indeed can support share memory transport
+     */
+    int use_shm = 1;
 
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
@@ -650,6 +655,7 @@ attr_list conn_attr_list;
         /* wait for peer process to attach to shared memory region */
         shm_wait_for_conn_ready(nnti_conn_data->shm_cd);
         shm_add_connection(ntd->shm_td, nnti_conn_data->shm_cd);
+        svc->trace_out(cm, "--> NNTI/SHM Connection established");
     }
 #endif
 
@@ -1241,6 +1247,7 @@ shm_listen_thread_func(void *vlsp)
         }
         pthread_mutex_unlock(&(shm_td->mutex));
     }
+    free(lsp);
     return NULL;
 }
 
@@ -1612,12 +1619,23 @@ attr_list listen_info;
     ntd->use_enet = use_enet;
 
 #ifdef DF_SHM_FOUND
-    ntd->shm_td->listen_thread_cmd = 1;
-    listen_struct_p lsp = malloc(sizeof(*lsp));
-    lsp->svc = svc;
-    lsp->trans = trans;
-    lsp->ntd = ntd;
-    (void) pthread_create(&ntd->shm_td->listen_thread, NULL, (void*(*)(void*))shm_listen_thread_func, lsp);
+    /* TODO: config this in a better way */
+    char *shm_str = getenv("NNTI_SHM_POLL_THREAD");
+    int use_shm = 0;
+    if(shm_str && strcmp(shm_str, "1")) {
+        use_shm = 1;
+    } 
+    if (use_shm) {
+        ntd->shm_td->listen_thread_cmd = 1;
+        listen_struct_p lsp = malloc(sizeof(*lsp));
+        lsp->svc = svc;
+        lsp->trans = trans;
+        lsp->ntd = ntd;
+        (void) pthread_create(&ntd->shm_td->listen_thread, NULL, (void*(*)(void*))shm_listen_thread_func, lsp);
+    }
+    else {
+       ntd->shm_td->listen_thread = 0;
+    }
 #endif
     return listen_list;
 
@@ -2183,12 +2201,14 @@ free_nnti_data(CManager cm, void *ntdv)
         svc->free_func(ntd->nnti_pull_completion_data);
     }
 #ifdef DF_SHM_FOUND
-    ntd->shm_td->listen_thread_cmd = 2;
-    pthread_cond_signal(&(ntd->shm_td->cond));
-    pthread_join(ntd->shm_td->listen_thread, NULL);
+    if(ntd->shm_td->listen_thread != 0) {
+        ntd->shm_td->listen_thread_cmd = 2;
+        pthread_cond_signal(&(ntd->shm_td->cond));
+        pthread_join(ntd->shm_td->listen_thread, NULL);
+    }
     pthread_cond_destroy(&(ntd->shm_td->cond));
     pthread_mutex_destroy(&(ntd->shm_td->mutex));
-
+    
     /* destory shm method handle and cleanup */
     df_shm_finalize(ntd->shm_td->shm_method);
     svc->free_func(ntd->shm_td);
