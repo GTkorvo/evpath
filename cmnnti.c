@@ -473,8 +473,8 @@ char *msg_type_name[] = {"NO MESSAGE", "CMNNTI_CONNECT", "CMNNTI_PIGGYBACK", "CM
 
 struct connect_message {
     short message_type;
-    short nnti_port;
-    short enet_port;
+    int nnti_port;
+    int enet_port;
     uint32_t enet_ip;
 #ifdef DF_SHM_FOUND
     uint32_t shm_contact_len;
@@ -1063,6 +1063,8 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	ncd = create_nnti_conn_data(svc);
 	ncd->ntd = ntd;
 	ncd->peer_hdl = wait_status->src;
+	ncd->peer_hostname = strdup(cm->name);
+	ncd->nnti_port = cm->nnti_port;
 	ncd->remote_contact_port = cm->enet_port;
 	ncd->remote_IP = cm->enet_ip;
 
@@ -1177,7 +1179,7 @@ listen_thread_func(void *vlsp)
 	    DROP_CM_LOCK(svc, trans->cm);
             return 1;
         } else {
-	    ntd->svc->trace_out(trans->cm, "  message arived: msg wait_status=%d size=%lu offs=%lu addr=%lu, offset was %ld",
+	    ntd->svc->trace_out(trans->cm, "  message arrived: msg wait_status=%d size=%lu offs=%lu addr=%lu, offset was %ld",
 		     wait_status.result, wait_status.length, wait_status.offset, wait_status.start+wait_status.offset, wait_status.offset);
         }
 
@@ -1549,6 +1551,7 @@ setup_nnti_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
 	initialized++;
     }
     NNTI_get_url(&trans_hdl, url, sizeof(url));
+    ntd->svc->trace_out(trans->cm, "NNTI_init succeeded, listening on url %s", url);
     last_colon = rindex(url, ':');
     *last_colon = 0;
     first_colon = index(url, ':');
