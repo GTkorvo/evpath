@@ -1142,7 +1142,7 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 int
 listen_thread_func(void *vlsp)
 {
-    int timeout = 10;
+    int timeout = 1000;
     listen_struct_p lsp = vlsp;
     nnti_transport_data_ptr ntd = lsp->ntd;
     CMtrans_services svc = lsp->svc;
@@ -1163,10 +1163,11 @@ listen_thread_func(void *vlsp)
 	DROP_CM_LOCK(svc, trans->cm);
         err = NNTI_waitany((const NNTI_buffer_t**)ntd->buf_list, ntd->buf_count, NNTI_RECV_QUEUE, timeout, &which, &wait_status);
 
+	ACQUIRE_CM_LOCK(svc, trans->cm);
 	if (ntd->shutdown_listen_thread) {
+	    DROP_CM_LOCK(svc, trans->cm);
 	    return 0;
 	}
-	ACQUIRE_CM_LOCK(svc, trans->cm);
 	if ((err == NNTI_ETIMEDOUT) || (err==NNTI_EAGAIN)) {
 	    //ntd->svc->trace_out(trans->cm, "NNTI_wait() on receiving result %d timed out...", err);
 
@@ -2227,11 +2228,11 @@ free_nnti_data(CManager cm, void *ntdv)
     nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) ntdv;
     CMtrans_services svc = ntd->svc;
     ntd->shutdown_listen_thread = 1;
-    pthread_join(ntd->listen_thread, NULL);
-    ntd->shutdown_listen_thread = 0;
     DROP_CM_LOCK(svc, ntd->cm);
+    pthread_join(ntd->listen_thread, NULL);
     NNTI_unregister_memory(&ntd->mr_recvs);
     ACQUIRE_CM_LOCK(svc, ntd->cm);
+    ntd->shutdown_listen_thread = 0;
     svc->free_func(ntd->nnti_pull_sched_data);
     if (ntd->nnti_pull_sched_data != ntd->nnti_pull_completion_data) {
         svc->free_func(ntd->nnti_pull_completion_data);
@@ -2294,7 +2295,7 @@ CMtrans_services svc;
     nnti_data->listen_attrs = NULL;
     nnti_data->enet_listen_port = -1;
     nnti_data->characteristics = create_attr_list();
-    nnti_data->cache_maps = 1;
+    nnti_data->cache_maps = 0;
     add_int_attr(nnti_data->characteristics, CM_TRANSPORT_RELIABLE, 1);
     svc->add_shutdown_task(cm, free_nnti_data, (void *) nnti_data, FREE_TASK);
 
