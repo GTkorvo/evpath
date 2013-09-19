@@ -568,7 +568,6 @@ attr_list conn_attr_list;
 
     int timeout = 500;
     ntd->svc->trace_out(trans->cm, "Connecting to URL \"%s\"", server_url);
-    printf("Trying connection to server_URL %s\n", server_url);
     DROP_CM_LOCK(svc, trans->cm);
     int err = NNTI_connect(&ntd->trans_hdl, server_url, timeout, 
 			   &nnti_conn_data->peer_hdl);
@@ -1345,6 +1344,17 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 	}
     }
 }
+static
+void
+nnti_enet_service_network_lock(CManager cm, void *void_trans)
+{
+    transport_entry trans = (transport_entry) void_trans;
+    nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) trans->trans_data;
+    CMtrans_services svc = ntd->svc;
+    ACQUIRE_CM_LOCK(svc, cm);
+    nnti_enet_service_network(cm, void_trans);
+    DROP_CM_LOCK(svc, cm);
+}
 #endif
 
 #ifdef DF_SHM_FOUND
@@ -1488,7 +1498,7 @@ setup_enet_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
 	    //return EXIT_FAILURE;
 	}
     }
-    svc->add_periodic_task(cm, 1, 0, nnti_enet_service_network, (void*)trans);
+    svc->add_periodic_task(cm, 1, 0, nnti_enet_service_network_lock, (void*)trans);
     svc->trace_out(cm, "CMNNTI begin ENET listen\n");
 
     srand48(seedval);
@@ -1639,7 +1649,7 @@ attr_list listen_info;
     lsp->svc = svc;
     lsp->trans = trans;
     lsp->ntd = ntd;
-    (void) pthread_create(&ntd->shm_td->listen_thread, NULL, (void*(*)(void*))shm_listen_thread_func, lsp);
+//    (void) pthread_create(&ntd->shm_td->listen_thread, NULL, (void*(*)(void*))shm_listen_thread_func, lsp);
 #endif
     return listen_list;
 
@@ -2000,7 +2010,7 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
     ACQUIRE_CM_LOCK(svc, trans->cm);
 
     chr_timer_stop(&recv_time);
-    printf("Receive time is %g millisecs, %g microsecs\n", chr_time_to_millisecs(&recv_time), chr_time_to_microsecs(&recv_time));
+//    printf("Receive time is %g millisecs, %g microsecs\n", chr_time_to_millisecs(&recv_time), chr_time_to_microsecs(&recv_time));
     if (err != NNTI_OK) {
 	fprintf (stderr, "  THREAD: Error: pull from client failed. NNTI_wait returned: %d %s, wait_status.result = %ds\n",err, NNTI_ERROR_STRING(err), status.result);
 	/* bad shit */
@@ -2229,7 +2239,7 @@ free_nnti_data(CManager cm, void *ntdv)
 #ifdef DF_SHM_FOUND
     ntd->shm_td->listen_thread_cmd = 2;
     pthread_cond_signal(&(ntd->shm_td->cond));
-    pthread_join(ntd->shm_td->listen_thread, NULL);
+//    pthread_join(ntd->shm_td->listen_thread, NULL);
     pthread_cond_destroy(&(ntd->shm_td->cond));
     pthread_mutex_destroy(&(ntd->shm_td->mutex));
 

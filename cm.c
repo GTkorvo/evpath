@@ -1744,6 +1744,11 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	    conn->partial_buffer = trans->read_block_func(&CMstatic_trans_svcs, 
 							  conn->transport_data,
 							  &length);
+	    if (conn->partial_buffer == NULL) {
+		CMtrace_out(cm, CMLowLevelVerbose, 
+			    "CMdata NULL return from read_block_func");
+		return;
+	    }
 	    buffer = conn->partial_buffer->buffer;
 	    conn->buffer_data_end = length;
 	    cm->abort_read_ahead = 1;
@@ -2344,10 +2349,8 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 static void
 transport_wake_any_pending_write(CMConnection conn)
 {
-    CManager_lock(conn->cm);
     conn->write_pending = 0;
     cm_wake_any_pending_write(conn);
-    CManager_unlock(conn->cm);
 }
 
 static void

@@ -295,10 +295,10 @@ int timeout_usec;
                      (fd_set *) NULL, &timeout);
 	ACQUIRE_CM_LOCK(svc, sd->cm);
     } else {
+	int max = sd->sel_item_max;
 	svc->trace_out(sd->cm, "CMSelect blocking select");
 	DROP_CM_LOCK(svc, sd->cm);
-	res = select(sd->sel_item_max+1, &rd_set, &wr_set,
-                     (fd_set *) NULL, NULL);
+	res = select(max+1, &rd_set, &wr_set, (fd_set *) NULL, NULL);
 	ACQUIRE_CM_LOCK(svc, sd->cm);
     }
     if (sd->closed) {
