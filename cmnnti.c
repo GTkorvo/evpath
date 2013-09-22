@@ -468,7 +468,7 @@ unlink_connection(nnti_transport_data_ptr ntd, nnti_conn_data_ptr ncd)
 
 #include "qual_hostname.c"
 
-enum {CMNNTI_CONNECT=1, CMNNTI_PIGGYBACK=2, CMNNTI_PULL_REQUEST=3, CMNNTI_PULL_COMPLETE=4, CMNNTI_PULL_SHM_REQUEST=5};
+enum {CMNNTI_CONNECT=1, CMNNTI_PIGGYBACK=2, CMNNTI_PULL_REQUEST=3, CMNNTI_PULL_COMPLETE=4, CMNNTI_PULL_SHM_REQUEST=5, CMNNTI_LAST_MSG_TYPE=6};
 char *msg_type_name[] = {"NO MESSAGE", "CMNNTI_CONNECT", "CMNNTI_PIGGYBACK", "CMNNTI_PULL_REQUEST", "CMNNTI_PULL_COMPLETE", "CMNNTI_PULL_SHM_REQUEST"};
 
 struct connect_message {
@@ -1049,6 +1049,10 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	}
 	ncd = ncd->next;
     }
+    if ((cm->message_type <= 0) || (cm->message_type > CMNNTI_LAST_MSG_TYPE)) {
+	printf("BAD INCOMING SHORT MESSAGE!\n");
+	exit(1);
+    }
     switch (cm->message_type){
     case CMNNTI_CONNECT: 
     {
@@ -1309,6 +1313,10 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 			   (unsigned int) event.packet -> dataLength,
 			   (unsigned int) event.channelID,
 			   msg_type_name[m->message_type], m->message_type);
+	    if ((m->message_type <= 0) || (m->message_type > CMNNTI_LAST_MSG_TYPE)) {
+		printf("BAD INCOMING ENET SHORT MESSAGE!\n");
+		exit(1);
+	    }
 	    if (m->message_type == CMNNTI_PIGGYBACK){
 		int piggyback_size;
 		ncd->packet = event.packet;
@@ -2264,7 +2272,7 @@ CMtrans_services svc;
         extern int logger_init(const int debug_level, const char *file);
         char nnti_log_filename[256];
 	sprintf(nnti_log_filename, "nnti_log_%x", getpid());
-        logger_init(6, nnti_log_filename);
+        logger_init(5, nnti_log_filename);
     }
     if (atom_init == 0) {
 	CM_NNTI_PORT = attr_atom_from_string("NNTI_PORT");
