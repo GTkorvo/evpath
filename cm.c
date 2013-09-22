@@ -2047,6 +2047,11 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	if (calculated_checksum != checksum) {
 	    printf("Discarding incoming message because of corruption.  Checksum mismatch got %x, expected %x\n",
 		   calculated_checksum, checksum);
+	    printf("Message was : ");
+	    for (i=0 ; i < length; i++) {
+		printf(" %02x",  ((unsigned char *)buffer)[i]);
+	    }
+	    printf("\n");
 	    return 0;
 	}
     }
