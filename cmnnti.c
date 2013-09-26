@@ -1555,7 +1555,7 @@ setup_nnti_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
     char url[256];
     char *last_colon, *first_colon, *last_slash;
     char *hostname;
-    int incoming_size = 10;
+    int incoming_size = 100;
     char *nnti_transport;
     int int_port_num = 0;
     int err;
