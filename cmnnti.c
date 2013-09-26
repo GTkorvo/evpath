@@ -1499,7 +1499,7 @@ setup_enet_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
     int low_bound = 26000;
     int high_bound = 26100;
     int size = high_bound - low_bound;
-    int tries = 10;
+    int tries = size;
 
     if (socket_global_init++ == 0) {
 	if (enet_initialize () != 0) {
@@ -1530,12 +1530,12 @@ setup_enet_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
 	}
     }
     if (server == NULL) {
-	fprintf(stderr, "Failed after 5 attempts to bind to a random port.  Lots of undead servers on this host?\n");
+	fprintf(stderr, "Failed after %d attempts to bind to a random port.  Lots of undead servers on this host?\n", tries);
 	return;
     }
     ntd->enet_server = server;
     ntd->enet_listen_port = address.port;
-    svc->trace_out(cm, "CMNNTI  ENET listen at port %d, server %p\n", address.port, server);
+    svc->trace_out(cm, "CMNNTI  ENET listen at port %d, server %p", address.port, server);
     svc->fd_add_select(cm, enet_host_get_sock_fd (server), 
 		       (select_list_func) nnti_enet_service_network, (void*)cm, (void*)trans);
     add_attr(listen_list, CM_ENET_PORT, Attr_Int4,
@@ -1570,6 +1570,21 @@ setup_nnti_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
 	initialized++;
     }
     NNTI_get_url(&trans_hdl, url, sizeof(url));
+    if (getenv("NNTI_INCOMING_SIZE")) {
+	char *size_str = getenv("NNTI_INCOMING_SIZE");
+	int incoming_tmp;
+	if (sscanf(size_str, "%d", &incoming_tmp) != 1) {
+	    ntd->svc->trace_out(trans->cm, "Failed to parse NNTI_INCOMING_SIZE, \"%s\"", size_str);
+	} else {
+	    if (incoming_tmp < incoming_size) {
+		ntd->svc->trace_out(trans->cm, "NNTI_INCOMING_SIZE %d ignored, smaller than default \"%d\"", incoming_tmp, incoming_size);
+	    } else {
+		ntd->svc->trace_out(trans->cm, "NNTI_INCOMING_SIZE set to %d", incoming_tmp);
+		incoming_size = incoming_tmp;
+	    }
+	}
+    }
+		
     ntd->svc->trace_out(trans->cm, "NNTI_init succeeded, listening on url %s", url);
     last_colon = rindex(url, ':');
     *last_colon = 0;
