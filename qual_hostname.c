@@ -71,7 +71,9 @@ get_self_ip_addr(CMtrans_services svc)
         char *interface;
 	// Print possible addresses
 	for (if_addr = if_addrs; if_addr != NULL; if_addr = if_addr->ifa_next) {
-	    int family = if_addr->ifa_addr->sa_family;
+	    int family;
+	    if (!if_addr->ifa_addr) continue;
+	    family = if_addr->ifa_addr->sa_family;
 	    if ((family != AF_INET) && (family != AF_INET6)) continue;
 	    if (if_addr->ifa_addr->sa_family == AF_INET) {
 	        tmp = &((struct sockaddr_in *)if_addr->ifa_addr)->sin_addr;
