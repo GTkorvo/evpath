@@ -123,6 +123,7 @@ char *NNTI_result_string[] = {
 struct pull_request;
 struct pull_request_queue;
 struct pull_sched_context;
+struct client_message;
 
 typedef int (* nnti_pull_sched_func) (struct pull_request *, struct pull_sched_context *, void *callback_data);
 
@@ -211,6 +212,99 @@ typedef struct nnti_connection_data {
     shm_conn_data_ptr shm_cd;
 #endif
 } *nnti_conn_data_ptr;
+
+
+#ifndef IOV_MAX
+/* this is not defined in some places where it should be.  Conservative. */
+#define IOV_MAX 16
+#endif
+
+typedef enum {enet, nnti} control_transport;
+
+typedef struct _send_handle {
+    control_transport t;
+    int size;
+#ifdef ENET_FOUND
+    ENetPacket *packet;
+#endif
+    nnti_conn_data_ptr ncd;
+} send_handle;
+
+send_handle
+get_control_message_buffer(nnti_conn_data_ptr ncd, struct client_message **mp,
+			   int size)
+{
+    send_handle ret;
+    if (ncd->use_enet) {
+	ret.t = enet;
+#ifdef ENET_FOUND
+	/* Create a reliable packet of the right size */
+	ret.packet = enet_packet_create (NULL, size,
+					 ENET_PACKET_FLAG_RELIABLE);
+	*mp = (struct client_message *) ret.packet->data;
+	memset(ret.packet->data, 0, size);
+#endif
+    } else {
+	assert(size < NNTI_REQUEST_BUFFER_SIZE);
+	ret.t = nnti;
+	*mp = (struct client_message*)ncd -> send_buffer;
+    }	
+    ret.ncd = ncd;
+    ret.size = size;
+    return ret;
+}
+
+int
+send_control_message(send_handle h)
+{
+    CManager cm = h.ncd->ntd->cm;
+    CMtrans_services svc = h.ncd->ntd->svc;
+    if (h.t == enet) {
+#ifdef ENET_FOUND
+        svc->trace_out(cm, "CMNNTI/ENET control write of %d bytes on peer %p",
+		       h.size, h.ncd->peer);
+	/* Send the packet to the peer over channel id 0. */
+	if (enet_peer_send (h.ncd->peer, 0, h.packet) == -1) {
+	    svc->trace_out(cm, "CMNNTI/ENET control write failed.");
+	    return 0;
+	}
+	enet_host_flush(h.ncd->ntd->enet_server);
+#endif
+    } else {
+        svc->trace_out(cm, "CMNNTI control write of %d bytes",
+		       h.size);
+	NNTI_status_t               status;
+	int timeout = 1000;
+	DROP_CM_LOCK(svc, cm);
+	int err = NNTI_send(&h.ncd->peer_hdl, &h.ncd->mr_send, NULL);
+	ACQUIRE_CM_LOCK(svc, cm);
+	
+	if (err != NNTI_OK) {
+	    fprintf (stderr, "Error: NNTI_send() returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
+	    return 1;
+	}
+	svc->trace_out(cm, "    NNTI_send() returned. Call wait... ");
+	
+	/* Wait for message to be sent */
+	timeout = 1000;
+      again:
+	DROP_CM_LOCK(svc, cm);
+	err = NNTI_wait(&h.ncd->mr_send, NNTI_SEND_SRC, timeout, &status);
+	ACQUIRE_CM_LOCK(svc, cm);
+	if (err == NNTI_ETIMEDOUT) {
+	  timeout *=2;
+	  if (h.ncd->ntd->shutdown_listen_thread) return 0;
+	  goto again;
+	}
+	if (err != NNTI_OK) {
+	  fprintf (stderr, "Error: NNTI_wait() for sending returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
+	  return 1;
+	}
+	svc->trace_out(cm, "    NNTI_wait() of send request returned... ");
+	
+    }
+    return 1;
+}
 
 #ifdef ENET_FOUND
 extern void
@@ -468,8 +562,8 @@ unlink_connection(nnti_transport_data_ptr ntd, nnti_conn_data_ptr ncd)
 
 #include "qual_hostname.c"
 
-enum {CMNNTI_CONNECT=1, CMNNTI_PIGGYBACK=2, CMNNTI_PULL_REQUEST=3, CMNNTI_PULL_COMPLETE=4, CMNNTI_PULL_SHM_REQUEST=5, CMNNTI_LAST_MSG_TYPE=6};
-char *msg_type_name[] = {"NO MESSAGE", "CMNNTI_CONNECT", "CMNNTI_PIGGYBACK", "CMNNTI_PULL_REQUEST", "CMNNTI_PULL_COMPLETE", "CMNNTI_PULL_SHM_REQUEST"};
+enum {CMNNTI_CONNECT=1, CMNNTI_PIGGYBACK=2, CMNNTI_PULL_REQUEST=3, CMNNTI_PULL_COMPLETE=4, CMNNTI_PULL_SHM_REQUEST=5, CMNNTI_PIGGYBACK_RECVD=6, CMNNTI_LAST_MSG_TYPE=7};
+char *msg_type_name[] = {"NO MESSAGE", "CMNNTI_CONNECT", "CMNNTI_PIGGYBACK", "CMNNTI_PULL_REQUEST", "CMNNTI_PULL_COMPLETE", "CMNNTI_PIGGYBACK_RECVD", "CMNNTI_PULL_SHM_REQUEST"};
 
 struct connect_message {
     short message_type;
@@ -1020,6 +1114,9 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
 static void
 handle_pull_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
 			     struct client_message *m);
+static void
+handle_piggyback_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
+			     struct client_message *m);
 
 static void
 handle_control_request(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans, 
@@ -1130,6 +1227,17 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	trans->data_available(trans, ncd->conn);
 	ntd->svc->return_data_buffer(trans->cm, ncd->read_buffer);
 	ncd->read_buffer = NULL;
+	if (!ncd->use_enet) {
+	    /* if NNTI, send piggyback recvd message to unblock writes */
+	    send_handle h;
+	    struct client_message *r;
+	    h = get_control_message_buffer(ncd, &r, sizeof(*r));
+	    r->message_type = CMNNTI_PIGGYBACK_RECVD;
+	    svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET piggyback recvd, returning control message, type %d", r->message_type);
+	    if (send_control_message(h) == 0) {
+		svc->trace_out(ncd->ntd->cm, "--- control message send failed!");
+	    }	  
+	}
     }
     break;
     default:
@@ -1429,6 +1537,10 @@ handle_control_request(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_e
       handle_pull_complete_message(ncd, svc, trans, m);
       break;
   }
+  case CMNNTI_PIGGYBACK_RECVD:{
+      handle_piggyback_complete_message(ncd, svc, trans, m);
+      break;
+  }
   }
 
 }
@@ -1714,97 +1826,6 @@ int *actual_len;
     return ncd->read_buffer;
 }
 
-#ifndef IOV_MAX
-/* this is not defined in some places where it should be.  Conservative. */
-#define IOV_MAX 16
-#endif
-
-typedef enum {enet, nnti} control_transport;
-
-typedef struct _send_handle {
-    control_transport t;
-    int size;
-#ifdef ENET_FOUND
-    ENetPacket *packet;
-#endif
-    nnti_conn_data_ptr ncd;
-} send_handle;
-
-send_handle
-get_control_message_buffer(nnti_conn_data_ptr ncd, struct client_message **mp,
-			   int size)
-{
-    send_handle ret;
-    if (ncd->use_enet) {
-	ret.t = enet;
-#ifdef ENET_FOUND
-	/* Create a reliable packet of the right size */
-	ret.packet = enet_packet_create (NULL, size,
-					 ENET_PACKET_FLAG_RELIABLE);
-	*mp = (struct client_message *) ret.packet->data;
-	memset(ret.packet->data, 0, size);
-#endif
-    } else {
-	assert(size < NNTI_REQUEST_BUFFER_SIZE);
-	ret.t = nnti;
-	*mp = (struct client_message*)ncd -> send_buffer;
-    }	
-    ret.ncd = ncd;
-    ret.size = size;
-    return ret;
-}
-
-int
-send_control_message(send_handle h)
-{
-    CManager cm = h.ncd->ntd->cm;
-    CMtrans_services svc = h.ncd->ntd->svc;
-    if (h.t == enet) {
-#ifdef ENET_FOUND
-        svc->trace_out(cm, "CMNNTI/ENET control write of %d bytes on peer %p",
-		       h.size, h.ncd->peer);
-	/* Send the packet to the peer over channel id 0. */
-	if (enet_peer_send (h.ncd->peer, 0, h.packet) == -1) {
-	    svc->trace_out(cm, "CMNNTI/ENET control write failed.");
-	    return 0;
-	}
-	enet_host_flush(h.ncd->ntd->enet_server);
-#endif
-    } else {
-        svc->trace_out(cm, "CMNNTI control write of %d bytes",
-		       h.size);
-	NNTI_status_t               status;
-	int timeout = 1000;
-	DROP_CM_LOCK(svc, cm);
-	int err = NNTI_send(&h.ncd->peer_hdl, &h.ncd->mr_send, NULL);
-	ACQUIRE_CM_LOCK(svc, cm);
-	
-	if (err != NNTI_OK) {
-	    fprintf (stderr, "Error: NNTI_send() returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
-	    return 1;
-	}
-	svc->trace_out(cm, "    NNTI_send() returned. Call wait... ");
-	
-	/* Wait for message to be sent */
-	timeout = 1000;
-      again:
-	DROP_CM_LOCK(svc, cm);
-	err = NNTI_wait(&h.ncd->mr_send, NNTI_SEND_SRC, timeout, &status);
-	ACQUIRE_CM_LOCK(svc, cm);
-	if (err == NNTI_ETIMEDOUT) {
-	  timeout *=2;
-	  if (h.ncd->ntd->shutdown_listen_thread) return 0;
-	  goto again;
-	}
-	if (err != NNTI_OK) {
-	  fprintf (stderr, "Error: NNTI_wait() for sending returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
-	  return 1;
-	}
-	svc->trace_out(cm, "    NNTI_wait() of send request returned... ");
-	
-    }
-    return 1;
-}
 
 typedef struct {
     int send_id;
@@ -1907,8 +1928,8 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
       size += iov[i].iov_len;
     }
     svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET registered buffer %p, copied %d bytes and sending pull request", data, size);
-    if (send_control_message(h) == 0) return 0;
     svc->set_pending_write(ncd->conn);
+    if (send_control_message(h) == 0) return 0;
 
     return 1;
 }
@@ -2178,6 +2199,14 @@ handle_pull_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, trans
     free(local_message_info);
 }
 
+static void
+handle_piggyback_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
+		       struct client_message *m)
+{
+    svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET received piggyback complete message, unblocking any pending writes");
+    svc->wake_any_pending_write(ncd->conn);
+}
+
 extern int
 libcmnnti_LTX_writev_func(svc, ncd, iov, iovcnt, attrs)
 CMtrans_services svc;
@@ -2237,6 +2266,10 @@ attr_list attrs;
 	  size += iov[i].iov_len;
 	}
         svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET outbound piggybacking %d bytes of data in control message", size);
+	if (!ncd->use_enet) {
+	    /* if NNTI, block writes until we get a piggyback recvd message */
+	    svc->set_pending_write(ncd->conn);
+	}
 	if (send_control_message(h) == 0) return 0;
     } else {
         if (copy_full_buffer_and_send_pull_request(svc, ncd, iov, iovcnt, attrs) == 0)
