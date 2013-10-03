@@ -376,12 +376,12 @@ preload_pbio_format(CMConnection conn, FMFormat ioformat)
 	return;
     }
 #ifndef MODULE
-	if (CMtrace_on(conn->cm, CMFormatVerbose)) {
-	    int junk;
-	    fprintf(CMTrace_file, "CMpbio Preload is format ");
-	    print_server_ID((unsigned char *)get_server_ID_FMformat(ioformat, &junk));
-	    fprintf(CMTrace_file, "\n");
-	}
+    if (CMtrace_on(conn->cm, CMFormatVerbose)) {
+	int junk;
+	fprintf(CMTrace_file, "CMpbio Preload is format ");
+	print_server_ID((unsigned char *)get_server_ID_FMformat(ioformat, &junk));
+	fprintf(CMTrace_file, "\n");
+    }
 #endif
 }
 
