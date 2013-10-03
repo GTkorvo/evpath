@@ -44,7 +44,10 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
+#define assert(e)  \
+    ((void) ((e) ? 0 : __assert (#e, __FILE__, __LINE__)))
+#define __assert(e, file, line) \
+    ((void)printf ("%s:%u: failed assertion `%s'\n", file, line, e), abort())
 #ifdef HAVE_MEMORY_H
 #include <memory.h>
 #endif
@@ -246,6 +249,10 @@ int timeout_usec;
 	return;
     }
 
+    if (sd->cm) {
+	/* assert CM is locked */
+	assert(CM_LOCKED(svc, sd->cm));
+    }
     if (sd->server_thread ==  (thr_thread_t) NULL) {
 	/* no server thread set, must be this one */
 	sd->server_thread = thr_thread_self();
@@ -282,12 +289,17 @@ int timeout_usec;
 	set_soonest_timeout(&timeout, sd->periodic_task_list, now);
         svc->trace_out(sd->cm, "CMSelect with timeout %d sec, %d usec", 
 		       timeout.tv_sec, timeout.tv_usec);
+
+	DROP_CM_LOCK(svc, sd->cm);
 	res = select(sd->sel_item_max+1, &rd_set, &wr_set,
                      (fd_set *) NULL, &timeout);
+	ACQUIRE_CM_LOCK(svc, sd->cm);
     } else {
+	int max = sd->sel_item_max;
 	svc->trace_out(sd->cm, "CMSelect blocking select");
-	res = select(sd->sel_item_max+1, &rd_set, &wr_set,
-                     (fd_set *) NULL, NULL);
+	DROP_CM_LOCK(svc, sd->cm);
+	res = select(max+1, &rd_set, &wr_set, (fd_set *) NULL, NULL);
+	ACQUIRE_CM_LOCK(svc, sd->cm);
     }
     if (sd->closed) {
 	sd->server_thread =  (thr_thread_t) NULL; 
@@ -466,8 +478,10 @@ int timeout_usec;
 			       this_periodic_task->period_usec);
 		if (this_periodic_task->executing == (thr_thread_t)-1) {
 		    this_periodic_task->executing = thr_thread_self();
+		    DROP_CM_LOCK(svc, sd->cm);
 		    this_periodic_task->func(this_periodic_task->arg1,
 					     this_periodic_task->arg2);
+		    ACQUIRE_CM_LOCK(svc, sd->cm);
 		    next = this_periodic_task->next;
 		    this_periodic_task->executing = (thr_thread_t) -1;
 		    if ((this_periodic_task->period_sec == 0) &&
@@ -503,6 +517,10 @@ void *arg1;
 void *arg2;
 {
     select_data_ptr sd = *((select_data_ptr *)sdp);
+    if (sd->cm) {
+	/* assert CM is locked */
+	assert(CM_LOCKED(svc, sd->cm));
+    }
     if (sd == NULL) {
 	init_select_data(svc, (select_data_ptr*)sdp, NULL);
 	sd = *((select_data_ptr *)sdp);
@@ -555,6 +573,10 @@ void *arg2;
     if (sd == NULL) {
 	init_select_data(svc, (select_data_ptr*)sdp, NULL);
 	sd = *((select_data_ptr *)sdp);
+    }
+    if (sd->cm) {
+	/* assert CM is locked */
+	assert(CM_LOCKED(svc, sd->cm));
     }
     sd->select_consistency_number++;
     if (fd > sd->sel_item_max) {
@@ -614,6 +636,10 @@ void *arg2;
 	sd = *((select_data_ptr *)sdp);
     }
 
+    if (sd->cm) {
+	/* assert CM is locked */
+	assert(CM_LOCKED(svc, sd->cm));
+    }
     handle->period_sec = interval_sec;
     handle->period_usec = interval_usec;
     handle->executing = (thr_thread_t) -1;
@@ -665,6 +691,10 @@ void *arg2;
 	sd = *((select_data_ptr *)sdp);
     }
 
+    if (sd->cm) {
+	/* assert CM is locked */
+	assert(CM_LOCKED(svc, sd->cm));
+    }
     handle->period_sec = 0;
     handle->period_usec = 0;
     handle->executing = (thr_thread_t) -1;
@@ -955,6 +985,10 @@ select_data_ptr *sdp;
     int filedes[2];
 
     select_data_ptr sd = *((select_data_ptr *)sdp);
+    if (sd->cm) {
+	/* assert CM is locked */
+	assert(CM_LOCKED(svc, sd->cm));
+    }
     if (sd->wake_read_fd != -1) return;
     if (pipe(filedes) != 0) {
 	perror("Pipe for wake not created.  Wake mechanism inoperative.");
@@ -1004,6 +1038,10 @@ void *client_data;
 	init_select_data(svc, (select_data_ptr*)client_data, NULL);
 	sd = *((select_data_ptr *)client_data);
     }
+    if (sd->cm) {
+	/* assert CM is locked */
+	assert(CM_LOCKED(svc, sd->cm));
+    }
     socket_select(svc, sd, -1, 0); /* no timeout */
 }
 
@@ -1016,6 +1054,10 @@ void *client_data;
     if (sd == NULL) {
 	init_select_data(svc, (select_data_ptr*)client_data, NULL);
 	sd = *((select_data_ptr *)client_data);
+    }
+    if (sd->cm) {
+	/* assert CM is locked */
+	assert(CM_LOCKED(svc, sd->cm));
     }
     socket_select(svc, sd, 0, 0); /* no blocking, immediate timeout */
 }

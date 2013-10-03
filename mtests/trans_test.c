@@ -143,7 +143,9 @@ static void
 fail_and_die(int signal)
 {
     (void)signal;
-    fprintf(stderr, "CMtest failed to complete in reasonable time\n");
+    fprintf(stderr, "Trans_test failed to complete in reasonable time\n");
+    fprintf(stderr, "Stats are : vec_count = %d, size = %d, msg_count = %d, reuse_write = %d, received_count = %d\n", vec_count, size, msg_count, reuse_write, received_count);
+    fprintf(stderr, "    reuse_write = %d, received_count = %d, taken_corrupt = %d, expected_count = %d, write_size = %d, size_error = %d\n", reuse_write, received_count, taken_corrupt, expected_count, write_size, size_error);
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
     }

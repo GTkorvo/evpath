@@ -55,6 +55,14 @@ extern int CMtrace_init(CMTraceType trace_type)
     if ((str = cercs_getenv("EVWarning")) != NULL) {
 	sscanf(str, "%d", &CMtrace_val[EVWarning]);
     }
+    if (cercs_getenv("CMVerbose") != NULL) {
+	int j;
+	for (j=0; j<CMLastTraceType; j++)
+	    CMtrace_val[j] = 1;
+    }
+    /* for low level verbose, value overrides general CMVerbose */
+    CMtrace_val[CMLowLevelVerbose] = (cercs_getenv("CMLowLevelVerbose") != NULL);
+
     if (cercs_getenv("CMTraceFile") != NULL) {
 	CMTrace_file_num = getpid();
     }
@@ -85,13 +93,6 @@ extern int CMtrace_init(CMTraceType trace_type)
     } else {
 	CMTrace_file = stdout;
     }
-    if (cercs_getenv("CMVerbose") != NULL) {
-	int j;
-	for (j=0; j<CMLastTraceType; j++)
-	    CMtrace_val[j] = 1;
-    }
-    /* for low level verbose, value overrides general CMVerbose */
-    CMtrace_val[CMLowLevelVerbose] = (cercs_getenv("CMLowLevelVerbose") != NULL);
     for (i = 0; i < sizeof(CMtrace_val)/sizeof(CMtrace_val[0]); i++) {
 	if (i!=EVWarning) trace |= CMtrace_val[i];
     }

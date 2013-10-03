@@ -84,6 +84,13 @@ typedef struct func_entry {
 
 #include "cm_transport.h"
 
+typedef struct pending_queue_entry {
+    CMConnection conn;
+    CMbuffer buffer;
+    long length;
+    struct pending_queue_entry *next;
+} *pending_queue;
+
 typedef struct _CManager {
     transport_entry *transports;
     int initialized;
@@ -117,6 +124,7 @@ typedef struct _CManager {
 
     CMbuffer taken_buffer_list;
     CMbuffer cm_buffer_list;
+    pending_queue pending_data_queue;
 
     attr_list *contact_lists;
 
@@ -512,7 +520,7 @@ extern int CMtrace_init(CMTraceType t);
 extern void INT_CMTrace_file_id(int ID);
 extern FILE* CMTrace_file;
 #define CMtrace_on(cm, trace_type)  ((CMtrace_val[0] == -1) ? CMtrace_init(trace_type) : CMtrace_val[trace_type])
-#define CMtrace_out(cm, trace_type, ...) (CMtrace_on(cm,trace_type) ? (CMtrace_on(cm,CMLowLevelVerbose) ? fprintf(CMTrace_file, "P%lxT%lx - ", (long) getpid(), (long)thr_thread_self()) : 0) , fprintf(CMTrace_file, __VA_ARGS__) : 0)
+#define CMtrace_out(cm, trace_type, ...) {(CMtrace_on(cm,trace_type) ? (CMtrace_on(cm,CMLowLevelVerbose) ? fprintf(CMTrace_file, "P%lxT%lx - ", (long) getpid(), (long)thr_thread_self()) : 0) , fprintf(CMTrace_file, __VA_ARGS__) : 0);fflush(CMTrace_file);}
 extern void CMdo_performance_response(CMConnection conn, long length, int func,
 				      int byte_swap, char *buffer);
 extern int
@@ -523,3 +531,4 @@ INT_CMConnection_dereference(CMConnection conn);
 extern FMContext INT_CMget_FMcontext(CManager cm);
 extern void INT_CMinstall_perf_upcall(CManager cm, CMperf_upcall upcall);
 extern attr_list INT_CMtest_transport(CMConnection conn, attr_list how);
+extern void INT_CMConnection_wait_for_pending_write(CMConnection conn);

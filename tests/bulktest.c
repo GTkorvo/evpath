@@ -319,6 +319,7 @@ main(int argc, char **argv)
 	for (i=0; i < msg_limit; i++) {
 	    data->integer_field++;
 	    data->long_field--;
+	    if (quiet <= 0) printf("Submitting %d of %d\n", i, msg_limit);
 	    EVsubmit(source_handle, data, attrs);
 	}
 	if (quiet <= 0) printf("Write %d messages\n", msg_limit);
