@@ -50,7 +50,7 @@ typedef void *(*CMTransport_get_transport_data)(CMConnection conn);
 typedef void (*CMTransport_action_pending_write)(CMConnection conn);
 typedef CMbuffer (*CMTransport_create_data_buffer)(CManager cm, void *buffer, int length);
 typedef int (*CMTransport_modify_global_lock)(CManager cm, char *file, int line);
-
+typedef void (*CMTransport_add_buffer_to_pending_queue)(CManager cm, CMConnection conn, CMbuffer buf, long length);
 
 typedef struct CMtrans_services_s {
     CMTransport_malloc_func malloc_func;
@@ -75,6 +75,7 @@ typedef struct CMtrans_services_s {
     CMTransport_modify_global_lock drop_CM_lock;
     CMTransport_modify_global_lock acquire_CM_lock;
     CMTransport_modify_global_lock return_CM_lock_status;
+    CMTransport_add_buffer_to_pending_queue add_buffer_to_pending_queue;
 } *CMtrans_services;
 #define DROP_CM_LOCK(svc, cm) (svc)->drop_CM_lock((cm), __FILE__, __LINE__)
 #define ACQUIRE_CM_LOCK(svc, cm) (svc)->acquire_CM_lock((cm), __FILE__, __LINE__)

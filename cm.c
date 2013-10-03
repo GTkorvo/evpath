@@ -70,6 +70,7 @@ static void cm_set_pending_write(CMConnection conn);
 static int drop_CM_lock(CManager cm, char *file, int line);
 static int acquire_CM_lock(CManager cm, char *file, int line);
 static int return_CM_lock_status(CManager cm, char *file, int line);
+static void add_buffer_to_pending_queue(CManager cm, CMConnection conn, CMbuffer buf, long length);
 
 struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, INT_CMfree, 
 					       INT_CM_fd_add_select, 
@@ -90,8 +91,8 @@ struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, IN
 					       transport_wake_any_pending_write,
 					       drop_CM_lock,
 					       acquire_CM_lock,
-					       return_CM_lock_status
-						 
+					       return_CM_lock_status,
+					       add_buffer_to_pending_queue
 };
 static void INT_CMControlList_close ARGS((CMControlList cl, CManager cm));
 static int CMcontrol_list_poll ARGS((CMControlList cl));
@@ -561,6 +562,8 @@ int
 CMcontrol_list_wait(CMControlList cl)
 {
     /* associated CM should be locked */
+    assert(CM_LOCKED(svc, sd->cm));
+
     if ((cl->server_thread != 0) &&
 	(cl->server_thread != thr_thread_self())) {
 	/* What?  We're polling, but we're not the server thread? */
@@ -581,6 +584,7 @@ static CMControlList CMControlList_create();
 
 static thr_mutex_t atl_mutex;
 static int atl_mutex_initialized = 0;
+static void process_pending_queue(CManager cm, void *junk);
 
 extern
 CManager
@@ -647,10 +651,12 @@ INT_CManager_create()
     cm->reg_user_formats = INT_CMmalloc(1);
     cm->taken_buffer_list = NULL;
     cm->cm_buffer_list = NULL;
+    cm->pending_data_queue = NULL;
 
     cm->contact_lists = NULL;
     cm->shutdown_functions = NULL;
     cm->perf_upcall = NULL;
+    INT_CMadd_poll(cm, process_pending_queue, NULL);
 #ifdef EV_INTERNAL_H
     CManager_lock(cm);
     EVPinit(cm);
@@ -1086,6 +1092,9 @@ INT_CMConnection_dereference(CMConnection conn)
     conn->closed = 1;
     CMtrace_out(conn->cm, CMConnectionVerbose, "CM - Shut down connection %p\n",
 		(void*)conn);
+    if (conn->write_pending) {
+	wait_for_pending_write(conn);
+    }
     if (conn->failed == 0) {
 	CMConnection_failed(conn, 0);
     }
@@ -1106,6 +1115,8 @@ CMConnection_failed(CMConnection conn, int do_dereference)
     CMTaskHandle prior_task = NULL;
     if (conn->failed) return;
     conn->failed = 1;
+    transport_wake_any_pending_write(conn);
+
     assert(CManager_locked(conn->cm));
     CMtrace_out(conn->cm, CMFreeVerbose, "CMConnection failed conn=%lx\n", 
 		(long) conn);
@@ -1642,6 +1653,45 @@ void (*cm_postread_hook)(int,char*) = (void (*)(int, char*)) NULL;
 void (*cm_last_postread_hook)() = (void (*)()) NULL;
 static int CMact_on_data(CMConnection conn, char *buffer, long length);
 
+static void process_pending_queue(CManager cm, void *junk)
+{
+    CManager_lock(cm);
+    while (cm->pending_data_queue) {
+	pending_queue entry = cm->pending_data_queue;
+	int result;
+	cm->pending_data_queue = entry->next;
+	result = CMact_on_data(entry->conn, entry->buffer->buffer, entry->length);
+	if (result != 0) {
+	    printf("in process pending, CMact_on_data returned %d\n", result);
+	}
+	cm_return_data_buf(cm, entry->buffer);
+	free(entry);
+    }
+    CManager_unlock(cm);
+}
+
+static void add_buffer_to_pending_queue(CManager cm, CMConnection conn, CMbuffer buf, long length)
+{
+    assert(CManager_locked(cm));
+    pending_queue entry = malloc(sizeof(struct pending_queue_entry));
+    entry->next = NULL;
+    entry->conn = conn;
+    entry->buffer = buf;
+    entry->length = length;
+    if (!cm->pending_data_queue) {
+	cm->pending_data_queue = entry;
+    } else {
+	pending_queue last = cm->pending_data_queue;
+	pending_queue tmp = last->next;
+	while (tmp) {
+	    last = tmp;
+	    tmp = tmp->next;
+	}
+	last->next = entry;
+    }
+    CMwake_server_thread(cm);
+}
+
 extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 {
     CManager cm = conn->cm;
@@ -1920,7 +1970,9 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	    CMConnection_failed(conn, 1);
 	}
 	cm_data_buf = conn->partial_buffer;
-	cm_return_data_buf(cm, cm_data_buf);
+	if (cm_data_buf) {
+	    cm_return_data_buf(cm, cm_data_buf);
+	}
 	conn->partial_buffer = NULL;
 	conn->buffer_full_point = 0;
 	conn->buffer_data_end = 0;
@@ -2036,7 +2088,9 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
     base = buffer + header_len;
     if (handshake) {
 	CMdo_handshake(conn, handshake_version, byte_swap, base);
-	cm_return_data_buf(cm, cm_data_buf);
+	if (cm_data_buf) {
+	    cm_return_data_buf(cm, cm_data_buf);
+	}
 	return 0;
     }
     if (checksum != 0) {
@@ -2058,7 +2112,9 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
     if (performance_msg) {
 	CMdo_performance_response(conn, data_length, performance_func, byte_swap,
 				  base);
-	cm_return_data_buf(cm, cm_data_buf);
+	if (cm_data_buf) { 
+	    cm_return_data_buf(cm, cm_data_buf);
+	}
         return 0;
     } else if (evcontrol_msg) {
         int arg;
@@ -2073,7 +2129,9 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 #ifdef EV_INTERNAL_H
         INT_EVhandle_control_message(conn->cm, conn, (unsigned char) performance_func, arg);
 #endif
-	cm_return_data_buf(cm, cm_data_buf);
+	if (cm_data_buf) {
+	    cm_return_data_buf(cm, cm_data_buf);
+	}
         return 0;
     }
     data_buffer = base + attr_length;
@@ -2125,7 +2183,9 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
     if ((cm_format == NULL) || (cm_format->handler == NULL)) {
 	fprintf(stderr, "CM - No handler for incoming data of this version of format \"%s\"\n",
 		name_of_FMformat(FMFormat_of_original(format)));
-	cm_return_data_buf(cm, cm_data_buf);
+	if (cm_data_buf) {
+	    cm_return_data_buf(cm, cm_data_buf);
+	}
 	return 0;
     }
     assert(FFShas_conversion(format));
@@ -2134,7 +2194,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	if (!FFSdecode_in_place(cm->FFScontext, data_buffer, 
 				       (void**) (long) &decode_buffer)) {
 	    printf("Decode failed\n");
-	    cm_return_data_buf(cm, cm_data_buf);
+	    if (cm_data_buf) cm_return_data_buf(cm, cm_data_buf);
 	    return 0;
 	}
     } else {
@@ -2142,12 +2202,12 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	cm_decode_buf = cm_get_data_buf(cm, decoded_length);
 	decode_buffer = cm_decode_buf->buffer;
 	FFSdecode_to_buffer(cm->FFScontext, data_buffer, decode_buffer);
-	cm_return_data_buf(cm, cm_data_buf);
+	if (cm_data_buf) cm_return_data_buf(cm, cm_data_buf);
     }
     if(cm_format->older_format) {
 #ifdef EVOL
 	if(!process_old_format_data(cm, cm_format, &decode_buffer, &cm_decode_buf)){
-	    cm_return_data_buf(cm, cm_data_buf);
+	    if (cm_data_buf) cm_return_data_buf(cm, cm_data_buf);
 	    return 0;
 	}
 #endif
@@ -2376,6 +2436,7 @@ cm_wake_any_pending_write(CMConnection conn)
     } else {
 	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, No notifications\n");
     }
+    CMwake_server_thread(conn->cm);
 }
 
 static void
@@ -2490,13 +2551,12 @@ static void
 wait_for_pending_write(CMConnection conn)
 {
     CMControlList cl = conn->cm->control_list;
-    if (!cl->has_thread) {
+    assert(CManager_locked(conn->cm));
+    if ((!cl->has_thread) || (thr_thread_self() == cl->server_thread)) {
 	/* single thread working, just poll network */
-	CManager_unlock(conn->cm);
 	while(conn->write_pending) {
 	    CMcontrol_list_wait(cl);
 	}
-	CManager_lock(conn->cm);
     } else {
 	/* other thread is handling the network wait for it to wake us up */
 	while (conn->write_pending) {
@@ -2506,6 +2566,12 @@ wait_for_pending_write(CMConnection conn)
 	    INT_CMCondition_wait(conn->cm, cond);
 	}
     }	    
+}
+
+void
+INT_CMConnection_wait_for_pending_write(CMConnection conn)
+{
+    wait_for_pending_write(conn);
 }
 
 /* Returns 1 if successful, -1 if deferred, 0 on error */

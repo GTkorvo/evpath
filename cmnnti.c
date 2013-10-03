@@ -563,7 +563,8 @@ unlink_connection(nnti_transport_data_ptr ntd, nnti_conn_data_ptr ncd)
 #include "qual_hostname.c"
 
 enum {CMNNTI_CONNECT=1, CMNNTI_PIGGYBACK=2, CMNNTI_PULL_REQUEST=3, CMNNTI_PULL_COMPLETE=4, CMNNTI_PULL_SHM_REQUEST=5, CMNNTI_PIGGYBACK_RECVD=6, CMNNTI_LAST_MSG_TYPE=7};
-char *msg_type_name[] = {"NO MESSAGE", "CMNNTI_CONNECT", "CMNNTI_PIGGYBACK", "CMNNTI_PULL_REQUEST", "CMNNTI_PULL_COMPLETE", "CMNNTI_PIGGYBACK_RECVD", "CMNNTI_PULL_SHM_REQUEST"};
+char *msg_type_name[] = 
+{"NO MESSAGE", "CMNNTI_CONNECT", "CMNNTI_PIGGYBACK", "CMNNTI_PULL_REQUEST", "CMNNTI_PULL_COMPLETE", "CMNNTI_PULL_SHM_REQUEST", "CMNNTI_PIGGYBACK_RECVD"};
 
 struct connect_message {
     short message_type;
@@ -1139,7 +1140,7 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	    
     nnti_conn_data_ptr ncd = ntd->connections;
     while (ncd != NULL) {
-	if (memcmp(&wait_status->src.url, &ncd->peer_hdl.url, sizeof(wait_status->src.url)) == 0) {
+	if (strcmp(&wait_status->src.url[0], &ncd->peer_hdl.url[0]) == 0) {
 	    ntd->svc->trace_out(trans->cm, "NNTI data available on existing connection, from host %s, type %s (%d)", 
 				ncd->peer_hostname, msg_type_name[cm->message_type], cm->message_type);
 	    break;
@@ -1215,28 +1216,25 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
     case CMNNTI_PIGGYBACK:
     {
 	struct client_message *m = (struct client_message *)cm;
+	CMbuffer read_buffer;
 	if (ncd == NULL) {
-	    printf("Incoing message failed to match connection!\n");
+	    printf("Incoming message failed to match connection!\n");
 	}
-	ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
+	read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
 	
-	memcpy(&((char*)ncd->read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
+	memcpy(&((char*)read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
 	
-	ncd->read_buf_len = m->pig.size;
-	/* kick this upstairs */
-	trans->data_available(trans, ncd->conn);
-	ntd->svc->return_data_buffer(trans->cm, ncd->read_buffer);
-	ncd->read_buffer = NULL;
+	ntd->svc->add_buffer_to_pending_queue(trans->cm, ncd->conn, read_buffer, m->pig.size);
 	if (!ncd->use_enet) {
 	    /* if NNTI, send piggyback recvd message to unblock writes */
 	    send_handle h;
 	    struct client_message *r;
 	    h = get_control_message_buffer(ncd, &r, sizeof(*r));
 	    r->message_type = CMNNTI_PIGGYBACK_RECVD;
-	    svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET piggyback recvd, returning control message, type %d", r->message_type);
+	    svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET piggyback processed, sending PIGGYBACK RECVD control message, type %d", r->message_type);
 	    if (send_control_message(h) == 0) {
 		svc->trace_out(ncd->ntd->cm, "--- control message send failed!");
-	    }	  
+	    }
 	}
     }
     break;
@@ -1244,7 +1242,7 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
     {
 	struct client_message *m = (struct client_message *)(wait_status->start+wait_status->offset);
 	if (ncd == NULL) {
-	    printf("Incoing message failed to match connection!\n");
+	    printf("Default handler: incoming message failed to match connection!\n");
 	}
 	handle_control_request(ncd, svc, trans, m);
     }
@@ -1341,19 +1339,16 @@ shm_listen_thread_func(void *vlsp)
             int rc = df_try_dequeue(conn->recv_ep, &data, &length);
             switch(rc) {
                 case 0: { /* dequeue succeeded */
-                    conn->ncd->read_buffer = shm_td->ntd->svc->get_data_buffer(trans->cm, length);
+                    CMbuffer read_buffer = shm_td->ntd->svc->get_data_buffer(trans->cm, length);
 
                     /* copy the data from shm into a cm buffer */
-                    memcpy(&((char*)conn->ncd->read_buffer->buffer)[0], data, length);
+                    memcpy(&((char*)read_buffer->buffer)[0], data, length);
 
                     df_release(conn->recv_ep);
 
-                    conn->ncd->read_buf_len = length;
-
                     /* kick upstairs */
-                    trans->data_available(trans, conn->ncd->conn);
-                    shm_td->ntd->svc->return_data_buffer(trans->cm, conn->ncd->read_buffer);
-                    conn->ncd->read_buffer = NULL;
+		    trans->add_buffer_to_pending_queue(trans->cm, conn->ncd->conn, read_buffer, length);
+
                     break;
                 }
                 case -1: { /* no data available */
@@ -1429,19 +1424,17 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 		int piggyback_size;
 		ncd->packet = event.packet;
 	      
-		ncd->read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
+		CMbuffer read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
 	      
 		piggyback_size = m->pig.size;
-		memcpy(&((char*)ncd->read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
+		memcpy(&((char*)read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
 	      
 
 		enet_packet_destroy(event.packet);
-		ncd->read_buf_len = piggyback_size;
 		/* kick this upstairs */
 		svc->trace_out(cm, "We received piggybacked data of size %d %x.",
 			       piggyback_size, piggyback_size);
-		trans->data_available(trans, ncd->conn);
-		ncd->read_buffer = NULL;
+		svc->add_buffer_to_pending_queue(trans->cm, ncd->conn, read_buffer, piggyback_size);
 	    } else {
 		handle_control_request(ncd, svc, trans, m);
 		enet_packet_destroy (event.packet);
@@ -1541,6 +1534,8 @@ handle_control_request(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_e
       handle_piggyback_complete_message(ncd, svc, trans, m);
       break;
   }
+  default:
+      printf("Bad control request! type %d\n", m->message_type);
   }
 
 }
@@ -1892,6 +1887,7 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
 	mr = ncd->outgoing_mapped_mr;
     } else {
 	if (ncd->outgoing_mapped_region != NULL) {
+	    ncd->outgoing_mapped_region = NULL;
 	    DROP_CM_LOCK(svc, ncd->ntd->cm);
 	    NNTI_unregister_memory(&ncd->outgoing_mapped_mr);
 	    ACQUIRE_CM_LOCK(svc, ncd->ntd->cm);
@@ -2071,12 +2067,9 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
 	    svc->trace_out(ncd->ntd->cm, "--- control message send failed!");
 	}	  
 	
-	ncd->read_buffer = read_buffer;
-	ncd->read_buf_len = request->size;
 	/* kick this upstairs */
-	trans->data_available(trans, ncd->conn);
+	svc->add_buffer_to_pending_queue(trans->cm, ncd->conn, read_buffer, request->size);
 	if (!ncd->ntd->cache_maps) {
-	    svc->return_data_buffer(trans->cm, ncd->read_buffer);
 	    DROP_CM_LOCK(svc, trans->cm);
 	    NNTI_unregister_memory(&ncd->mr_pull);
 	    ACQUIRE_CM_LOCK(svc, trans->cm);

@@ -1940,8 +1940,18 @@ do_bridge_action(CManager cm, int s)
 	    INT_CMConnection_write_would_block(act->o.bri.conn)) {
             queue_item *q = stone->queue->queue_head;
 	    int i = 0;
-	    CMtrace_out(cm, EVerbose, "Would call congestion_handler, new flag %d\n", stone->new_enqueue_flag);
-/*	    if (stone->new_enqueue_flag == 1) {*/
+	    {
+		/* this is temporary, a disabling of congestion handlers */
+		INT_CMConnection_wait_for_pending_write(act->o.bri.conn);
+		if (stone->queue->queue_head == NULL) {
+		    /* all the events disappeared while we were waiting */
+		    return 0;
+		}
+	    }
+		
+
+/*	    CMtrace_out(cm, EVerbose, "Would call congestion_handler, new flag %d\n", stone->new_enqueue_flag);
+	    if (stone->new_enqueue_flag == 1) {
 		stone->new_enqueue_flag = 0;
                 while (q != NULL) {q = q->next; i++;}
 		CMtrace_out(cm, EVerbose, "Would call congestion_handler, %d items queued\n", i);
@@ -1953,7 +1963,7 @@ do_bridge_action(CManager cm, int s)
 		}
                 process_events_stone(cm, s, Congestion);
 		return 0;
-/*	    }*/
+	    }*/
 	}
 	event_item *event = dequeue_event(cm, stone, &action_id);
 	long event_length = 0;

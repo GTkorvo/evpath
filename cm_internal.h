@@ -84,6 +84,13 @@ typedef struct func_entry {
 
 #include "cm_transport.h"
 
+typedef struct pending_queue_entry {
+    CMConnection conn;
+    CMbuffer buffer;
+    long length;
+    struct pending_queue_entry *next;
+} *pending_queue;
+
 typedef struct _CManager {
     transport_entry *transports;
     int initialized;
@@ -117,6 +124,7 @@ typedef struct _CManager {
 
     CMbuffer taken_buffer_list;
     CMbuffer cm_buffer_list;
+    pending_queue pending_data_queue;
 
     attr_list *contact_lists;
 
@@ -523,3 +531,4 @@ INT_CMConnection_dereference(CMConnection conn);
 extern FMContext INT_CMget_FMcontext(CManager cm);
 extern void INT_CMinstall_perf_upcall(CManager cm, CMperf_upcall upcall);
 extern attr_list INT_CMtest_transport(CMConnection conn, attr_list how);
+extern void INT_CMConnection_wait_for_pending_write(CMConnection conn);
