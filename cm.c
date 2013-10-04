@@ -1527,7 +1527,7 @@ cm_get_data_buf(CManager cm, int length)
 		CMtrace_out(cm, CMLowLevelVerbose, "      cm_get_data_buf resizing!\n");
 		return tmp;
 	    }
-	    if ((tmp->size) / 10 <= length) {
+	    if (((tmp->size) / 10 <= length) || (length < 24)) {
 		/* if the buffer is more than 10 times too big, don't use it */
 		tmp->in_use_by_cm++;
 		CMtrace_out(cm, CMLowLevelVerbose, "cm_get_data_buf called len %d, return existing %p, next %p, count %d\n",
