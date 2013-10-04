@@ -562,8 +562,6 @@ int
 CMcontrol_list_wait(CMControlList cl)
 {
     /* associated CM should be locked */
-    assert(CM_LOCKED(svc, sd->cm));
-
     if ((cl->server_thread != 0) &&
 	(cl->server_thread != thr_thread_self())) {
 	/* What?  We're polling, but we're not the server thread? */
