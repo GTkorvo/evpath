@@ -12,6 +12,7 @@ typedef struct _CMbuffer {
     void *buffer;
     int size;
     int in_use_by_cm;
+    int ref_count;
     struct _CMbuffer *next;
     void (*return_callback)(void *);
     void *return_callback_data;
