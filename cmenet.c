@@ -110,6 +110,9 @@ enet_service_network(CManager cm, void *void_trans)
     ENetEvent event;
     
     if (!ecd->server) return;
+    if (!(CM_LOCKED(svc, ecd->cm))) {
+	printf("Enet service network, CManager not locked\n");
+    }
 
     /* Wait up to 1000 milliseconds for an event. */
     while (enet_host_service (ecd->server, & event, 1) > 0) {
@@ -155,6 +158,18 @@ enet_service_network(CManager cm, void *void_trans)
         }
 	}
     }
+}
+static
+void
+enet_service_network_lock(CManager cm, void *void_trans)
+{
+    transport_entry trans = (transport_entry) void_trans;
+    enet_client_data_ptr ecd = (enet_client_data_ptr) trans->trans_data;
+    CMtrans_services svc = ecd->svc;
+
+    ACQUIRE_CM_LOCK(svc, ecd->cm);
+    enet_service_network(cm, void_trans);
+    DROP_CM_LOCK(svc, ecd->cm);
 }
 
 #ifdef NOTDEF
@@ -750,7 +765,7 @@ libcmenet_LTX_initialize(CManager cm, CMtrans_services svc,
 
     svc->add_shutdown_task(cm, shutdown_enet_thread, (void *) enet_data, SHUTDOWN_TASK);
     svc->add_shutdown_task(cm, free_enet_data, (void *) enet_data, FREE_TASK);
-    svc->add_periodic_task(cm, 1, 0, enet_service_network, (void*)trans);
+    svc->add_periodic_task(cm, 1, 0, enet_service_network_lock, (void*)trans);
     return (void *) enet_data;
 }
 
