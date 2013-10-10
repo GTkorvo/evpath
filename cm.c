@@ -647,7 +647,6 @@ INT_CManager_create()
     cm->connections = INT_CMmalloc(1);
     cm->reg_user_format_count = 0;
     cm->reg_user_formats = INT_CMmalloc(1);
-    cm->taken_buffer_list = NULL;
     cm->cm_buffer_list = NULL;
     cm->pending_data_queue = NULL;
 
@@ -706,20 +705,16 @@ CManager_free(CManager cm)
 	}
 	INT_CMfree(cm->contact_lists);
     }
-    list = cm->taken_buffer_list;
-    while (list != NULL) {
-	CMbuffer next = list->next;
-	/* don't free the taken buffers */
-	INT_CMfree(list);
-	list = next;
-    }
     list = cm->cm_buffer_list;
+    i=0;
     while (list != NULL) {
 	CMbuffer next = list->next;
+	CMtrace_out(cm, CMBufferVerbose, "Final buffer disposition buf %d, %p, size %d, ref_count %d\n", i++, list, list->size, list->ref_count);
 	INT_CMfree(list->buffer);
 	INT_CMfree(list);
 	list = next;
     }
+    cm->cm_buffer_list = NULL;
     if (cm->shutdown_functions) INT_CMfree(cm->shutdown_functions);
     INT_CMfree(cm);
 }
@@ -922,7 +917,7 @@ CMConnection_create(transport_entry trans, void *transport_data,
     conn->attrs = conn_attrs;
     conn->attr_encode_buffer = create_AttrBuffer();
 
-    conn->partial_buffer = NULL;
+    conn->message_buffer = NULL;
     conn->buffer_full_point = 0;
     conn->buffer_data_end = 0;
 
@@ -1476,7 +1471,8 @@ cm_create_transport_buffer(CManager cm, void *buffer, int length)
     memset(tmp, 0, sizeof(*tmp));
     tmp->buffer = buffer;
     tmp->size = length;
-    tmp->in_use_by_cm = 1;
+    tmp->ref_count = 1;
+    CMtrace_out(cm, CMBufferVerbose, "Creating buffer %p, ref_count is %d\n", tmp, tmp->ref_count);
 //   This should just return the buffer... not update the link list.  That's handled in the calling routine.
 //    tmp->next = cm->cm_buffer_list;
 //    cm->cm_buffer_list = tmp;
@@ -1491,7 +1487,8 @@ cm_create_transport_and_link_buffer(CManager cm, void *buffer, int length)
     memset(tmp, 0, sizeof(*tmp));
     tmp->buffer = buffer;
     tmp->size = length;
-    tmp->in_use_by_cm = 1;
+    tmp->ref_count = 1;
+    CMtrace_out(cm, CMBufferVerbose, "Create and link buffer %p, ref_count is %d\n", tmp, tmp->ref_count);
     tmp->next = cm->cm_buffer_list;
     cm->cm_buffer_list = tmp;
     return tmp;
@@ -1504,45 +1501,80 @@ cm_get_data_buf(CManager cm, int length)
     int buffer_count = 0;
     CMbuffer tmp = cm->cm_buffer_list;
 
-    CMtrace_out(cm, CMLowLevelVerbose, "cm_get_data_buf called with len %d\n",
+    CMtrace_out(cm, CMBufferVerbose, "cm_get_data_buf called with len %d\n",
 		length);
     while (tmp != NULL) {
-	CMtrace_out(cm, CMLowLevelVerbose, "  buffer %d, size is %d, data %p, in_use %d\n",
-		    buffer_count, tmp->size, tmp->buffer, tmp->in_use_by_cm);
+	CMtrace_out(cm, CMBufferVerbose, "  buffer %d %p, size is %d, data %p, ref_count %d\n",
+		    buffer_count, tmp, tmp->size, tmp->buffer, tmp->ref_count);
 	buffer_count++;
 	tmp = tmp->next;
     }
 
     tmp = cm->cm_buffer_list;
     buffer_count = 0;
+    /* first baseline consistency check */
     while (tmp != NULL) {
-	if (!tmp->in_use_by_cm) {
-	    if (tmp->size < length) {
+	if (tmp->ref_count < 0) {
+	    CMtrace_out(cm, CMBufferVerbose, "cm_get_data_buf buffer %p, ref_count is %d, should not be negative\n", tmp, tmp->ref_count);
+	}
+	buffer_count++;
+	tmp = tmp->next;
+    }
+    /* first look for a buffer big enough, but not too big */
+    tmp = cm->cm_buffer_list;
+    while (tmp != NULL) {
+	if (tmp->ref_count <= 0) {
+	    if ((tmp->size >= length) && ((tmp->size/10) < length)) {
+		CMtrace_out(cm, CMBufferVerbose, "cm_get_data_buf called len %d, return existing %p, next %p, count %d\n",
+			    length, tmp, tmp->next, buffer_count);
+		tmp->ref_count = 1;
+		return tmp;
+	    }
+	}
+	tmp = tmp->next;
+    }		
+    /* ok, we'll settle for way too big, but realloc it down */
+    tmp = cm->cm_buffer_list;
+    while (tmp != NULL) {
+	if (tmp->ref_count <= 0) {
+	    if ((tmp->size >= length)) {
 		char *t = INT_CMrealloc(tmp->buffer, length);
 		if (t == NULL) {
 		    return NULL;
 		}
 		tmp->buffer = t;
 		tmp->size = length;
-		CMtrace_out(cm, CMLowLevelVerbose, "      cm_get_data_buf resizing!\n");
-		return tmp;
-	    }
-	    if (((tmp->size) / 10 <= length) || (length < 24)) {
-		/* if the buffer is more than 10 times too big, don't use it */
-		tmp->in_use_by_cm++;
-		CMtrace_out(cm, CMLowLevelVerbose, "cm_get_data_buf called len %d, return existing %p, next %p, count %d\n",
-			    length, tmp, tmp->next, buffer_count);
+		tmp->ref_count = 1;
+		CMtrace_out(cm, CMBufferVerbose, "      cm_get_data_buf resizing down!  return is %p\n", tmp);
 		return tmp;
 	    }
 	}
-	buffer_count++;
+	tmp = tmp->next;
+    }		
+    tmp = cm->cm_buffer_list;
+    /* well, look for a small one to realloc up */
+    while (tmp != NULL) {
+	if (tmp->ref_count <= 0) {
+	    if (tmp->size <= length) {
+		char *t = INT_CMrealloc(tmp->buffer, length);
+		if (t == NULL) {
+		    return NULL;
+		}
+		tmp->buffer = t;
+		tmp->size = length;
+		tmp->ref_count = 1;
+		CMtrace_out(cm, CMBufferVerbose, "      cm_get_data_buf resizingup!  return is %p\n", tmp);
+		return tmp;
+	    }
+	}
 	tmp = tmp->next;
     }
     tmp = cm_create_transport_buffer(cm, INT_CMmalloc(length), length);
+    tmp->ref_count = 1;
     tmp->next = cm->cm_buffer_list;
     cm->cm_buffer_list = tmp;
-    CMtrace_out(cm, CMLowLevelVerbose, "cm_get_data_buf called len %d, return %p, next %p, count %d\n",
-		length, tmp, tmp->next, buffer_count);
+    CMtrace_out(cm, CMBufferVerbose, "cm_get_data_buf create new len %d, return %p, count %d\n",
+		length, tmp, buffer_count);
     return tmp;
 }
 
@@ -1566,12 +1598,12 @@ cm_extend_data_buf(CManager cm, CMbuffer tmp, int length)
 extern void
 cm_return_data_buf(CManager cm, CMbuffer cmb)
 {
-    CMtrace_out(cm, CMLowLevelVerbose, "cm_return_data_buf called %p  in_use %d, callback %p\n",cmb, cmb->in_use_by_cm, cmb->return_callback);
-    if (cmb) cmb->in_use_by_cm = 0;
-    if (cmb && cmb->return_callback != NULL) {
+    cmb->ref_count--;
+    CMtrace_out(cm, CMBufferVerbose, "cm_return_data_buf buffer %p, callback %p, ref_count is now %d\n", cmb, cmb->return_callback, cmb->ref_count);
+    if ((cmb->ref_count == 0) && (cmb->return_callback != NULL)) {
 	CMbuffer last = NULL, tmp = cm->cm_buffer_list;
 	/* UNLINK */
-	CMtrace_out(cm, CMLowLevelVerbose, "cm_return_data_buf --- Unlinking %p cmb\n", cmb);
+	CMtrace_out(cm, CMBufferVerbose, "cm_return_data_buf --- Unlinking %p cmb\n", cmb);
 	while (tmp != NULL) {
 	    if (tmp != cmb) {
 		last = tmp;
@@ -1592,64 +1624,25 @@ cm_return_data_buf(CManager cm, CMbuffer cmb)
     }
 }
 
-/* user wants CM temporary buffer */
-static int
-cm_user_take_data_buf(CManager cm, void *buffer)
+static CMbuffer
+cm_buffer_lookup(CManager cm, void *buffer)
 {
     CMbuffer tmp = cm->cm_buffer_list;
-    CMbuffer last = NULL;
     while (tmp != NULL) {
 	if ((tmp->buffer <= buffer) && 
 	    ((char*)buffer < ((char*)tmp->buffer + tmp->size))){
-	    /* remove the buffer from CM's list */
-	    if (last == NULL) {
-		cm->cm_buffer_list = tmp->next;
-	    } else {
-		last->next = tmp->next;
-	    }
-	    /* add the buffer to the taken list */
-	    tmp->next = cm->taken_buffer_list;
-	    cm->taken_buffer_list = tmp;
-	    return 1;
+	    return tmp;
 	}
-	last = tmp;
 	tmp = tmp->next;
     }
-    return 0;
+    return NULL;
 }
     
-/* user is done with CM temporary buffer */
-static int
-cm_user_return_data_buf(CManager cm, void *buffer)
-{
-    CMbuffer tmp = cm->taken_buffer_list;
-    CMbuffer last = NULL;
-    while (tmp != NULL) {
-	if ((tmp->buffer <= buffer) && 
-	    ((char*)buffer < ((char*)tmp->buffer + tmp->size))){
-	    /* remove the buffer from taken list */
-	    if (last == NULL) {
-		cm->taken_buffer_list = tmp->next;
-	    } else {
-		last->next = tmp->next;
-	    }
-	    /* add the buffer to the CMs list */
-	    tmp->next = cm->cm_buffer_list;
-	    cm->cm_buffer_list = tmp;
-	    cm_return_data_buf(cm, tmp);
-	    return 1;
-	}
-	last = tmp;
-	tmp = tmp->next;
-    }
-    return 0;
-}
-
 int (*cm_write_hook)(int) = (int (*)(int)) NULL;
 int (*cm_preread_hook)(int,char*) = (int (*)(int, char*)) NULL;
 void (*cm_postread_hook)(int,char*) = (void (*)(int, char*)) NULL;
 void (*cm_last_postread_hook)() = (void (*)()) NULL;
-static int CMact_on_data(CMConnection conn, char *buffer, long length);
+static int CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length);
 
 static void process_pending_queue(CManager cm, void *junk)
 {
@@ -1658,7 +1651,7 @@ static void process_pending_queue(CManager cm, void *junk)
 	pending_queue entry = cm->pending_data_queue;
 	int result;
 	cm->pending_data_queue = entry->next;
-	result = CMact_on_data(entry->conn, entry->buffer->buffer, entry->length);
+	result = CMact_on_data(entry->conn, entry->buffer, entry->buffer->buffer, entry->length);
 	if (result != 0) {
 	    printf("in process pending, CMact_on_data returned %d\n", result);
 	}
@@ -1690,6 +1683,15 @@ static void add_buffer_to_pending_queue(CManager cm, CMConnection conn, CMbuffer
     CMwake_server_thread(cm);
 }
 
+static
+CMbuffer
+fill_cmbuffer(CManager cm, char *buf, long length)
+{
+    CMbuffer ret = cm_get_data_buf(cm, length);
+    memcpy(ret->buffer, buf, length);
+    return ret;
+}
+
 extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 {
     CManager cm = conn->cm;
@@ -1702,8 +1704,10 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
     static int read_ahead_byte_limit = 1024*1024;
     static int use_blocking_reads = 0;
     int first_four = 0;
-    char *buffer = NULL;
-    int length;
+    char *tmp_message_buffer = NULL;
+    int data_length;
+    CMbuffer message_buffer;
+    int buffer_full_point, buffer_data_end;
 
     /* called from the transport, grab the locks */
     if (first) {
@@ -1727,32 +1731,64 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
         }
     }
 
+    if (conn->buffer_full_point == 0) {
+	/* nothing saved from last invocation */
+	message_buffer = NULL;
+	buffer_full_point = 0;
+	buffer_data_end = 0;
+    } else {
+	/* message_buffer, buffer_full_point and buffer_data_end cached from last call to CMDataAvailable */
+	message_buffer = conn->message_buffer;
+	conn->message_buffer = NULL;
+	buffer_full_point = conn->buffer_full_point;
+	conn->buffer_full_point = 0;
+	buffer_data_end = conn->buffer_data_end;
+	conn->buffer_data_end = 0;
+    }
  start_read:
     if (conn->closed) {
 	return;
     }
-    if ((trans->read_to_buffer_func) && (conn->partial_buffer == NULL)) {
-	conn->partial_buffer = cm_get_data_buf(cm, 4);
-	conn->buffer_full_point = 4;
-	conn->buffer_data_end = 0;
+    if (buffer_full_point == 0) {
+	buffer_full_point = 4; /* read first 4 bytes first thing */
+	buffer_data_end = 0; /* no bytes read yet */
 	first_four = 1;
-	CMtrace_out(cm, CMLowLevelVerbose, "CMdata beginning new read, expect 4\n");
+    }
+    if (trans->read_to_buffer_func) {
+	CMtrace_out(cm, CMLowLevelVerbose, "CMdata continuing read, already have %d bytes, trying to read total %d\n", buffer_data_end, buffer_full_point);
     } else {
-	if (trans->read_to_buffer_func) {
-	    CMtrace_out(cm, CMLowLevelVerbose, "CMdata continuing read, got %d, expecting %d\n", conn->buffer_data_end, conn->buffer_full_point);
-	} else {
-	    CMtrace_out(cm, CMLowLevelVerbose, "CMdata block read beginning\n");
-	}
+	CMtrace_out(cm, CMLowLevelVerbose, "CMdata block read beginning\n");
     }	
-
-    /* read first 4 bytes */
+    if (buffer_full_point < HEADER_BUFFER_SIZE) {
+	tmp_message_buffer = &conn->header_buffer[0];
+    } else {
+	if (message_buffer == NULL) {
+	    /* we had data in the header buffer, but need more space */
+	    message_buffer = cm_get_data_buf(cm, buffer_full_point);
+	    memcpy(message_buffer->buffer, &conn->header_buffer[0],
+		   buffer_data_end);
+	    tmp_message_buffer = message_buffer->buffer;
+	} else {
+	    /* make sure buffer is big enough */
+	    cm_extend_data_buf(cm, message_buffer, buffer_full_point);
+	    tmp_message_buffer = message_buffer->buffer;
+	}
+    }
     if (cm_preread_hook) {
-	do_read = cm_preread_hook(conn->buffer_full_point - conn->buffer_data_end, conn->partial_buffer->buffer);
+	do_read = cm_preread_hook(buffer_full_point - buffer_data_end, tmp_message_buffer);
     }
     if (do_read) {
 	if (trans->read_to_buffer_func) {
-	    int len = conn->buffer_full_point - conn->buffer_data_end;
-	    char *buf = (char*)conn->partial_buffer->buffer + conn->buffer_data_end;
+	/* 
+	 * read_to_buffer functionality present means we can read the transport directly to any memory area
+	 * This gives us the most flexibility in managing our data.  
+	 *   At this point, tmp_message_buffer is the char* buffer to which we want to read
+	 *   If non-NULL, message_buffer is the CMBuffer that holds this memory
+	 *   buffer_data_end is how much data is already in the buffer
+	 *   buffer_full_point is how much data we think we need for the message to be complete
+	 */
+	    int read_len = buffer_full_point - buffer_data_end;
+	    char *read_target_buf = tmp_message_buffer + buffer_data_end;
 	    /* 
 	     * non blocking is True only if :
 	     *    - we're reading the first four bytes (first_four is true) and use_read_thread is false
@@ -1764,12 +1800,13 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	        non_blocking = 0;
                 CManager_unlock(cm);
             }
-	    if (len == 0) {
-	      printf("Seriously bad shit\n");
+	    if (read_len == 0) {
+		/* should never happen that we are here but don't need more data */
+		printf("Seriously bad shit\n");
 	    }
             actual = trans->read_to_buffer_func(&CMstatic_trans_svcs, 
 						conn->transport_data, 
-						buf, len, non_blocking);
+						read_target_buf, read_len, non_blocking);
             if (conn->use_read_thread) {
                 CManager_lock(cm);
             }
@@ -1779,57 +1816,68 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 		CMConnection_failed(conn, 1);
 		return;
 	    }
-	    conn->buffer_data_end += actual;
-	    if (actual < len) {
-		/* partial read */
+	    buffer_data_end += actual;
+	    if (actual < read_len) {
+		/* partial read, we know we don't have enough data now, roll on */
 		CMtrace_out(cm, CMLowLevelVerbose, 
 			    "CMdata read partial, got %d\n", actual);
+		/* save state and return */
+		conn->message_buffer = message_buffer;
+		conn->buffer_full_point = buffer_full_point;
+		conn->buffer_data_end = buffer_data_end;
 		return;
 	    }
-	    buffer = conn->partial_buffer->buffer;
-	    length = conn->buffer_data_end;
+	    data_length = buffer_data_end;
 	} else {
-	    conn->partial_buffer = trans->read_block_func(&CMstatic_trans_svcs, 
-							  conn->transport_data,
-							  &length);
-	    if (conn->partial_buffer == NULL) {
+	    message_buffer = trans->read_block_func(&CMstatic_trans_svcs, 
+						    conn->transport_data,
+						    &data_length);
+	    if (message_buffer == NULL) {
 		CMtrace_out(cm, CMLowLevelVerbose, 
 			    "CMdata NULL return from read_block_func");
 		return;
 	    }
-	    buffer = conn->partial_buffer->buffer;
-	    conn->buffer_data_end = length;
+	    message_buffer->ref_count++;
+	    CMtrace_out(cm, CMBufferVerbose, "Received buffer %p from transport read_block_func, increment ref count, now is %d\n", message_buffer, message_buffer->ref_count);
+	    tmp_message_buffer = message_buffer->buffer;
+	    buffer_data_end = data_length;
 	    cm->abort_read_ahead = 1;
 
-	    if (length == -1) {
+	    if (data_length == -1) {
 		CMtrace_out(cm, CMLowLevelVerbose, 
-			    "CMdata read failed, actual %d, failing connection %p\n", length, conn);
+			    "CMdata read failed, actual %d, failing connection %p\n", data_length, conn);
 		CMConnection_failed(conn, 1);
 		return;
 	    }
-	    if (length == 0) {
+	    if (data_length == 0) {
 		return;
 	    }
-	    if (buffer == NULL) {
+	    if (tmp_message_buffer == NULL) {
 		CMtrace_out(cm, CMLowLevelVerbose, "CMdata read_block failed, failing connection %p\n", conn);
 		CMConnection_failed(conn, 1);
 		return;
 	    }
-	    CMtrace_out(cm, CMLowLevelVerbose, "CMdata read_block returned %d bytes of data\n", length);
+	    CMtrace_out(cm, CMLowLevelVerbose, "CMdata read_block returned %d bytes of data\n", data_length);
 	}
 	if (cm_postread_hook) {
-	    cm_postread_hook(conn->buffer_full_point - conn->buffer_data_end, 
-			     conn->partial_buffer->buffer);
+	    cm_postread_hook(data_length, tmp_message_buffer);
 	}
     }
-    result = CMact_on_data(conn, buffer, length);
+    result = CMact_on_data(conn, message_buffer, tmp_message_buffer, data_length);
     if (result != 0) {
-	conn->buffer_full_point += result;
-	cm_extend_data_buf(cm, conn->partial_buffer, conn->buffer_full_point);
+	/* whoops, reevaluate.  We need more data */
+	buffer_full_point += result;
 	goto start_read;
     }
+    /* OK, we consumed all data */
+    buffer_full_point = 0;
+    buffer_data_end = 0;
+    if (message_buffer) {
+	cm_return_data_buf(cm, message_buffer);
+	message_buffer = NULL;
+    }
     read_msg_count++;
-    read_byte_count += length;
+    read_byte_count += data_length;
 
     /* try read-ahead */
     if (cm->abort_read_ahead == 1) {
@@ -1898,7 +1946,8 @@ CMdo_handshake(CMConnection conn, int handshake_version, int byte_swap, char *ba
 }
 
 static int
-CMact_on_data(CMConnection conn, char *buffer, long length){
+CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
+{
     char *base = buffer;
     char *check_sum_base = buffer;
     int byte_swap = 0;
@@ -1906,7 +1955,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
     int skip = 0;
     int performance_msg = 0, event_msg = 0, evcontrol_msg = 0, handshake = 0;
     int performance_func = 0, handshake_version = 0;
-    CMbuffer cm_decode_buf = NULL, cm_data_buf;
+    CMbuffer cm_decode_buf = NULL;
     attr_list attrs = NULL;
     int64_t data_length, decoded_length;
     int attr_length = 0, i;
@@ -1962,19 +2011,23 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	/*  lookup registered message prefixes and try to find handler */
 	/*  otherwise give up */
       {
-	int ret = CMdo_non_CM_handler(conn, *(int*)buffer, buffer, length);
-	if (ret == -1) {
-	    printf("Unknown message on connection %lx, failed %d, closed %d, %x\n", (long) conn, conn->failed, conn->closed, *(int*)buffer);
-	    CMConnection_failed(conn, 1);
-	}
-	cm_data_buf = conn->partial_buffer;
-	if (cm_data_buf) {
-	    cm_return_data_buf(cm, cm_data_buf);
-	}
-	conn->partial_buffer = NULL;
-	conn->buffer_full_point = 0;
-	conn->buffer_data_end = 0;
-	return 0;
+	  int ret;
+	  CMbuffer local = NULL;
+#ifdef EVER_HAVE_HANDLERS_OTHER_THAN_PBIO
+	  if (cm_buffer == NULL) {
+	      local = fill_cmbuffer(cm, buffer, length);
+	      buffer = local->buffer;
+	  }
+#endif
+	  CManager_unlock(cm);
+	  ret = CMdo_non_CM_handler(conn, *(int*)buffer, buffer, length);
+	  CManager_lock(cm);
+	  if (local) cm_return_data_buf(cm, local);
+	  if (ret == -1) {
+	      printf("Unknown message on connection %lx, failed %d, closed %d, %x\n", (long) conn, conn->failed, conn->closed, *(int*)buffer);
+	      CMConnection_failed(conn, 1);
+	  }
+	  return 0;
       }
     }
 
@@ -2078,17 +2131,9 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	    length;
     }
     /* At this point, the message is accepted.  Determine processing */
-    cm_data_buf = conn->partial_buffer;
-    conn->partial_buffer = NULL;
-    conn->buffer_full_point = 0;
-    conn->buffer_data_end = 0;
-
     base = buffer + header_len;
     if (handshake) {
 	CMdo_handshake(conn, handshake_version, byte_swap, base);
-	if (cm_data_buf) {
-	    cm_return_data_buf(cm, cm_data_buf);
-	}
 	return 0;
     }
     if (checksum != 0) {
@@ -2110,9 +2155,6 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
     if (performance_msg) {
 	CMdo_performance_response(conn, data_length, performance_func, byte_swap,
 				  base);
-	if (cm_data_buf) { 
-	    cm_return_data_buf(cm, cm_data_buf);
-	}
         return 0;
     } else if (evcontrol_msg) {
         int arg;
@@ -2127,9 +2169,6 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 #ifdef EV_INTERNAL_H
         INT_EVhandle_control_message(conn->cm, conn, (unsigned char) performance_func, arg);
 #endif
-	if (cm_data_buf) {
-	    cm_return_data_buf(cm, cm_data_buf);
-	}
         return 0;
     }
     data_buffer = base + attr_length;
@@ -2141,6 +2180,7 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	}
     }
     if (event_msg) {
+	CMbuffer local = NULL;
 	CMtrace_out(cm, CMDataVerbose, "CM - Receiving event message data len %ld, attr len %d, stone_id %x\n",
 		    (long)data_length, attr_length, stone_id);
 	if (attrs == NULL){
@@ -2148,10 +2188,17 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	}
 	set_int_attr(attrs, CM_EVENT_SIZE, data_length);
 
+	if (cm_buffer == NULL) {
+	    local = fill_cmbuffer(cm, buffer, length);
+	    data_buffer = (data_buffer - buffer) + local->buffer;
+	    buffer = local->buffer;
+	    cm_buffer = local;
+	}
 #ifdef EV_INTERNAL_H	
-	internal_cm_network_submit(cm, cm_data_buf, attrs, conn, data_buffer,
+	internal_cm_network_submit(cm, cm_buffer, attrs, conn, data_buffer,
 				   data_length, stone_id);
 #endif
+	if (local) cm_return_data_buf(cm, local);
 	free_attr_list(attrs);
 	return 0;
     }
@@ -2181,9 +2228,6 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
     if ((cm_format == NULL) || (cm_format->handler == NULL)) {
 	fprintf(stderr, "CM - No handler for incoming data of this version of format \"%s\"\n",
 		name_of_FMformat(FMFormat_of_original(format)));
-	if (cm_data_buf) {
-	    cm_return_data_buf(cm, cm_data_buf);
-	}
 	return 0;
     }
     assert(FFShas_conversion(format));
@@ -2192,7 +2236,6 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	if (!FFSdecode_in_place(cm->FFScontext, data_buffer, 
 				       (void**) (long) &decode_buffer)) {
 	    printf("Decode failed\n");
-	    if (cm_data_buf) cm_return_data_buf(cm, cm_data_buf);
 	    return 0;
 	}
     } else {
@@ -2200,12 +2243,10 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 	cm_decode_buf = cm_get_data_buf(cm, decoded_length);
 	decode_buffer = cm_decode_buf->buffer;
 	FFSdecode_to_buffer(cm->FFScontext, data_buffer, decode_buffer);
-	if (cm_data_buf) cm_return_data_buf(cm, cm_data_buf);
     }
     if(cm_format->older_format) {
 #ifdef EVOL
 	if(!process_old_format_data(cm, cm_format, &decode_buffer, &cm_decode_buf)){
-	    if (cm_data_buf) cm_return_data_buf(cm, cm_data_buf);
 	    return 0;
 	}
 #endif
@@ -2241,13 +2282,18 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
      *  Handler may recurse, so clear these structures first
      */
     INT_CMConnection_add_reference(conn);
-    CManager_unlock(cm);
-    cm_format->handler(cm, conn, decode_buffer, cm_format->client_data,
-		       attrs);
-    CManager_lock(cm);
-    INT_CMConnection_dereference(conn);
-    if (cm_data_buf) {
-	cm_return_data_buf(cm, cm_data_buf);
+    {
+	CMbuffer local = NULL;
+	if ((cm_buffer == NULL) && (decode_buffer == NULL)) {
+	    local = fill_cmbuffer(cm, buffer, length);
+	    buffer = local->buffer;
+	}
+	CManager_unlock(cm);
+	cm_format->handler(cm, conn, decode_buffer, cm_format->client_data,
+			   attrs);
+	CManager_lock(cm);
+	if (local) cm_return_data_buf(cm, local);
+	INT_CMConnection_dereference(conn);
     }
     if (cm_decode_buf) {
 	cm_return_data_buf(cm, cm_decode_buf);
@@ -2265,15 +2311,13 @@ CMact_on_data(CMConnection conn, char *buffer, long length){
 void *
 INT_CMtake_buffer(CManager cm, void *data)
 {
-    if (cm_user_take_data_buf(cm, data) == 0) {
-	/*
-	 * someday we may get here if we have transports that allocate 
-	 * their own buffers.  How to support?  Maybe do a copy and 
-	 * return the copy...?
-	 */
+    CMbuffer buf = cm_buffer_lookup(cm, data);
+    if (buf == NULL) {
 	fprintf(stderr, "Error: INT_CMtake_buffer called with record not associated with cm\n");
 	return NULL;
     } else {
+	buf->ref_count++;
+	CMtrace_out(cm, CMBufferVerbose, "CMtake_buffer, data %p found buffer %p, ref_count incremented, now %d\n", data, buf, buf->ref_count);
 	return data;
     }
 }
@@ -2281,22 +2325,13 @@ INT_CMtake_buffer(CManager cm, void *data)
 extern void
 INT_CMreturn_buffer(CManager cm, void *data)
 {
-    if (cm_user_return_data_buf(cm, data) == 0) {
-	/*
-	 * someday we may get here if we have transports that allocate 
-	 * their own buffers.  How to support?  Maybe do a copy and 
-	 * return the copy...?
-	 */
+    CMbuffer buf = cm_buffer_lookup(cm, data);
+    if (buf == NULL) {
 	fprintf(stderr, "Error: INT_CMreturn_buffer called with record %lx not associated with cm\n", (long)data);
+	return;
     }
-}
-
-extern int
-INT_CMtry_return_buffer(CManager cm, void *data)
-{
-    int ret;
-    ret = cm_user_return_data_buf(cm, data);
-    return ret;
+    CMtrace_out(cm, CMBufferVerbose, "CMreturn_buffer, data %p found buffer %p, ref_count now %d, calling cm_return_data_buf\n", data, buf, buf->ref_count);
+    cm_return_data_buf(cm, buf);
 }
 
 void

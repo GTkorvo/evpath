@@ -39,7 +39,7 @@ typedef struct enet_connection_data {
     int remote_IP;
     int remote_contact_port;
     ENetPeer *peer;
-    void *read_buffer;
+    CMbuffer read_buffer;
     int read_buffer_len;
     ENetPacket *packet;
     enet_client_data_ptr sd;
@@ -100,6 +100,13 @@ create_enet_conn_data(CMtrans_services svc)
 static void *
 enet_accept_conn(enet_client_data_ptr sd, transport_entry trans, 
 		 ENetAddress *address);
+
+static void free_func(void *packet)
+{
+    /* Clean up the packet now that we're done using it. */
+    enet_packet_destroy ((ENetPacket*)packet);
+}
+
 static
 void
 enet_service_network(CManager cm, void *void_trans)
@@ -135,17 +142,24 @@ enet_service_network(CManager cm, void *void_trans)
 	}
         case ENET_EVENT_TYPE_RECEIVE: {
 	    enet_conn_data_ptr econn_d = event.peer->data;
+	    CMbuffer cb;
 	    svc->trace_out(cm, "A packet of length %u containing %s was received on channel %u.\n",
                     (unsigned int) event.packet -> dataLength,
                     event.packet -> data,
                     (unsigned int) event.channelID);
 	    econn_d->read_buffer_len = event.packet -> dataLength;
-	    econn_d->read_buffer = event.packet->data;
+	    cb = svc->create_data_and_link_buffer(cm, 
+						  event.packet->data, 
+						  econn_d->read_buffer_len);
+	    econn_d->read_buffer = cb;
+	    cb->return_callback = free_func;
+	    cb->return_callback_data = event.packet;
 	    econn_d->packet = event.packet;
 
 	    /* kick this upstairs */
 	    trans->data_available(trans, econn_d->conn);
-
+	    svc->return_data_buffer(trans->cm, cb);
+	    
             break;
 	}           
         case ENET_EVENT_TYPE_DISCONNECT: {
@@ -645,12 +659,6 @@ struct iovec {
 
 #endif
 
-static void free_func(void *packet)
-{
-    /* Clean up the packet now that we're done using it. */
-    enet_packet_destroy ((ENetPacket*)packet);
-}
-
 extern void *
 libcmenet_LTX_read_block_func(CMtrans_services svc,
 			      enet_conn_data_ptr conn_data, int *actual_len)
@@ -659,13 +667,10 @@ libcmenet_LTX_read_block_func(CMtrans_services svc,
 
     if (conn_data->read_buffer_len == -1) return NULL;
 
-    cb = svc->create_data_and_link_buffer(conn_data->sd->cm, conn_data->read_buffer, 
-					  conn_data->read_buffer_len);
     *actual_len = conn_data->read_buffer_len;
+    cb = conn_data->read_buffer;
     conn_data->read_buffer_len = 0;
-    cb->return_callback = free_func;
-    cb->return_callback_data = (void*)conn_data->packet;
-            
+    conn_data->read_buffer = NULL;
     return cb;
 }
 

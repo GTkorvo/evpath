@@ -1147,8 +1147,9 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
     nnti_conn_data_ptr ncd = ntd->connections;
     while (ncd != NULL) {
 	if (strcmp(&wait_status->src.url[0], &ncd->peer_hdl.url[0]) == 0) {
-	    ntd->svc->trace_out(trans->cm, "NNTI data available on existing connection, from host %s, type %s (%d)", 
-				ncd->peer_hostname, msg_type_name[cm->message_type], cm->message_type);
+	    ntd->svc->trace_out(trans->cm, "NNTI data available on existing connection, from host %s, port %d, type %s (%d)", 
+				ncd->peer_hostname, ncd->nnti_port,
+				msg_type_name[cm->message_type], cm->message_type);
 	    break;
 	}
 	ncd = ncd->next;
@@ -1346,6 +1347,7 @@ shm_listen_thread_func(void *vlsp)
             switch(rc) {
                 case 0: { /* dequeue succeeded */
                     CMbuffer read_buffer = shm_td->ntd->svc->get_data_buffer(trans->cm, length);
+		    read_buffer->ref_count++;
 
                     /* copy the data from shm into a cm buffer */
                     memcpy(&((char*)read_buffer->buffer)[0], data, length);
@@ -1353,7 +1355,7 @@ shm_listen_thread_func(void *vlsp)
                     df_release(conn->recv_ep);
 
                     /* kick upstairs */
-		    trans->add_buffer_to_pending_queue(trans->cm, conn->ncd->conn, read_buffer, length);
+		    svc->add_buffer_to_pending_queue(trans->cm, conn->ncd->conn, read_buffer, length);
 
                     break;
                 }
@@ -1432,6 +1434,7 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 		ncd->packet = event.packet;
 	      
 		CMbuffer read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
+		ncd->read_buffer->ref_count++;
 	      
 		piggyback_size = m->pig.size;
 		memcpy(&((char*)read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
@@ -1488,6 +1491,7 @@ handle_pull_shm_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, tr
     switch(rc) {
         case 0: { /* dequeue succeeded */
             ncd->read_buffer = shm_td->ntd->svc->get_data_buffer(trans->cm, length);
+	    ncd->read_buffer->ref_count++;
 
             /* copy the data from shm into a cm buffer */
             memcpy(&((char*)conn->ncd->read_buffer->buffer)[0], data, length);
@@ -2003,6 +2007,9 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
 
     svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET Received pull request, pulling %d bytes", request->size);
 
+    if (ncd->read_buffer) {
+	svc->trace_out(ncd->ntd->cm, "Considering reuse of buffer %p, ref_count %d\n", ncd->read_buffer, ncd->read_buffer->ref_count);
+    }
     if (ncd->ntd->cache_maps &&
         (memcmp(&request->buf_addr, &ncd->incoming_mapped_region, sizeof(NNTI_buffer_t)) == 0)) {
 	/* no need to reregister!  We'll reuse!*/
@@ -2026,6 +2033,7 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
 	}
 
         read_buffer = svc->get_data_buffer(ncd->ntd->cm, request->size);
+	read_buffer->ref_count++;
 	data = read_buffer->buffer;
         svc->trace_out(ncd->ntd->cm, "CMNNTI registering region at %p, size %d",
 		       data, read_buffer->size);

@@ -820,8 +820,8 @@ dequeue_item(CManager cm, stone_type stone, queue_item *to_dequeue)
     action_state as = evp->as;
     queue_item *item = q->queue_head;
     event_item *event = NULL;
-    if (item == NULL) return event;
-    event = item->item;
+    if (to_dequeue == NULL) return event;
+    event = to_dequeue->item;
     if (q->queue_head == to_dequeue) {
 	if (q->queue_head == q->queue_tail) {
 	    q->queue_head = NULL;
@@ -843,6 +843,10 @@ dequeue_item(CManager cm, stone_type stone, queue_item *to_dequeue)
 	if (cur == q->queue_tail) {
 	    q->queue_tail = last;
 	}
+	cur = q->queue_head;
+	while (cur != NULL) {
+	    cur = cur->next;
+	}
     }
     item->next = evp->queue_items_free_list;
     evp->queue_items_free_list = item;
@@ -854,7 +858,9 @@ dequeue_item(CManager cm, stone_type stone, queue_item *to_dequeue)
 void
 EVdiscard_queue_item(CManager cm, int s, queue_item *item) {
     stone_type stone = stone_struct(cm->evp, s);
-    (void) dequeue_item(cm, stone, item);
+    event_item *event;
+    event = dequeue_item(cm, stone, item);
+    if (event) return_event(cm->evp, event);
 }
 
 static void encode_event(CManager, event_item*);
@@ -1043,6 +1049,8 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
     }
     stone->response_cache[stone->response_cache_count].reference_format =
 	event->reference_format;
+    stone->response_cache[stone->response_cache_count].action_type =
+	Action_NoAction;
     return_response = stone->response_cache_count++;
 
     if (stone->default_action != -1 
@@ -1119,8 +1127,10 @@ return_event(event_path_data evp, event_item *event)
 	switch (event->contents) {
 	case Event_CM_Owned:
 	    if (event->decoded_event) {
+		CMtrace_out(event->cm, CMBufferVerbose, "RETURN decoded event %p\n", event->decoded_event);
 		INT_CMreturn_buffer(event->cm, event->decoded_event);
 	    } else {
+		CMtrace_out(event->cm, CMBufferVerbose, "RETURN encoded event %p\n", event->decoded_event);
 		INT_CMreturn_buffer(event->cm, event->encoded_event);
 	    }
 	    break;
@@ -1169,12 +1179,15 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
 						       event->event_len);
 	    CMbuffer cm_decode_buf = cm_get_data_buf(cm, decoded_length);
 	    void *decode_buffer = cm_decode_buf->buffer;
+	    CMtrace_out(event->cm, CMBufferVerbose, "Last cm_get_data_buf was for EVPath decode buffer, return was %p\n", cm_decode_buf);
 	    if (event->event_len == -1) printf("BAD LENGTH\n");
 	    FFSdecode_to_buffer(act->o.decode.context, event->encoded_event, 
 				decode_buffer);
-	    INT_CMtake_buffer(cm, decode_buffer);
 	    event->decoded_event = decode_buffer;
 	    event->event_encoded = 0;
+	    CMtrace_out(event->cm, CMBufferVerbose, "EVPath now returning original, data is %p\n", event->encoded_event);
+	    INT_CMreturn_buffer(cm, event->encoded_event);
+	    event->encoded_event = NULL;
 	    event->reference_format = act->o.decode.target_reference_format;
 	    return event;
 	}
@@ -1189,10 +1202,10 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
 	event_item *new_event = get_free_event(evp);
 	CMbuffer cm_decode_buf = cm_get_data_buf(cm, decoded_length);
 	void *decode_buffer = cm_decode_buf->buffer;
+	CMtrace_out(event->cm, CMBufferVerbose, "Last cm_get_data_buf was for EVPath decode buffer2, return was %p\n", cm_decode_buf);
 	if (event->event_len == -1) printf("BAD LENGTH\n");
 	FFSdecode_to_buffer(act->o.decode.context, 
 			    event->encoded_event, decode_buffer);
-	INT_CMtake_buffer(cm, decode_buffer);
 	new_event->decoded_event = decode_buffer;
 	new_event->event_encoded = 0;
 	new_event->encoded_event = NULL;
@@ -1780,6 +1793,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		    more_pending++;
 		stone = stone_struct(cm->evp, s);
 		stone->is_processing = 0;
+		next = NULL;  /* call only once, not once per item in the queue */
 	    }
             break;    
 	} 
@@ -2152,8 +2166,7 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
 	resp->reference_format = reference_formats[i];
 	if (CMtrace_on(cm, EVerbose)) {
 	    char *tmp;
-	    fprintf(CMTrace_file, "\tResponse %d for format \"%s\"(%p)", i, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
-	    i++;
+	    fprintf(CMTrace_file, "\tResponse %d for format \"%s\"(%p)\n", stone->response_cache_count+i, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
 	    free(tmp);
 	}
     }

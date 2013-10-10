@@ -122,7 +122,6 @@ typedef struct _CManager {
     int FFSserver_identifier;	/* identifier for what FFS server we're talking to */
     thr_mutex_t context_lock;
 
-    CMbuffer taken_buffer_list;
     CMbuffer cm_buffer_list;
     pending_queue pending_data_queue;
 
@@ -226,6 +225,7 @@ typedef struct _CMConnHandlerList {
     void *client_data;
 } *CMConnHandlerList, CMConnHandlerListEntry;
 
+#define HEADER_BUFFER_SIZE 20
 struct _CMConnection {
     CManager cm;
     /* remote contact info */
@@ -249,7 +249,8 @@ struct _CMConnection {
     FMContext IOsubcontext;
     AttrBuffer attr_encode_buffer;
 
-    CMbuffer partial_buffer;	/* holds data from partial reads */
+    char header_buffer[HEADER_BUFFER_SIZE];		/* holds data until we know final size */
+    CMbuffer message_buffer;    /* final destination of buffer */
     int buffer_full_point;	/* data required for buffer to be full */
     int buffer_data_end;	/* last point with valid data in buffer */
 
@@ -294,7 +295,7 @@ extern void IntCMConn_write_unlock(CMConnection cl, char *file,
 extern int CMConn_write_locked(CMConnection cl);
 
 typedef enum _CMTraceType {
-    CMAlwaysTrace, CMControlVerbose, CMConnectionVerbose, CMLowLevelVerbose, CMDataVerbose, CMTransportVerbose, CMFormatVerbose, CMFreeVerbose, CMAttrVerbose, EVerbose, EVWarning, CMIBTransportVerbose, EVdfgVerbose,
+    CMAlwaysTrace, CMControlVerbose, CMConnectionVerbose, CMLowLevelVerbose, CMDataVerbose, CMTransportVerbose, CMFormatVerbose, CMFreeVerbose, CMAttrVerbose, CMBufferVerbose, EVerbose, EVWarning, CMIBTransportVerbose, EVdfgVerbose, 
     CMLastTraceType /* add before this one */
 } CMTraceType;
 

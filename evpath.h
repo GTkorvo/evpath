@@ -553,20 +553,6 @@ extern void *CMtake_buffer ARGS((CManager cm, void *data));
 */
 extern void CMreturn_buffer ARGS((CManager cm, void *data));
 
-/*!
- * try to return a buffer of incoming data.
- *
- * This call recycles a data buffer that the application has taken control
- * of through CMtake_buffer().  If it is called with a valid CM buffer, 
- * it returns 1, otherwise it returns 0.
- * \param cm The CManager in which the handler was called.
- * \param data The base address of the data (I.E. same value that was passed
- * to CMtake_buffer().
- * \return 1 if the data value was actually from a CMtake_buffer() call.  
- * 0 otherwise. 
-*/
-extern int CMtry_return_buffer ARGS((CManager cm, void *data));
-
 #include "cm_transport.h"
 /*!
  * The prototype for a non-CM message handler.

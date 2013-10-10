@@ -49,6 +49,7 @@ extern int CMtrace_init(CMTraceType trace_type)
     CMtrace_val[CMFormatVerbose] = (cercs_getenv("CMFormatVerbose") != NULL);
     CMtrace_val[CMFreeVerbose] = (cercs_getenv("CMFreeVerbose") != NULL);
     CMtrace_val[CMAttrVerbose] = (cercs_getenv("CMAttrVerbose") != NULL);
+    CMtrace_val[CMBufferVerbose] = (cercs_getenv("CMBufferVerbose") != NULL);
     CMtrace_val[EVerbose] = (cercs_getenv("EVerbose") != NULL);
     CMtrace_val[CMIBTransportVerbose] = (cercs_getenv("CMIBTransportVerbose") != NULL);    
     CMtrace_val[EVdfgVerbose] = (cercs_getenv("EVdfgVerbose") != NULL);
@@ -84,6 +85,7 @@ extern int CMtrace_init(CMTraceType trace_type)
 	    if (CMtrace_val[CMFormatVerbose]) fprintf(CMTrace_file, "CMFormatVerbose, ");
 	    if (CMtrace_val[CMFreeVerbose]) fprintf(CMTrace_file, "CMFreeVerbose, ");
 	    if (CMtrace_val[CMAttrVerbose]) fprintf(CMTrace_file, "CMAttrVerbose, ");
+	    if (CMtrace_val[CMBufferVerbose]) fprintf(CMTrace_file, "CMBufferVerbose, ");
 	    if (CMtrace_val[EVerbose]) fprintf(CMTrace_file, "EVerbose, ");
 	    if (CMtrace_val[EVWarning]) fprintf(CMTrace_file, "EVWarning, ");
 	    if (CMtrace_val[CMIBTransportVerbose]) fprintf(CMTrace_file, "CMIBTransportVerbose, ");

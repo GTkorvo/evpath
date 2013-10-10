@@ -548,6 +548,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
     int used_length = 4;
     int header = *(int*)buffer;
 
+    CManager_lock(conn->cm);
     CMtrace_out(conn->cm, CMFormatVerbose, "CMPbio operation in progress\n");
      
     if (header == 0x5042494f) {
@@ -565,6 +566,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
 		CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d\n", actual);
 		INT_CMConnection_close(conn);
+		CManager_unlock(conn->cm);
 		return 0;
 	    }
 	    incoming_length = &tmp_length;
@@ -592,6 +594,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
 		CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d\n", actual);
 		INT_CMConnection_close(conn);
+		CManager_unlock(conn->cm);
 		return 0;
 	    }
 	    msg = &tmp_msg;
@@ -615,6 +618,7 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
 		    "CMpbio Inconsistent length information, incoming %d, pay1 %d, pay2 %d\n", 
 		    *incoming_length, msg->payload1_length, msg->payload2_length);
 	INT_CMConnection_close(conn);
+	CManager_unlock(conn->cm);
 	return 0;
     }
     CMtrace_out(conn->cm, CMFormatVerbose, 
@@ -756,5 +760,6 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
 	    break;
 	}
     }
+    CManager_unlock(conn->cm);
     return 0;
 }

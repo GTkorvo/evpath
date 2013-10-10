@@ -11,7 +11,6 @@ typedef struct _transport_item *CMTransport;
 typedef struct _CMbuffer {
     void *buffer;
     int size;
-    int in_use_by_cm;
     int ref_count;
     struct _CMbuffer *next;
     void (*return_callback)(void *);
