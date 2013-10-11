@@ -1219,6 +1219,8 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
 	} else {
 	    new_event->attrs = NULL;
 	}
+	/* new event will take the place of old event */
+	return_event(evp, event);
 	return new_event;
     }
     }
