@@ -154,3 +154,11 @@
    fun:enet_packet_create
    fun:enet_host_service
 }
+{
+   when we create field lists in COD, they get leaked
+   Memcheck:Leak
+...
+   fun:add_field_list
+   fun:semanticize_expr
+...
+}
