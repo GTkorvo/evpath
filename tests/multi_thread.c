@@ -196,6 +196,7 @@ main(int argc, char **argv)
     if (quiet <= 0) printf("submitting %d\n", data.integer_field);
     EVsubmit(source_handle, &data, NULL);
     CMsleep(cm, 1);
+    EVfree_source(source_handle);
     CManager_close(cm);
     CManager_close(cm2);
     if (message_count != 1) printf("Message count == %d\n", message_count);
