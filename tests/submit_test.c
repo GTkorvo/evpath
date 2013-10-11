@@ -435,6 +435,8 @@ do_regression_master_test()
     args[2] = malloc(10 + strlen(string_list) + strlen(filter));
     sprintf(args[2], "%d:%s", fstone, string_list);
     subproc_proc = run_subprocess(args);
+    free(args[2]);
+    free(filter);
 
     /* give him time to start */
     CMsleep(cm, 10);
