@@ -773,7 +773,6 @@ CMusleep ARGS((CManager cm, int usecs));
  * \note Not all pending messages will be handled, but generally one message
  * will be handled for each connection upon which input is pending.
  */
-/*NOLOCK*/
 extern 
 void CMpoll_network ARGS((CManager cm));
 
