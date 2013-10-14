@@ -30,17 +30,18 @@ join_handler(EVdfg dfg, char *identifier, void* available_sources, void *availab
 {
     static int client_count = 1;
     int i;
-    char *canon_name = malloc(20);
+    char *canon_name;
     EVdfg_stone last, tmp, sink;
     (void) available_sources;
     (void) available_sinks;
     if (client_count < node_count) {
+	canon_name = malloc(20);
 	sprintf(canon_name, "client%d", client_count);
     } else {
 	canon_name = strdup("terminal");
     }
     EVdfg_assign_canonical_name(dfg, identifier, canon_name);
-
+    free(canon_name);
     
     if (client_count < node_count) {
 	/* increment the count and wait for the others to join */
