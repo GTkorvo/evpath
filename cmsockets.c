@@ -851,6 +851,7 @@ attr_list attrs;
                            (void *) trans, (void *) conn);
     }
 
+    free_attr_list(conn_attr_list);
 /* dump_sockinfo("initiate ", sock); */
     return conn;
 }
