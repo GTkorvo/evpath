@@ -82,7 +82,7 @@ join_handler(EVdfg dfg, char *identifier, void* available_sources, void *availab
 	    canon_name = strdup("terminal");
 	}
 	EVdfg_assign_canonical_name(dfg, identifier, canon_name);
-
+	free(canon_name);
     
 	if (client_count < static_node_count) {
 	    return;
@@ -121,6 +121,7 @@ join_handler(EVdfg dfg, char *identifier, void* available_sources, void *availab
 	middle_stone = EVdfg_create_stone(dfg, filter);
 	EVdfg_assign_node(middle_stone, canon_name);
 		
+	free(canon_name);
 	    //      EVdfg_reconfig_link_port_to_stone(dfg, stone_index, 0, middle_stone, NULL);
 	    //      EVdfg_reconfig_link_port_from_stone(dfg, middle_stone, 0, 2, NULL);
 		
@@ -214,7 +215,7 @@ be_test_master(int argc, char **argv)
 	free(nodes[i]);
     }
     free(nodes);
-    for (i=1; i < reconfig_node_count; i++) {
+    for (i=0; i < (reconfig_node_count + 1); i++) {
 	free(reconfig_list[i]);
     }
     free(reconfig_list);
