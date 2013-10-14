@@ -162,3 +162,12 @@
    fun:semanticize_expr
 ...
 }
+{
+   don't warn about uninit write vectors.  Too common...
+   Memcheck:Param
+   writev(vector[...])
+   ...
+   fun:*
+   fun:INT_CMwrite_raw
+   fun:internal_write_event
+}
