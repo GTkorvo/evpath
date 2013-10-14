@@ -483,6 +483,7 @@ CMinit_local_formats(CManager cm)
 	cm->FFScontext = create_FFSContext_FM(fmc);
 	CMtrace_out(cm, CMFormatVerbose, 
 		    "\nUsing self-hosted PBIO formats\n");
+	free_FMcontext(fmc);  /* really just drop the ref count */
     } else {
 	cm->FFScontext = create_FFSContext();
 	FMcontext_allow_self_formats(FMContext_from_FFS(cm->FFScontext));
