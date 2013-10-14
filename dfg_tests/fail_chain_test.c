@@ -136,6 +136,7 @@ be_test_master(int argc, char **argv)
 	    sprintf(nodes[i], "N%d", i);
 	}
     }
+    nodes[node_count] = NULL;
     cm = CManager_create();
     CMlisten(cm);
 
@@ -180,6 +181,8 @@ be_test_master(int argc, char **argv)
 /* Fork the others */
     test_fork_children(&nodes[0], str_contact);
 
+    free(str_contact);
+
     if (EVdfg_ready_wait(test_dfg) != 1) {
 	/* dfg initialization failed! */
 	exit(1);
@@ -200,14 +203,20 @@ be_test_master(int argc, char **argv)
 	    generate_simple_record(&rec);
 	    /* submit would be quietly ignored if source is not active */
 	    EVsubmit(source_handle, &rec, attrs);
+	    free_attr_list(attrs);
 	    CMsleep(cm, 1);
 	}
 	if (!quiet) printf("Source complete\n");
     }
+    EVfree_source(source_handle);
 
     status = EVdfg_wait_for_shutdown(test_dfg);
 
     wait_for_children(nodes);
+    for (i=0; i < node_count; i++) {
+	free(nodes[i]);
+    }
+    free(nodes);
 
     CManager_close(cm);
     return status;
@@ -250,6 +259,7 @@ be_test_child(int argc, char **argv)
 	/* submit would be quietly ignored if source is not active */
 	EVsubmit(src, &rec, NULL);
     }
+    EVfree_source(src);
     if (die_early) {
 	CMsleep(cm, 45);
 	if (!quiet) printf("Node %s exiting early\n", argv[1]);

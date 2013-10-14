@@ -149,6 +149,7 @@ be_test_master(int argc, char **argv)
     CMlisten(cm);
     contact_list = CMget_contact_list(cm);
     str_contact = attr_list_to_string(contact_list);
+    free_attr_list(contact_list);
 	
 	/*
 	 **  LOCAL DFG SUPPORT   Sources and sinks that might or might not be utilized.
@@ -197,6 +198,7 @@ be_test_master(int argc, char **argv)
     Hop_count_atom = attr_atom_from_string("hop_count_atom");
     if (EVdfg_source_active(source_handle)) {
 	simple_rec rec;
+	memset(&rec, 0, sizeof(rec));
         for (i = 0; i < EVENT_COUNT; ++i) {
 	    attr_list attrs = create_attr_list();
 	    CMsleep(cm, 1);
