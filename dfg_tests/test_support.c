@@ -201,7 +201,8 @@ delayed_fork_children(CManager cm, char **list, char *master_contact, int delay_
     delay_struct *str = malloc(sizeof(delay_struct));
     str->list = list;
     str->master_contact = master_contact;
-    CMadd_delayed_task(cm, delay_seconds, 0, delay_fork_wrapper, (void*) str);
+    CMTaskHandle handle = CMadd_delayed_task(cm, delay_seconds, 0, delay_fork_wrapper, (void*) str);
+    free(handle);
 }
 
 int wait_for_children(char **list)
