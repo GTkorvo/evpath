@@ -20,6 +20,8 @@ static void dump_action(stone_type stone, response_cache_element *resp,
 static void dump_stone(stone_type stone);
 static void fdump_stone(FILE* out, stone_type stone);
 static int is_bridge_stone(CManager cm, EVstone stone_num);
+static event_item *
+dequeue_event(CManager cm, stone_type stone, int *act_p);
 
 static const char *action_str[] = { "Action_NoAction","Action_Bridge", "Action_Thread_Bridge", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Encode_to_Buffer", "Action_Split", "Action_Store", "Action_Congestion", "Action_Source"};
 
@@ -298,7 +300,14 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
     }
     if (stone->proto_actions != NULL) free(stone->proto_actions);
     if (stone->response_cache != NULL) free_response_cache(stone);
+    
+    while (stone->queue->queue_head != NULL) {
+      int action_id;
+      event_item *event = dequeue_event(cm, stone, &action_id);
+      return_event(evp, event);
+    }
     free(stone->queue);
+      
     /* XXX unsquelch senders */
     stone->queue = NULL;
     stone->local_id = -1;
