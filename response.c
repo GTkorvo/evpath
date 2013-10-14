@@ -1125,7 +1125,9 @@ FMformat_compat_cmp2(FMFormat format, FMFormat *formatList,
 
 static void
 free_multi_response(void *client_data)
-{}
+{
+    response_instance resp = (response_instance) client_data;
+}
 
 static void
 free_imm_response(void *client_data)
@@ -1365,6 +1367,11 @@ response_data_free(CManager cm, void *resp_void)
 	free_struct_list(resp->u.transform.out_format_list);
         free(resp->u.transform.function);
 	break;
+    case Response_Multityped:
+      free(resp->u.multityped.struct_list);
+      free(resp->u.multityped.reference_input_format_list);
+      free(resp->u.multityped.function);
+      break;
     default:
 	break;
     }
