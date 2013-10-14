@@ -3447,13 +3447,15 @@ INT_EVunfreeze_stone(CManager cm, EVstone stone_id)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
+    CMTaskHandle handle;
     stone = stone_struct(evp, stone_id);
     if (!stone) return -1;
 
     stone->is_frozen = 0;
     /* ensure that we run the process_actions loop soon so the stone's
        pending events (or pending output) won't be ignored */
-    (void) INT_CMadd_delayed_task(cm, 0, 0, deferred_process_actions, NULL);
+    handle = INT_CMadd_delayed_task(cm, 0, 0, deferred_process_actions, NULL);
+    free(handle); /* we don't need this */
     return 1;	
 }
 
