@@ -96,6 +96,7 @@ fail_handler(EVdfg dfg, char *failed_node_name, int failed_stone)
 	}
 	if (nodes[i] && (strcmp(nodes[i], failed_node_name) == 0)) {
 	    failed_node = i;
+	    free(nodes[i]);
 	    nodes[i] = NULL;
 	    stones[i] = NULL;
 	    if (!quiet)printf("Failed node is %d\n", failed_node);
