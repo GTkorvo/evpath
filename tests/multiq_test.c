@@ -512,5 +512,7 @@ do_regression_master_test()
 	if (a_map[i] != 1) printf("A_map[%d] = %d\n", i, a_map[i]);
 	if (b_map[i] != 1) printf("B_map[%d] = %d\n", i, b_map[i]);
     }
+    free(a_map);
+    free(b_map);
     return !(message_count == repeat_count / 2);
 }
