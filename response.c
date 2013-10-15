@@ -77,6 +77,7 @@ struct transform_instance {
 };
 
 struct queued_instance {
+    int ref_count;
     cod_code code;
     cod_exec_context ec;
     void *client_data;
@@ -354,6 +355,7 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 		accept_anonymous++;
 	    }
 	}
+	struct_list[list_count] = NULL;
 	function = malloc(strlen(str) + 1);
 	strcpy(function, str);
 	response->response_type = Response_Multityped;
@@ -1127,6 +1129,11 @@ static void
 free_multi_response(void *client_data)
 {
     response_instance resp = (response_instance) client_data;
+    resp->u.queued.ref_count--;
+    if (resp->u.queued.ref_count > 0) return;
+    if (resp->u.queued.code) cod_code_free(resp->u.queued.code);
+    if (resp->u.queued.ec) cod_exec_context_free(resp->u.queued.ec);
+    free(resp);
 }
 
 static void
@@ -1368,6 +1375,20 @@ response_data_free(CManager cm, void *resp_void)
         free(resp->u.transform.function);
 	break;
     case Response_Multityped:
+      {
+	  int i = 0;
+	  while(resp->u.multityped.struct_list[i] != NULL) {
+	      FMStructDescList list = resp->u.multityped.struct_list[i];
+	      int j = 0;
+	      while (list[j].format_name != NULL) {
+		  free(list[j].format_name);
+		  free_FMfield_list(list[j].field_list);
+		  j++;
+	      }
+	      free(list);
+	      i++;
+	  }
+      }
       free(resp->u.multityped.struct_list);
       free(resp->u.multityped.reference_input_format_list);
       free(resp->u.multityped.function);
@@ -1715,7 +1736,6 @@ add_queued_constants(cod_parse_context context, FMFormat *formats)
         char *name = malloc(4 + strlen(fmt_name));
         sprintf(name, "%s_ID", fmt_name);
         cod_add_int_constant_to_parse_context(name, i, context);
-        /* free(name); */
     }
 }
 
@@ -2060,6 +2080,7 @@ generate_multityped_code(CManager cm, struct response_spec *mrd, stone_type ston
 {
     response_instance instance = malloc(sizeof(*instance));
     FMFormat *cur_format;
+    int format_count = 0;
 
     cod_code code;
     cod_parse_context parse_context = new_cod_parse_context();
@@ -2069,6 +2090,7 @@ generate_multityped_code(CManager cm, struct response_spec *mrd, stone_type ston
 
     for (cur_format = formats; *cur_format; ++cur_format) {
 	add_type(parse_context, *cur_format);
+	format_count++;
     }
 
     add_standard_routines(stone, parse_context);
@@ -2101,6 +2123,7 @@ generate_multityped_code(CManager cm, struct response_spec *mrd, stone_type ston
 	}*/
     code = cod_code_gen(mrd->u.multityped.function, parse_context);
     instance->response_type = mrd->response_type;
+    instance->u.queued.ref_count = format_count;
     instance->u.queued.formats = formats;
     instance->u.queued.code = code;
     if (code)
