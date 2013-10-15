@@ -272,6 +272,7 @@ main(int argc, char **argv)
 
 	printf("Contact list \"%d:%s\"\n", fstone, string_list);
 	CMsleep(cm, 120);
+	free(filter);
     } else {
 	attr_list attrs;
 	int remote_stone, stone = 0;
@@ -469,6 +470,8 @@ do_regression_master_test()
     args[2] = malloc(10 + strlen(string_list) + strlen(filter));
     sprintf(args[2], "%d:%s", fstone, string_list);
     subproc_proc = run_subprocess(args);
+    free(filter);
+    free(args[2]);
 
     /* give him time to start */
     CMsleep(cm, 10);
