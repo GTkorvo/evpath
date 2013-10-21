@@ -1490,20 +1490,21 @@ handle_pull_shm_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, tr
     int rc = df_try_dequeue(conn->recv_ep, &data, &length);
     switch(rc) {
         case 0: { /* dequeue succeeded */
-            ncd->read_buffer = shm_td->ntd->svc->get_data_buffer(trans->cm, length);
-	    ncd->read_buffer->ref_count++;
+            CMbuffer read_buffer = shm_td->ntd->svc->get_data_buffer(trans->cm, length);
+	    read_buffer->ref_count++;
 
             /* copy the data from shm into a cm buffer */
-            memcpy(&((char*)conn->ncd->read_buffer->buffer)[0], data, length);
+            memcpy(&((char*)read_buffer->buffer)[0], data, length);
 
             df_release(conn->recv_ep);
 
             conn->ncd->read_buf_len = length;
 
+            svc->trace_out(ncd->ntd->cm, "NNTI/DF_SHM: received piggybacked data of size %d.",
+                length);
+
             /* kick upstairs */
-            trans->data_available(trans, conn->ncd->conn);
-            shm_td->ntd->svc->return_data_buffer(trans->cm, conn->ncd->read_buffer);
-            conn->ncd->read_buffer = NULL;
+            shm_td->ntd->svc->add_buffer_to_pending_queue(trans->cm, ncd->conn, read_buffer, length);
             break;
         }
         case -1: { /* no data available */
@@ -2254,7 +2255,7 @@ attr_list attrs;
                 memcpy(&m->pig.payload[size], iov[i].iov_base, iov[i].iov_len);
                 size += iov[i].iov_len;
             }
-            svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET outbound piggybacking %d bytes of data in control message", size);
+            svc->trace_out(ncd->ntd->cm, "CMNNTI/SHM outbound piggybacking %d bytes of data in control message", size);
             if (send_control_message(h) == 0) return 0;
         }
         else {
@@ -2412,9 +2413,9 @@ CMtrans_services svc;
         shm_method = DF_SHM_METHOD_POSIX_SHM;
     }
     else {
-        fprintf(stderr, "Error: invalid CMSNNTI_HM_METHOD value: %s\n"
-                        "Valide options are: SYSV|MMAP|POSIXSHM\n"
-                        "Use SYSV by default\n", temp_str);
+        svc->trace_out(cm, "Error: invalid CMSNNTI_HM_METHOD value: %s\n"
+            "Valide options are: SYSV|MMAP|POSIXSHM\n"
+            "Use SYSV by default\n", temp_str);
         shm_method = shm_default_method;
     }
 
