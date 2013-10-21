@@ -1500,7 +1500,7 @@ handle_pull_shm_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, tr
 
             conn->ncd->read_buf_len = length;
 
-            svc->trace_out(ncd->ntd->cm, "NNTI/DF_SHM: received piggybacked data of size %d.",
+            svc->trace_out(ncd->ntd->cm, "NNTI/DF_SHM: received data of size %d.",
                 length);
 
             /* kick upstairs */
