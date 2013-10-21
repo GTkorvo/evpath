@@ -2259,13 +2259,6 @@ attr_list attrs;
             if (send_control_message(h) == 0) return 0;
         }
         else {
-            /* put data to shared memory send queue. this is a blocking call. */
-            df_queue_ep_t send_ep = ncd->shm_cd->send_ep;
-            int rc = df_enqueue_vector (send_ep, iov, iovcnt);
-            if (rc != 0) {
-                return -1;
-            }
-
             /* send out a control message */
             if (copy_full_buffer_and_send_pull_request(svc, ncd, iov, iovcnt, attrs) == 0)
             return 0;
