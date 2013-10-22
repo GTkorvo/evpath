@@ -1276,6 +1276,11 @@ send_and_maybe_wait_for_handshake(CManager cm, CMConnection conn)
     actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
 				      conn->transport_data, 
 				      &tmp_vec[0], 1, NULL);
+    
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - after handshake, pending is %d\n");
+    if (conn->write_pending) {
+	wait_for_pending_write(conn);
+    }
     if (actual != 1) {
 	printf("handshake write failed\n");
     }
@@ -2448,6 +2453,7 @@ static void
 transport_wake_any_pending_write(CMConnection conn)
 {
     conn->write_pending = 0;
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "UNSet Pending write for conn %p\n", conn);
     cm_wake_any_pending_write(conn);
 }
 
@@ -2476,6 +2482,7 @@ static void
 cm_set_pending_write(CMConnection conn)
 {
     assert(CManager_locked(conn->cm));
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "Set Pending write for conn %p\n", conn);
     conn->write_pending = 1;
 }
 
@@ -2585,9 +2592,12 @@ wait_for_pending_write(CMConnection conn)
 {
     CMControlList cl = conn->cm->control_list;
     assert(CManager_locked(conn->cm));
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "Wait for pending write for conn %p\n", conn);
+
     if ((!cl->has_thread) || (thr_thread_self() == cl->server_thread)) {
 	/* single thread working, just poll network */
 	while(conn->write_pending) {
+	    CMtrace_out(conn->cm, CMLowLevelVerbose, "Control list wait for conn %p\n", conn);
 	    CMcontrol_list_wait(cl);
 	}
     } else {
@@ -2596,9 +2606,11 @@ wait_for_pending_write(CMConnection conn)
 	    int cond = INT_CMCondition_get(conn->cm, conn);
 	    add_pending_write_callback(conn, wake_pending_write, 
 				       (void*) (long)cond);
+	    CMtrace_out(conn->cm, CMLowLevelVerbose, "Condition wait for conn %p\n", conn);
 	    INT_CMCondition_wait(conn->cm, cond);
 	}
     }	    
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "Done waiting for pending write for conn %p\n", conn);
 }
 
 void
