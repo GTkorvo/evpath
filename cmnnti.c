@@ -597,7 +597,7 @@ attr_list conn_attr_list;
      *TODO: config this in a better way. e.g., first make sure the receiving
      * side indeed can support share memory transport
      */
-    int use_shm = 1;
+    int use_shm = 0;
 
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
@@ -1434,7 +1434,6 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 		ncd->packet = event.packet;
 	      
 		CMbuffer read_buffer = ntd->svc->get_data_buffer(trans->cm, (int)m->pig.size);
-		ncd->read_buffer->ref_count++;
 	      
 		piggyback_size = m->pig.size;
 		memcpy(&((char*)read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
@@ -1498,7 +1497,6 @@ handle_pull_shm_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, tr
 
             df_release(conn->recv_ep);
 
-            conn->ncd->read_buf_len = length;
 
             svc->trace_out(ncd->ntd->cm, "NNTI/DF_SHM: received data of size %d.",
                 length);
@@ -1836,12 +1834,8 @@ CMtrans_services svc;
 nnti_conn_data_ptr ncd;
 int *actual_len;
 {
-    if (ncd->read_buf_len == -1) return NULL;
-
-    *actual_len = ncd->read_buf_len;
-    ncd->read_buf_len = 0;
-            
-    return ncd->read_buffer;
+    printf("Don't call me!\n");
+    return (void*)0;
 }
 
 
