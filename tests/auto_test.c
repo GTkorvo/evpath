@@ -300,7 +300,7 @@ do_regression_master_test()
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
     char *string_list, *transport, *postfix;
-    int message_count = 0;
+    int message_count = 0, i;
     EVstone handle;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
@@ -366,7 +366,10 @@ do_regression_master_test()
     subproc_proc = run_subprocess(args);
 
     /* give him time to start */
-    CMsleep(cm, 10);
+    for (i=0; i< 10; i++) {
+	if (message_count == 1) break;
+	CMsleep(cm, 1);
+    }
 /* stuff */
     if (quiet <= 0) {
 	printf("Waiting for remote....\n");

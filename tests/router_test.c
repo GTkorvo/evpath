@@ -370,7 +370,7 @@ do_regression_master_test()
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
     char *string_list, *transport, *postfix;
-    int message_counts[3];
+    int message_counts[3], i;
     EVstone term0, term1, term2, fstone;
     EVaction faction;
     struct _client_rec rec0, rec1, rec2;
@@ -456,7 +456,12 @@ do_regression_master_test()
     subproc_proc = run_subprocess(args);
 
     /* give him time to start */
-    CMsleep(cm, 10);
+    for (i=0; i< 10; i++) {
+	if ((message_counts[0] == 5) &&
+	    (message_counts[1] == 3) &&
+	    (message_counts[2] == 2)) break;
+	CMsleep(cm, 1);
+    }
 /* stuff */
     if (quiet <= 0) {
 	printf("Waiting for remote....\n");

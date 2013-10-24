@@ -136,6 +136,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 	if (attrs) dump_attr_list(attrs);
     }
     if (client_data != NULL) {
+	CMConnection conn;
 	int tmp = *((int *) client_data);
 	*((int *) client_data) = tmp + 1;
     }
@@ -210,7 +211,7 @@ main(int argc, char **argv)
 	if (transport != NULL) {
 	    char *actual_transport = NULL;
 	    get_string_attr(contact_list, CM_TRANSPORT, &actual_transport);
-	    if (!actual_transport || (strcmp(actual_transport, transport) != 0)) {
+	    if (!actual_transport || (strncmp(actual_transport, transport, strlen(actual_transport)) != 0)) {
 		printf("Failed to load transport \"%s\"\n", transport);
 		exit(1);
 	    }
@@ -263,7 +264,7 @@ main(int argc, char **argv)
 	if (quiet <= 0) printf("submitting %d\n", data.integer_field);
 	EVsubmit(source_handle, &data, attrs);
 	stone_attrs = EVextract_attr_list(cm, stone);
-	dump_attr_list(stone_attrs);
+	if (quiet <= 0) dump_attr_list(stone_attrs);
 	CMsleep(cm, 1);
 	EVfree_source(source_handle);
 	free_attr_list(attrs);
@@ -329,6 +330,7 @@ do_regression_master_test()
     char *string_list, *postfix;
     int message_count = 0;
     EVstone handle;
+    int i;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
 #else
@@ -358,7 +360,7 @@ do_regression_master_test()
     if (transport != NULL) {
       char *actual_transport = NULL;
       get_string_attr(contact_list, CM_TRANSPORT, &actual_transport);
-      if (!actual_transport || (strcmp(actual_transport, transport) != 0)) {
+	    if (!actual_transport || (strncmp(actual_transport, transport, strlen(actual_transport)) != 0)) {
 	printf("Failed to load transport \"%s\"\n", transport);
 	exit(1);
       }
@@ -403,7 +405,10 @@ do_regression_master_test()
     free(args[2]);
 
     /* give him time to start */
-    CMsleep(cm, 10);
+    for (i=0; i< 10; i++) {
+	if (message_count == 1) break;
+	CMsleep(cm, 1);
+    }
 /* stuff */
     if (quiet <= 0) {
 	printf("Waiting for remote....\n");

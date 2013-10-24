@@ -353,7 +353,7 @@ do_regression_master_test(int do_dll)
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
     char *string_list, *transport, *postfix;
-    int message_count = 0;
+    int message_count = 0, i;
     EVstone term, fstone;
     EVaction faction;
 #ifdef HAVE_WINDOWS_H
@@ -365,7 +365,7 @@ do_regression_master_test(int do_dll)
     sigemptyset(&sigact.sa_mask);
     sigaddset(&sigact.sa_mask, SIGALRM);
     sigaction(SIGALRM, &sigact, NULL);
-    alarm(300);
+    alarm(30);
 #endif
     cm = CManager_create();
     forked = CMfork_comm_thread(cm);
@@ -431,7 +431,10 @@ do_regression_master_test(int do_dll)
     subproc_proc = run_subprocess(args);
 
     /* give him time to start */
-    CMsleep(cm, 10);
+    for (i=0; i< 10; i++) {
+	if (message_count == repeat_count) break;
+	CMsleep(cm, 1);
+    }
 /* stuff */
     free(args[2]);
     free(filter);

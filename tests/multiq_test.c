@@ -474,7 +474,10 @@ do_regression_master_test()
     free(args[2]);
 
     /* give him time to start */
-    CMsleep(cm, 10);
+    for (i=0; i< 10; i++) {
+	if (message_count == repeat_count / 2) break;
+	CMsleep(cm, 1);
+    }
 /* stuff */
     if (quiet <= 0) {
 	printf("Waiting for remote....\n");

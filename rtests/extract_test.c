@@ -211,7 +211,7 @@ main(int argc, char **argv)
 	attr_list parent_contact_list = attr_list_from_string(argv[1]);
 	handshake_with_parent(cm, parent_contact_list);
 /*    (void) CMfork_comm_thread(cm);*/
-	CMsleep(cm, 20);
+	CMsleep(cm, 5);
 	CManager_close(cm);
 	return 0;
     } else {
@@ -364,7 +364,7 @@ do_regression_master_test()
     char *args[] = {argv0, "-s", NULL, NULL};
     int exit_state;
     int forked = 0;
-    int ret;
+    int ret, i;
     attr_list contact_list, listen_list = NULL;
     char *string_list, *transport, *postfix;
     CMFormat alive_format;
@@ -431,7 +431,12 @@ do_regression_master_test()
     subproc_proc = run_subprocess(args);
 
     /* give him time to start, run and send us data */
-    CMsleep(cm, 10);
+    for (i=0; i< 10; i++) {
+	if ((message_counts[0] == 5) &&
+	    (message_counts[1] == 0) &&
+	    (message_counts[2] == 5)) break;
+	CMsleep(cm, 1);
+    }
     if (dont_fork) {
 	CMsleep(cm, 300);
     } else {
