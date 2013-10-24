@@ -11,6 +11,7 @@
 #include <unistd.h>
 #endif
 #include <stdlib.h>
+#include <limits.h>
 #ifdef HAVE_WINDOWS_H
 #include <winsock.h>
 #define __ANSI_CPP__
@@ -61,6 +62,7 @@ atom_t CM_BW_MEASURED_COF = -1;
 atom_t CM_BW_MEASURE_SIZE = -1;
 atom_t CM_BW_MEASURE_SIZEINC = -1;
 static atom_t CM_EVENT_SIZE = -1;
+static atom_t CM_INCOMING_CONNECTION = -1;
 static atom_t CM_TRANSPORT_RELIABLE = -1;
 
 static void wait_for_pending_write(CMConnection conn);
@@ -333,10 +335,16 @@ extern attr_list
 INT_CMget_specific_contact_list(CManager cm, attr_list attrs)
 {
     char *chosen_transport = NULL, *chosen_net = NULL;
+    char *freeable_transport = NULL;
     int i = 0;
 
     if (attrs != NULL) {
 	get_string_attr(attrs, CM_TRANSPORT, &chosen_transport);
+    }
+    if (chosen_transport && (strchr(chosen_transport, ':') != NULL)) {
+	freeable_transport = strdup(chosen_transport);
+	*(strchr(freeable_transport, ':')) = 0;
+	chosen_transport = freeable_transport;
     }
     if (attrs != NULL) {
 	get_string_attr(attrs, CM_NETWORK_POSTFIX, &chosen_net);
@@ -369,6 +377,7 @@ INT_CMget_specific_contact_list(CManager cm, attr_list attrs)
 		}
 	    }
 	    CMadd_ref_attr_list(cm, cm->contact_lists[i]);
+	    if (freeable_transport) free(freeable_transport);
 	    return cm->contact_lists[i];
 	}
 	i++;
@@ -400,11 +409,13 @@ INT_CMget_specific_contact_list(CManager cm, attr_list attrs)
 		}
 	    }
 	    CMadd_ref_attr_list(cm, cm->contact_lists[i]);
+	    if (freeable_transport) free(freeable_transport);
 	    return cm->contact_lists[i];
 	}
 	i++;
     }
     /* maybe it failed to load */
+    if (freeable_transport) free(freeable_transport);
     return NULL;
 }
 
@@ -414,36 +425,99 @@ INT_CMlisten(CManager cm)
   return INT_CMlisten_specific (cm, NULL);
 }
 
+static attr_list
+split_transport_attributes(attr_list list)
+{
+    char *chosen_transport = NULL;
+    if (list) {
+	get_string_attr(list, CM_TRANSPORT, &chosen_transport);
+    }
+    if (chosen_transport && (strchr(chosen_transport, ':') != NULL)) {
+	attr_list new_list = attr_copy_list(list);
+	atom_t atom;
+	char *old_transport, *params;
+	char *next_param;
+	get_string_attr(new_list, CM_TRANSPORT, &old_transport);
+	params = strchr(old_transport, ':');
+	*(params++) = 0;
+	set_string_attr(new_list, CM_TRANSPORT, strdup(old_transport));
+	while (params != NULL) {
+	    char *equal, *end;
+	    next_param = strchr(params, ',');
+	    if (next_param) *(next_param++) = 0;  /* kill comma */
+	    if ((equal = strchr(params, '=')) != NULL) {
+		/* there's an equal sign */
+		*(equal++) = 0;
+		/* we'll deal with this later */
+	    }
+	    while (isspace(*params)) params++;  /* skip white */
+	    end = params + strlen(params) - 1;
+	    while(end > params && isspace(*end)) end--;
+	    // Write new null terminator
+	    *(end+1) = 0;
+	    atom = attr_atom_from_string(params);
+	    if (equal == NULL) {
+		set_int_attr(new_list, atom, 1);
+	    } else {
+		char *tail;
+		long value;
+		while (isspace(*equal)) equal++;  /* skip white */
+		end = equal + strlen(equal) - 1;
+		while(end > equal && isspace(*end)) end--;
+		// Write new null terminator
+		*(end+1) = 0;
+		value = strtol(equal, &tail, 10);
+		if (!tail || (strlen(tail) != 0)) {
+		    /* valid integer! */
+		    if ((value < INT_MAX) && (value > INT_MIN)) {
+			set_int_attr(new_list, atom, (int)value);
+		    } else {
+			set_long_attr(new_list, atom, value);
+		    }
+		} else {
+		    /* string... */
+		    set_string_attr(new_list, atom, strdup(equal));
+		}
+	    }
+	    params = next_param;
+	}
+	free(old_transport);  /* not free'd by replace */
+	free_attr_list(list);
+	list = new_list;
+    }
+    return list;
+}
 extern int
 CMinternal_listen(CManager cm, attr_list listen_info, int try_others)
 {
     int success = 0;
     transport_entry *trans_list;
-    char *choosen_transport = NULL;
+    char *chosen_transport = NULL;
 
-    if (listen_info != NULL) {
-	get_string_attr(listen_info, CM_TRANSPORT, &choosen_transport);
+    if (listen_info) {
+	listen_info = split_transport_attributes(listen_info);
+	get_string_attr(listen_info, CM_TRANSPORT, &chosen_transport);
     }
-    if (choosen_transport != NULL) {
+    if (chosen_transport != NULL) {
         CMtrace_out(cm, CMConnectionVerbose,
 		    "CM - Listening only on transport \"%s\"\n",
-		    choosen_transport);
-	if (load_transport(cm, choosen_transport, 1) == 0) {
+		    chosen_transport);
+	if (load_transport(cm, chosen_transport, 1) == 0) {
 	    CMtrace_out(cm, CMConnectionVerbose,
 			"Failed to load transport \"%s\".  Revert to default.\n",
-			choosen_transport);
+			chosen_transport);
 	    CMtrace_out(cm, CMTransportVerbose,
 			"Failed to load transport \"%s\".  Revert to default.\n",
-			choosen_transport);
+			chosen_transport);
 	    if (!try_others) return success;
-	    choosen_transport = NULL;
+	    chosen_transport = NULL;
 	}
     }
     trans_list = cm->transports;
     while ((trans_list != NULL) && (*trans_list != NULL)) {
 	attr_list attrs;
-	if ((choosen_transport == NULL) || 
-	    (strcmp((*trans_list)->trans_name, choosen_transport) == 0)) {
+	if ((chosen_transport == NULL) || 
+	    (strcmp((*trans_list)->trans_name, chosen_transport) == 0)) {
 	    attrs = (*trans_list)->listen(cm, &CMstatic_trans_svcs,
 					  *trans_list,
 					  listen_info);
@@ -613,6 +687,7 @@ INT_CManager_create()
 	CM_BW_MEASURE_SIZE = attr_atom_from_string("CM_BW_MEASURE_SIZE");
 	CM_BW_MEASURE_SIZEINC = attr_atom_from_string("CM_BW_MEASURE_SIZEINC");
 	CM_EVENT_SIZE = attr_atom_from_string("CM_EVENT_SIZE");
+	CM_INCOMING_CONNECTION = attr_atom_from_string("CM_INCOMING_CONNECTION");
 	CM_TRANSPORT_RELIABLE = attr_atom_from_string("CM_TRANSPORT_RELIABLE");
     }
 
@@ -1317,23 +1392,24 @@ CMConnection
 CMinternal_initiate_conn(CManager cm, attr_list attrs)
 {
     transport_entry *trans_list;
-    char *choosen_transport = NULL;
+    char *chosen_transport = NULL;
 
     assert(CManager_locked(cm));
 
-    if (attrs != NULL) {
-	get_string_attr(attrs, CM_TRANSPORT, &choosen_transport);
+    if (attrs) {
+	attrs = split_transport_attributes(attrs);
+	get_string_attr(attrs, CM_TRANSPORT, &chosen_transport);
     }
-    if (choosen_transport != NULL) {
-	if (load_transport(cm, choosen_transport, 1) == 0) {
+    if (chosen_transport != NULL) {
+	if (load_transport(cm, chosen_transport, 1) == 0) {
 	    CMtrace_out(cm, CMConnectionVerbose,
 			"Failed to load transport \"%s\".  Revert to default.\n",
-			choosen_transport);
-	    choosen_transport = NULL;
+			chosen_transport);
+	    chosen_transport = NULL;
 	}
     }
     trans_list = cm->transports;
-    if (choosen_transport == NULL) {
+    if (chosen_transport == NULL) {
         CMtrace_out(cm, CMConnectionVerbose,
 		    "INT_CMinitiate_conn no transport attr found\n");
 
@@ -1346,16 +1422,16 @@ CMinternal_initiate_conn(CManager cm, attr_list attrs)
     } else {
         CMtrace_out(cm, CMConnectionVerbose,
 		    "INT_CMinitiate_conn looking for transport \"%s\"\n", 
-		    choosen_transport);
+		    chosen_transport);
 	while ((trans_list != NULL) && (*trans_list != NULL)) {
-	    if (strcmp((*trans_list)->trans_name, choosen_transport) == 0) {
+	    if (strcmp((*trans_list)->trans_name, chosen_transport) == 0) {
 		return try_conn_init(cm, *trans_list, attrs);
 	    }
 	    trans_list++;
 	}
         CMtrace_out(cm, CMConnectionVerbose,
 		    "INT_CMinitiate_conn transport \"%s\" not found - no connection\n", 
-		    choosen_transport);
+		    chosen_transport);
 	return NULL;
     }
 	
@@ -2192,6 +2268,7 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 	    attrs = CMcreate_attr_list(cm);
 	}
 	set_int_attr(attrs, CM_EVENT_SIZE, data_length);
+	set_long_attr(attrs, CM_INCOMING_CONNECTION, (long)conn);
 
 	if (cm_buffer == NULL) {
 	    local = fill_cmbuffer(cm, buffer, length);
