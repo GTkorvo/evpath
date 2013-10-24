@@ -210,7 +210,7 @@ main(int argc, char **argv)
 	if (transport != NULL) {
 	    char *actual_transport = NULL;
 	    get_string_attr(contact_list, CM_TRANSPORT, &actual_transport);
-	    if (!actual_transport || (strcmp(actual_transport, transport) != 0)) {
+	    if (!actual_transport || (strncmp(actual_transport, transport, strlen(actual_transport)) != 0)) {
 		printf("Failed to load transport \"%s\"\n", transport);
 		exit(1);
 	    }
@@ -341,7 +341,7 @@ do_regression_master_test()
     if (transport != NULL) {
       char *actual_transport = NULL;
       get_string_attr(contact_list, CM_TRANSPORT, &actual_transport);
-      if (!actual_transport || (strcmp(actual_transport, transport) != 0)) {
+      if (!actual_transport || (strncmp(actual_transport, transport, strlen(actual_transport)) != 0)) {
 	printf("Failed to load transport \"%s\"\n", transport);
 	exit(1);
       }
