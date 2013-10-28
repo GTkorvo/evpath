@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <time.h>
 #include <arpa/inet.h>
 #include "evpath.h"
 #ifdef HAVE_WINDOWS_H

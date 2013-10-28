@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <ctype.h>
 #include <math.h>
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
@@ -1352,7 +1353,7 @@ send_and_maybe_wait_for_handshake(CManager cm, CMConnection conn)
 				      conn->transport_data, 
 				      &tmp_vec[0], 1, NULL);
     
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - after handshake, pending is %d\n");
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - after handshake, pending is %d\n", conn->write_pending);
     if (conn->write_pending) {
 	wait_for_pending_write(conn);
     }
