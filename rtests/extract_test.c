@@ -211,7 +211,7 @@ main(int argc, char **argv)
 	attr_list parent_contact_list = attr_list_from_string(argv[1]);
 	handshake_with_parent(cm, parent_contact_list);
 /*    (void) CMfork_comm_thread(cm);*/
-	CMsleep(cm, 5);
+	CMsleep(cm, 20);
 	CManager_close(cm);
 	return 0;
     } else {
