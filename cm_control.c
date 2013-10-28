@@ -71,6 +71,9 @@ INT_CMCondition_get(CManager cm, CMConnection conn)
     cond->waiting = 0;
     cond->signaled = 0;
     cond->failed = 0;
+    if (conn && conn->closed) {
+	cond->failed = 1;
+    }
     thr_condition_init(cond->cond_condition);
     return cond->condition_num;
 }
