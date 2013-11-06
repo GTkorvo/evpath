@@ -2685,7 +2685,10 @@ wait_for_pending_write(CMConnection conn)
 	    add_pending_write_callback(conn, wake_pending_write, 
 				       (void*) (long)cond);
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "Condition wait for conn %p\n", conn);
-	    INT_CMCondition_wait(conn->cm, cond);
+	    if (INT_CMCondition_wait(conn->cm, cond) == 0) {
+		/* condition wait failed, connection is dead */
+		conn->write_pending = 0;
+	    }
 	}
     }	    
     CMtrace_out(conn->cm, CMLowLevelVerbose, "Done waiting for pending write for conn %p\n", conn);
