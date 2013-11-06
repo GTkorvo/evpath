@@ -174,6 +174,9 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
     if (client_data != NULL) {
 	int tmp = *((int *) client_data);
 	*((int *) client_data) = tmp + 1;
+	if (quiet <= 0) {
+	    printf("message count = %d\n", *((int *) client_data));
+	}
     }
 }
 
@@ -278,6 +281,9 @@ main(int argc, char **argv)
 		    printf(".");
 		    fflush(stdout);
 		}
+	    }
+	    if (quiet <= 0) {
+		printf("Write message count = %d\n", i);
 	    }
 	    CMwrite_attr(conn, format, data, attrs);
 	    if (block) {
