@@ -3473,14 +3473,19 @@ INT_EVdrain_stone(CManager cm, EVstone stone_id)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
-/*    attr_list stone_attrs;
-    EVevent_list buf_list = NULL;*/
+    int count = 0;
 
     stone = stone_struct(evp, stone_id);
     if (!stone) return -1;
 
     stone->is_draining = 1;
-    while(stone->is_processing || stone->is_outputting);
+    while(stone->is_processing || stone->is_outputting) {
+	if (count++ > 20) {
+	    /* if not drained in 10 seconds, fail */
+	    return 0;
+	}
+	INT_CMusleep(cm, 500);
+    }
     stone->is_draining = 2;
     return 1;
 }
