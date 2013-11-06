@@ -288,6 +288,7 @@ static FMStructDescRec filter_format_list[] =
 };
 
 int message_counts[3];
+struct _client_rec rec0, rec1, rec2;
 
 static void
 alive_handler(CManager cm, CMConnection conn, void *alive_v, 
@@ -296,7 +297,6 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
     EVaction action, faction;
     EVstone term0, term1, term2, bridge0, bridge1, bridge2, router_stone, source_stone;
     char *filter, *gen_spec;
-    struct _client_rec rec0, rec1, rec2;
     int count;
     attr_list self_list;
 
@@ -352,7 +352,7 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
 	REVfreeze_stone(conn, bridge1);
 	count = REVtransfer_events(conn, bridge1, bridge2);
 	if (quiet <= 0) {
-	    printf("Events transfered : %d\n", count);
+	    printf("Events transferred : %d\n", count);
 	}
 	REVdrain_stone(conn, bridge2);
 }
