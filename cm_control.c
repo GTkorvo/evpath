@@ -258,6 +258,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 		fprintf(CMTrace_file, "CMLowLevel polling for CMcondition %d\n", condition);
 	    }
 	    CMcontrol_list_wait(cl);
+	    if (cl->closed) cond->failed = 1;
 	}
 	cl->cond_polling = 0;
     } else {
