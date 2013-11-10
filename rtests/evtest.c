@@ -168,6 +168,7 @@ handshake_with_parent(CManager cm, attr_list parent_contact_list)
     alive.contact = attr_list_to_string(tmp_list = CMget_contact_list(cm));
     free_attr_list(tmp_list);
     alive_format = CMregister_format(cm, alive_formats);
+    if (quiet <= 0) printf("Sending alive message\n");
     CMwrite(conn, alive_format, &alive);
 }
 
@@ -271,6 +272,7 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
 
     char *action_spec = create_transform_action_spec(NULL, simple_format_list, ECL_generate);
     (void)alive_v; (void)client_data; (void) attrs;
+    if (quiet <= 0) printf("Received alive message\n");
     stone = REValloc_stone (conn);
     action = REVassoc_immediate_action (conn, stone, action_spec);
     free(action_spec);
@@ -281,7 +283,8 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
     
     REVassoc_bridge_action(conn, output_stone, tmp_list = CMget_contact_list(cm), local_stone);
     free_attr_list(tmp_list);
-    REVenable_auto_stone(conn, stone, 1, 0);
+    if (quiet <= 0) printf("Enabling auto stone\n");
+    REVenable_auto_stone(conn, stone, 0, 10);
 }
 
 static int

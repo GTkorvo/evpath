@@ -279,7 +279,7 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
     REVassoc_bridge_action(conn, output_stone, tmp_list = CMget_contact_list(cm), local_stone);
     free_attr_list(tmp_list);
     free(action_spec);
-    REVenable_auto_stone(conn, stone, 1, 0);
+    REVenable_auto_stone(conn, stone, 0, 100);
 }
 
 static int
