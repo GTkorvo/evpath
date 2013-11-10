@@ -347,8 +347,8 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
 	free(filter);
 	REVaction_set_output(conn, source_stone, action, 0, router_stone);
 
-	REVenable_auto_stone(conn, source_stone, 0, 50000);
-	CMsleep(cm, 7);
+	REVenable_auto_stone(conn, source_stone, 0, 5000);
+	CMsleep(cm, 4);
 	REVfreeze_stone(conn, bridge1);
 	count = REVtransfer_events(conn, bridge1, bridge2);
 	if (quiet <= 0) {
@@ -431,7 +431,7 @@ do_regression_master_test()
     subproc_proc = run_subprocess(args);
 
     /* give him time to start, run and send us data */
-    for (i=0; i< 10; i++) {
+    for (i=0; i< 20; i++) {
 	if ((message_counts[0] == 5) &&
 	    (message_counts[1] == 0) &&
 	    (message_counts[2] == 5)) break;
@@ -477,15 +477,15 @@ do_regression_master_test()
     CManager_close(cm);
     ret = 0;
     if (message_counts[0] != 5) {
-	printf("Message count[0] == %d\n", message_counts[0]);
+	printf("Message count[0] == %d, should be 5\n", message_counts[0]);
 	ret = 1;
     }
     if (message_counts[1] != 0) {
-	printf("Message count[1] == %d\n", message_counts[1]);
+	printf("Message count[1] == %d, should be 0\n", message_counts[1]);
 	ret = 1;
     }
     if (message_counts[2] != 5) {
-	printf("Message count[2] == %d\n", message_counts[2]);
+	printf("Message count[2] == %d, should be 5\n", message_counts[2]);
 	ret = 1;
     }
     return ret;
