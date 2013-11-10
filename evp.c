@@ -1571,7 +1571,7 @@ process_events_stone(CManager cm, int s, action_class c)
     stone = stone_struct(cm->evp, s);
     if (!stone) return 0;
     if (stone->local_id == -1) return 0;
-    if (stone->is_draining == 1) return 0;
+    if (stone->is_draining == 2) return 0;
     if (stone->is_frozen == 1) return 0;
     if (c == Immediate_and_Multi && stone->pending_output) {
         more_pending += process_stone_pending_output(cm, s);
@@ -1843,7 +1843,7 @@ process_local_actions(CManager cm)
 	for (s = evp->stone_base_num; s < evp->stone_count + evp->stone_base_num; s++) {
 	    stone_type stone = stone_struct(evp, s);
 	    if (stone->local_id == -1) continue;
-	    if (stone->is_draining == 1) continue;
+	    if (stone->is_draining == 2) continue;
 	    if (stone->is_frozen == 1) continue;
 	    CMtrace_out(cm, EVerbose, "1 - in-play %d\n", as->events_in_play);
 	    more_pending += process_events_stone(cm, s, Immediate_and_Multi);
@@ -1952,9 +1952,9 @@ do_bridge_action(CManager cm, int s)
     CMtrace_out(cm, EVerbose, "Process output action on stone %x\n", s);
     stone = stone_struct(evp, s);
 
-    if (stone->is_frozen || stone->is_draining) return 0;
+    if (stone->is_frozen || (stone->is_draining == 2)) return 0;
     stone->is_outputting = 1;
-    for (a=0 ; a < stone->proto_action_count && stone->is_frozen == 0 && stone->is_draining == 0; a++) {
+    for (a=0 ; a < stone->proto_action_count && stone->is_frozen == 0 && (stone->is_draining != 2); a++) {
 	if (stone->proto_actions[a].action_type == Action_Bridge) {
 	    act = &stone->proto_actions[a];
 	}
@@ -3479,12 +3479,13 @@ INT_EVdrain_stone(CManager cm, EVstone stone_id)
     if (!stone) return -1;
 
     stone->is_draining = 1;
-    while(stone->is_processing || stone->is_outputting) {
+    while(stone->is_processing || stone->is_outputting ||
+	  (stone->queue->queue_head != NULL)) {
 	if (count++ > 20) {
 	    /* if not drained in 10 seconds, fail */
 	    return 0;
 	}
-	INT_CMusleep(cm, 500);
+	INT_CMusleep(cm, 500000);
     }
     stone->is_draining = 2;
     return 1;
