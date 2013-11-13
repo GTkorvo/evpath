@@ -1371,9 +1371,7 @@ int non_blocking;
 		       scd->fd);
 	set_block_state(svc, scd, Non_Block);
     }
-    DROP_CM_LOCK(svc, scd->sd->cm);
     iget = read(scd->fd, (char *) buffer, requested_len);
-    ACQUIRE_CM_LOCK(svc, scd->sd->cm);
     if (iget == -1) {
 	int lerrno = errno;
 	if ((lerrno != EWOULDBLOCK) &&
@@ -1400,10 +1398,8 @@ int non_blocking;
     left = requested_len - iget;
     while (left > 0) {
 	int lerrno;
-	DROP_CM_LOCK(svc, scd->sd->cm);
 	iget = read(scd->fd, (char *) buffer + requested_len - left,
 		    left);
-	ACQUIRE_CM_LOCK(svc, scd->sd->cm);
 	lerrno = errno;
 	if (iget == -1) {
 	    if ((lerrno != EWOULDBLOCK) &&
@@ -1496,7 +1492,6 @@ attr_list attrs;
 
     svc->trace_out(scd->sd->cm, "CMSocket writev of %d bytes on fd %d",
 		   left, fd);
-    DROP_CM_LOCK(svc, scd->sd->cm);
     while (left > 0) {
 	int write_count = iovleft;
 	if (write_count > IOV_MAX)
@@ -1507,7 +1502,6 @@ attr_list attrs;
 	    svc->trace_out(scd->sd->cm, "	writev failed, errno was %d", errno);
 	    if ((errno != EWOULDBLOCK) && (errno != EAGAIN)) {
 		/* serious error */
-		ACQUIRE_CM_LOCK(svc, scd->sd->cm);
 		return (iovcnt - iovleft);
 	    } else {
 		if (errno == EWOULDBLOCK) {
@@ -1519,7 +1513,6 @@ attr_list attrs;
 	    }
 	}
 	if (iget == left) {
-	    ACQUIRE_CM_LOCK(svc, scd->sd->cm);
 	    return iovcnt;
 	}
 	svc->trace_out(scd->sd->cm, "	writev partial success, %d bytes written", iget);
@@ -1544,7 +1537,6 @@ attr_list attrs;
 		(char *) (iov[iovcnt - iovleft].iov_base) + iget;
 	}
     }
-    ACQUIRE_CM_LOCK(svc, scd->sd->cm);
     return iovcnt;
 }
 
