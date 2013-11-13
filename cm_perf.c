@@ -31,6 +31,15 @@ extern atom_t CM_BW_MEASURED_VALUE;
 extern atom_t CM_BW_MEASURED_COF;
 extern atom_t CM_BW_MEASURE_SIZE;
 extern atom_t CM_BW_MEASURE_SIZEINC;
+static void init_atoms();
+
+static atom_t CM_TRANS_TEST_SIZE = -1;
+static atom_t CM_TRANS_TEST_VECS = -1;
+static atom_t CM_TRANS_TEST_VERBOSE = -1;
+static atom_t CM_TRANS_TEST_REPEAT = -1;
+static atom_t CM_TRANS_TEST_REUSE_WRITE_BUFFER = -1;
+static atom_t CM_TRANS_TEST_DURATION = -1;
+static atom_t CM_TRANS_MEGABITS_SEC = -1;
 
 #define CMPerfProbe (unsigned int) 0xf0
 #define CMPerfProbeResponse (unsigned int) 0xf1
@@ -55,6 +64,7 @@ CMdo_performance_response(CMConnection conn, long length, int func,
     /* part of length was read already */
     length += 8;
     CMtrace_out(conn->cm, CMControlVerbose, "CMDo_performance_response func %d \n", func);
+    init_atoms();
     switch(func) {
     case CMPerfProbe:
 	/* first half of latency probe arriving */
@@ -195,7 +205,7 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	{
 	    int header[6];
 	    int actual;
-	    attr_list upcall_result;
+	    attr_list upcall_result, upcall_feed;
 	    char *str_list = NULL;
 	    struct FFSEncodeVec tmp_vec[2];
 	    chr_timer_stop(&conn->bandwidth_start_time);
@@ -210,9 +220,13 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	    tmp_vec[0].iov_len = sizeof(header);
 	    tmp_vec[1].iov_base = NULL;
 	    tmp_vec[1].iov_len = 0;
+	    upcall_feed = create_attr_list();
+
+	    set_double_attr(upcall_feed, CM_TRANS_TEST_DURATION,
+			    chr_time_to_secs(&conn->bandwidth_start_time));
 	    if (conn->cm->perf_upcall)  {
 		CManager_unlock(conn->cm);
-		upcall_result = conn->cm->perf_upcall(conn->cm, buffer, length - 8, 2, NULL);
+		upcall_result = conn->cm->perf_upcall(conn->cm, buffer, length - 8, 2, upcall_feed);
 		CManager_lock(conn->cm);
 		if (upcall_result) {
 		    str_list = attr_list_to_string(upcall_result);
@@ -222,6 +236,7 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 		    header[2] += header[4];
 		}
 	    }
+	    free_attr_list(upcall_feed);
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - transport test response sent:");
 	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 2, sizeof(header) + tmp_vec[1].iov_len, NULL, 0, 0);
 	    if (str_list) free(str_list);
@@ -453,15 +468,24 @@ INT_CMprobe_bandwidth(CMConnection conn, long size, attr_list attrs)
     INT_CMCondition_wait(conn->cm, cond);
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Completed bandwidth probe - result %g seconds\n", secs_to_receive);
     bandwidth = ((double) size * (double)repeat_count) / secs_to_receive;
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Estimated bandwidth - %g Mbytes/sec\n", bandwidth / 1024.0 * 1024.0);
+    CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Estimated bandwidth - %g Mbites/sec\n", bandwidth / 1000.0 * 1000.0 * 8);
     return  bandwidth;
 }
 
-static atom_t CM_TRANS_TEST_SIZE = -1;
-static atom_t CM_TRANS_TEST_VECS = -1;
-static atom_t CM_TRANS_TEST_VERBOSE = -1;
-static atom_t CM_TRANS_TEST_REPEAT = -1;
-static atom_t CM_TRANS_TEST_REUSE_WRITE_BUFFER = -1;
+
+static void
+init_atoms()
+{
+    if (CM_TRANS_TEST_SIZE==-1) {
+	CM_TRANS_TEST_SIZE = attr_atom_from_string("CM_TRANS_TEST_SIZE");
+	CM_TRANS_TEST_VECS = attr_atom_from_string("CM_TRANS_TEST_VECS");
+	CM_TRANS_TEST_VERBOSE = attr_atom_from_string("CM_TRANS_TEST_VERBOSE");
+	CM_TRANS_TEST_REPEAT = attr_atom_from_string("CM_TRANS_TEST_REPEAT");
+	CM_TRANS_TEST_REUSE_WRITE_BUFFER = attr_atom_from_string("CM_TRANS_TEST_REUSE_WRITE_BUFFER");
+	CM_TRANS_TEST_DURATION = attr_atom_from_string("CM_TRANS_TEST_DURATION_SECS");
+	CM_TRANS_MEGABITS_SEC = attr_atom_from_string("CM_TRANS_MEGABITS_SEC");
+    }
+}
 
 extern attr_list
 INT_CMtest_transport(CMConnection conn, attr_list how)
@@ -471,7 +495,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     attr_list result;
     long actual;
     struct FFSEncodeVec *write_vec;
-    struct FFSEncodeVec *tmp_vec;
+    struct FFSEncodeVec *tmp_vec, *header_vec;
     int header[6];
     long size;
     int vecs = 1;
@@ -479,13 +503,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     int repeat_count = 1;
     int reuse_write_buffer = 1;
     long start_size, count;
-    if (CM_TRANS_TEST_SIZE==-1) {
-	CM_TRANS_TEST_SIZE = attr_atom_from_string("CM_TRANS_TEST_SIZE");
-	CM_TRANS_TEST_VECS = attr_atom_from_string("CM_TRANS_TEST_VECS");
-	CM_TRANS_TEST_VERBOSE = attr_atom_from_string("CM_TRANS_TEST_VERBOSE");
-	CM_TRANS_TEST_REPEAT = attr_atom_from_string("CM_TRANS_TEST_REPEAT");
-	CM_TRANS_TEST_REUSE_WRITE_BUFFER = attr_atom_from_string("CM_TRANS_TEST_REUSE_WRITE_BUFFER");
-    }
+    init_atoms();
     cond = INT_CMCondition_get(conn->cm, conn);
 
     if (!get_long_attr(how, CM_TRANS_TEST_SIZE, &size)) {
@@ -518,36 +536,34 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     INT_CMCondition_set_client_data( conn->cm, cond, &result);
 
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CM - Initiating transport test of %ld bytes, %d messages\n", size, repeat_count);
-    tmp_vec = malloc(sizeof(tmp_vec[0]) * (vecs + 1));  /* at least 2 */
-    tmp_vec[0].iov_base = &header[0];
-    tmp_vec[0].iov_len = sizeof(header);
-    tmp_vec[1].iov_base = attr_str;
-    tmp_vec[1].iov_len = strlen(attr_str) + 1; /* send NULL */
-    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 2, tmp_vec[0].iov_len + tmp_vec[1].iov_len, NULL, 0, 1);
-    free(attr_str);
-    if (actual != 1) { 
-	free(tmp_vec);
-	return NULL;
-    }
 
+    tmp_vec = malloc(sizeof(tmp_vec[0]) * (vecs + 1));  /* at least 2 */
     tmp_vec[0].iov_base = NULL;
     tmp_vec[1].iov_base = NULL;
     int each = (size + vecs - 1) / vecs;
+    for (count = 0; count < vecs; count++) {
+	tmp_vec[count].iov_base = calloc(each + repeat_count, 1);
+	tmp_vec[count].iov_len = each;
+    }
+    for (count = 0; count < vecs; count++) {
+	/* for each vector, give it unique data */
+	int j;
+	for (j=0; j < ((each + repeat_count) /sizeof(int)); j++) {
+	    ((int*)tmp_vec[count].iov_base)[j] = lrand48();
+	}
+    }
+    header_vec = malloc(sizeof(header_vec[0]) * (vecs + 1));  /* at least 2 */
+    header_vec[0].iov_base = &header[0];
+    header_vec[0].iov_len = sizeof(header);
+    header_vec[1].iov_base = attr_str;
+    header_vec[1].iov_len = strlen(attr_str) + 1; /* send NULL */
+    actual = INT_CMwrite_raw(conn, header_vec, NULL, 2, header_vec[0].iov_len + header_vec[1].iov_len, NULL, 0, 1);
+    free(attr_str);
+    if (actual != 1) { 
+	free(header_vec);
+	return NULL;
+    }
     for (i=0; i <repeat_count; i++) {
-	if (tmp_vec[0].iov_base == NULL) {
-	    /* alloc */
-	    for (count = 0; count < vecs; count++) {
-		tmp_vec[count].iov_base = calloc(each, 1);
-		tmp_vec[count].iov_len = each;
-	    }
-	}
-	for (count = 0; count < vecs; count++) {
-	    /* for each vector, give it unique data */
-	    int j;
-	    for (j=0; j < (each/sizeof(int)); j++) {
-		((int*)tmp_vec[count].iov_base)[j] = lrand48();
-	    }
-	}
 	((int*)tmp_vec[0].iov_base)[0] = 0x434d5000;
     /* size in second entry, high byte gives CMPerf operation */
 	((int*)tmp_vec[0].iov_base)[1] = ((size >> 32) &0xffffff) | (CMPerfTestBody<<24);
@@ -556,6 +572,10 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	tmp_vec[vecs-1].iov_len = size - (each * (vecs-1));
 	write_vec = malloc(sizeof(write_vec[0]) * (vecs + 1));  /* at least 2 */
 	memcpy(write_vec, tmp_vec, sizeof(write_vec[0]) * (vecs + 1));
+	for (count = 0; count < vecs; count++) {
+	    /* On each iteration, increment the write base for each buffer by 1 */
+	    write_vec[count+1].iov_base += i;
+	}
 	actual = INT_CMwrite_raw(conn, write_vec, NULL, vecs, size, NULL, 0, 0);
 	free(write_vec);
 	if (actual != 1) {
@@ -580,6 +600,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     tmp_vec[0].iov_len = sizeof(header);
     actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, sizeof(header), NULL, 0, 0);
     free(tmp_vec);
+    free(header_vec);
     if (actual != 1) {
 	return NULL;
     }
