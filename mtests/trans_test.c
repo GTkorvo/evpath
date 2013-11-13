@@ -16,6 +16,8 @@ static atom_t CM_TRANS_TEST_VECS = 4;
 static atom_t CM_TRANS_TEST_VERBOSE = -1;
 static atom_t CM_TRANS_TEST_REPEAT = 10;
 static atom_t CM_TRANS_TEST_REUSE_WRITE_BUFFER = -1;
+static atom_t CM_TRANS_TEST_DURATION = -1;
+static atom_t CM_TRANS_MEGABITS_SEC = -1;
 static atom_t CM_TRANS_TEST_TAKE_RECEIVE_BUFFER = -1;
 static atom_t CM_TRANSPORT = -1;
 static atom_t CM_TRANS_TEST_RECEIVED_COUNT = -1;
@@ -101,6 +103,7 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
     case 2: {
 	/* test finalize */
 	attr_list ret = create_attr_list();
+	double secs;
 	int buf;
 	for (buf = 0; buf < buffer_count; buf++) {
 	    int sum = 0;
@@ -119,6 +122,16 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
 	    buffer_list = NULL;
 	}
 	set_int_attr(ret, CM_TRANS_TEST_RECEIVED_COUNT, received_count);
+	dump_attr_list(list);
+	if (get_double_attr(list, CM_TRANS_TEST_DURATION, &secs)) {
+	    int size = received_count * write_size;
+	    double megabits = (double)size / ((double)1000*1000*8);
+	    double megabits_sec = megabits / secs;
+	    set_double_attr(ret, CM_TRANS_MEGABITS_SEC, megabits_sec);
+	    printf("Megabits/sec is %g\n", megabits_sec);
+	} else {
+	    printf("No test duration attr\n");
+	}
 	if (taken_corrupt) {
 	    set_int_attr(ret, CM_TRANS_TEST_TAKEN_CORRUPT, taken_corrupt);
 	}
@@ -138,12 +151,13 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
 
 static char *argv0;
 static pid_t subproc_proc = 0;
+static int timeout = 60;
 
 static void
 fail_and_die(int signal)
 {
     (void)signal;
-    fprintf(stderr, "Trans_test failed to complete in reasonable time\n");
+    fprintf(stderr, "Trans_test failed to complete in reasonable time, increase from -timeout %d\n", timeout);
     fprintf(stderr, "Stats are : vec_count = %d, size = %d, msg_count = %d, reuse_write = %d, received_count = %d\n", vec_count, size, msg_count, reuse_write, received_count);
     fprintf(stderr, "    reuse_write = %d, received_count = %d, taken_corrupt = %d, expected_count = %d, write_size = %d, size_error = %d\n", reuse_write, received_count, taken_corrupt, expected_count, write_size, size_error);
     if (subproc_proc != 0) {
@@ -191,13 +205,21 @@ main(argc, argv)
     CMFormat format;
     static int atom_init = 0;
     int start_subprocess = 1;
-    int timeout = 60;
     int ret, actual_count;
     argv0 = argv[0];
     int start_subproc_arg_count = 4; /* leave a few open at the beginning */
     char **subproc_args = calloc((argc + start_subproc_arg_count + 2), sizeof(argv[0]));
     int cur_subproc_arg = start_subproc_arg_count;
     char *transport = NULL;
+    char path[10240];
+    getcwd(&path[0], sizeof(path));
+    if (argv0[0] != '/') {
+	strcat(path, "/");
+	strcat(path, argv0);
+    } else {
+	strcpy(path, argv0);
+    }
+    subproc_args[--start_subproc_arg_count] = strdup(path);
     while (argv[1] && (argv[1][0] == '-')) {
 	subproc_args[cur_subproc_arg++] = strdup(argv[1]);
 	if (argv[1][1] == 'c') {
@@ -220,6 +242,19 @@ main(argc, argv)
 	    }
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
 	    argv++; argc--;
+	} else if (strcmp(&argv[1][1], "ssh") == 0) {
+	    char *destination_host;
+	    if (!argv[2]) {
+		printf("Missing --ssh destination\n");
+		usage();
+	    }
+	    destination_host = strdup(argv[2]);
+	    start_subproc_arg_count-=2;
+	    subproc_args[start_subproc_arg_count] = strdup(SSH_PATH);
+	    subproc_args[start_subproc_arg_count+1] = destination_host;
+	    cur_subproc_arg--;
+	    free(subproc_args[cur_subproc_arg]);
+	    argv++; argc--;
 	} else if (strcmp(&argv[1][1], "transport") == 0) {
 	    if (!argv[2]) {
 		printf("missing -transport\n");
@@ -231,6 +266,13 @@ main(argc, argv)
 	} else if (strcmp(&argv[1][1], "msg_count") == 0) {
 	    if (!argv[2] || (sscanf(argv[2], "%d", &msg_count) != 1)) {
 		printf("Bad -msg_count argument \"%s\"\n", argv[2]);
+		usage();
+	    }
+	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
+	    argv++; argc--;
+	} else if (strcmp(&argv[1][1], "timeout") == 0) {
+	    if (!argv[2] || (sscanf(argv[2], "%d", &timeout) != 1)) {
+		printf("Bad -timeout argument \"%s\"\n", argv[2]);
 		usage();
 	    }
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
@@ -282,6 +324,8 @@ main(argc, argv)
 	CM_TRANS_TEST_TAKE_RECEIVE_BUFFER = attr_atom_from_string("CM_TRANS_TEST_TAKE_RECEIVE_BUFFER");
 	CM_TRANS_TEST_RECEIVED_COUNT = attr_atom_from_string("CM_TRANS_TEST_RECEIVED_COUNT");
 	CM_TRANS_TEST_TAKEN_CORRUPT = attr_atom_from_string("CM_TRANS_TEST_TAKEN_CORRUPT");
+	CM_TRANS_TEST_DURATION = attr_atom_from_string("CM_TRANS_TEST_DURATION_SECS");
+	CM_TRANS_MEGABITS_SEC = attr_atom_from_string("CM_TRANS_MEGABITS_SEC");
 	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
 	atom_init++;
     }
@@ -301,7 +345,6 @@ main(argc, argv)
 	contact_list = CMget_contact_list(cm);
 	subproc_args[cur_subproc_arg++] = attr_list_to_string(contact_list);
 	subproc_args[cur_subproc_arg] = NULL;
-	subproc_args[--start_subproc_arg_count] = strdup(argv0);
 	global_exit_condition = CMCondition_get(cm, NULL);
 	if (start_subprocess) {
 	    subproc_proc = run_subprocess(&subproc_args[start_subproc_arg_count]);
