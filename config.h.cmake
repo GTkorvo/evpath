@@ -15,6 +15,9 @@
 /* Place where evpath transport libraries are installed */
 #cmakedefine EVPATH_LIBRARY_INSTALL_DIR "@EVPATH_LIBRARY_INSTALL_DIR@"
 
+/* Place where the ssh binary can be found */
+#define SSH_PATH "@SSH@"
+
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #cmakedefine HAVE_DLFCN_H
 
