@@ -251,8 +251,8 @@ struct _CMConnection {
 
     char header_buffer[HEADER_BUFFER_SIZE];		/* holds data until we know final size */
     CMbuffer message_buffer;    /* final destination of buffer */
-    int buffer_full_point;	/* data required for buffer to be full */
-    int buffer_data_end;	/* last point with valid data in buffer */
+    long buffer_full_point;	/* data required for buffer to be full */
+    long buffer_data_end;	/* last point with valid data in buffer */
 
     attr_list characteristics;
     chr_time bandwidth_start_time;
