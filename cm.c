@@ -1779,17 +1779,17 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
     CManager cm = conn->cm;
     int do_read = 1;
     int read_msg_count = 0;
-    int read_byte_count = 0;
+    long read_byte_count = 0;
     int result;
     static int first = 1;
     static int read_ahead_msg_limit = 50;
-    static int read_ahead_byte_limit = 1024*1024;
-    static int use_blocking_reads = 0;
+    static long read_ahead_byte_limit = 1024*1024*1024;
+    static int use_blocking_reads = 1;
     int first_four = 0;
     char *tmp_message_buffer = NULL;
     int data_length;
     CMbuffer message_buffer;
-    int buffer_full_point, buffer_data_end;
+    long buffer_full_point, buffer_data_end;
 
     /* called from the transport, grab the locks */
     if (first) {
@@ -1803,7 +1803,7 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	}
 	tmp = cercs_getenv("CMReadAheadByteLimit");
 	if (tmp != NULL) {
-	    if (sscanf(tmp, "%d", &read_ahead_byte_limit) != 1) {
+	    if (sscanf(tmp, "%ld", &read_ahead_byte_limit) != 1) {
 		printf("Read ahead byte limit \"%s\" not parsed\n", tmp);
 	    }
 	}
@@ -2709,17 +2709,24 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
     unsigned char checksum = 0;
     int i, j, start;
     long count = 0;
+    long length = 0;
     assert(!conn->closed && !conn->failed);
     if (conn->write_pending) {
 	wait_for_pending_write(conn);
     }
-    start = 4;
     for (i=0; i < vec_count; i++) {
-	count += full_vec[i].iov_len - start;
-	for (j=start; j< full_vec[i].iov_len; j++) {
-	    checksum += ((unsigned char*)full_vec[i].iov_base)[j];
+	length += full_vec[i].iov_len;
+    }
+    start = 4;
+    if (length < 10240) {
+	/* do checksum for small messages */
+	for (i=0; i < vec_count; i++) {
+	    count += full_vec[i].iov_len - start;
+	    for (j=start; j< full_vec[i].iov_len; j++) {
+		checksum += ((unsigned char*)full_vec[i].iov_base)[j];
+	    }
+	    start = 0;
 	}
-	start = 0;
     }
     ((int*)full_vec[0].iov_base)[0] = 
 	(((int*)full_vec[0].iov_base)[0] & 0xffffff00) | (unsigned char) checksum;
