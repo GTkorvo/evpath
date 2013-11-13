@@ -237,7 +237,11 @@ ADD_SUBDIRECTORY( dfg_tests )
 if (MPI_FOUND)
     ADD_SUBDIRECTORY( mpi_tests )
 endif (MPI_FOUND)
-
+find_program(SSH ssh)
+if (SSH) 
+   message (STATUS "located ssh at ${SSH}")
+   set (SSH_PATH "${SSH}")
+endif (SSH) 
 ADD_SUBDIRECTORY( examples )
 
 get_target_property_with_default(EVPATH_VERSION_MAJOR evpath LT_VERSION_CURRENT "0")
