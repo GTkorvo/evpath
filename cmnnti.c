@@ -275,9 +275,7 @@ send_control_message(send_handle h)
 		       h.size);
 	NNTI_status_t               status;
 	int timeout = 1000;
-	DROP_CM_LOCK(svc, cm);
 	int err = NNTI_send(&h.ncd->peer_hdl, &h.ncd->mr_send, NULL);
-	ACQUIRE_CM_LOCK(svc, cm);
 	
 	if (err != NNTI_OK) {
 	    fprintf (stderr, "Error: NNTI_send() returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
@@ -288,9 +286,7 @@ send_control_message(send_handle h)
 	/* Wait for message to be sent */
 	timeout = 1000;
       again:
-	DROP_CM_LOCK(svc, cm);
 	err = NNTI_wait(&h.ncd->mr_send, NNTI_SEND_SRC, timeout, &status);
-	ACQUIRE_CM_LOCK(svc, cm);
 	if (err == NNTI_ETIMEDOUT) {
 	  timeout *=2;
 	  if (h.ncd->ntd->shutdown_listen_thread) return 0;
@@ -721,9 +717,7 @@ attr_list conn_attr_list;
 #endif
 
     svc->trace_out(cm, "CMNNTI initiate sending connect message to remote host");
-    DROP_CM_LOCK(svc, trans->cm);
     err = NNTI_send(&nnti_conn_data->peer_hdl, &nnti_conn_data->mr_send, NULL);
-    ACQUIRE_CM_LOCK(svc, trans->cm);
     if (err != NNTI_OK) {
         fprintf (stderr, "Error: NNTI_send() returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
         return 1;
@@ -738,9 +732,7 @@ attr_list conn_attr_list;
     NNTI_status_t               status;
     timeout = 500;
  again:
-    DROP_CM_LOCK(svc, trans->cm);
     err = NNTI_wait(&nnti_conn_data->mr_send, NNTI_SEND_SRC, timeout, &status);
-    ACQUIRE_CM_LOCK(svc, trans->cm);
     if ((err == NNTI_ETIMEDOUT) || (err == NNTI_EAGAIN)) {
 	if (nnti_conn_data->ntd->shutdown_listen_thread) return 0;
 	timeout *=2;
