@@ -469,7 +469,7 @@ extern void
 CMinit_local_formats(CManager cm)
 {
     if (CMself_hosted_formats == -1) {
-	CMself_hosted_formats = 0;
+	CMself_hosted_formats = CM_SELF_FORMATS;  /* default set in CMake */
 	if (cercs_getenv("CMSelfFormats") != NULL) {
 	    CMself_hosted_formats = 1;
 	} else if (cercs_getenv("CMExternalFormats") != NULL) {
