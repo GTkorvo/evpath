@@ -163,5 +163,5 @@
 #cmakedefine NNTI_FOUND
 
 /* Set to 1 if CM should default to CMSelfFormats */
-#cmakedefine CM_SELF_FORMATS @CM_SELF_FORMATS@
+#define CM_SELF_FORMATS @CM_SELF_FORMATS@
 
