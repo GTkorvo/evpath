@@ -1682,7 +1682,7 @@ cmsockets_add_static_transport(CManager cm, CMtrans_services svc)
 {
     transport_entry transport;
     transport = svc->malloc_func(sizeof(struct _transport_item));
-    transport->trans_name = strdup("socket");
+    transport->trans_name = strdup("sockets");
     transport->cm = cm;
     transport->transport_init = (CMTransport_func)libcmsockets_LTX_initialize;
     transport->listen = (CMTransport_listen_func)libcmsockets_LTX_non_blocking_listen;
