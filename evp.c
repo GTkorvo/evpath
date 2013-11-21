@@ -1012,7 +1012,7 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
 	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is NULL\n");
     } else {
 	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %p (%s)\n",
-	   event->reference_format, name_of_FMformat(event->reference_format));
+	   event->reference_format, global_name_of_FMFormat(event->reference_format));
     }
     for (i=0; i < stone->response_cache_count; i++) {
         if (!compatible_stages(stage, stone->response_cache[i].stage)) {
@@ -1448,7 +1448,7 @@ fdump_stone(FILE* out, stone_type stone)
     for (i=0; i< stone->response_cache_count; i++) {
 	response_cache_element *resp = &stone->response_cache[i];
 	fprintf(out, "Response cache item %d, reference format %p (%s)\n", i, resp->reference_format,
-	       resp->reference_format ? name_of_FMformat(resp->reference_format) : "<none>");
+		resp->reference_format ? global_name_of_FMFormat(resp->reference_format) : "<none>");
 	fprintf(out, "stage %d, action_type %s, proto_action_id %d, requires_decoded %d\n", resp->stage,
 	       action_str[resp->action_type], resp->proto_action_id, resp->requires_decoded);
     }
@@ -1622,7 +1622,7 @@ process_events_stone(CManager cm, int s, action_class c)
                 } else {
                     printf("    Unhandled incoming event format was NULL\n");
                 }
-                free(tmp);
+                if (tmp) free(tmp);
                 event = dequeue_item(cm, stone, item);
                 return_event(evp, event);
             }
@@ -3130,7 +3130,7 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	fprintf(CMTrace_file, "CM - record type %s, contents are:\n  ", name_of_FMformat(event->reference_format));
+	fprintf(CMTrace_file, "CM - record type %s, contents are:\n  ", global_name_of_FMFormat(event->reference_format));
 	r = FMfdump_encoded_data(CMTrace_file, event->reference_format,
 				event->encoded_event, dump_char_limit);
 	if (r && !warned) {
