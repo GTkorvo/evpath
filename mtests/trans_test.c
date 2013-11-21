@@ -180,6 +180,13 @@ run_subprocess(char **args)
     return child;
 #else
     pid_t child = fork();
+/*    int i = 0;
+    printf("Running : ");
+    while (args[i] != NULL) {
+	printf("%s ", args[i++]);
+	
+    }
+    printf("\n");*/
     if (child == 0) {
 	/* I'm the child */
 	execv(args[0], args);
@@ -254,6 +261,7 @@ main(argc, argv)
 	    subproc_args[start_subproc_arg_count+1] = destination_host;
 	    cur_subproc_arg--;
 	    free(subproc_args[cur_subproc_arg]);
+	    subproc_args[cur_subproc_arg] = NULL;
 	    argv++; argc--;
 	} else if (strcmp(&argv[1][1], "transport") == 0) {
 	    if (!argv[2]) {
@@ -341,8 +349,12 @@ main(argc, argv)
 	    add_string_attr(listen_list, CM_TRANSPORT, strdup(transport));
 	}
 	CMlisten_specific(cm, listen_list);
-	free_attr_list(listen_list);
 	contact_list = CMget_contact_list(cm);
+	if (contact_list == NULL) {
+	    printf("Attribute lists resulted in no listen info!\n");
+	    dump_attr_list(listen_list);
+	}
+	free_attr_list(listen_list);
 	subproc_args[cur_subproc_arg++] = attr_list_to_string(contact_list);
 	subproc_args[cur_subproc_arg] = NULL;
 	global_exit_condition = CMCondition_get(cm, NULL);
