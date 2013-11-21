@@ -564,6 +564,19 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	return NULL;
     }
     for (i=0; i <repeat_count; i++) {
+	if (tmp_vec[0].iov_base == NULL) {
+	    for (count = 0; count < vecs; count++) {
+		tmp_vec[count].iov_base = calloc(each + repeat_count, 1);
+		tmp_vec[count].iov_len = each;
+	    }
+	    for (count = 0; count < vecs; count++) {
+		/* for each vector, give it unique data */
+		int j;
+		for (j=0; j < ((each + repeat_count) /sizeof(int)); j++) {
+		    ((int*)tmp_vec[count].iov_base)[j] = lrand48();
+		}
+	    }
+	}
 	((int*)tmp_vec[0].iov_base)[0] = 0x434d5000;
     /* size in second entry, high byte gives CMPerf operation */
 	((int*)tmp_vec[0].iov_base)[1] = ((size >> 32) &0xffffff) | (CMPerfTestBody<<24);
