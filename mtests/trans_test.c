@@ -24,14 +24,14 @@ static atom_t CM_TRANS_TEST_RECEIVED_COUNT = -1;
 static atom_t CM_TRANS_TEST_TAKEN_CORRUPT = -1;
 
 static int vec_count = 4;
-static int size = 10240;
+static long size = 10240;
 static int msg_count = 10;
 static int reuse_write = 1;
 
 static int received_count = 0;
 static int taken_corrupt = 0;
 static int expected_count = -1;
-static int write_size = -1;
+static long write_size = -1;
 static int verbose = 0;
 static int take = 0;
 static int size_error = 0;
@@ -60,7 +60,7 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
 	received_count = 0;
 	if (list) {
 	    get_int_attr(list, CM_TRANS_TEST_REPEAT, &expected_count);
-	    get_int_attr(list, CM_TRANS_TEST_SIZE, &write_size);
+	    get_long_attr(list, CM_TRANS_TEST_SIZE, &write_size);
 	    get_int_attr(list, CM_TRANS_TEST_VERBOSE, &verbose);
 	    get_int_attr(list, CM_TRANS_TEST_TAKE_RECEIVE_BUFFER, &take);
 	}
@@ -243,9 +243,24 @@ main(argc, argv)
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
 	    argv++; argc--;
 	} else if (strcmp(&argv[1][1], "size") == 0) {
-	    if (!argv[2] || (sscanf(argv[2], "%d", &size) != 1)) {
+	    char *endptr;
+	    if (!argv[2]) {
 		printf("Bad -size argument \"%s\"\n", argv[2]);
 		usage();
+	    }
+	    size = strtol(argv[2], &endptr, 10);
+	    if (endptr == argv[2]) {
+		printf("Bad -size argument \"%s\"\n", argv[2]);
+		usage();
+	    }
+	    if ((strcmp(endptr, "k") == 0) || (strcmp(endptr, "K") == 0)) {
+		size *= 1000;
+	    } else if ((strcmp(endptr, "m") == 0) || (strcmp(endptr, "M") == 0)) {
+		size *= 1000 * 1000;
+	    } else if ((strcmp(endptr, "g") == 0) || (strcmp(endptr, "G") == 0)) {
+		size *= 1000 * 1000 * 1000;
+	    } else {
+		printf("Unknownn postfix to size digits, \"%s\"\n", endptr);
 	    }
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
 	    argv++; argc--;
