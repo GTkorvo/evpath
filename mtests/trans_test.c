@@ -122,13 +122,14 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
 	    buffer_list = NULL;
 	}
 	set_int_attr(ret, CM_TRANS_TEST_RECEIVED_COUNT, received_count);
-	dump_attr_list(list);
+	//dump_attr_list(list);
 	if (get_double_attr(list, CM_TRANS_TEST_DURATION, &secs)) {
-	    int size = received_count * write_size;
-	    double megabits = (double)size / ((double)1000*1000*8);
+	    long size = received_count * write_size;
+	    double megabits = (double)size*8 / ((double)1000*1000);
 	    double megabits_sec = megabits / secs;
 	    set_double_attr(ret, CM_TRANS_MEGABITS_SEC, megabits_sec);
-	    printf("Megabits/sec is %g\n", megabits_sec);
+	    set_double_attr(ret, CM_TRANS_TEST_DURATION, secs);
+//	    printf("Megabits/sec is %g\n", megabits_sec);
 	} else {
 	    printf("No test duration attr\n");
 	}
@@ -260,7 +261,9 @@ main(argc, argv)
 	    } else if ((strcmp(endptr, "g") == 0) || (strcmp(endptr, "G") == 0)) {
 		size *= 1000 * 1000 * 1000;
 	    } else {
-		printf("Unknownn postfix to size digits, \"%s\"\n", endptr);
+		if (endptr[0] != 0) {
+		    printf("Unknownn postfix to size digits, \"%s\"\n", endptr);
+		}
 	    }
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
 	    argv++; argc--;
@@ -376,7 +379,13 @@ main(argc, argv)
 	if (start_subprocess) {
 	    subproc_proc = run_subprocess(&subproc_args[start_subproc_arg_count]);
 	    CMCondition_wait(cm, global_exit_condition);
-	    if (global_test_result) dump_attr_list(global_test_result);
+	    if (global_test_result) {
+		double secs, mbps;
+		get_double_attr(global_test_result, CM_TRANS_TEST_DURATION, &secs);
+		get_double_attr(global_test_result, CM_TRANS_MEGABITS_SEC, &mbps);
+		printf("transport = %s size = %d, count = %d, secs = %g, Mbps = %g\n",
+		       transport, size, msg_count, secs, mbps);
+	    }
 	} else {
 	    int i;
 	    printf("Would have run: \n");
