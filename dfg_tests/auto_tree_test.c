@@ -24,9 +24,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     (void)client_data;
     static int count = 0;
     count++;
-    printf("Count is now %d\n", count);
     if (count == node_count) {
-    printf("SHUTDOWN !   Count is now %d\n", count);
 	EVdfg_shutdown(test_dfg, 0);
     }
     return 0;
@@ -129,11 +127,12 @@ be_test_master(int argc, char **argv)
 	char *action_spec = create_transform_action_spec(NULL,simple_format_list,COD_generate);
 	for(i=0; i < node_count; i++) {
 	    EVdfg_stone autos;
-	    autos = EVdfg_create_stone(test_dfg, action_spec);
+	    autos = EVdfg_create_stone(test_dfg, strdup(action_spec));
 	    EVdfg_assign_node(autos, nodes[i]);
 	    EVdfg_enable_auto_stone(autos, 1, 0);
 	    EVdfg_link_port(autos, 0, sink); 
 	}
+	free(action_spec);
     }
     
     EVdfg_realize(test_dfg);
@@ -155,18 +154,13 @@ be_test_master(int argc, char **argv)
     }
 
     status = EVdfg_wait_for_shutdown(test_dfg);
-    printf("DFG wait returned\n");
     free(str_contact);
-    printf("DFG wait for children\n");
     wait_for_children(nodes);
-    printf("DFG close\n");
 
     CManager_close(cm);
     for (i=0; i < node_count; i++) {
-	printf("Free nodes[%d]\n", i);
 	free(nodes[i]);
     }
-    printf("Free nodes\n");
     free(nodes);
     if (last) free(last);
     if (tmp) free(tmp);
