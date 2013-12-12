@@ -199,7 +199,22 @@ run_subprocess(char **args)
 static void
 usage()
 {
-    printf("USAGE STUFF\n");
+    printf("Usage:  trans_test <options> \n");
+    printf("  Options:\n");
+    printf("\t-q  quiet\n");
+    printf("\t-v  verbose\n");
+    printf("\t-vectors <count>  Number of separate data blocks within test data.\n");
+    printf("\t-size <byte count>  Overall size of test messages.\n");
+    printf("\t\tbyte count can be <int> for bytes, <int>k for kilobytes (1000),\n");
+    printf("\t\t<int>m for megabytes (1,000,000),\n\t\t<int>g for gigabytes (1,000,000,000)\n");
+    printf("\t-ssh <hostname>  host to use for remote client via ssh.\n");
+    printf("\t-transport <trans>  which CM/EVPath transport to use.\n");
+    printf("\t-msg_count <count>  how many messages to send.\n");
+    printf("\t-timeout <seconds>  how long to wait before declaring failure.\n");
+    printf("\t-reuse_write_buffers <0/1>  should the same buffer be sent \n\t\tmultiple times or different buffers?\n");
+    printf("\t-take_receive_buffer <0/1>  should the receiving buffer be \n\t\ttaken out of service upon receipt?\n");
+    printf("\t-n  No regression test.  I.E. just run the master and print \n\t\twhat command would have been run for client.\n");
+
     exit(1);
 }
 
@@ -236,6 +251,9 @@ main(argc, argv)
 	    verbose--;
 	} else if (strcmp(&argv[1][1], "v") == 0) {
 	    verbose++;
+	} else if (strcmp(&argv[1][1], "h") == 0) {
+	    usage();
+	    exit(0);
 	} else if (strcmp(&argv[1][1], "vectors") == 0) {
 	    if (!argv[2] || (sscanf(argv[2], "%d", &vec_count) != 1)) {
 		printf("Bad -vectors argument \"%s\"\n", argv[2]);
