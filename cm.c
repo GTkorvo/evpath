@@ -74,6 +74,7 @@ static int drop_CM_lock(CManager cm, char *file, int line);
 static int acquire_CM_lock(CManager cm, char *file, int line);
 static int return_CM_lock_status(CManager cm, char *file, int line);
 static void add_buffer_to_pending_queue(CManager cm, CMConnection conn, CMbuffer buf, long length);
+static void cond_wait_CM_lock(CManager cm, void *cond, char *file, int line);
 
 struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, INT_CMfree, 
 					       INT_CM_fd_add_select, 
@@ -95,6 +96,7 @@ struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, IN
 					       drop_CM_lock,
 					       acquire_CM_lock,
 					       return_CM_lock_status,
+					       cond_wait_CM_lock,
 					       add_buffer_to_pending_queue
 };
 static void INT_CMControlList_close ARGS((CMControlList cl, CManager cm));
@@ -107,6 +109,19 @@ void CMdo_performance_response ARGS((CMConnection conn, long length,
 
 void CMhttp_handler ARGS((CMConnection conn, char* buffer, int length));
 static void CM_init_select ARGS((CMControlList cl, CManager cm));
+
+static void cond_wait_CM_lock(CManager cm, void *vcond, char *file, int line)
+{
+    int ret = cm->locked;
+    pthread_cond_t *cond = vcond;
+    CMtrace_out(cm, CMLowLevelVerbose, "CManager Condition wait at \"%s\" line %d\n",
+		file, line);
+    cm->locked--;
+    pthread_cond_wait(cond, &cm->exchange_lock);
+    CMtrace_out(cm, CMLowLevelVerbose, "CManager Condition wake at \"%s\" line %d\n",
+		file, line);
+    cm->locked++;
+}
 
 static int drop_CM_lock(CManager cm, char *file, int line)
 {
@@ -468,7 +483,7 @@ split_transport_attributes(attr_list list)
 		// Write new null terminator
 		*(end+1) = 0;
 		value = strtol(equal, &tail, 10);
-		if (!tail || (strlen(tail) != 0)) {
+		if (strlen(tail) == 0) {
 		    /* valid integer! */
 		    if ((value < INT_MAX) && (value > INT_MIN)) {
 			set_int_attr(new_list, atom, (int)value);
@@ -483,7 +498,6 @@ split_transport_attributes(attr_list list)
 	    params = next_param;
 	}
 	free(old_transport);  /* not free'd by replace */
-	free_attr_list(list);
 	list = new_list;
     }
     return list;

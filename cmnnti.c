@@ -58,6 +58,7 @@ static atom_t CM_NNTI_PORT = -1;
 static atom_t CM_NNTI_PARAMS = -1;
 static atom_t CM_NNTI_ADDR = -1;
 static atom_t CM_NNTI_ENET_CONTROL = -1;
+static atom_t CM_NNTI_IMMEDIATE_PULL_WAIT = -1;
 static atom_t CM_IP_HOSTNAME = -1;
 static atom_t CM_TRANSPORT = -1;
 static atom_t CM_NNTI_TRANSPORT = -1;
@@ -141,7 +142,10 @@ typedef struct nnti_transport_data {
     NNTI_buffer_t  mr_recvs;
     NNTI_transport_t trans_hdl;
     pthread_t listen_thread;
+    pthread_t listen_thread2;
+    pthread_cond_t cond;
     int use_enet;
+    int immediate_pull_wait;
     int shutdown_listen_thread;
     struct nnti_connection_data *connections;
     int cache_maps;
@@ -153,9 +157,8 @@ typedef struct nnti_transport_data {
     void *nnti_pull_sched_data;
     nnti_pull_completion_func nnti_pull_completion;
     void *nnti_pull_completion_data;
-    int buf_size;
-    int buf_count;
-    NNTI_buffer_t **buf_list;
+    int request_size;
+    struct nnti_connection_data **request_list;
 
 #ifdef ENET_FOUND
     /* enet support */
@@ -196,6 +199,8 @@ typedef struct nnti_connection_data {
     NNTI_buffer_t incoming_mapped_region;
     long incoming_mapped_size;
     NNTI_buffer_t incoming_mapped_mr;
+    void *pending_request_msg_info;
+    long pending_request_size;
 
     /* enet support */
     char *remote_host;
@@ -675,10 +680,8 @@ attr_list conn_attr_list;
 
     /* register memory regions */
     char *req_buf = malloc (NNTI_REQUEST_BUFFER_SIZE);
-    DROP_CM_LOCK(svc, trans->cm);
     err = NNTI_register_memory(&ntd->trans_hdl, req_buf, NNTI_REQUEST_BUFFER_SIZE, 1,
                                 NNTI_SEND_SRC, &nnti_conn_data->peer_hdl, &nnti_conn_data->mr_send);
-    ACQUIRE_CM_LOCK(svc, trans->cm);
     if (err != NNTI_OK) {
         fprintf (stderr, "Error: NNTI_register_memory(SEND_SRC) for client message returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
         return 1;
@@ -1122,10 +1125,14 @@ handle_control_request(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_e
 		       struct client_message *m);
 
 static int nnti_conn_count = 0;
+#define WAIT_MODE_BOTH 1
+#define WAIT_MODE_REQUEST 2
+#define WAIT_MODE_RDMA 3
 typedef struct listen_struct {
-  nnti_transport_data_ptr ntd;
-  CMtrans_services svc;
-  transport_entry trans;
+    nnti_transport_data_ptr ntd;
+    CMtrans_services svc;
+    transport_entry trans;
+    int wait_mode;
 } *listen_struct_p;
 
 static void
@@ -1184,12 +1191,10 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	ncd->attrs = conn_attr_list;
 	add_connection(ntd, ncd);
 	ncd->send_buffer = malloc(NNTI_REQUEST_BUFFER_SIZE);
-	DROP_CM_LOCK(svc, trans->cm);
 	err = NNTI_register_memory (&ntd->trans_hdl,
 				    ncd->send_buffer,
 				    NNTI_REQUEST_BUFFER_SIZE, 1, NNTI_SEND_SRC,
 				    &ncd->peer_hdl, &ncd->mr_send);
-	ACQUIRE_CM_LOCK(svc, trans->cm);
 	if (err != NNTI_OK) {
 	    fprintf (stderr, "Error: NNTI_register_memory(NNTI_SEND_SRC) for server message returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
 	    return;
@@ -1260,19 +1265,39 @@ listen_thread_func(void *vlsp)
     NNTI_status_t               wait_status;
 
     ACQUIRE_CM_LOCK(svc, trans->cm);
-    ntd->buf_size = 10;  // initial size
-    ntd->buf_list = malloc(sizeof(ntd->buf_list[0]) * ntd->buf_size);
-  
+    int buf_size = 10;  // initial size
+    NNTI_buffer_t **buf_list = malloc(sizeof(buf_list[0]) * buf_size);
+
     while (1) {
-        ntd->buf_count = 1;
 	unsigned int which;
-        ntd->buf_list[0] = &ntd->mr_recvs;
-
+	int buf_count = 1;
+	if (lsp->wait_mode != WAIT_MODE_RDMA) {
+	    buf_list[0] = &ntd->mr_recvs;
+	} else {
+	    buf_count = 0;
+	}
+	if (lsp->wait_mode != WAIT_MODE_REQUEST) {
+	    if (buf_size < ntd->request_size) {
+		buf_list = realloc(buf_list, sizeof(buf_list[0]) * ntd->request_size);
+		buf_size = ntd->request_size;
+	    }
+	    for(which=1; which <= ntd->request_size; which++) {
+		if (ntd->request_list[which-1] != NULL) {
+		    buf_list[buf_count] = &ntd->request_list[which-1]->mr_pull;
+		    buf_count++;
+		}
+	    }
+	}
 	//err = NNTI_wait(&ntd->mr_recvs, NNTI_RECV_QUEUE, timeout, &wait_status);
-	DROP_CM_LOCK(svc, trans->cm);
-        err = NNTI_waitany((const NNTI_buffer_t**)ntd->buf_list, ntd->buf_count, NNTI_RECV_QUEUE, timeout, &which, &wait_status);
-
-	ACQUIRE_CM_LOCK(svc, trans->cm);
+	if (buf_count > 0) {
+	    DROP_CM_LOCK(svc, trans->cm);
+	    err = NNTI_waitany((const struct NNTI_buffer_t **)buf_list, buf_count, NNTI_RECV_QUEUE, timeout, &which, &wait_status);
+	    ACQUIRE_CM_LOCK(svc, trans->cm);
+	} else {
+	    svc->cond_wait_CM_lock((trans->cm),&(ntd->cond),  __FILE__, __LINE__);
+	    /* nothing to do but go back and wait for other stuff */
+	    continue;
+	}	    
 	if (ntd->shutdown_listen_thread) {
 	    DROP_CM_LOCK(svc, trans->cm);
 	    return 0;
@@ -1293,13 +1318,41 @@ listen_thread_func(void *vlsp)
         }
 
         if (wait_status.result == NNTI_OK) {
-/*	  if (which == 0) { */
-	    handle_request_buffer_event(lsp, &wait_status);
-/*	  } */
+	    if ((which == 0) && (lsp->wait_mode != WAIT_MODE_RDMA)) {
+		handle_request_buffer_event(lsp, &wait_status);
+	    } else {
+		/* handle a completed pull request */
+		send_handle h;
+		struct client_message *r;
+		nnti_conn_data_ptr ncd = NULL;
+		int i;
+		for (i=0; i < ntd->request_size; i++) {
+		    if ((ntd->request_list[i] != NULL) &&
+			(&ntd->request_list[i]->mr_pull == buf_list[which])) {
+			ncd = ntd->request_list[i];
+			ntd->request_list[i] = NULL;
+		    }
+		}
+		if (ncd == NULL) {
+		    printf("Ugh.  Didn't find connection data for completed pull.  Dying.\n");
+		}
+		h = get_control_message_buffer(ncd, &r, sizeof(*r));
+		r->message_type = CMNNTI_PULL_COMPLETE;
+		r->pull_complete.msg_info = ncd->pending_request_msg_info;
+		svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET done with pull, returning control message, type %d, local_info %p", r->message_type, r->pull_complete.msg_info);
+		if (send_control_message(h) == 0) {
+		    svc->trace_out(ncd->ntd->cm, "--- control message send failed!");
+		}	  
+		
+		/* kick this upstairs */
+		svc->add_buffer_to_pending_queue(trans->cm, ncd->conn, ncd->read_buffer, ncd->pending_request_size);
+		if (!ncd->ntd->cache_maps) {
+		    ncd->read_buffer = NULL;
+		    NNTI_unregister_memory(&ncd->mr_pull);
+		}
+	    }
 	}
-
         // TODO: check if it's time to schedule Puts and check progress of outstanding requests
-
     }
 }
 
@@ -1720,11 +1773,9 @@ setup_nnti_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
     ntd->incoming  = malloc (incoming_size * NNTI_REQUEST_BUFFER_SIZE);
     memset (ntd->incoming, 0, incoming_size * NNTI_REQUEST_BUFFER_SIZE);
     
-    DROP_CM_LOCK(svc, trans->cm);
     err = NNTI_register_memory(&trans_hdl, (char*)ntd->incoming, 
 			       NNTI_REQUEST_BUFFER_SIZE, incoming_size,
 			       NNTI_RECV_QUEUE, &trans_hdl.me, &ntd->mr_recvs);
-    ACQUIRE_CM_LOCK(svc, trans->cm);
     if (err != NNTI_OK) {
       fprintf (stderr, "Error: NNTI_register_memory(NNTI_RECV_DST) for client messages returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
       return;
@@ -1738,10 +1789,18 @@ setup_nnti_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
     lsp->svc = svc;
     lsp->trans = trans;
     lsp->ntd = ntd;
+    lsp->wait_mode = WAIT_MODE_REQUEST;
     ntd->shutdown_listen_thread = 0;
     ntd->listen_thread = 0;
     ntd->self_hostname = strdup(hostname);
+    pthread_cond_init(&(ntd->cond), NULL);   
     err = pthread_create(&ntd->listen_thread, NULL, (void*(*)(void*))listen_thread_func, lsp);
+    lsp = malloc(sizeof(*lsp));
+    lsp->svc = svc;
+    lsp->trans = trans;
+    lsp->ntd = ntd;
+    lsp->wait_mode = WAIT_MODE_RDMA;
+    err = pthread_create(&ntd->listen_thread2, NULL, (void*(*)(void*))listen_thread_func, lsp);
 }
 
 extern attr_list
@@ -1756,6 +1815,7 @@ attr_list listen_info;
     int use_enet = 0;
     char *enet = getenv("NNTI_ENET");
     int use_nnti = 1;
+    int immediate_pull = 1;
     if (ntd->listen_attrs != NULL) {
 	return ntd->listen_attrs;
     }
@@ -1764,7 +1824,9 @@ attr_list listen_info;
     }
     if (listen_info) {
 	get_int_attr(listen_info, CM_NNTI_ENET_CONTROL, &use_enet);
+	get_int_attr(listen_info, CM_NNTI_IMMEDIATE_PULL_WAIT, &immediate_pull);
     }
+    ntd->immediate_pull_wait = immediate_pull;
 
     listen_list = create_attr_list();
     if (use_nnti) {
@@ -1897,17 +1959,13 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     } else {
 	if (ncd->outgoing_mapped_region != NULL) {
 	    ncd->outgoing_mapped_region = NULL;
-	    DROP_CM_LOCK(svc, ncd->ntd->cm);
 	    NNTI_unregister_memory(&ncd->outgoing_mapped_mr);
-	    ACQUIRE_CM_LOCK(svc, ncd->ntd->cm);
 	    svc->trace_out(ncd->ntd->cm, "CMNNTI unregistering previously mapped region at %p, size %d",
 			   ncd->outgoing_mapped_region, ncd->outgoing_mapped_size);
 	}
         svc->trace_out(ncd->ntd->cm, "CMNNTI registering region at %p, size %d",
 		       data, register_size);
-	DROP_CM_LOCK(svc, ncd->ntd->cm);
 	err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, register_size, 1, NNTI_GET_SRC, &ncd->peer_hdl, &mr);
-	ACQUIRE_CM_LOCK(svc, ncd->ntd->cm);
 	if (err != NNTI_OK) {
 	    printf ("  CMNNTI: NNTI_register_memory() for message returned non-zero: %d %s\n",
 		    err, NNTI_ERROR_STRING(err));
@@ -1978,6 +2036,24 @@ void nnti_rate_limit_on_completion(struct pull_request *request,
     sched_data->ongoing_req_count --;
 }
 
+void
+add_ncd_to_request_list(nnti_conn_data_ptr ncd)
+{
+    int i;
+    for (i=0; i< ncd->ntd->request_size; i++) {
+	if (ncd->ntd->request_list[i] == NULL) {
+	    ncd->ntd->request_list[i] = ncd;
+	    pthread_cond_signal(&(ncd->ntd->cond));
+	    return;
+	}
+    }
+    /* above found no empty slots */
+    ncd->ntd->request_size ++;
+    ncd->ntd->request_list = realloc(ncd->ntd->request_list, sizeof(ncd->ntd->request_list[0]) * ncd->ntd->request_size);
+    ncd->ntd->request_list[ncd->ntd->request_size-1] = ncd;
+    pthread_cond_signal(&(ncd->ntd->cond));
+}
+
 /*
  * issue RDMA Get for the request. Return 0 for success and -1 for error.
  */
@@ -1990,7 +2066,6 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
     CMbuffer read_buffer;
     char *data;
     NNTI_status_t               status;
-    chr_time recv_time;
 
     svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET Received pull request, pulling %d bytes", request->size);
 
@@ -2009,9 +2084,7 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
 	    svc->return_data_buffer(trans->cm, ncd->read_buffer);
 	    svc->trace_out(ncd->ntd->cm, "CMNNTI unregistering previously mapped region at %p, size %d",
 			   ncd->incoming_mapped_region, ncd->incoming_mapped_size);
-	    DROP_CM_LOCK(svc, trans->cm);
 	    err = NNTI_unregister_memory(&ncd->mr_pull);
-	    ACQUIRE_CM_LOCK(svc, trans->cm);
 	    if (err != NNTI_OK) {
 		printf ("  CMNNTI: NNTI_unregister_memory() for client returned non-zero: %d %s\n",
 			err, NNTI_ERROR_STRING(err));
@@ -2024,10 +2097,8 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
 	data = read_buffer->buffer;
         svc->trace_out(ncd->ntd->cm, "CMNNTI registering region at %p, size %d",
 		       data, read_buffer->size);
-	DROP_CM_LOCK(svc, trans->cm);
         err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, request->size, 1,
 			       NNTI_GET_DST, &ncd->peer_hdl, &ncd->mr_pull);
-	ACQUIRE_CM_LOCK(svc, trans->cm);
 	if (err != NNTI_OK) {
 	    printf ("  CMNNTI: NNTI_register_memory() for client returned non-zero: %d %s\n",
 		    err, NNTI_ERROR_STRING(err));
@@ -2037,14 +2108,11 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
         memcpy(&ncd->incoming_mapped_region, &request->buf_addr, sizeof(NNTI_buffer_t));
     }
 
-    chr_timer_start(&recv_time);
-    DROP_CM_LOCK(svc, trans->cm);
     err = NNTI_get (&request->buf_addr,
 		    offset,  // get from this remote buffer+offset
 		    pullsize,      // this amount of data
 		    &ncd->mr_pull,
 		    offset); // into this buffer+offset
-    ACQUIRE_CM_LOCK(svc, trans->cm);
     
     if (err != NNTI_OK) {
 	printf ("  THREAD: Error: NNTI_get() for client returned non-zero: %d %s\n",
@@ -2052,56 +2120,49 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
     //    conns[which%nc].status = 1; // failed status
         return -1;
     }
-#define NO_SCHEDULER
-#ifdef NO_SCHEDULER
-    int timeout = 500;
-    err = NNTI_ETIMEDOUT;
-    DROP_CM_LOCK(svc, trans->cm);
-    while ( (err == NNTI_ETIMEDOUT ) && (timeout < 520)) {
-	err = NNTI_wait(&ncd->mr_pull, NNTI_GET_DST, timeout, &status);
-	timeout ++;
-    }
-    ACQUIRE_CM_LOCK(svc, trans->cm);
 
-    chr_timer_stop(&recv_time);
-//    printf("Receive time is %g millisecs, %g microsecs\n", chr_time_to_millisecs(&recv_time), chr_time_to_microsecs(&recv_time));
-    if (err != NNTI_OK) {
-	fprintf (stderr, "  THREAD: Error: pull from client failed. NNTI_wait returned: %d %s, wait_status.result = %ds\n",err, NNTI_ERROR_STRING(err), status.result);
-	/* bad shit */
-    } else {
-	// completed a pull here
-	send_handle h;
-	struct client_message *r;
-	h = get_control_message_buffer(ncd, &r, sizeof(*r));
-	r->message_type = CMNNTI_PULL_COMPLETE;
-	r->pull_complete.msg_info = request->msg_info;
-	svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET done with pull, returning control message, type %d, local_info %p", r->message_type, r->pull_complete.msg_info);
-	if (send_control_message(h) == 0) {
-	    svc->trace_out(ncd->ntd->cm, "--- control message send failed!");
-	}	  
-	
-	/* kick this upstairs */
-	svc->add_buffer_to_pending_queue(trans->cm, ncd->conn, read_buffer, request->size);
-	if (!ncd->ntd->cache_maps) {
-	    DROP_CM_LOCK(svc, trans->cm);
-	    NNTI_unregister_memory(&ncd->mr_pull);
-	    ACQUIRE_CM_LOCK(svc, trans->cm);
-	    ncd->read_buffer = NULL;
+    if (ncd->ntd->immediate_pull_wait) {
+	int timeout = 500;
+	err = NNTI_ETIMEDOUT;
+	DROP_CM_LOCK(svc, trans->cm);
+	while ( (err == NNTI_ETIMEDOUT ) && (timeout < 520)) {
+	    err = NNTI_wait(&ncd->mr_pull, NNTI_GET_DST, timeout, &status);
+	    timeout ++;
 	}
-    }
-    return 0;
-#else
+	ACQUIRE_CM_LOCK(svc, trans->cm);
 
-    // instead of waiting for current Get operation to finish, go on to pull for any other requests
-    // add destination buffer to ntd->buf_list to wait
-    if (ncd->ntd->buf_count == ncd->ntd->buf_size) {
-        ncd->ntd->buf_size ++;
-        ncd->ntd->buf_list = realloc(ncd->ntd->buf_list, sizeof(sizeof(ncd->ntd->buf_list[0]) * ncd->ntd->buf_size));
+	if (err != NNTI_OK) {
+	    fprintf (stderr, "  THREAD: Error: pull from client failed. NNTI_wait returned: %d %s, wait_status.result = %ds\n",err, NNTI_ERROR_STRING(err), status.result);
+	    /* bad shit */
+	} else {
+	    // completed a pull here
+	    send_handle h;
+	    struct client_message *r;
+	    h = get_control_message_buffer(ncd, &r, sizeof(*r));
+	    r->message_type = CMNNTI_PULL_COMPLETE;
+	    r->pull_complete.msg_info = request->msg_info;
+	    svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET done with pull, returning control message, type %d, local_info %p", r->message_type, r->pull_complete.msg_info);
+	    if (send_control_message(h) == 0) {
+		svc->trace_out(ncd->ntd->cm, "--- control message send failed!");
+	    }	  
+	    
+	    /* kick this upstairs */
+	    svc->add_buffer_to_pending_queue(trans->cm, ncd->conn, read_buffer, request->size);
+	    if (!ncd->ntd->cache_maps) {
+		NNTI_unregister_memory(&ncd->mr_pull);
+		ncd->read_buffer = NULL;
+	    }
+	}
+	return 0;
+    } else {
+	// instead of waiting for current Get operation to finish, go on to pull for any other requests
+	// add destination buffer to ntd->request_list to wait
+	ncd->pending_request_msg_info = request->msg_info;
+	ncd->pending_request_size = request->size;
+	ncd->read_buffer = read_buffer;
+	add_ncd_to_request_list(ncd);
+	return 0;
     }
-    ncd->ntd->buf_list[ncd->ntd->buf_count-1] = &ncd->mr_pull;
-    ncd->ntd->buf_count ++;
-    return 0;
-#endif
 }
 
 
@@ -2120,6 +2181,7 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
     request->state = GET_SCHED_QUEUED;
     request->num_errors = 0;
 
+#define NO_SCHEDULER
 #ifdef NO_SCHEDULER
     int rc = perform_pull_request_message(ncd, svc, trans, &request->request);
     free(request);
@@ -2197,9 +2259,7 @@ handle_pull_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, trans
     svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET received pull complete message, freeing resources, unblocking any pending writes");
     svc->return_data_buffer(ncd->ntd->cm, local_message_info->write_buffer);
     if (!ncd->ntd->cache_maps) {
-	DROP_CM_LOCK(svc, trans->cm);
 	NNTI_unregister_memory(&local_message_info->mr);
-	ACQUIRE_CM_LOCK(svc, trans->cm);
     }
     svc->wake_any_pending_write(ncd->conn);
     free(local_message_info);
@@ -2285,8 +2345,8 @@ free_nnti_data(CManager cm, void *ntdv)
     ntd->shutdown_listen_thread = 1;
     DROP_CM_LOCK(svc, ntd->cm);
     pthread_join(ntd->listen_thread, NULL);
-    NNTI_unregister_memory(&ntd->mr_recvs);
     ACQUIRE_CM_LOCK(svc, ntd->cm);
+    NNTI_unregister_memory(&ntd->mr_recvs);
     ntd->shutdown_listen_thread = 0;
     svc->free_func(ntd->nnti_pull_sched_data);
     if (ntd->nnti_pull_sched_data != ntd->nnti_pull_completion_data) {
@@ -2328,6 +2388,7 @@ CMtrans_services svc;
 	CM_NNTI_ADDR = attr_atom_from_string("NNTI_ADDR");
 	CM_NNTI_PARAMS = attr_atom_from_string("NNTI_PARAMS");
 	CM_NNTI_ENET_CONTROL = attr_atom_from_string("NNTI_ENET_CONTROL");
+	CM_NNTI_IMMEDIATE_PULL_WAIT = attr_atom_from_string("NNTI_IMMEDIATE_PULL_WAIT");
 	CM_IP_HOSTNAME = attr_atom_from_string("IP_HOST");
 	CM_ENET_ADDR = attr_atom_from_string("CM_ENET_ADDR");
 	CM_ENET_PORT = attr_atom_from_string("CM_ENET_PORT");
@@ -2422,9 +2483,7 @@ nnti_conn_data_ptr ncd;
     }
 #endif
     unlink_connection(ncd->ntd, ncd);
-    DROP_CM_LOCK(svc, ncd->ntd->cm);
     NNTI_unregister_memory(&ncd->mr_send);
-    ACQUIRE_CM_LOCK(svc, ncd->ntd->cm);
     free(ncd->peer_hostname);
     //    free_attr_list(ncd->attrs);
     free(ncd);
