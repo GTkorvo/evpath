@@ -1463,8 +1463,8 @@ fdump_CMConnection(FILE *out, CMConnection conn)
     fprintf(out, "CMConnection %lx, reference count %d, closed %d\n\tattrs : ", 
 	   (long) conn, conn->ref_count, conn->closed);
     fdump_attr_list(out, conn->attrs);
-    fprintf(out, "\tbuffer_full_point %d, current buffer_end %d\n", 
-	   conn->buffer_full_point, conn->buffer_data_end);
+    fprintf(out, "\tbuffer_full_point %ld, current buffer_end %ld\n", 
+	    conn->buffer_full_point, conn->buffer_data_end);
     fprintf(out, "\twrite_pending %d\n", conn->write_pending);
 }
 
@@ -1851,7 +1851,7 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	first_four = 1;
     }
     if (trans->read_to_buffer_func) {
-	CMtrace_out(cm, CMLowLevelVerbose, "CMdata continuing read, already have %d bytes, trying to read total %d\n", buffer_data_end, buffer_full_point);
+	CMtrace_out(cm, CMLowLevelVerbose, "CMdata continuing read, already have %ld bytes, trying to read total %ld\n", buffer_data_end, buffer_full_point);
     } else {
 	CMtrace_out(cm, CMLowLevelVerbose, "CMdata block read beginning\n");
     }	
@@ -1985,7 +1985,7 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
     if ((read_msg_count > read_ahead_msg_limit) || 
 	(read_byte_count > read_ahead_byte_limit)) {
 	CMtrace_out(cm, CMDataVerbose, 
-		    "CM - readahead not tried, fairness, read %d msgs, %d bytes\n",
+		    "CM - readahead not tried, fairness, read %d msgs, %ld bytes\n",
 		    read_msg_count, read_byte_count);
 	return;
     } else {
