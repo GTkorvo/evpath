@@ -3587,10 +3587,8 @@ INT_EVdestroy_stone(CManager cm, EVstone stone_id)
     stone_type stone;
     stone = stone_struct(evp, stone_id);
     if (!stone) return -1;
-    while (stone->is_draining != 2);  
+    INT_EVdrain_stone(cm, stone_id);
     empty_queue(stone->queue);
-    free(stone->queue);
-    stone->queue = NULL;
     INT_EVfree_stone(cm, stone_id);  
     return 1;      
 } 
