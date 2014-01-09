@@ -90,7 +90,9 @@ get_self_ip_addr(CMtrans_services svc)
 	}
 	if ((interface = getenv("CM_INTERFACE")) != NULL) {
 	    for (if_addr = if_addrs; if_addr != NULL; if_addr = if_addr->ifa_next) {
-		int family = if_addr->ifa_addr->sa_family;
+	        int family;
+	        if (!if_addr->ifa_addr) continue;
+		family = if_addr->ifa_addr->sa_family;
 		if (family != AF_INET) continue;  /* currently not looking for ipv6 */
 		if (strcmp(if_addr->ifa_name, interface) != 0) continue;
 		tmp = &((struct sockaddr_in *)if_addr->ifa_addr)->sin_addr;
@@ -124,7 +126,9 @@ get_self_ip_addr(CMtrans_services svc)
 	}
 	/* choose the first thing that's not a loopback interface */
 	for (if_addr = if_addrs; if_addr != NULL; if_addr = if_addr->ifa_next) {
-	    int family = if_addr->ifa_addr->sa_family;
+	    int family;
+	    if (!if_addr->ifa_addr) continue;
+	    family = if_addr->ifa_addr->sa_family;
 	    if (family != AF_INET) continue;  /* currently not looking for ipv6 */
 	    if ((if_addr->ifa_flags & IFF_LOOPBACK) != 0)  continue;
 	    tmp = &((struct sockaddr_in *)if_addr->ifa_addr)->sin_addr;
