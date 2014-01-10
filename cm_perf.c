@@ -528,7 +528,11 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     /* CMP\0 in first entry for CMPerformance message */
     ((int*)header)[0] = 0x434d5000;
     /* size in second entry, high byte gives CMPerf operation */
+#if SIZEOF_LONG == 4
+    ((int*)header)[1] = (CMPerfTestInit<<24);
+#else
     ((int*)header)[1] = ((start_size >> 32) &0xffffff) | (CMPerfTestInit<<24);
+#endif
     ((int*)header)[2] = (start_size & 0xffffffff);
     ((int*)header)[3] = cond;   /* condition value in third entry */
     ((int*)header)[4] = sizeof(header);   /* header size 4th entry */
@@ -579,7 +583,11 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	}
 	((int*)tmp_vec[0].iov_base)[0] = 0x434d5000;
     /* size in second entry, high byte gives CMPerf operation */
+#if SIZEOF_LONG == 4
+	((int*)tmp_vec[0].iov_base)[1] = (CMPerfTestBody<<24);
+#else
 	((int*)tmp_vec[0].iov_base)[1] = ((size >> 32) &0xffffff) | (CMPerfTestBody<<24);
+#endif
 	((int*)tmp_vec[0].iov_base)[2] = (size & 0xffffffff);
 	((int*)tmp_vec[0].iov_base)[3] = i;   /* sequence number */
 	tmp_vec[vecs-1].iov_len = size - (each * (vecs-1));
