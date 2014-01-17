@@ -702,7 +702,6 @@ libcmenet_LTX_writev_func(CMtrans_services svc, enet_conn_data_ptr ecd,
 
     /* Send the packet to the peer over channel id 0. */
     if (enet_peer_send (ecd->peer, 0, packet) == -1) return -1;
-    enet_host_flush(ecd->sd->server);
     return iovcnt;
 }
 
