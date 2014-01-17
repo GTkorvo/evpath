@@ -1,10 +1,26 @@
 # read in config files: system first, then user
 use Data::Dumper;
 $return = 0;
-for $file ("./test_spec",
-           "../test_spec", 
-	   "../../mtests/test_spec")
+my @file_list = ("./test_spec", "../test_spec", "../../mtests/test_spec");
+ARG: while (@ARGV && $ARGV[0] =~ s/^-(?=.)//) {
+    OPT: for (shift @ARGV) {
+         m/^$/       && do {                             next ARG; };
+         m/^-$/      && do {                             last ARG; };
+	 m/^f.*/      && do {@file_list = (); push (@file_list, shift(@ARGV)); 	 print "File list is @file_list\n"; next ARG;};
+         m/^o.*/      && do {$output_file = shift(@ARGV);
+			    open(OUTFILE, ">", "$output_file") 
+				or die "cannot open > $output_file: $!";
+			    next ARG; };
+         s/^l//      && do { $Generate_Listing++;        redo OPT; };
+         s/^i(.*)//  && do { $In_Place = $1 || ".bak";   next ARG; };
+         print("Unknown option: $_");
+    }
+}
+
+
+for (@file_list)
 {
+  $file = $_; 
   next unless -r $file;
   unless ($return = do $file) {
     warn "couldn't parse $file: $@" if $@;
@@ -12,9 +28,8 @@ for $file ("./test_spec",
     warn "couldn't run $file"       unless $return;
   }
 }
-die "No test spec file found\n" unless $return;
+die "No test spec file found in list : @file_list\n" unless $return;
 
-print "Transport list is @transport_list\n";
 $change = 1;
 
 while ( my ($key, $value) = each(%test_set) ) {
@@ -61,8 +76,6 @@ while ( my ($key, $value) = each(%test_set) ) {
 	    $i++;
 	}
     }
-    print("End of change loop, key $key\n");
-    
 }
 
 
@@ -74,16 +87,19 @@ while ( my ($transport, $value) = each(%test_set) ) {
   $value = $test_set{$transport};
   foreach (@{$value}) {
     $_ =~ s/(\w+):(\w+)/-\1 \2/g;
-    $_ = "./trans_test -transport $transport $_";
+    $_ = "./trans_test -transport $transport $_ 2> /dev/null";
     print "Running: $_ \n";
     my $output = `$_`;
     my $my_exit_code = $?;
     if ($my_exit_code != 0) {
       print ("Error while running $_\n");
       print ("Output was:\n");
-      print "$_\n";
+      print "$output";
     } else {
       print ("success\n");
+      print OUTFILE "$output";
     }
   }
 }
+
+close OUTFILE;

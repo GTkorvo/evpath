@@ -273,7 +273,6 @@ send_control_message(send_handle h)
 	    svc->trace_out(cm, "CMNNTI/ENET control write failed.");
 	    return 0;
 	}
-	enet_host_flush(h.ncd->ntd->enet_server);
 #endif
     } else {
         svc->trace_out(cm, "CMNNTI control write of %d bytes",
@@ -2093,7 +2092,6 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
 	}
 
         read_buffer = svc->get_data_buffer(ncd->ntd->cm, request->size);
-	read_buffer->ref_count++;
 	data = read_buffer->buffer;
         svc->trace_out(ncd->ntd->cm, "CMNNTI registering region at %p, size %d",
 		       data, read_buffer->size);
