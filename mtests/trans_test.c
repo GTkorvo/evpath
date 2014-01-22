@@ -70,7 +70,7 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
 	/* body message */
 	if (verbose) printf("Body message %d received, length %ld\n", *(int*)buffer, length);
 	if (length != (write_size - 12 /* test protocol swallows a little as header */)) {
-	    printf("Error in body delivery size, expected %d, got %ld\n", write_size - 12, length);
+	    printf("Error in body delivery size, expected %ld, got %ld\n", write_size - 12, length);
 	    size_error++;
 	}
 	if (*(int*)buffer != received_count) {
@@ -159,8 +159,8 @@ fail_and_die(int signal)
 {
     (void)signal;
     fprintf(stderr, "Trans_test failed to complete in reasonable time, increase from -timeout %d\n", timeout);
-    fprintf(stderr, "Stats are : vec_count = %d, size = %d, msg_count = %d, reuse_write = %d, received_count = %d\n", vec_count, size, msg_count, reuse_write, received_count);
-    fprintf(stderr, "    reuse_write = %d, received_count = %d, taken_corrupt = %d, expected_count = %d, write_size = %d, size_error = %d\n", reuse_write, received_count, taken_corrupt, expected_count, write_size, size_error);
+    fprintf(stderr, "Stats are : vec_count = %d, size = %ld, msg_count = %d, reuse_write = %d, received_count = %d\n", vec_count, size, msg_count, reuse_write, received_count);
+    fprintf(stderr, "    reuse_write = %d, received_count = %d, taken_corrupt = %d, expected_count = %d, write_size = %ld, size_error = %d\n", reuse_write, received_count, taken_corrupt, expected_count, write_size, size_error);
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
     }
@@ -401,7 +401,7 @@ main(argc, argv)
 		double secs, mbps;
 		get_double_attr(global_test_result, CM_TRANS_TEST_DURATION, &secs);
 		get_double_attr(global_test_result, CM_TRANS_MEGABITS_SEC, &mbps);
-		printf("transport = %s size = %d, count = %d, secs = %g, Mbps = %g\n",
+		printf("transport = %s size = %ld, count = %d, secs = %g, Mbps = %g\n",
 		       transport, size, msg_count, secs, mbps);
 	    }
 	} else {
