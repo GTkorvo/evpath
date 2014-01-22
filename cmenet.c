@@ -13,6 +13,12 @@
 #include <enet/enet.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include <sys/time.h>
+ 
+#ifdef __MACH__
+#include <mach/clock.h>
+#include <mach/mach.h>
+#endif
 
 #include <atl.h>
 #include <cercs_env.h>
@@ -674,12 +680,43 @@ libcmenet_LTX_read_block_func(CMtrans_services svc,
     return cb;
 }
 
+static
+void current_utc_time(struct timespec *ts)
+{
+#ifdef __MACH__ // OS X does not have clock_gettime, use clock_get_time
+    clock_serv_t cclock;
+    mach_timespec_t mts;
+    host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
+    clock_get_time(cclock, &mts);
+    mach_port_deallocate(mach_task_self(), cclock);
+    ts->tv_sec = mts.tv_sec;
+    ts->tv_nsec = mts.tv_nsec;
+#else
+    clock_gettime(CLOCK_REALTIME, ts);
+#endif
+ 
+}
+
+static struct timespec time_diff(struct timespec start, struct timespec end)
+{
+    struct timespec temp;
+    if ((end.tv_nsec-start.tv_nsec)<0) {
+	temp.tv_sec = end.tv_sec-start.tv_sec-1;
+	temp.tv_nsec = 1000000000+end.tv_nsec-start.tv_nsec;
+    } else {
+	temp.tv_sec = end.tv_sec-start.tv_sec;
+	temp.tv_nsec = end.tv_nsec-start.tv_nsec;
+    }
+    return temp;
+}
+
 extern int
 libcmenet_LTX_writev_func(CMtrans_services svc, enet_conn_data_ptr ecd,
 			  struct iovec *iov, int iovcnt, attr_list attrs)
 {
     int i;
     int length = 0;
+    static struct timespec last_flush_call = {0,0};
 
     (void) attrs;
     for (i = 0; i < iovcnt; i++) {
@@ -702,6 +739,18 @@ libcmenet_LTX_writev_func(CMtrans_services svc, enet_conn_data_ptr ecd,
 
     /* Send the packet to the peer over channel id 0. */
     if (enet_peer_send (ecd->peer, 0, packet) == -1) return -1;
+    if (last_flush_call.tv_sec == 0) {
+	enet_host_flush(ecd->sd->server);
+	current_utc_time(&last_flush_call);
+    } else {
+	struct timespec now, diff;
+	current_utc_time(&now);
+	diff = time_diff(last_flush_call, now);
+	if (diff.tv_sec > 0) {
+	    last_flush_call = now;
+	    enet_host_flush(ecd->sd->server);
+	}
+    }
     return iovcnt;
 }
 
