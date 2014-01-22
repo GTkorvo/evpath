@@ -361,7 +361,7 @@ int timeout_usec;
 		    (long) ((fd_set *) sd->fdset)->fds_bits[2],
 		    (long) ((fd_set *) sd->fdset)->fds_bits[3]);
 #else
-	    fprintf(stderr, "seelct failed, errno %d\n", errno);
+	    fprintf(stderr, "select failed, errno %d\n", errno);
 #endif
 	    exit(1);
 	    return;
