@@ -716,7 +716,7 @@ libcmenet_LTX_writev_func(CMtrans_services svc, enet_conn_data_ptr ecd,
 {
     int i;
     int length = 0;
-    static struct timespec last_flush_call = {0,0};
+    static time_t last_flush_call = 0;
 
     (void) attrs;
     for (i = 0; i < iovcnt; i++) {
@@ -739,14 +739,12 @@ libcmenet_LTX_writev_func(CMtrans_services svc, enet_conn_data_ptr ecd,
 
     /* Send the packet to the peer over channel id 0. */
     if (enet_peer_send (ecd->peer, 0, packet) == -1) return -1;
-    if (last_flush_call.tv_sec == 0) {
+    if (last_flush_call == 0) {
 	enet_host_flush(ecd->sd->server);
-	current_utc_time(&last_flush_call);
+	last_flush_call = time(NULL);
     } else {
-	struct timespec now, diff;
-	current_utc_time(&now);
-	diff = time_diff(last_flush_call, now);
-	if (diff.tv_sec > 0) {
+	time_t now = time(NULL);
+	if (now > last_flush_call) {
 	    last_flush_call = now;
 	    enet_host_flush(ecd->sd->server);
 	}
