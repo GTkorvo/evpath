@@ -149,9 +149,8 @@ enet_service_network(CManager cm, void *void_trans)
         case ENET_EVENT_TYPE_RECEIVE: {
 	    enet_conn_data_ptr econn_d = event.peer->data;
 	    CMbuffer cb;
-	    svc->trace_out(cm, "A packet of length %u containing %s was received on channel %u.\n",
+	    svc->trace_out(cm, "A packet of length %u was received on channel %u.\n",
                     (unsigned int) event.packet -> dataLength,
-                    event.packet -> data,
                     (unsigned int) event.channelID);
 	    econn_d->read_buffer_len = event.packet -> dataLength;
 	    cb = svc->create_data_and_link_buffer(cm, 
