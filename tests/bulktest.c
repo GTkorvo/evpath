@@ -21,6 +21,8 @@
 
 #define MSG_COUNT 30
 static int msg_limit = MSG_COUNT;
+static int message_count = 0;
+static int expected_count = MSG_COUNT;
 
 typedef struct _complex_rec {
     double r;
@@ -157,6 +159,9 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     }
     msg_count++;
     usleep(10000);
+    if ( quiet <= 0) {
+      printf(".\n");
+    }
     if ((quiet <= -1) || (sum != scan_sum)) {
 	printf("In the handler, event data is :\n");
 	printf("	integer_field = %d\n", event->integer_field);
@@ -323,6 +328,7 @@ main(int argc, char **argv)
 	    EVsubmit(source_handle, data, attrs);
 	}
 	if (quiet <= 0) printf("Write %d messages\n", msg_limit);
+	CMsleep(cm, 30);
     }
     CManager_close(cm);
     return 0;
@@ -335,6 +341,10 @@ fail_and_die(int signal)
 {
     (void)signal;
     fprintf(stderr, "bulktest failed to complete in reasonable time\n");
+    if (message_count != expected_count) {
+	printf ("failure, received %d messages instead of %d\n",
+		message_count, expected_count);
+    }
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
     }
@@ -382,8 +392,6 @@ do_regression_master_test()
     char size_str[4];
     char vec_str[4];
     EVstone handle;
-    int message_count = 0;
-    int expected_count = msg_limit;
     int done = 0;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
