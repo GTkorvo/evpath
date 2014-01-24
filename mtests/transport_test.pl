@@ -11,12 +11,11 @@ ARG: while (@ARGV && $ARGV[0] =~ s/^-(?=.)//) {
 			    open(OUTFILE, ">", "$output_file") 
 				or die "cannot open > $output_file: $!";
 			    next ARG; };
-         s/^l//      && do { $Generate_Listing++;        redo OPT; };
+         s/^ssh//      && do { $ssh_host = shift(@ARGV);        next ARG; };
          s/^i(.*)//  && do { $In_Place = $1 || ".bak";   next ARG; };
          print("Unknown option: $_");
     }
 }
-
 
 for (@file_list)
 {
@@ -87,6 +86,10 @@ while ( my ($transport, $value) = each(%test_set) ) {
   $value = $test_set{$transport};
   foreach (@{$value}) {
     $_ =~ s/(\w+):(\w+)/-\1 \2/g;
+    if (defined $ssh_host) {
+	$_ .= " -ssh $ssh_host";
+    }
+
     $_ = "./trans_test -transport $transport $_ 2> /dev/null";
     print "Running: $_ \n";
     my $output = `$_`;
