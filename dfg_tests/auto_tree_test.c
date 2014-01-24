@@ -59,6 +59,7 @@ be_test_master(int argc, char **argv)
 	sscanf(argv[0], "%d", &level_count);
     }
     node_count = (int) pow(base,level_count) -1;
+    last_row_size = (int)pow(base,level_count - 1);
     nodes = malloc(sizeof(nodes[0]) * (node_count+1));
     
     for (i=0; i < node_count; i++) {
