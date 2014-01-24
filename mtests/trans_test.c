@@ -235,7 +235,8 @@ main(argc, argv)
     int cur_subproc_arg = start_subproc_arg_count;
     char *transport = NULL;
     char path[10240];
-    getcwd(&path[0], sizeof(path));
+
+    (void)getcwd(&path[0], sizeof(path));
     if (argv0[0] != '/') {
 	strcat(path, "/");
 	strcat(path, argv0);
