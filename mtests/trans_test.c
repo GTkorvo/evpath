@@ -294,6 +294,10 @@ main(argc, argv)
 	    }
 	    destination_host = strdup(argv[2]);
 	    start_subproc_arg_count-=2;
+	    if (strlen(SSH_PATH) == 0) {
+		printf("SSH_PATH in config.h is empty!  Can't run ssh\n");
+		exit(1);
+	    }
 	    subproc_args[start_subproc_arg_count] = strdup(SSH_PATH);
 	    subproc_args[start_subproc_arg_count+1] = destination_host;
 	    cur_subproc_arg--;
