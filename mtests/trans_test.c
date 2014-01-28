@@ -236,7 +236,10 @@ main(argc, argv)
     char *transport = NULL;
     char path[10240];
 
-    (void)getcwd(&path[0], sizeof(path));
+    if (getcwd(&path[0], sizeof(path)) == NULL) {
+        printf("Couldn't get pwd\n");
+	exit(1);
+    }
     if (argv0[0] != '/') {
 	strcat(path, "/");
 	strcat(path, argv0);
