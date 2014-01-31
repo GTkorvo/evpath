@@ -10,6 +10,12 @@
 #include <signal.h>
 #include "evpath.h"
 #include <errno.h>
+#ifdef MPI_C_FOUND
+#include "mpi.h"
+#define CONTACTLEN 1024
+#else
+#define MPI_Finalize()
+#endif
 
 static atom_t CM_TRANS_TEST_SIZE = 10240;
 static atom_t CM_TRANS_TEST_VECS = 4;
@@ -164,6 +170,7 @@ fail_and_die(int signal)
     if (subproc_proc != 0) {
 	kill(subproc_proc, 9);
     }
+    MPI_Finalize();
     exit(1);
 }
 
@@ -215,6 +222,7 @@ usage()
     printf("\t-take_receive_buffer <0/1>  should the receiving buffer be \n\t\ttaken out of service upon receipt?\n");
     printf("\t-n  No regression test.  I.E. just run the master and print \n\t\twhat command would have been run for client.\n");
 
+    MPI_Finalize();
     exit(1);
 }
 
@@ -228,6 +236,7 @@ main(argc, argv)
     CMFormat format;
     static int atom_init = 0;
     int start_subprocess = 1;
+    int use_mpi = 0;
     int ret, actual_count;
     argv0 = argv[0];
     int start_subproc_arg_count = 4; /* leave a few open at the beginning */
@@ -235,9 +244,15 @@ main(argc, argv)
     int cur_subproc_arg = start_subproc_arg_count;
     char *transport = NULL;
     char path[10240];
+    int me;
+#ifdef MPI_C_FOUND
+    MPI_Status status;          /* Status object for receive */
+    int np;
+#endif
 
     if (getcwd(&path[0], sizeof(path)) == NULL) {
         printf("Couldn't get pwd\n");
+	MPI_Finalize();
 	exit(1);
     }
     if (argv0[0] != '/') {
@@ -257,6 +272,7 @@ main(argc, argv)
 	    verbose++;
 	} else if (strcmp(&argv[1][1], "h") == 0) {
 	    usage();
+	    MPI_Finalize();
 	    exit(0);
 	} else if (strcmp(&argv[1][1], "vectors") == 0) {
 	    if (!argv[2] || (sscanf(argv[2], "%d", &vec_count) != 1)) {
@@ -347,6 +363,14 @@ main(argc, argv)
 	    start_subprocess = 0;
 	    verbose = 1;
 	    timeout = 600;
+	} else if (strcmp(&argv[1][1], "mpi") == 0) {
+	    start_subprocess = 0;
+#ifdef MPI_C_FOUND
+	    use_mpi = 1;
+#else
+	    printf("Argument -mpi specified, but MPI not found at Cmake time\n");
+	    exit(1);
+#endif
 	} else {
 	    printf("Argument not recognized, \"%s\"\n", argv[1]);
 	    usage();
@@ -354,6 +378,22 @@ main(argc, argv)
 	argv++;
 	argc--;
     }
+
+#ifdef MPI_C_FOUND
+    if (use_mpi) {
+	MPI_Init(&argc, &argv);                /* Initialize MPI */
+	MPI_Comm_size(MPI_COMM_WORLD, &np);    /* Get nr of processes */
+	MPI_Comm_rank(MPI_COMM_WORLD, &me);    /* Get own identifier */
+	if (np != 2) {
+	    MPI_Finalize();
+	    exit(1);
+	}
+    } else {
+	me = 0;
+    }
+#else
+    me = 0;
+#endif
 
     struct sigaction sigact;
     sigact.sa_flags = 0;
@@ -383,7 +423,7 @@ main(argc, argv)
     }
 
 
-    if (argc == 1) {
+    if ((argc == 1) && (me == 0)) {
 	attr_list contact_list, listen_list = NULL;
 	if (transport == NULL) {
 	    transport = getenv("CMTransport");
@@ -412,6 +452,20 @@ main(argc, argv)
 		printf("transport = %s size = %ld, count = %d, secs = %g, Mbps = %g\n",
 		       transport, size, msg_count, secs, mbps);
 	    }
+#ifdef MPI_C_FOUND
+	} else if (use_mpi) {
+	    char master_contact[CONTACTLEN];             /* Local host name string */
+	    strcpy(master_contact, attr_list_to_string(contact_list));
+	    MPI_Bcast(master_contact,CONTACTLEN,MPI_CHAR,0,MPI_COMM_WORLD);
+	    CMCondition_wait(cm, global_exit_condition);
+	    if (global_test_result) {
+		double secs, mbps;
+		get_double_attr(global_test_result, CM_TRANS_TEST_DURATION, &secs);
+		get_double_attr(global_test_result, CM_TRANS_MEGABITS_SEC, &mbps);
+		printf("transport = %s size = %ld, count = %d, secs = %g, Mbps = %g\n",
+		       transport, size, msg_count, secs, mbps);
+	    }
+#endif
 	} else {
 	    int i;
 	    printf("Would have run: \n");
@@ -428,13 +482,23 @@ main(argc, argv)
 	attr_list contact_list = NULL;
 	attr_list test_list, result;
 
-	for (i = 1; i < argc; i++) {
-	    contact_list = attr_list_from_string(argv[i]);
-	    if (contact_list == NULL) {
-		printf("Remaining Argument \"%s\" not recognized as size or contact list\n",
-		       argv[i]);
-		usage();
+	if (me == 0) {
+	    for (i = 1; i < argc; i++) {
+		contact_list = attr_list_from_string(argv[i]);
+		if (contact_list == NULL) {
+		    printf("Remaining Argument \"%s\" not recognized as size or contact list\n",
+			   argv[i]);
+		    usage();
+		}
 	    }
+	} else {
+#ifdef MPI_C_FOUND
+	    char master_contact[CONTACTLEN];             /* Local host name string */
+	    MPI_Bcast(master_contact,CONTACTLEN,MPI_CHAR,0,MPI_COMM_WORLD);
+	    contact_list = attr_list_from_string(master_contact);
+#else
+	    exit(1);
+#endif
 	}
 	if (contact_list == NULL) {
 	    exit(1);
