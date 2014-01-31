@@ -165,3 +165,6 @@
 /* Set to 1 if CM should default to CMSelfFormats */
 #define CM_SELF_FORMATS @CM_SELF_FORMATS@
 
+/* Set to 1 if Cmake found MPI for C */
+#cmakedefine MPI_C_FOUND
+
