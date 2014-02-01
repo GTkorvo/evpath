@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 2.8)
 
 set (TESTS cmtest cmping bulktest take_test)
 
+include_directories(${MPI_C_INCLUDE_PATH})
+
 ENABLE_TESTING()
 
 INCLUDE_DIRECTORIES(BEFORE ${evpath_BINARY_DIR} ${evpath_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
@@ -15,6 +17,12 @@ endforeach()
 ADD_TEST (mtests_cmtest_UDP mtests_cmtest -t udp)
 ADD_TEST (mtests_cmping_UDP mtests_cmping -t udp)
 ADD_EXECUTABLE (trans_test trans_test.c)
-TARGET_LINK_LIBRARIES(trans_test evpath ${BASE_LIBS})
+if(MPI_COMPILE_FLAGS)
+  set_target_properties(trans_test PROPERTIES COMPILE_FLAGS "${MPI_C_COMPILE_FLAGS}")
+endif()
+if(MPI_LINK_FLAGS)
+  set_target_properties(trans_test PROPERTIES LINK_FLAGS "${MPI_C_LINK_FLAGS}")
+endif()
+TARGET_LINK_LIBRARIES(trans_test evpath ${MPI_C_LIBRARIES} ${BASE_LIBS})
 configure_file(transport_test.pl transport_test.pl COPYONLY)
 configure_file(test_spec test_spec COPYONLY)
