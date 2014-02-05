@@ -15,6 +15,7 @@ include(CheckTypeSize)
 include(CheckStructHasMember)
 include(CreateLibtoolFile)
 include(AddLibtoolLibrary)
+include(TestBigEndian)
 
 include(FindCERCSProject)
 include(CTest)
@@ -192,6 +193,7 @@ CHECK_STRUCT_HAS_MEMBER("struct fd_set" "fds_bits" "sys/select.h" HAVE_FDS_BITS)
 
 CHECK_TYPE_SIZE("int"   SIZEOF_INT)
 CHECK_TYPE_SIZE("long"   SIZEOF_LONG)
+TEST_BIG_ENDIAN(WORDS_BIGENDIAN)
 
 CHECK_FUNCTION_EXISTS(writev HAVE_WRITEV)
 CHECK_FUNCTION_EXISTS(uname HAVE_UNAME)

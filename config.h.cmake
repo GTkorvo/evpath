@@ -168,3 +168,6 @@
 /* Set to 1 if Cmake found MPI for C */
 #cmakedefine MPI_C_FOUND
 
+/* Define if byteorder is bigendian */
+#cmakedefine WORDS_BIGENDIAN
+

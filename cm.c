@@ -2149,7 +2149,12 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
     if (short_length) {
 	if (byte_swap) {
 	    int tmp;
+#define WORDS_BIGENDIAN
+#ifdef WORDS_BIGENDIAN	    
+	    checksum = (unsigned char) check_sum_base[0];
+#else
 	    checksum = (unsigned char) check_sum_base[3];
+#endif
 	    ((char*)&tmp)[0] = base[3];
 	    ((char*)&tmp)[1] = base[2];
 	    ((char*)&tmp)[2] = base[1];
@@ -2162,7 +2167,11 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 		((char*)&attr_length)[3] = base[4];
 	    }
 	} else {
+#ifdef WORDS_BIGENDIAN	    
+	    checksum = (unsigned char) check_sum_base[3];
+#else
 	    checksum = (unsigned char) check_sum_base[0];
+#endif
 	    data_length = ((int *) base)[0];
 	    if (header_len != 8) {
 		attr_length = ((int *) base)[1];
@@ -2170,7 +2179,11 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 	}
     } else {
 	if (byte_swap) {
+#ifdef WORDS_BIGENDIAN	    
+	    checksum = (unsigned char) check_sum_base[0];
+#else
 	    checksum = (unsigned char) check_sum_base[3];
+#endif
 	    int tmp;
 	    ((char*)&tmp)[0] = base[3];
 	    ((char*)&tmp)[1] = base[2];
@@ -2188,7 +2201,11 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 		((char*)&attr_length)[3] = base[8];
 	    }
 	} else {
+#ifdef WORDS_BIGENDIAN	    
+	    checksum = (unsigned char) check_sum_base[3];
+#else
 	    checksum = (unsigned char) check_sum_base[0];
+#endif
 	    data_length = ((int64_t)(((int *) base)[0])) << 32;
 	    data_length += ((int *) base)[1];
 	    if (header_len != 12) {
