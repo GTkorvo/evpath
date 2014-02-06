@@ -2149,7 +2149,6 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
     if (short_length) {
 	if (byte_swap) {
 	    int tmp;
-#define WORDS_BIGENDIAN
 #ifdef WORDS_BIGENDIAN	    
 	    checksum = (unsigned char) check_sum_base[0];
 #else
