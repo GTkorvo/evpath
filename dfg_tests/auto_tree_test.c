@@ -41,6 +41,7 @@ static char extern_string[] = "int generate_record();\0\0";
 
 char *COD_generate = "{\n\
     output.integer_field = generate_record();\n\
+    return 1;\n\
 }";
 
 extern int

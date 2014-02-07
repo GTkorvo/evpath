@@ -16,6 +16,7 @@ int hop_count;\n\
 hop_count = attr_ivalue(event_attrs, \"hop_count_atom\");\n\
 hop_count++;\n\
 set_int_attr(event_attrs, \"hop_count_atom\", hop_count);\n\
+return 1;\n\
 }\0\0";
 
 #define REPEAT_COUNT 100
