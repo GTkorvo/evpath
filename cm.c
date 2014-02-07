@@ -1742,6 +1742,9 @@ static int CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, lo
 
 static void process_pending_queue(CManager cm, void *junk)
 {
+    /* shortcircuit if no data, no lock */
+    if (!cm->pending_data_queue) return;
+
     CManager_lock(cm);
     while (cm->pending_data_queue) {
 	pending_queue entry = cm->pending_data_queue;
