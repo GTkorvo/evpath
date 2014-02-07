@@ -2121,6 +2121,7 @@ generate_multityped_code(CManager cm, struct response_spec *mrd, stone_type ston
     } else {
 	cod_add_param("input", "int", 1, parse_context);
 	}*/
+    cod_set_return_type("void", parse_context);
     code = cod_code_gen(mrd->u.multityped.function, parse_context);
     instance->response_type = mrd->response_type;
     instance->u.queued.ref_count = format_count;
