@@ -22,7 +22,7 @@
 #include "evpath.h"
 #include "cm_internal.h"
 
-static void add_format_to_cm ARGS((CManager cm, CMFormat format));
+static CMFormat add_format_to_cm ARGS((CManager cm, CMFormat format));
 
 CMFormat
 INT_CMlookup_format(CManager cm, FMStructDescList format_list)
@@ -132,7 +132,7 @@ INT_CMregister_format(CManager cm, FMStructDescList format_list)
     format->format_list = format_list;
     format->registration_pending = 1;
 
-    add_format_to_cm(cm, format);
+    format = add_format_to_cm(cm, format);
     return format;
 }
 
@@ -155,9 +155,17 @@ CMcomplete_format_registration(CMFormat format, int lock)
     
     CManager cm = format->cm;
     FMContext c = FMContext_from_FFS(format->cm->FFScontext);
+    int i;
     format->fmformat = register_data_format(c, format->format_list);
     format->ffsformat = FFSset_fixed_target(format->cm->FFScontext, 
 					    format->format_list);
+	    
+    for(i=0; i < cm->in_format_count; i++) {
+	if (cm->in_formats[i].format == format->ffsformat) {
+	    format->fmformat = NULL;
+	    return;
+	}
+    }
     cm->in_formats = INT_CMrealloc(cm->in_formats,
 			       sizeof(struct _CMincoming_format) *
 			       (cm->in_format_count + 1));
@@ -224,7 +232,7 @@ CMFormatList subformat_list;
 }
 #endif
 
-static void
+static CMFormat
 add_format_to_cm(CManager cm, CMFormat format)
 {
     char *format_name = format->format_name;
@@ -239,11 +247,25 @@ add_format_to_cm(CManager cm, CMFormat format)
 	} else if (order == 0) {
 	    /* have the same name */
 	    FMformat_order suborder;
-	    if (format->registration_pending) {
-		CMcomplete_format_registration(format, 0);
-	    }
 	    if (cm->reg_formats[i]->registration_pending) {
 		CMcomplete_format_registration(cm->reg_formats[i], 0);
+	    }
+	    if (format->registration_pending) {
+		CMcomplete_format_registration(format, 0);
+		if (format->registration_pending) {
+		    CMFormat dup;
+		    int i = 0;
+		    /* if still pending, it's a duplicate format */
+		    for(i=0; i < cm->in_format_count; i++) {
+			if (cm->in_formats[i].format == format->ffsformat) {
+			    free(format->format_name);
+			    free(format);
+			    return cm->in_formats[i].f2_format;
+			}
+		    }
+		    printf("Gack, duplicate format, but didn't find it\n");
+		    return NULL;
+		}
 	    }
 	    suborder = FMformat_cmp(format->fmformat, 
 				    cm->reg_formats[i]->fmformat);
@@ -267,6 +289,7 @@ add_format_to_cm(CManager cm, CMFormat format)
     }
     cm->reg_formats[insert_before] = format;
     cm->reg_format_count++;
+    return format;
 }
 
 extern void
