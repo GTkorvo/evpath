@@ -1725,9 +1725,14 @@ setup_nnti_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
     setenv("TRIOS_NNTI_USE_RDMA_TARGET_ACK", "FALSE", 1);
 
     if (!initialized) {
+	NNTI_result_t rc;
 	DROP_CM_LOCK(svc, trans->cm);
-	NNTI_init(NNTI_DEFAULT_TRANSPORT, NULL, &trans_hdl);
+	rc = NNTI_init(NNTI_DEFAULT_TRANSPORT, NULL, &trans_hdl);
 	ACQUIRE_CM_LOCK(svc, trans->cm);
+	if (rc != NNTI_OK) {
+	    printf("Failed to initialize NNTI transport, exiting\n");
+	    exit(1);
+	}
 	initialized++;
     }
     NNTI_get_url(&trans_hdl, url, sizeof(url));
