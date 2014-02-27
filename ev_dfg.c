@@ -22,6 +22,7 @@ static void
 queue_conn_shutdown_message(EVdfg dfg, int stone)
 {
     int count = 0;
+    CMtrace_out(cm, EVdfgVerbose, "EVDFG queue_conn_shutdown_message -  master DFG state is %s\n", str_state[dfg->state]);
     if (dfg->queued_messages == NULL) {
 	dfg->queued_messages = malloc(sizeof(dfg->queued_messages[0]) * 2);
     } else {
@@ -42,6 +43,7 @@ static void
 queue_node_join_message(EVdfg dfg, char *node_name, char *contact_string, CMConnection conn)
 {
     int count = 0;
+    CMtrace_out(cm, EVdfgVerbose, "EVDFG queue_node_join_message -  master DFG state is %s\n", str_state[dfg->state]);
     if (dfg->queued_messages == NULL) {
 	dfg->queued_messages = malloc(sizeof(dfg->queued_messages[0]) * 2);
     } else {
@@ -70,6 +72,11 @@ handle_queued_messages(EVdfg dfg)
     /* just do everything in order */
     /* beware the the list might change while we're running a handler */
     if (dfg->queued_messages == NULL) return;
+    CMtrace_out(cm, EVdfgVerbose, "EVDFG handle_queued_messages -  master DFG state is %s\n", str_state[dfg->state]);
+    if (dfg->state == DFG_Starting) {
+	CMtrace_out(cm, EVdfgVerbose, "EVDFG handle_queued_messages -  returning because state is inappropriate\n");
+	return;
+    }
     while (dfg->queued_messages[0].msg != NULL) {
 	int count;
 	int msg_type = dfg->queued_messages[0].msg_type;
@@ -476,6 +483,7 @@ dfg_conn_shutdown_handler(CManager cm, CMConnection conn, void *vmsg,
 	break;
     case DFG_Running:
 	dfg->state = DFG_Reconfiguring;
+	CMtrace_out(cm, EVdfgVerbose, "EVDFG conn_shutdown_handler -  master DFG state is now %s\n", str_state[dfg->state]);
 	handle_conn_shutdown(dfg, msg->stone);
 	break;
     }
@@ -789,6 +797,7 @@ INT_EVdfg_create(CManager cm)
     dfg->delete_list = NULL;
     dfg->no_deployment = 0;
     dfg->state = DFG_Joining;
+    CMtrace_out(cm, EVdfgVerbose, "EVDFG initialization -  master DFG state set to %s\n", str_state[dfg->state]);
     contact_list = INT_CMget_contact_list(cm);
     dfg->master_contact_str = attr_list_to_string(contact_list);
     dfg->startup_ack_condition = -1;
@@ -1518,10 +1527,17 @@ dfg_startup_ack_handler(CManager cm, CMConnection conn, void *vmsg,
     CMtrace_out(cm, EVdfgVerbose, "Client %s reports deployed, count %d\n", msg->node_id, dfg->deploy_ack_count);
     if ((dfg->deploy_ack_count == dfg->node_count) && (dfg->startup_ack_condition != -1)) {
 	CMtrace_out(cm, EVdfgVerbose, "That was the last one, Signalling %d\n", dfg->startup_ack_condition);
+	CMtrace_out(cm, EVdfgVerbose, "EVDFG exit startup ack handler -  master DFG state is %s\n", str_state[dfg->state]);
 	INT_CMCondition_signal(cm, dfg->startup_ack_condition);
 	dfg->startup_ack_condition = -1;
 	assert(dfg->state == DFG_Starting);
 	dfg->state = DFG_Running;
+	CMtrace_out(cm, EVdfgVerbose, "EVDFG  -  master DFG state set to %s\n", str_state[dfg->state]);
+    } else {
+      if (dfg->state == DFG_Reconfiguring) {
+	dfg->state = DFG_Running;
+	CMtrace_out(cm, EVdfgVerbose, "EVDFG after reconfiguration -  master DFG state set to %s\n", str_state[dfg->state]);
+      }
     }
     CMtrace_out(cm, EVdfgVerbose, "EVDFG exit startup ack handler -  master DFG state is %s\n", str_state[dfg->state]);
     handle_queued_messages(dfg);
@@ -1648,6 +1664,7 @@ perform_deployment(EVdfg dfg)
 	    deploy_to_node(dfg, i);
 	}
     } else {
+        CMtrace_out(cm, EVdfgVerbose, "EVDFG perform_deployment -  master DFG state set to %s\n", str_state[dfg->state]);
 	assert(dfg->state == DFG_Reconfiguring);
 	reconfig_add_bridge_stones(dfg);
 	reconfig_deploy(dfg);
