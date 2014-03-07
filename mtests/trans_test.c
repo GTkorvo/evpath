@@ -444,27 +444,11 @@ main(argc, argv)
 	global_exit_condition = CMCondition_get(cm, NULL);
 	if (start_subprocess) {
 	    subproc_proc = run_subprocess(&subproc_args[start_subproc_arg_count]);
-	    CMCondition_wait(cm, global_exit_condition);
-	    if (global_test_result) {
-		double secs, mbps;
-		get_double_attr(global_test_result, CM_TRANS_TEST_DURATION, &secs);
-		get_double_attr(global_test_result, CM_TRANS_MEGABITS_SEC, &mbps);
-		printf("transport = %s size = %ld, count = %d, secs = %g, Mbps = %g\n",
-		       transport, size, msg_count, secs, mbps);
-	    }
 #ifdef MPI_C_FOUND
 	} else if (use_mpi) {
 	    char master_contact[CONTACTLEN];             /* Local host name string */
 	    strcpy(master_contact, attr_list_to_string(contact_list));
 	    MPI_Bcast(master_contact,CONTACTLEN,MPI_CHAR,0,MPI_COMM_WORLD);
-	    CMCondition_wait(cm, global_exit_condition);
-	    if (global_test_result) {
-		double secs, mbps;
-		get_double_attr(global_test_result, CM_TRANS_TEST_DURATION, &secs);
-		get_double_attr(global_test_result, CM_TRANS_MEGABITS_SEC, &mbps);
-		printf("transport = %s size = %ld, count = %d, secs = %g, Mbps = %g\n",
-		       transport, size, msg_count, secs, mbps);
-	    }
 #endif
 	} else {
 	    int i;
@@ -473,7 +457,15 @@ main(argc, argv)
 		printf(" %s", subproc_args[i]);
 	    }
 	    printf("\n");
-	    CMCondition_wait(cm, global_exit_condition);
+	}
+	/* print stats */
+	CMCondition_wait(cm, global_exit_condition);
+	if (global_test_result) {
+	  double secs, mbps;
+	  get_double_attr(global_test_result, CM_TRANS_TEST_DURATION, &secs);
+	  get_double_attr(global_test_result, CM_TRANS_MEGABITS_SEC, &mbps);
+	  printf("transport = %s size = %ld, count = %d, secs = %g, Mbps = %g\n",
+		 transport, size, msg_count, secs, mbps);
 	}
 	free_attr_list(contact_list);
     } else {
