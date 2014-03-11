@@ -72,7 +72,7 @@ static FMField simple_field_list[] =
 
 static FMStructDescRec simple_format_list[] =
 { 
-    {"simple", simple_field_list}, sizeof(simple_rec), NULL,
+    {"simple", simple_field_list, sizeof(simple_rec), NULL},
     {"complex", complex_field_list, sizeof(complex), NULL},
     {"nested", nested_field_list, sizeof(nested), NULL},
    {NULL, NULL}
@@ -147,6 +147,11 @@ attr_list attrs;
 }
 
 static int do_regression_master_test();
+static atom_t CM_TRANSPORT;
+static atom_t CM_NETWORK_POSTFIX;
+static atom_t CM_MCAST_ADDR;
+static atom_t CM_MCAST_PORT;
+
 static int regression = 1;
 
 int
@@ -174,6 +179,11 @@ char **argv;
 	argc--;
     }
     srand48(getpid());
+    CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
+    CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
+    CM_MCAST_PORT = attr_atom_from_string("MCAST_PORT");
+    CM_MCAST_ADDR = attr_atom_from_string("MCAST_ADDR");
+
     if (regression && regression_master) {
 	return do_regression_master_test();
     }
@@ -226,6 +236,7 @@ char **argv;
 	attr_list attrs;
 	int remote_stone, stone = 0;
 	EVsource source_handle;
+	atom_t CMDEMO_TEST_ATOM;
 	if (argc == 2) {
 	    attr_list contact_list;
 	    int last_row_stones[8];
