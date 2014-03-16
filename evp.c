@@ -154,6 +154,10 @@ INT_EValloc_stone(CManager cm)
     stone->write_callback = -1;
     stone->proto_actions = NULL;
     stone->stone_attrs = CMcreate_attr_list(cm);
+    stone->output_count = 0;
+    stone->output_stone_ids = malloc(sizeof(int));
+    stone->output_stone_ids[0] = -1;
+
     stone->queue_size = 0;
     stone->is_stalled = 0;
     stone->stall_from = Stall_None;
@@ -283,7 +287,6 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	    }
 	    break;
 	case Action_Split:
-	    free(act->o.split_stone_targets);
 	    break;
 	case Action_Immediate:
         case Action_Multi:
@@ -291,7 +294,6 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	    if (act->o.imm.mutable_response_data != NULL) {
 		response_data_free(cm, act->o.imm.mutable_response_data);
 	    }
-	    free(act->o.imm.output_stone_ids);
 	    break;
         case Action_Store:
             storage_queue_cleanup(cm, &act->o.store.queue);
@@ -317,6 +319,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	INT_CMfree_attr_list(cm, stone->stone_attrs);
 	stone->stone_attrs = NULL;
     }
+    free(stone->output_stone_ids);
     remove_stone_from_lookup(evp, stone_num);
 }
 
@@ -567,9 +570,6 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
     memset(&stone->proto_actions[action_num], 0, sizeof(stone->proto_actions[0]));
     stone->proto_actions[action_num].data_state = Requires_Decoded;
     stone->proto_actions[action_num].action_type = Action_Immediate;
-    stone->proto_actions[action_num].o.imm.output_count = 0;
-    stone->proto_actions[action_num].o.imm.output_stone_ids = malloc(sizeof(int));
-    stone->proto_actions[action_num].o.imm.output_stone_ids[0] = -1;
     stone->proto_actions[action_num].o.imm.mutable_response_data = 
  	install_response_handler(cm, stone_num, action_spec, client_data, 
 				 &stone->proto_actions[action_num].matching_reference_formats);
@@ -604,9 +604,6 @@ INT_EVassoc_multi_action(CManager cm, EVstone stone_num,
     memset(&stone->proto_actions[action_num], 0, sizeof(stone->proto_actions[0]));
     stone->proto_actions[action_num].data_state = Requires_Decoded;
     stone->proto_actions[action_num].action_type = Action_Multi;
-    stone->proto_actions[action_num].o.imm.output_count = 0;
-    stone->proto_actions[action_num].o.imm.output_stone_ids = malloc(sizeof(int));
-    stone->proto_actions[action_num].o.imm.output_stone_ids[0] = -1;
     stone->proto_actions[action_num].o.imm.mutable_response_data = 
  	install_response_handler(cm, stone_num, action_spec, client_data, 
 				 &stone->proto_actions[action_num].matching_reference_formats);
@@ -634,9 +631,6 @@ INT_EVassoc_congestion_action(CManager cm, EVstone stone_num,
     memset(&stone->proto_actions[action_num], 0, sizeof(stone->proto_actions[0]));
     stone->proto_actions[action_num].data_state = Requires_Decoded;
     stone->proto_actions[action_num].action_type = Action_Congestion;
-    stone->proto_actions[action_num].o.imm.output_count = 0;
-    stone->proto_actions[action_num].o.imm.output_stone_ids = malloc(sizeof(int));
-    stone->proto_actions[action_num].o.imm.output_stone_ids[0] = -1;
     stone->proto_actions[action_num].o.imm.mutable_response_data = 
  	install_response_handler(cm, stone_num, action_spec, client_data, 
 				 &stone->proto_actions[action_num].matching_reference_formats);
@@ -962,37 +956,36 @@ int
 INT_EVaction_set_output(CManager cm, EVstone stone_num, EVaction act_num, 
 		    int output_index, EVstone output_stone)
 {
+    return INT_EVstone_set_output(cm, stone_num, output_index, output_stone);
+}
+
+int
+INT_EVstone_set_output(CManager cm, EVstone stone_num, 
+		       int output_index, EVstone output_stone)
+{
     stone_type stone;
     int output_count = 0;
 
     stone = stone_struct(cm->evp, stone_num);
     if (!stone) return -1;
-    if (act_num > stone->proto_action_count) return 0;
-    if (stone->proto_actions[act_num].action_type == Action_Store) {
-        assert(output_index == 0); /* more than one storage output not supported */
-        stone->proto_actions[act_num].o.store.target_stone_id = output_stone;
-    } else {
-        assert((stone->proto_actions[act_num].action_type == Action_Immediate) ||
-               (stone->proto_actions[act_num].action_type == Action_Multi));
-	if (CMtrace_on(cm, EVerbose)) {
-	    fprintf(CMTrace_file, "Setting output %d on ", output_index);
-	    fprint_stone_identifier(CMTrace_file, cm->evp, stone_num);
-	    fprintf(CMTrace_file, " to forward to ");
-	    fprint_stone_identifier(CMTrace_file, cm->evp, output_stone);
-	    fprintf(CMTrace_file, "\n");
-	}
-        output_count = stone->proto_actions[act_num].o.imm.output_count;
-        if (output_index >= output_count) {
-            stone->proto_actions[act_num].o.imm.output_stone_ids = 
-                realloc(stone->proto_actions[act_num].o.imm.output_stone_ids,
-                        sizeof(int) * (output_index + 2));
-            for ( ; output_count < output_index; output_count++) {
-                stone->proto_actions[act_num].o.imm.output_stone_ids[output_count] = -1;
-            }
-            stone->proto_actions[act_num].o.imm.output_count = output_index + 1;
-        }
-        stone->proto_actions[act_num].o.imm.output_stone_ids[output_index] = output_stone;
+    if (CMtrace_on(cm, EVerbose)) {
+	fprintf(CMTrace_file, "Setting output %d on ", output_index);
+	fprint_stone_identifier(CMTrace_file, cm->evp, stone_num);
+	fprintf(CMTrace_file, " to forward to ");
+	fprint_stone_identifier(CMTrace_file, cm->evp, output_stone);
+	fprintf(CMTrace_file, "\n");
     }
+    output_count = stone->output_count;
+    if (output_index >= output_count) {
+	stone->output_stone_ids = 
+	    realloc(stone->output_stone_ids,
+                        sizeof(int) * (output_index + 2));
+	for ( ; output_count < output_index; output_count++) {
+	    stone->output_stone_ids[output_count] = -1;
+	}
+	stone->output_count = output_index + 1;
+    }
+    stone->output_stone_ids[output_index] = output_stone;
     return 1;
 }
 
@@ -1373,28 +1366,10 @@ fdump_action(FILE* out, stone_type stone, response_cache_element *resp, int a, c
 	fprintf(out, "   Decoding action\n");
 	break;
     case Action_Split:
-	fprintf(out, "    Split target stones: ");
-	{
-	    int i = 0;
-	    while (act->o.split_stone_targets[i] != -1) {
-		fprintf(out, " %d", act->o.split_stone_targets[i]); i++;
-	    }
-	    fprintf(out, "\n");
-	}
+	fprintf(out, "    Split action\n");
 	break;
     case Action_Immediate: 
 	fprintf(out, "   Immediate action\n");
-	fprintf(out, "       Target Stones:");
-	{
-	    int i;
-	    for(i = 0; i < act->o.imm.output_count; i++) {
-		if (i != act->o.imm.output_count - 1) {
-		    fprintf(out, " %d,", act->o.imm.output_stone_ids[i]);
-		} else {
-		    fprintf(out, " %d\n", act->o.imm.output_stone_ids[i]);
-		}
-	    }
-	}
 	dump_mrd(act->o.imm.mutable_response_data);
 	break;
     case Action_Store:
@@ -1405,18 +1380,6 @@ fdump_action(FILE* out, stone_type stone, response_cache_element *resp, int a, c
 	break;
     case Action_Multi:
 	fprintf(out, "   Multi action\n");
-	fprintf(out, "       Target Stones: ");
-	{
-	    int i;
-	    for(i = 0; i < act->o.imm.output_count; i++) {
-		if (i != act->o.imm.output_count - 1) {
-		    fprintf(out, " %d,", act->o.imm.output_stone_ids[i]);
-		} else {
-		    fprintf(out, " %d", act->o.imm.output_stone_ids[i]);
-		}
-	    }
-            fprintf(out, "\n");
-	}
 	dump_mrd(act->o.imm.mutable_response_data);
 	break;
     default:
@@ -1435,7 +1398,18 @@ fdump_stone(FILE* out, stone_type stone)
 {
     int i;
     fprintf(out, "Dump stone ID %d, local addr %lx, default action %d\n",
-	   stone->local_id, (long)stone, stone->default_action);
+	    stone->local_id, (long)stone, stone->default_action);
+    fprintf(out, "       Target Stones:");
+    {
+	int i;
+	for(i = 0; i < stone->output_count; i++) {
+	    if (i != stone->output_count - 1) {
+		fprintf(out, " %d,", stone->output_stone_ids[i]);
+	    } else {
+		fprintf(out, " %d\n", stone->output_stone_ids[i]);
+	    }
+	}
+    }
     fprintf(out, "  proto_action_count %d:\n", stone->proto_action_count);
     for (i=0; i< stone->proto_action_count; i++) {
 	fdump_proto_action(out, stone, i, "    ");
@@ -1732,12 +1706,13 @@ process_events_stone(CManager cm, int s, action_class c)
 		int t = 0;
 		proto_action *p = &stone->proto_actions[act->proto_action_id];
 		update_event_length_sum(cm, p, event);
-		while (p->o.split_stone_targets[t] != -1) {
-		    internal_path_submit(cm, 
-					 p->o.split_stone_targets[t],
-					 event);
-		    t++;
-		    more_pending++;
+		for (t=0; t < stone->output_count; t++) {
+		    if (stone->output_stone_ids[t] != -1) {
+			internal_path_submit(cm, 
+					     stone->output_stone_ids[t],
+					     event);
+			more_pending++;
+		    }
 		}
 		return_event(evp, event);
 		break;
@@ -1752,8 +1727,8 @@ process_events_stone(CManager cm, int s, action_class c)
 		/* data is already in the right format */
 		func = act->o.imm.handler;
 		client_data = act->o.imm.client_data;
-		out_stones = p->o.imm.output_stone_ids;
-		out_count = p->o.imm.output_count;
+		out_stones = stone->output_stone_ids;
+		out_count = stone->output_count;
 		stone->new_enqueue_flag = 0;
 		stone->is_processing = 1;
 		func(cm, event, client_data, event->attrs, out_count, out_stones);
@@ -1799,8 +1774,8 @@ process_events_stone(CManager cm, int s, action_class c)
 		stone->new_enqueue_flag = 0;
 		stone->is_processing = 1;
 		if ((act->o.multi.handler)(cm, stone->queue, item,
-					   act->o.multi.client_data, p->o.imm.output_count,
-					   p->o.imm.output_stone_ids))
+					   act->o.multi.client_data, stone->output_count,
+					   stone->output_stone_ids))
 		    more_pending++;
 		stone = stone_struct(cm->evp, s);
 		stone->is_processing = 0;
@@ -2356,13 +2331,11 @@ INT_EVassoc_split_action(CManager cm, EVstone stone_num,
 	}
 	fprintf(CMTrace_file, "\n");
     }
-    stone->proto_actions[action_num].o.split_stone_targets = 
-	malloc((target_count + 1) * sizeof(EVstone));
+    stone->output_stone_ids = malloc((target_count + 1) * sizeof(EVstone));
     for (i=0; i < target_count; i++) {
-	stone->proto_actions[action_num].o.split_stone_targets[i] = 
-	    target_stone_list[i];
+	stone->output_stone_ids[i] = target_stone_list[i];
     }
-    stone->proto_actions[action_num].o.split_stone_targets[i] = -1;
+    stone->output_count = target_count;
     stone->default_action = action_num;
     stone->proto_action_count++;
     clear_response_cache(stone);
@@ -2389,15 +2362,11 @@ INT_EVaction_add_split_target(CManager cm, EVstone stone_num,
 	new_stone_target = lookup_local_stone(evp, new_stone_target);
     }
 
-    target_stone_list = stone->proto_actions[action_num].o.split_stone_targets;
-    while (target_stone_list && (target_stone_list[target_count] != -1)) {
-	target_count++;
-    }
+    target_stone_list = stone->output_stone_ids;
     target_stone_list = realloc(target_stone_list, 
-				(target_count + 2) * sizeof(EVstone));
-    target_stone_list[target_count] = new_stone_target;
-    target_stone_list[target_count+1] = -1;
-    stone->proto_actions[action_num].o.split_stone_targets = target_stone_list;
+				(stone->output_count + 1) * sizeof(EVstone));
+    target_stone_list[stone->output_count++] = new_stone_target;
+    stone->output_stone_ids = target_stone_list;
     return 1;
 }
 
@@ -2416,15 +2385,11 @@ INT_EVstone_add_split_target(CManager cm, EVstone stone_num, EVstone new_stone_t
 	    EVstone *target_stone_list;
 	    int target_count = 0;
 
-	    target_stone_list = stone->proto_actions[action_num].o.split_stone_targets;
-	    while (target_stone_list && (target_stone_list[target_count] != -1)) {
-		target_count++;
-	    }
+	    target_stone_list = stone->output_stone_ids;
 	    target_stone_list = realloc(target_stone_list, 
-					(target_count + 2) * sizeof(EVstone));
-	    target_stone_list[target_count] = new_stone_target;
-	    target_stone_list[target_count+1] = -1;
-	    stone->proto_actions[action_num].o.split_stone_targets = target_stone_list;
+					(stone->output_count + 1) * sizeof(EVstone));
+	    target_stone_list[stone->output_count++] = new_stone_target;
+	    stone->output_stone_ids = target_stone_list;
 	}
     }
     return 1;
@@ -2433,6 +2398,13 @@ INT_EVstone_add_split_target(CManager cm, EVstone stone_num, EVstone new_stone_t
 extern void
 INT_EVaction_remove_split_target(CManager cm, EVstone stone_num, 
 			  EVaction action_num, EVstone stone_target)
+{
+    INT_EVstone_remove_split_target(cm, stone_num, stone_target);
+}
+
+extern void
+INT_EVstone_remove_split_target(CManager cm, EVstone stone_num, 
+				EVstone stone_target)
 {
     event_path_data evp = cm->evp;
     stone_type stone;
@@ -2446,55 +2418,16 @@ INT_EVaction_remove_split_target(CManager cm, EVstone stone_num,
 	stone_target = lookup_local_stone(evp, stone_target);
     }
 
-    if (stone->proto_actions[action_num].action_type != Action_Split ) {
-	printf("Not split action\n");
-    }
-    target_stone_list = stone->proto_actions[action_num].o.split_stone_targets;
+    target_stone_list = stone->output_stone_ids;
     if (!target_stone_list) return;
     while (target_stone_list[target_count] != stone_target) {
 	target_count++;
     }
-    while (target_stone_list[target_count+1] != -1 ) {
+    for ( ; target_count < stone->output_count; target_count++) {
 	/* move them down, overwriting target */
 	target_stone_list[target_count] = target_stone_list[target_count+1];
-	target_count++;
     }
-    target_stone_list[target_count] = -1;
-}
-
-extern void
-INT_EVstone_remove_split_target(CManager cm, EVstone stone_num, EVstone stone_target)
-{
-    event_path_data evp = cm->evp;
-    stone_type stone;
-    int action_num = 0;
-
-    stone = stone_struct(evp, stone_num);
-    if (!stone) return;
-
-    if ((stone_target & 0x80000000) == 0x80000000) {
-	stone_target = lookup_local_stone(evp, stone_target);
-    }
-
-    for (action_num = 0; action_num < stone->proto_action_count; action_num ++) {
-	if (stone->proto_actions[action_num].action_type == Action_Split ) {
-	    EVstone *target_stone_list;
-	    int target_count = 0;
-
-	    target_stone_list = stone->proto_actions[action_num].o.split_stone_targets;
-	    if (!target_stone_list) return;
-	    while (target_stone_list[target_count] != stone_target) {
-	        if (target_stone_list[target_count] == -1) return;
-		target_count++;
-	    }
-	    while (target_stone_list[target_count+1] != -1 ) {
-		/* move them down, overwriting target */
-		target_stone_list[target_count] = target_stone_list[target_count+1];
-		target_count++;
-	    }
-	    target_stone_list[target_count] = -1;
-	}
-    }
+    stone->output_count--;
 }
 
 void
@@ -2656,10 +2589,17 @@ foreach_source_inner(CManager cm, EVstone to_stone, char *seen,
             }
         } else {
             int was_stalled = stone->is_stalled;
+	    int i;
+	    int matches = 0;
+	    int matches_recursive = 0;
+	    for (i = 0; i < stone->output_count; ++i) {
+		if (to_stone == stone->output_stone_ids[i]) {
+		    ++matches;
+		    ++matches_recursive;
+		}
+	    }
             for (cur_action = 0; cur_action < stone->proto_action_count; ++cur_action) {
                 proto_action *act;
-                int matches = 0;
-                int matches_recursive = 0;
                 act = &stone->proto_actions[cur_action];
                 switch (act->action_type) {
                 case Action_Store:
@@ -2668,15 +2608,6 @@ foreach_source_inner(CManager cm, EVstone to_stone, char *seen,
                     }
                     break;
                 case Action_Split:
-                    {
-                        int i;
-                        for (i = 0; act->o.split_stone_targets[i] != -1; ++i) {
-                            if (act->o.split_stone_targets[i] == to_stone) {
-                                ++matches;
-                                ++matches_recursive;
-                            }
-                        }
-                    }
                     break;
                 case Action_Filter:
                     if (to_stone == act->o.term.target_stone_id) {
@@ -2685,15 +2616,6 @@ foreach_source_inner(CManager cm, EVstone to_stone, char *seen,
                     }
                     break;
                 case Action_Immediate:
-                    {
-                        int i;
-                        for (i = 0; i < act->o.imm.output_count; ++i) {
-                            if (to_stone == act->o.imm.output_stone_ids[i]) {
-                                ++matches;
-                                ++matches_recursive;
-                            }
-                        }
-                    }
                     break;
                 case Action_Terminal:
                     /* nothing to do */

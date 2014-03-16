@@ -1335,11 +1335,36 @@ EVcreate_immediate_action(CManager cm, char *action_spec, EVstone *target_list);
  * directed. 
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
+ *
+ * \deprecated Early EVPath associated output ports with actions
+ * individually, with the result that the topology of the stone graph was
+ * potentially multiplex for each action, rather than being a property of
+ * the stone.  This is now changed, and all actions share the same set of
+ * output ports.  When this routine is called, the action parameter is
+ * ignored, but new code should use EVstone_set_output().
  */
 /*REMOTE*/
 extern int
 EVaction_set_output(CManager cm, EVstone stone, EVaction action, 
 		    int output_index, EVstone target_stone);
+
+/*!
+ * Direct a particular output port of a stone to another local target stone
+ *
+ * Immediate and queued actions have one or more outputs from which data
+ * will emerge.  EVaction_set_output() is used to assign each of these
+ * outputs to a local stone.  (It is NOT used with output stones.)
+ * \param cm The CManager from which this stone was allocated.
+ * \param stone The stone to which the action is registered.
+ * \param output_index The zero-based index of the output to assign.
+ * \param target_stone The stone to which the specified output should be
+ * directed. 
+ * \return An action identifier, an integer EVaction value, which can be used
+ * in subsequent calls to modify or remove the action.
+ */
+/*REMOTE*/
+extern int
+EVstone_set_output(CManager cm, EVstone stone, int output_index, EVstone target_stone);
 
 /*!
  * Associate an immediate non-ECL filter action with a stone.
@@ -2233,11 +2258,58 @@ extern void
 EVassoc_conversion_action(CManager cm, int stone_id, int stage, FMFormat target_format,
 			  FMFormat incoming_format);
 
+/*!
+ * Perform a transport-level bandwidth test
+ *
+ * This function requests that EVPath perform a transport-level performance
+ * check (currently of bandwidth) by sending a series of messages of a fixed
+ * size, broken up internally into a fixed number of vectors (a la
+ * writev()).  Th nature of the test is controled by the 'how' attribute
+ * list parameter.  In particular, the CM_TRANS_TEST_SIZE attribute controls
+ * the message size in bytes, the CM_TRANS_TEST_VECS attribute specifies how
+ * many vectors the message is to be broken up into (each vector will be
+ * roughly size/vectors in bytes), and CM_TRANS_TEST_REPEAT gives the total
+ * number of messages to send.  The total number of bytes sent will be size
+ * * repeat_count.  The return attribute list value will contain at least
+ * the following double-valued attributes, CM_TRANS_TEST_DURATION -
+ * containing the duration of the test in seconds, and CM_TRANS_MEGABITS_SEC
+ * - containing the estimated bandwidth in megabits per sec.  I.E. size *
+ * repeat_count * 8 / 1000 * 1000 * secs.  Note the "bits", not bytes, and
+ * that we use 1000 rather than 1024 to more closely match networking
+ * conventions.  
+ * 
+ * \param conn The CMConnection on which to perform the bandwidth test 
+ * \param how Parameters to control the bandwidth test
+ */
 extern attr_list
 CMtest_transport(CMConnection conn, attr_list how);
 
+/*!
+ * Callback function to support transport tests
+ * 
+ * CMperf_upcall is the type of a callback function that is used as part of
+ * CM transport testing.  This function is called on the receiving side of
+ * the transport for every message that arrives.  The data of the message
+ * and it's length are provided in parameters 'buffer' and 'length'
+ * respectively.  The 'type' parameter varies with the message that arrives.
+ * Current types are '0' for test initiation (I.E. the first short header of
+ * a bandwidth tests), '1' for "body" messages (I.E. the N-1 repeats of a
+ * bandwidth test), and '2' for the "final" message (I.E. the last message
+ * of a bandwidth test).  The return value is only read for the final
+ * message, and it is returned to caller of CMtest_transport(), so should
+ * contain the final values of testing.
+ *
+ */
 typedef attr_list (*CMperf_upcall)(CManager cm, void *buffer, long length, int type, attr_list list);
 
+/*!
+ * install the callback function to support transport testing
+ *
+ * CMinstall_perf_upcall() sets up an upcall to be used when
+ * CMtest_transport() initiates a transport-level performance test.
+ * \param cm The CManager in which to register the upcall.
+ * \param upcall  The function to be called when a performance message arrives.
+ */
 extern void
 CMinstall_perf_upcall(CManager cm, CMperf_upcall upcall);
 

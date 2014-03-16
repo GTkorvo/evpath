@@ -80,8 +80,6 @@ typedef struct multi_cache_vals {
 
 typedef struct immediate_action_struct {
     void *mutable_response_data;
-    int output_count;
-    int *output_stone_ids;
 } immediate_action_vals;
 
 typedef struct queue_item {
@@ -139,7 +137,6 @@ typedef struct _proto_action {
 	thread_bridge_action_vals thr_bri;
 	decode_action_vals decode;
 	immediate_action_vals imm;
-	int *split_stone_targets;
         struct storage_proto_vals store;
     }o;
     encode_state data_state;
@@ -196,6 +193,8 @@ typedef struct _stone {
     struct _proto_action *proto_actions;
     CMTaskHandle periodic_handle;
     attr_list stone_attrs;
+    int output_count;
+    int *output_stone_ids;
 
     CMConnection last_remote_source;
     int squelch_depth;
@@ -339,6 +338,9 @@ INT_EVstone_remove_split_target(CManager cm, EVstone stone, EVstone target_stone
 extern int
 INT_EVaction_set_output(CManager cm, EVstone stone, EVaction action, 
 		    int output_index, EVstone output_stone);
+extern int
+INT_EVstone_set_output(CManager cm, EVstone stone, int output_index, EVstone output_stone);
+
 extern EVaction
 INT_EVassoc_filter_action(CManager cm, EVstone stone, 
 			  FMStructDescList incoming_format_list, 
