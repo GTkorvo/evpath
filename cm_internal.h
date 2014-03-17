@@ -246,7 +246,6 @@ struct _CMConnection {
 
     int write_callback_len;
     CMConnHandlerList write_callbacks;
-    FMContext IOsubcontext;
     AttrBuffer attr_encode_buffer;
 
     char header_buffer[HEADER_BUFFER_SIZE];		/* holds data until we know final size */

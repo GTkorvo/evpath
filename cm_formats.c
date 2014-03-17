@@ -36,66 +36,6 @@ INT_CMlookup_format(CManager cm, FMStructDescList format_list)
     return NULL;
 }
 
-#ifdef USER
-FFSFormat
-INT_CMlookup_user_format(cm, format_list)
-CManager cm;
-FMStructDescList format_list;
-{
-    int i;
-    for (i=0; i< cm->reg_user_format_count; i++) {
-	if (cm->reg_user_formats[i]->format_list == format_list) {
-	    return cm->reg_user_formats[i]->format;
-	}
-    }
-    return NULL;
-}
-
-FMContext
-INT_CMget_user_type_context(cm)
-CManager cm;
-{
-    return create_IOsubcontext(cm->IOcontext);
-}
-
-void
-INT_CMfree_user_type_context(cm, context)
-CManager cm;
-IOContext context;
-{
-    int i, j;
-    CMFormat* tmp_user_formats;
-    int new_count = 0;
-    int dead_count = 0;
-
-
-    for (i=0; i < cm->reg_user_format_count; i++) {
-        if (cm->reg_user_formats[i]->IOsubcontext == context) {
-          dead_count++;
-        }
-    }
-
-    new_count = cm->reg_user_format_count - dead_count;
-    tmp_user_formats = INT_CMmalloc (sizeof (CMFormat) * new_count);
-    
-    for (i=0, j=0; i < cm->reg_user_format_count; i++) {
-	if (cm->reg_user_formats[i]->IOsubcontext != context) {
-	    tmp_user_formats[j++] = cm->reg_user_formats[i];
-	} else {
-	    INT_CMfree(cm->reg_user_formats[i]->format_name);
-	    INT_CMfree(cm->reg_user_formats[i]);
-	}
-    }
-
-    free_IOcontext (context);
-    INT_CMfree (cm->reg_user_formats);
-
-    cm->reg_user_format_count = new_count;
-    cm->reg_user_formats = tmp_user_formats;
-
-}
-#endif 
-
 CMFormat
 INT_CMregister_simple_format(CManager cm, char *format_name, FMFieldList field_list, int struct_size)
 {
@@ -188,49 +128,6 @@ CMcomplete_format_registration(CMFormat format, int lock)
     }
     format->registration_pending = 0;
 }
-
-#ifdef USER
-IOFormat
-INT_CMregister_user_format(cm, type_context, format_name, field_list, 
-		       subformat_list)
-CManager cm;
-IOContext type_context;
-char *format_name;
-IOFieldList field_list;
-CMFormatList subformat_list;
-{
-    CMFormat format;
-
-    if ((field_list == NULL) || (format_name == NULL) 
-	|| (cm == NULL) || (type_context == NULL)) 
-	return NULL;
-
-    format = INT_CMmalloc(sizeof(struct _CMFormat));
-    
-    format->cm = cm;
-    format->format_name = INT_CMmalloc(strlen(format_name) + 1);
-    strcpy(format->format_name, format_name);
-    /*  create a new subcontext (to localize name resolution) */
-    format->IOsubcontext = type_context;
-    format->format = NULL;
-    format->field_list_addr = field_list;
-    format->handler = (CMHandlerFunc) NULL;
-    format->client_data = NULL;
-    format->field_list = field_list;
-    format->subformat_list = subformat_list;
-    format->registration_pending = 1;
-    format->opt_info = NULL;
-    CMcomplete_format_registration(format, 0);
-    if (format->format != NULL) {
-	add_user_format_to_cm(cm,format);
-	return format->format;
-    } else {
-	INT_CMfree(format->format_name);
-	INT_CMfree(format);
-	return NULL;
-    }
-}
-#endif
 
 static CMFormat
 add_format_to_cm(CManager cm, CMFormat format)
