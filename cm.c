@@ -2318,10 +2318,15 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 	free_attr_list(attrs);
 	return 0;
     }
-    for (i = 0; i < cm->reg_format_count; i++) {
-	if (cm->reg_formats[i]->registration_pending)
-	    CMcomplete_format_registration(cm->reg_formats[i], 0);
+    {
+	char *incoming_name = name_of_FMformat(FMformat_from_ID(FMContext_from_FFS(cm->FFScontext), data_buffer));
 
+	for (i = 0; i < cm->reg_format_count; i++) {
+	    if ((cm->reg_formats[i]->registration_pending) && 
+		(strcmp(incoming_name, cm->reg_formats[i]->format_name) == 0)) {
+		CMcomplete_format_registration(cm->reg_formats[i], 0);
+	    }
+	}
     }
     format = FFS_target_from_encode(conn->cm->FFScontext, data_buffer);
     if (format == NULL) {
