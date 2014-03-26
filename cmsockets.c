@@ -1179,7 +1179,7 @@ attr_list listen_info;
 	int low_bound = 26000;
 	int high_bound = 26100;
 	int size = high_bound - low_bound;
-	int tries = 10;
+	int tries = 30;
 	int result = SOCKET_ERROR;
 	srand48(seedval);
 	while (tries > 0) {
@@ -1190,9 +1190,17 @@ attr_list listen_info;
 			  sizeof sock_addr);
 	    tries--;
 	    if (result != SOCKET_ERROR) tries = 0;
-	    if (tries == 5) {
+	    if (tries%5 == 4) {
 		/* try reseeding in case we're in sync with another process */
 		srand48(time(NULL) + getpid());
+	    }
+	    if (tries == 20) {
+		/* damn, tried a lot, increase the range */
+		size = 1000;
+	    }
+	    if (tries == 10) {
+		/* damn, tried a lot more, increase the range */
+		size = 10000;
 	    }
 	}
 	if (result == SOCKET_ERROR) {
