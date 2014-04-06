@@ -761,7 +761,8 @@ static queue_item *cod_find_index(int absp, struct ev_state_data *ev_state, int 
 
 /* }}} */
 
-static void cod_ev_discard(cod_exec_context ec, int absp, int queue, int index) {
+static void cod_ev_discard(cod_exec_context ec, int absp, int queue, int index) 
+{
     struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
     CManager cm = ev_state->cm;
     queue_item *item;
@@ -797,7 +798,8 @@ port_to_stone(struct ev_state_data *evstate, int port)
 }
 
 static void cod_ev_discard_and_submit(cod_exec_context ec,
-        int absp, int port, int queue, int index) {
+        int absp, int port, int queue, int index) 
+{
     struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
     CManager cm = ev_state->cm;
     queue_item *item;
@@ -820,12 +822,12 @@ static void cod_ev_discard_and_submit(cod_exec_context ec,
     internal_path_submit(cm, target_stone, item->item);
 
     ev_state->did_output++;
-
     EVdiscard_queue_item(cm, ev_state->stone, item);
 }
 
 static void cod_ev_submit(cod_exec_context ec,
-        int absp, int port, int queue, int index) {
+        int absp, int port, int queue, int index) 
+{
     struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
     CManager cm = ev_state->cm;
     queue_item *item;
@@ -848,7 +850,6 @@ static void cod_ev_submit(cod_exec_context ec,
     internal_path_submit(cm, target_stone, item->item);
 
     ev_state->did_output++;
-
 }
 
 static void cod_ev_submit_rel(cod_exec_context ec,int port, int queue, int index) 
@@ -861,26 +862,22 @@ static void cod_ev_submit_abs(cod_exec_context ec,int port, int queue, int index
     cod_ev_submit(ec, 1, port, queue, index);
 }
 
-static int cod_ev_get_port(cod_exec_context ec, int queue) {
-
-	struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
-
-	int port = (ev_state->out_stones[queue]);
-
-	return  port;
-
+static int cod_ev_get_port(cod_exec_context ec, int queue)
+{
+    struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
+    int port = (ev_state->out_stones[queue]);
+    
+    return  port;
 }
 
-static int cod_ev_target_size(cod_exec_context ec, int stone) {
+static int cod_ev_target_size(cod_exec_context ec, int stone_num)
+{
+    struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
 
-	struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
-
-	CManager cm = ev_state->cm;
-
-	int queue_len = cm->evp->stone_map[stone].queue_size;
-
-	return queue_len;
-
+    CManager cm = ev_state->cm;
+    stone_type stone = stone_struct(cm->evp, stone_num);
+    if (!stone) return -1;
+    return stone->queue_size;
 }
 
 
@@ -1448,6 +1445,32 @@ INT_EVadd_standard_structs(CManager cm, FMStructDescList *lists)
     }
 }
 
+static
+int
+cod_max_output(cod_exec_context ec)
+{
+    struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
+    CManager cm = ev_state->cm;
+    event_path_data evp = ev_state->cm->evp;
+    return ev_state->out_count;
+}
+
+static int
+cod_target_stone_on_port(cod_exec_context ec, int port, void *data, void *type_info, attr_list attrs)
+{
+    struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
+    CManager cm = ev_state->cm;
+    event_path_data evp = ev_state->cm->evp;
+    event_item *event;
+    EVstone target_stone = port_to_stone(ev_state, port);
+
+    if (target_stone == -1) {
+        printf("Port %d on stone %d invalid\n", port, ev_state->stone);
+	return -1;
+    }
+    return target_stone;
+}
+
 static void
 internal_cod_submit_attr(cod_exec_context ec, int port, void *data, void *type_info, attr_list attrs)
 {
@@ -1515,6 +1538,8 @@ add_standard_routines(stone_type stone, cod_parse_context context)
 		char * strstr(char * haystack, char * needle);\n\
 		long lrand48();\n\
 		double drand48();\n\
+		int EVmax_output(cod_exec_context ec);\n\
+		int EVtarget_stone_on_port(cod_exec_context ec, int port);\n\
 		void EVsubmit(cod_exec_context ec, int port, void* d, cod_type_spec dt);\n\
 		void EVsubmit_attr(cod_exec_context ec, int port, void* d, cod_type_spec dt, attr_list list);\n\
 		attr_list stone_attrs;\n";
@@ -1531,6 +1556,8 @@ add_standard_routines(stone_type stone, cod_parse_context context)
 	{"EVsubmit", (void *) 0},
 	{"EVsubmit_attr", (void *) 0},
 	{"sleep", (void*) 0},
+	{"EVmax_output", (void*)0},
+	{"EVtarget_stone_on_port", (void*)0},
 	{(void *) 0, (void *) 0}
     };
 
@@ -1550,7 +1577,8 @@ add_standard_routines(stone_type stone, cod_parse_context context)
     externs[7].extern_value = (void *) (long) &internal_cod_submit;
     externs[8].extern_value = (void *) (long) &internal_cod_submit_attr;
     externs[9].extern_value = (void *) (long) &sleep;
-    //externs[9].extern_value = (void *) (long) time;
+    externs[10].extern_value = (void *) (long) &cod_max_output;
+    externs[11].extern_value = (void *) (long) &cod_target_stone_on_port;
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
@@ -1672,7 +1700,7 @@ add_queued_routines(cod_parse_context context, FMFormat *formats)
         int EVcount(cod_exec_context ec, int queue);\n\
         int EVcount_full(cod_exec_context ec, cod_closure_context type);\n\
         int EVpresent(cod_exec_context ec, int queue, int index);\n\
-		int EVget_port(cod_exec_context ec, int queue);\n\
+	int EVget_port(cod_exec_context ec, int queue);\n\
     	int EVtarget_size(cod_exec_context ec, int outstone);\n\
         void EVget_attrs(cod_exec_context ec, int queue, int index);\n\
         void EVget_attrs_full(cod_exec_context ec, cod_closure_context queue, int index);\n";
