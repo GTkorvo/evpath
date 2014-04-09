@@ -55,15 +55,19 @@ extern void EVdfg_register_node_list(EVdfg dfg, char** list);
 extern void EVdfg_assign_canonical_name(EVdfg dfg, char *given_name, char *canonical_name);
 typedef int (*EVdfgJoinHandlerFunc) (EVdfg dfg, char *identifier, void* available_sources, void *available_sinks);
 typedef void (*EVdfgFailHandlerFunc) (EVdfg dfg, char *identifier, int reporting_stone);
+typedef void (*EVdfgReconfigHandlerFunc) (EVdfg dfg);
 extern void EVdfg_node_join_handler (EVdfg dfg, EVdfgJoinHandlerFunc func);
 extern void EVdfg_node_fail_handler (EVdfg dfg, EVdfgFailHandlerFunc func);
+extern void EVdfg_node_reconfig_handler (EVdfg dfg, EVdfgReconfigHandlerFunc func);
 
 extern int EVdfg_realize(EVdfg dfg);
 extern int EVdfg_ready_wait(EVdfg dfg);
 extern void EVdfg_join_dfg(EVdfg dfg, char *node_name, char *master_contact);
 
 extern int EVdfg_shutdown(EVdfg dfg, int result);
+extern int EVdfg_force_shutdown(EVdfg dfg, int result);
 extern int EVdfg_wait_for_shutdown(EVdfg dfg);
+extern void EVdfg_ready_for_shutdown(EVdfg dfg);
 
 /*
   (VERY) tentative reconfiguration interface
@@ -92,7 +96,6 @@ EVdfg_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSi
 extern void
 EVdfg_register_raw_sink_handler(CManager cm, char *name, EVRawHandlerFunc handler);
 
-extern void EVdfg_ready_for_shutdown(EVdfg dfg);
 extern int EVdfg_source_active(EVsource src);
 extern int EVdfg_active_sink_count(EVdfg dfg);
 

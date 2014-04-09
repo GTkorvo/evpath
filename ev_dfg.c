@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <strings.h>
 
+#include "cod.h"
 #include "evpath.h"
 #include "cm_internal.h"
 #include "ev_deploy.h"
@@ -334,6 +335,15 @@ FMStructDescRec EVdfg_conn_shutdown_format_list[] = {
     {"EVdfg_conn_shutdown", EVconn_shutdown_msg_flds, sizeof(EVconn_shutdown_msg), NULL},
     {NULL, NULL, 0, NULL}
 };
+FMField EVflush_attrs_reconfig_msg_flds[] = {
+    {"reconfig", "integer", sizeof(int), FMOffset(EVflush_attrs_reconfig_ptr, reconfig)},
+    {NULL, NULL, 0, 0}
+};
+
+FMStructDescRec EVdfg_flush_attrs_reconfig_format_list[] = {
+    {"EVflush_attrs_reconfig", EVflush_attrs_reconfig_msg_flds, sizeof(EVflush_attrs_reconfig_msg), NULL},
+    {NULL, NULL, 0, NULL}
+};
 
 FMField EVdfg_stone_flds[] = {
     {"global_stone_id", "integer", sizeof(int), 
@@ -455,6 +465,12 @@ handle_conn_shutdown(EVdfg dfg, int stone)
 	dfg->sig_reconfig_bool = 1;
 	check_all_nodes_registered(dfg);
     }
+}
+
+static void
+dfg_flush_attr_reconfig_shutdown_handler(CManager cm, CMConnection conn, void *vmsg, 
+			  void *client_data, attr_list attrs)
+{
 }
 
 static void
@@ -779,11 +795,37 @@ free_dfg(CManager cm, void *vdfg)
     free(dfg);
 }
 
+static char dfg_extern_string[] = "\
+	void EVdfg_trigger_reconfiguration(cod_exec_context ec);\n\
+	void EVdfg_flush_attrs(cod_exec_context ec);\n\
+";
+
+static cod_extern_entry dfg_extern_map[] = {
+    {"EVdfg_trigger_reconfiguration", (void *) 0},
+    {"EVdfg_flush_attrs", (void *) 0},
+    {(void*)0, (void*)0}
+};
+
+static void
+cod_EVdfg_trigger_reconfig()
+{
+    printf("Got trigger reconfig!\n");
+}
+
+static void
+cod_EVdfg_flush_attrs()
+{
+    printf("Got flush_attrs!\n");
+}
+
 extern EVdfg
 INT_EVdfg_create(CManager cm)
 {
     EVdfg dfg = malloc(sizeof(struct _EVdfg));
     attr_list contact_list;
+
+    dfg_extern_map[0].extern_value = (void*)(long)cod_EVdfg_trigger_reconfig;
+    dfg_extern_map[1].extern_value = (void*)(long)cod_EVdfg_flush_attrs;
 
     memset(dfg, 0, sizeof(struct _EVdfg));
     dfg->cm = cm;
@@ -803,6 +845,7 @@ INT_EVdfg_create(CManager cm)
     dfg->startup_ack_condition = -1;
     free_attr_list(contact_list);
     INT_EVregister_close_handler(cm, dfg_stone_close_handler, (void*)dfg);
+    INT_EVadd_standard_routines(cm, dfg_extern_string, dfg_extern_map);
     INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_register_format_list),
 			   node_register_handler, dfg);
     INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_ready_format_list),
@@ -815,6 +858,8 @@ INT_EVdfg_create(CManager cm)
 			   dfg_shutdown_handler, dfg);
     INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_conn_shutdown_format_list),
 			   dfg_conn_shutdown_handler, dfg);
+    INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_flush_attrs_reconfig_format_list),
+			   dfg_flush_attr_reconfig_shutdown_handler, dfg);
     INT_CMadd_shutdown_task(cm, free_dfg, dfg, FREE_TASK);
     return dfg;
 }
@@ -939,6 +984,29 @@ extern int
 INT_EVdfg_shutdown(EVdfg dfg, int result)
 {
     if (dfg->already_shutdown) printf("Node %d, already shut down BAD!\n", dfg->my_node_id);
+    if (dfg->master_connection != NULL) {
+	/* we are a client, tell the master to shutdown */
+	CMFormat shutdown_msg = INT_CMlookup_format(dfg->cm, EVdfg_shutdown_format_list);
+	EVshutdown_msg msg;
+	msg.value = result;
+	INT_CMwrite(dfg->master_connection, shutdown_msg, &msg);
+	/* and wait until we hear back */
+    } else {
+	possibly_signal_shutdown(dfg, result, NULL);
+    }
+    if (!dfg->already_shutdown) {
+	CManager_unlock(dfg->cm);
+	CMCondition_wait(dfg->cm, new_shutdown_condition(dfg, dfg->master_connection));
+	CManager_lock(dfg->cm);
+    }
+    return dfg->shutdown_value;
+}
+
+extern int
+INT_EVdfg_force_shutdown(EVdfg dfg, int result)
+{
+    result |= STATUS_FORCE;
+    if (dfg->already_shutdown) printf("Node %d, already contributed to shutdown.  Don't call shutdown twice!\n", dfg->my_node_id);
     if (dfg->master_connection != NULL) {
 	/* we are a client, tell the master to shutdown */
 	CMFormat shutdown_msg = INT_CMlookup_format(dfg->cm, EVdfg_shutdown_format_list);
@@ -1737,6 +1805,7 @@ possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn)
     EVshutdown_msg msg;
     int status = STATUS_SUCCESS;
     int shutdown = 1;
+    int force_shutdown = 0;
     int signal_from_client = -1;
     assert(CManager_locked(dfg->cm));
     for (i=0; i < dfg->node_count; i++) {
@@ -1748,8 +1817,17 @@ possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn)
 	}
     }
 	
-    CMtrace_out(cm, EVdfgVerbose, "Client %d signals %d, See if we're all ready to signal shutdown\n", signal_from_client, value);
+    if ((value >= 0) && ((value & STATUS_FORCE) == STATUS_FORCE)) {
+	force_shutdown = 1;
+	value ^= STATUS_FORCE;   /* yes, that's xor-assign */
+    }
+    if (force_shutdown) {
+	CMtrace_out(cm, EVdfgVerbose, "Client %d signals %d, forces shutdown\n", signal_from_client, value);
+    } else {
+	CMtrace_out(cm, EVdfgVerbose, "Client %d signals %d, See if we're all ready to signal shutdown\n", signal_from_client, value);
+    }
     dfg->nodes[signal_from_client].shutdown_status_contribution = value;
+    
     for (i=0; i < dfg->node_count; i++) {
 	CMtrace_out(cm, EVdfgVerbose, "NODE %d status is :", i);
 	switch (dfg->nodes[i].shutdown_status_contribution) {
@@ -1771,7 +1849,12 @@ possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn)
 			dfg->nodes[i].shutdown_status_contribution);
 	    status |= dfg->nodes[i].shutdown_status_contribution;
 	    break;
-	}	    
+	}
+    }
+    if (force_shutdown) {
+	shutdown = 1;
+	status = value;
+	CMtrace_out(cm, EVdfgVerbose, "DFG undergoing forced shutdown\n");
     }
     if (!shutdown) {
 	CMtrace_out(cm, EVdfgVerbose, "DFG not ready for shutdown\n");
@@ -1810,6 +1893,11 @@ extern void INT_EVdfg_node_join_handler(EVdfg dfg, EVdfgJoinHandlerFunc func)
 extern void INT_EVdfg_node_fail_handler(EVdfg dfg, EVdfgFailHandlerFunc func)
 {
     dfg->node_fail_handler = func;
+}
+
+extern void INT_EVdfg_node_reconfig_handler(EVdfg dfg, EVdfgReconfigHandlerFunc func)
+{
+    dfg->node_reconfig_handler = func;
 }
 
 static void

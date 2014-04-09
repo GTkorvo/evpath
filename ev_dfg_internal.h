@@ -28,6 +28,10 @@ typedef struct _EVconn_shutdown_msg {
     int stone;
 } EVconn_shutdown_msg, *EVconn_shutdown_ptr;
 
+typedef struct _EVflush_attrs_reconfig_msg {
+    int reconfig;
+} EVflush_attrs_reconfig_msg, *EVflush_attrs_reconfig_ptr;
+
 typedef struct _EVdfg_msg_stone {
     int global_stone_id;
     char *attrs;
@@ -100,6 +104,7 @@ extern char *str_state[];
 #define STATUS_NO_CONTRIBUTION -1
 #define STATUS_SUCCESS 0
 #define STATUS_FAILURE 1
+#define STATUS_FORCE 0x10000
 
 struct _EVdfg {
     CManager cm;
@@ -116,6 +121,7 @@ struct _EVdfg {
     EVint_node_list nodes;
     EVdfgJoinHandlerFunc node_join_handler;
     EVdfgFailHandlerFunc node_fail_handler;
+    EVdfgReconfigHandlerFunc node_reconfig_handler;
     int my_node_id;
     int realized;
     int already_shutdown;
@@ -152,6 +158,7 @@ extern char* INT_EVdfg_get_contact_list ( EVdfg dfg );
 extern void INT_EVdfg_join_dfg ( EVdfg dfg, char *node_name, char *master_contact );
 extern void INT_EVdfg_link_port ( EVdfg_stone source, int source_port, EVdfg_stone destination );
 extern void INT_EVdfg_node_fail_handler ( EVdfg dfg, EVdfgFailHandlerFunc func );
+extern void INT_EVdfg_node_reconfig_handler ( EVdfg dfg, EVdfgReconfigHandlerFunc func );
 extern void INT_EVdfg_node_join_handler ( EVdfg dfg, EVdfgJoinHandlerFunc func );
 extern void INT_EVdfg_ready_for_shutdown ( EVdfg dfg );
 extern int INT_EVdfg_ready_wait ( EVdfg dfg );
@@ -169,6 +176,7 @@ extern void INT_EVdfg_register_sink_handler ( CManager cm, char *name, FMStructD
 extern void INT_EVdfg_register_source ( char *name, EVsource src );
 extern void INT_EVdfg_set_attr_list ( EVdfg_stone stone, attr_list attrs );
 extern int INT_EVdfg_shutdown ( EVdfg dfg, int result );
+extern int INT_EVdfg_force_shutdown ( EVdfg dfg, int result );
 extern int INT_EVdfg_source_active ( EVsource src );
 extern int INT_EVdfg_wait_for_shutdown ( EVdfg dfg );
 
