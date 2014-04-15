@@ -118,7 +118,7 @@ queue_flush_attr_reconfig_message(EVdfg dfg, EVflush_attrs_reconfig_ptr msg, int
 	copy = malloc(sizeof(EVflush_attrs_reconfig_msg));
 	copy->reconfig = msg->reconfig;
 	copy->count = msg->count;
-	copy->attr_stone_list = malloc(count * sizeof(EVattr_stone_struct));
+	copy->attr_stone_list = malloc(msg->count * sizeof(EVattr_stone_struct));
 	for (i=0; i < msg->count ; i++) {
 	    copy->attr_stone_list[i] = msg->attr_stone_list[i];
 	    copy->attr_stone_list[i].attr_str = strdup(copy->attr_stone_list[i].attr_str);
@@ -812,6 +812,7 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
     (void) dfg;
     (void) conn;
     (void) attrs;
+    static int first_time_deploy = 1;
     EVdfg_stones_ptr msg =  vmsg;
     int i, base = evp->stone_lookup_table_size;
     int auto_stones = 0;
@@ -1425,7 +1426,7 @@ deploy_to_node(EVdfg dfg, int node)
     msg.stone_list = malloc(stone_count * sizeof(msg.stone_list[0]));
     memset(msg.stone_list, 0, stone_count * sizeof(msg.stone_list[0]));
     j = 0;
-    for (i=0; i< dfg->stone_count; i++) {
+    for (i=dfg->deployed_stone_count; i< dfg->stone_count; i++) {
 	if (dfg->stones[i]->node == node) {
 	    deploy_msg_stone mstone = &msg.stone_list[j];
 	    EVdfg_stone dstone = dfg->stones[i];
