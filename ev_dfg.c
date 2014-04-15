@@ -14,10 +14,46 @@
 #include "ev_dfg_internal.h"
 #include <assert.h>
 
+/*
+ *  Some notes about the (current) operation of EVdfg.
+ *  
+ *  EVdfg operation is based on CM-level messages.  It currently supports
+ *  only one DFG per process/CM (I.E. there is no DFG identifier passed in
+ *  any operation, so the DFG is implied by the contacted CM).  DFGs pass
+ *  through several states, including : Joining (while waiting for
+ *  participating nodes), Starting (between last node join and actual
+ *  operation), Running (normal operation), Reconfiguring (master changing
+ *  DFG structure), and Shutdown (all nodes have voted for shutdown and
+ *  we're killing the system).  (State is maintained in the master, and is
+ *  not reliable in the client nodes.)
+ *  
+ *  Generally, most operation triggers have the same sort of structure.
+ *  I.E. they check to see if they are the master.  If they are, the perform
+ *  the operation directly, and if not they send a message to the master.
+ *  The message handler then does the subroutine call that performs the
+ *  operation directly.  So, the message handler and the wrapper subroutine
+ *  are structured similarly for most operations.  However, some are handled
+ *  differently.  In particular, notification of client departure
+ *  (connection/node failure) and client join can't be handled except when
+ *  we're in the Running state.  (Well, Join is handled in Joining too.)
+ *  Also, voluntary reconfiguration, in addition to only being handled in
+ *  the Running state, *must* be queued for later handling if it happens
+ *  locally (because it's triggered by a call inside a CoD event handler,
+ *  and reconfiguring while running inside a handler seems bad).  So, those
+ *  messages must be queued for later handling.
+ *
+ *  Currently, we handle each of these messages on transition from another
+ *  state into Running, or, in the case of voluntary reconfiguration if
+ *  triggered locally, we handle it inside a CM delayed task (which should
+ *  assure that we're at least at a message handling point).
+ */
+
+
 char *str_state[] = {"DFG_Joining", "DFG_Starting", "DFG_Running", "DFG_Reconfiguring", "DFG_Shutting_Down"};
 
 static void handle_conn_shutdown(EVdfg dfg, int stone);
 static void handle_node_join(EVdfg dfg, char *node_name, char *contact_string, CMConnection conn);
+static void handle_flush_attr_reconfig(EVdfg dfg, EVflush_attrs_reconfig_ptr msg);
 
 static void
 queue_conn_shutdown_message(EVdfg dfg, int stone)
@@ -64,6 +100,36 @@ queue_node_join_message(EVdfg dfg, char *node_name, char *contact_string, CMConn
 }
 
 static void
+queue_flush_attr_reconfig_message(EVdfg dfg, EVflush_attrs_reconfig_ptr msg, int do_copy)
+{
+    int i, count = 0;
+    EVflush_attrs_reconfig_ptr copy = msg;
+    CMtrace_out(cm, EVdfgVerbose, "EVDFG flush_attr_reconfig_message -  master DFG state is %s\n", str_state[dfg->state]);
+    if (dfg->queued_messages == NULL) {
+	dfg->queued_messages = malloc(sizeof(dfg->queued_messages[0]) * 2);
+    } else {
+	while (dfg->queued_messages[count].msg != NULL) count++;
+	dfg->queued_messages = realloc(dfg->queued_messages, 
+				       sizeof(dfg->queued_messages[0]) * (count + 2));
+    }
+    CMtrace_out(dfg->cm, EVdfgVerbose, "Queueing at (position %d) attr_flush_reconfig (reconfig %d)\n", count, msg->reconfig);
+    dfg->queued_messages[count].msg_type = 3;   /* flush */
+    if (do_copy) {
+	copy = malloc(sizeof(EVflush_attrs_reconfig_msg));
+	copy->reconfig = msg->reconfig;
+	copy->count = msg->count;
+	copy->attr_stone_list = malloc(count * sizeof(EVattr_stone_struct));
+	for (i=0; i < msg->count ; i++) {
+	    copy->attr_stone_list[i] = msg->attr_stone_list[i];
+	    copy->attr_stone_list[i].attr_str = strdup(copy->attr_stone_list[i].attr_str);
+	}
+    }
+    dfg->queued_messages[count].msg = copy;
+    dfg->queued_messages[count+1].msg_type = 0;
+    dfg->queued_messages[count+1].msg = NULL;
+}
+
+static void
 handle_queued_messages(EVdfg dfg)
 {
     /* SHOULD */
@@ -74,7 +140,7 @@ handle_queued_messages(EVdfg dfg)
     /* beware the the list might change while we're running a handler */
     if (dfg->queued_messages == NULL) return;
     CMtrace_out(cm, EVdfgVerbose, "EVDFG handle_queued_messages -  master DFG state is %s\n", str_state[dfg->state]);
-    if (dfg->state == DFG_Starting) {
+    if ((dfg->state == DFG_Starting) || (dfg->state == DFG_Reconfiguring)) {
 	CMtrace_out(cm, EVdfgVerbose, "EVDFG handle_queued_messages -  returning because state is inappropriate\n");
 	return;
     }
@@ -84,6 +150,10 @@ handle_queued_messages(EVdfg dfg)
 	CMConnection conn = dfg->queued_messages[0].conn;
 	void *msg = dfg->queued_messages[0].msg;
 
+	if ((dfg->state == DFG_Starting) || (dfg->state == DFG_Reconfiguring)) {
+	    CMtrace_out(cm, EVdfgVerbose, "EVDFG handle_queued_messages -  returning because state is inappropriate\n");
+	    return;
+	}
 	count = 0;
 	while (dfg->queued_messages[count+1].msg != NULL) {
 	    /* copy down */
@@ -101,6 +171,14 @@ handle_queued_messages(EVdfg dfg)
 	    dfg->state = DFG_Reconfiguring;
 	    CMtrace_out(cm, EVdfgVerbose, "EVDFG queued node join -  master DFG state is now %s\n", str_state[dfg->state]);
 	    handle_node_join(dfg, ((EVregister_msg*)msg)->node_name, ((EVregister_msg*)msg)->contact_string, conn);
+	    break;
+	case 3:
+	    if (((EVflush_attrs_reconfig_ptr)msg)->reconfig) {
+		dfg->state = DFG_Reconfiguring;
+	    }
+	    CMtrace_out(cm, EVdfgVerbose, "EVDFG queued flush_attr_reconfig -  master DFG state is now %s\n", str_state[dfg->state]);
+	    handle_flush_attr_reconfig(dfg, msg);
+	    break;
 	}
 	free(msg);
 	CMtrace_out(cm, EVdfgVerbose, "EVDFG handle queued end loop -  master DFG state is now %s\n", str_state[dfg->state]);
@@ -335,13 +413,23 @@ FMStructDescRec EVdfg_conn_shutdown_format_list[] = {
     {"EVdfg_conn_shutdown", EVconn_shutdown_msg_flds, sizeof(EVconn_shutdown_msg), NULL},
     {NULL, NULL, 0, NULL}
 };
+
+FMField EVattr_stone_flds[] = {
+    {"stone", "integer", sizeof(long), FMOffset(EVattr_stone_ptr, stone)},
+    {"attr_str", "string", sizeof(char*), FMOffset(EVattr_stone_ptr, attr_str)},
+    {NULL, NULL, 0, 0}
+};
+
 FMField EVflush_attrs_reconfig_msg_flds[] = {
     {"reconfig", "integer", sizeof(int), FMOffset(EVflush_attrs_reconfig_ptr, reconfig)},
+    {"count", "integer", sizeof(long), FMOffset(EVflush_attrs_reconfig_ptr, count)},
+    {"attr_stone_list", "attr_stone_element[count]", sizeof(EVattr_stone_struct), FMOffset(EVflush_attrs_reconfig_ptr, attr_stone_list)},
     {NULL, NULL, 0, 0}
 };
 
 FMStructDescRec EVdfg_flush_attrs_reconfig_format_list[] = {
     {"EVflush_attrs_reconfig", EVflush_attrs_reconfig_msg_flds, sizeof(EVflush_attrs_reconfig_msg), NULL},
+    {"attr_stone_element", EVattr_stone_flds, sizeof(EVattr_stone_struct), NULL},
     {NULL, NULL, 0, NULL}
 };
 
@@ -471,6 +559,12 @@ static void
 dfg_flush_attr_reconfig_shutdown_handler(CManager cm, CMConnection conn, void *vmsg, 
 			  void *client_data, attr_list attrs)
 {
+    EVdfg dfg = client_data;
+    /* coming in from the network? queue it and handle messages */
+    CManager_lock(cm);
+    queue_flush_attr_reconfig_message(dfg, vmsg, 1 /* copy it */);
+    handle_queued_messages(dfg);
+    CManager_unlock(cm);
 }
 
 static void
@@ -586,6 +680,33 @@ INT_EVdfg_assign_canonical_name(EVdfg dfg, char *given_name, char *canonical_nam
 		CMtrace_out(dfg->cm, EVdfgVerbose, "Reconfigure canonical name assignment, node = %d\n", node);
 	    dfg->nodes[node].canonical_name = strdup(canonical_name);
 	}
+    }
+}
+
+static void
+handle_flush_attr_reconfig(EVdfg dfg, EVflush_attrs_reconfig_ptr msg)
+{
+    int i, j;
+    assert(CManager_locked(dfg->cm));
+    for (i=0; i < msg->count; i++) {
+	/* go through incoming attributes */
+	for (j=0; j< dfg->stone_count; j++) {
+	    if (dfg->stones[j]->stone_id == msg->attr_stone_list[i].stone) {
+		if (dfg->stones[j]->attrs != NULL) {
+		    free_attr_list(dfg->stones[j]->attrs);
+		}
+		dfg->stones[j]->attrs = attr_list_from_string(msg->attr_stone_list[i].attr_str);
+	    }
+	    break;
+	}
+    }
+    if (msg->reconfig) {
+	CManager_unlock(dfg->cm);
+	dfg->node_reconfig_handler(dfg);
+	CManager_lock(dfg->cm);
+	dfg->reconfig = 1;
+	dfg->sig_reconfig_bool = 1;
+	check_all_nodes_registered(dfg);
     }
 }
 
@@ -806,16 +927,72 @@ static cod_extern_entry dfg_extern_map[] = {
     {(void*)0, (void*)0}
 };
 
-static void
-cod_EVdfg_trigger_reconfig()
+
+static EVflush_attrs_reconfig_ptr
+build_attrs_msg(EVdfg dfg)
 {
-    printf("Got trigger reconfig!\n");
+    CManager cm = dfg->cm;
+    event_path_data evp = cm->evp;
+    int i = 0, cur_stone;
+    EVflush_attrs_reconfig_ptr msg = malloc(sizeof(*msg));
+    memset(msg, 0, sizeof(*msg));
+    msg->attr_stone_list = malloc(sizeof(EVattr_stone_struct));
+    for (cur_stone = evp->stone_base_num; cur_stone < evp->stone_count + evp->stone_base_num; ++cur_stone) {
+	stone_type stone = stone_struct(evp, cur_stone);
+	if (stone->stone_attrs != NULL) {
+	    msg->attr_stone_list[i].stone = lookup_global_stone(evp, stone->local_id);
+	    msg->attr_stone_list[i].attr_str = attr_list_to_string(stone->stone_attrs);
+	    i++;
+	    msg->attr_stone_list = realloc(msg->attr_stone_list, sizeof(EVattr_stone_struct)*(i+1));
+	}
+    }
+    msg->count = i;
+    return (msg);
 }
 
 static void
-cod_EVdfg_flush_attrs()
+free_attrs_msg(EVflush_attrs_reconfig_ptr msg)
 {
-    printf("Got flush_attrs!\n");
+    int i = 0;
+    for (i = 0; i < msg->count; i++) {
+	free(msg->attr_stone_list[i].attr_str);
+    }
+    free(msg->attr_stone_list);
+    free(msg);
+}
+
+static void
+flush_and_trigger(EVdfg dfg, int reconfig)
+{
+    EVflush_attrs_reconfig_ptr msg = build_attrs_msg(dfg);
+    msg->reconfig = reconfig;
+    if (dfg->master_connection != NULL) {
+	/* we are a client, send the reconfig to the master */
+	CMFormat flush_msg = INT_CMlookup_format(dfg->cm, EVdfg_flush_attrs_reconfig_format_list);
+	INT_CMwrite(dfg->master_connection, flush_msg, msg);
+	free_attrs_msg(msg);
+    } else {
+	queue_flush_attr_reconfig_message(dfg, msg, 0);
+    }
+}
+
+
+static void
+cod_EVdfg_trigger_reconfig(cod_exec_context ec)
+{
+    CManager cm = get_cm_from_ev_state((void*)cod_get_client_data(ec, 0x34567890));
+    event_path_data evp = cm->evp;
+    EVdfg dfg = evp->app_stone_close_data;  /* cheating a bit.  We know we store the DFG pointer here */
+    flush_and_trigger(dfg, 1);
+}
+
+static void
+cod_EVdfg_flush_attrs(cod_exec_context ec)
+{
+    CManager cm = get_cm_from_ev_state((void*)cod_get_client_data(ec, 0x34567890));
+    event_path_data evp = cm->evp;
+    EVdfg dfg = evp->app_stone_close_data;  /* cheating a bit.  We know we store the DFG pointer here */
+    flush_and_trigger(dfg, 0);
 }
 
 extern EVdfg
@@ -1233,7 +1410,7 @@ deploy_to_node(EVdfg dfg, int node)
     EVdfg_stones_msg msg;
     CMFormat deploy_msg = INT_CMlookup_format(dfg->cm, EVdfg_deploy_format_list);
 
-    for (i=0; i< dfg->stone_count; i++) {
+    for (i=dfg->deployed_stone_count; i< dfg->stone_count; i++) {
 	if (dfg->stones[i]->node == node) {
 	    stone_count++;
 	}
@@ -1378,7 +1555,7 @@ static void reconfig_deploy(EVdfg dfg)
     EVdfg_stone target = NULL;
 	
 	
-    for (i = dfg->old_node_count; i < dfg->node_count; ++i) {
+    for (i = 0; i < dfg->node_count; ++i) {
 	deploy_to_node(dfg, i);
     }
 	
@@ -1404,7 +1581,7 @@ static void reconfig_deploy(EVdfg dfg)
 		} else {
 		    temp_stone = NULL;
 		}
-		cur->out_links[cur->new_out_ports[j]] = cur->new_out_links[j];
+		INT_EVdfg_link_port(cur, cur->new_out_ports[j], cur->new_out_links[j]);
 		
 		target = cur->out_links[cur->new_out_ports[j]];
 		if (target && (cur->bridge_stone == 0) && (cur->node != target->node)) {
@@ -1527,8 +1704,8 @@ static void reconfig_deploy(EVdfg dfg)
 	    if (cur->node == 0) {
 		//	    if (cur->pending_events != NULL) {
 		//	      printf("\nResubmitting events locally! Cheers!\n");
-		//	      fflush(stdout);
-		//	      EVsubmit_encoded(dfg->cm, cur->stone_id, cur->pending_events->buffer, cur->pending_events->length, dfg->nodes[0].contact_list);
+		//	      fflush(EVsubmit);
+		//	      stdout_encoded(dfg->cm, cur->stone_id, cur->pending_events->buffer, cur->pending_events->length, dfg->nodes[0].contact_list);
 		//	    }
 		EVunfreeze_stone(dfg->cm, cur->stone_id);
 	    } else {

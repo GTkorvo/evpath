@@ -399,3 +399,6 @@ extern action_value action_type(char *action_spec);
 extern void parse_bridge_action_spec(char *action_spec, int *target, char **contact);
 extern void fix_response_cache(stone_type stone);
 stone_type stone_struct(event_path_data evp, int stone_num);
+extern int lookup_global_stone(event_path_data evp, int stone_num);
+extern CManager get_cm_from_ev_state(void *evstate);
+

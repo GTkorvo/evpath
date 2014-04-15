@@ -555,6 +555,13 @@ struct ev_state_data {
     int did_output;
 };
 
+extern CManager
+get_cm_from_ev_state(void *vevstate)
+{
+    struct ev_state_data *evstate = (struct ev_state_data *)vevstate;
+    return evstate->cm;
+}
+
 static int
 filter_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	       attr_list attrs, int out_count, int *out_stones)

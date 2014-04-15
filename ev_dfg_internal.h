@@ -28,8 +28,15 @@ typedef struct _EVconn_shutdown_msg {
     int stone;
 } EVconn_shutdown_msg, *EVconn_shutdown_ptr;
 
+typedef struct _EVattr_stone_struct {
+    long stone;
+    char *attr_str;
+} EVattr_stone_struct, *EVattr_stone_ptr;
+
 typedef struct _EVflush_attrs_reconfig_msg {
     int reconfig;
+    long count;
+    EVattr_stone_struct *attr_stone_list;
 } EVflush_attrs_reconfig_msg, *EVflush_attrs_reconfig_ptr;
 
 typedef struct _EVdfg_msg_stone {
