@@ -2331,9 +2331,8 @@ INT_EVassoc_split_action(CManager cm, EVstone stone_num,
 	}
 	fprintf(CMTrace_file, "\n");
     }
-    stone->output_stone_ids = malloc((target_count + 1) * sizeof(EVstone));
     for (i=0; i < target_count; i++) {
-	stone->output_stone_ids[i] = target_stone_list[i];
+	INT_EVstone_add_split_target(cm, stone_num, target_stone_list[i]);
     }
     stone->output_count = target_count;
     stone->default_action = action_num;
@@ -2346,18 +2345,20 @@ extern int
 INT_EVaction_add_split_target(CManager cm, EVstone stone_num, 
 			  EVaction action_num, EVstone new_stone_target)
 {
+    return INT_EVstone_add_split_target(cm, stone_num, new_stone_target);
+}
+
+extern int
+INT_EVstone_add_split_target(CManager cm, EVstone stone_num, EVstone new_stone_target)
+{
     event_path_data evp = cm->evp;
     stone_type stone;
+    int action_num = 0;
     EVstone *target_stone_list;
-    int target_count = 0;
 
     stone = stone_struct(evp, stone_num);
     if (!stone) return -1;
 
-    if (stone->proto_actions[action_num].action_type != Action_Split ) {
-	printf("Not split action\n");
-	return 0;
-    }
     if ((new_stone_target & 0x80000000) == 0x80000000) {
 	new_stone_target = lookup_local_stone(evp, new_stone_target);
     }
@@ -2367,31 +2368,7 @@ INT_EVaction_add_split_target(CManager cm, EVstone stone_num,
 				(stone->output_count + 1) * sizeof(EVstone));
     target_stone_list[stone->output_count++] = new_stone_target;
     stone->output_stone_ids = target_stone_list;
-    return 1;
-}
 
-extern int
-INT_EVstone_add_split_target(CManager cm, EVstone stone_num, EVstone new_stone_target)
-{
-    event_path_data evp = cm->evp;
-    stone_type stone;
-    int action_num = 0;
-
-    stone = stone_struct(evp, stone_num);
-    if (!stone) return -1;
-
-    for (action_num = 0; action_num < stone->proto_action_count; action_num ++) {
-	if (stone->proto_actions[action_num].action_type == Action_Split ) {
-	    EVstone *target_stone_list;
-	    int target_count = 0;
-
-	    target_stone_list = stone->output_stone_ids;
-	    target_stone_list = realloc(target_stone_list, 
-					(stone->output_count + 1) * sizeof(EVstone));
-	    target_stone_list[stone->output_count++] = new_stone_target;
-	    stone->output_stone_ids = target_stone_list;
-	}
-    }
     return 1;
 }
 
@@ -3224,6 +3201,7 @@ free_evp(CManager cm, void *not_used)
     if (evp->sources) free(evp->sources);
     if (evp->sink_handlers) free(evp->sink_handlers);
     if (evp->stone_lookup_table) free(evp->stone_lookup_table);
+    if (evp->externs) free(evp->externs);
     thr_mutex_free(evp->lock);
     free(evp);
 }
