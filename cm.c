@@ -2842,12 +2842,20 @@ INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data,
     if (conn->write_pending) {
 	wait_for_pending_write(conn);
     }
+    if (conn->closed != 0) {
+	CMtrace_out(conn->cm, CMDataVerbose, "Not writing data to closed connection\n");
+	return 0;
+    }
     if (format->registration_pending) {
 	CMcomplete_format_registration(format, 1);
     }
     if (format->fmformat == NULL) {
 	printf("Format registration has failed for format \"%s\" - write aborted\n",
 	       format->format_name);
+	return 0;
+    }
+    if (conn->closed != 0) {
+	CMtrace_out(conn->cm, CMDataVerbose, "Not writing data to closed connection\n");
 	return 0;
     }
     CMformat_preload(conn, format);
