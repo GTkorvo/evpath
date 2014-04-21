@@ -101,6 +101,7 @@ typedef struct _EVint_node_rec {
     CMConnection conn;
     int self;
     int shutdown_status_contribution;
+    int needs_ready;
 } *EVint_node_list;
 
 typedef enum {DFG_Joining, DFG_Starting, DFG_Running, DFG_Reconfiguring, DFG_Shutting_Down} DFG_State;
@@ -113,6 +114,12 @@ extern char *str_state[];
 #define STATUS_FAILURE 1
 #define STATUS_FORCE 0x10000
 
+typedef struct {
+    int stone;
+    int period_secs;
+    int period_usecs;
+} auto_stone_list;
+
 struct _EVdfg {
     CManager cm;
     char *master_contact_str;
@@ -121,6 +128,7 @@ struct _EVdfg {
     DFG_State state;
     int shutdown_value;
     int ready_condition;
+    auto_stone_list *pending_auto_list;
     int *shutdown_conditions;
     int stone_count;
     EVdfg_stone *stones;

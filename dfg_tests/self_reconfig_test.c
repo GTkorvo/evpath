@@ -29,11 +29,12 @@ static char *new_filter_func = "{\n\
 	int hop_count;\n\
 	hop_count = attr_ivalue(event_attrs, \"hop_count_atom\");\n\
 	hop_count+= 10 * hop_count;\n\
+	hop_count++;\n\
 	set_int_attr(event_attrs, \"hop_count_atom\", hop_count);\n\
 	return 1;\n\
 }\0\0";
 
-#define REPEAT_COUNT 100
+#define REPEAT_COUNT 50
 
 #include "ev_dfg_internal.h"
 static int received_count = -1;
@@ -65,6 +66,11 @@ on_failure()
     }
 }
 
+int node_count = 3;
+char **nodes;
+EVdfg_stone *stones;
+EVdfg_stone reconfig_prev, reconfig_next;
+
 static
 int
 simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
@@ -82,41 +88,37 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     checksum_simple_record(event, attrs, quiet);
     count++;
     received_count = count;
-    if (count == REPEAT_COUNT) {
+    if (!quiet)
+	printf("Goal hops is %d\n", node_count + 10*((int)(node_count/2)));
+    if (hop_count == node_count + 10*((int)(node_count/2))) {
 	if (!quiet) printf("SINK complete\n");
         EVdfg_shutdown(test_dfg, 0);
-    } else {
-//        printf("."); fflush(stdout);
     }
     if (!quiet) printf("\nreceived had %d hops\n", hop_count);
     return 0;
 }
 
 
-int node_count = 3;
-char **nodes;
-EVdfg_stone *stones;
-EVdfg_stone reconfig_prev, reconfig_next;
-
 extern void
 reconfig_handler(EVdfg dfg)
 {
     char *filter;
     EVdfg_stone middle_stone;
-//    if (!quiet) 
-    printf("Master has been requested to reconfigure\n");
+    if (!quiet) 
+	printf("Master has been requested to reconfigure\n");
 
 
     filter = create_filter_action_spec(NULL, new_filter_func);
 
     middle_stone = EVdfg_create_stone(dfg, filter);
     EVdfg_assign_node(middle_stone, nodes[node_count/2-1]);
-    printf("new stone deployed to node %s\n", nodes[node_count/2]);
+    if (!quiet)
+	printf("new stone deployed to node %s\n", nodes[node_count/2]);
 		
     EVdfg_reconfig_insert_on_port(dfg, reconfig_prev, 0, middle_stone, NULL);
     EVdfg_realize(dfg);
-//	if (!quiet) 
-    printf("realized\n");
+    if (!quiet) 
+	printf("realized\n");
 
 }
 
@@ -167,7 +169,8 @@ be_test_master(int argc, char **argv)
     EVdfg_register_node_list(test_dfg, &nodes[0]);
     src = EVdfg_create_source_stone(test_dfg, "master_source");
     EVdfg_assign_node(src, nodes[0]);
-    printf("stone %d deployed to node %s\n", 0, nodes[0]);
+    if (!quiet)
+	printf("stone %d deployed to node %s\n", 0, nodes[0]);
 
     stones[0] = last = src;
     filter = create_filter_action_spec(NULL, filter_func);
@@ -176,12 +179,12 @@ be_test_master(int argc, char **argv)
 	stones[i] = tmp = EVdfg_create_stone(test_dfg, filter);
 	EVdfg_link_port(last, 0, tmp);
 	EVdfg_assign_node(tmp, nodes[i]);
-	printf("stone %d deployed to node %s\n", i, nodes[i]);
+	if (!quiet)
+	    printf("stone %d deployed to node %s\n", i, nodes[i]);
 	if (i == ( node_count / 2 )) {
 	    attr_list attrs = create_attr_list();
 	    set_int_attr(attrs, attr_atom_from_string("DoReconfig"), 1);
 	    EVdfg_set_attr_list(tmp, attrs);  /* this one will cause reconfig */
-	    printf("prev is %d, node %s, next is %d, node %s\n", i-1, nodes[i-1], i, nodes[i]);
 	    reconfig_prev = last;
 	    reconfig_next = tmp;
 	}
@@ -191,7 +194,8 @@ be_test_master(int argc, char **argv)
     stones[node_count-1] = sink;
     EVdfg_link_port(last, 0, sink);
     EVdfg_assign_node(sink, nodes[node_count-1]);
-    printf("stone %d deployed to node %s\n", node_count-1, nodes[node_count-1]);
+    if (!quiet)
+	printf("stone %d deployed to node %s\n", node_count-1, nodes[node_count-1]);
 
     EVdfg_realize(test_dfg);
 
@@ -214,7 +218,7 @@ be_test_master(int argc, char **argv)
     }
 
     if (EVdfg_source_active(source_handle)) {
-	for (i=0 ; i < REPEAT_COUNT + 5; i++) {
+	for (i=0 ; i < REPEAT_COUNT; i++) {
 	    simple_rec rec;
 	    atom_t hop_count_atom;
 	    attr_list attrs = create_attr_list();
