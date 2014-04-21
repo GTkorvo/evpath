@@ -190,6 +190,7 @@ extern void INT_EVdfg_register_raw_sink_handler ( CManager cm, char *name, EVRaw
 extern void INT_EVdfg_register_sink_handler ( CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler );
 extern void INT_EVdfg_register_source ( char *name, EVsource src );
 extern void INT_EVdfg_set_attr_list ( EVdfg_stone stone, attr_list attrs );
+extern attr_list INT_EVdfg_get_attr_list ( EVdfg_stone stone );
 extern int INT_EVdfg_shutdown ( EVdfg dfg, int result );
 extern int INT_EVdfg_force_shutdown ( EVdfg dfg, int result );
 extern int INT_EVdfg_source_active ( EVsource src );

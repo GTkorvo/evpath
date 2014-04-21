@@ -49,6 +49,7 @@ extern void EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec,
 extern void EVdfg_link_port(EVdfg_stone source, int source_port, 
 			    EVdfg_stone destination);
 extern void EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs);
+extern attr_list EVdfg_get_attr_list(EVdfg_stone stone);
 
 extern void EVdfg_assign_node(EVdfg_stone stone, char *node);
 extern void EVdfg_register_node_list(EVdfg dfg, char** list);

@@ -351,6 +351,16 @@ INT_EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs)
     stone->attrs = attrs;
 }
 
+extern attr_list
+INT_EVdfg_get_attr_list(EVdfg_stone stone)
+{
+    attr_list attrs = stone->attrs;
+    if (attrs) {
+	add_ref_attr_list(attrs);
+    }
+    return attrs;
+}
+
 FMField EVleaf_element_flds[] = {
     {"name", "string", sizeof(char*), FMOffset(leaf_element*, name)},
     {"FMtype", "string", sizeof(char*), FMOffset(leaf_element*, FMtype)},
@@ -695,8 +705,8 @@ handle_flush_attr_reconfig(EVdfg dfg, EVflush_attrs_reconfig_ptr msg)
 		    free_attr_list(dfg->stones[j]->attrs);
 		}
 		dfg->stones[j]->attrs = attr_list_from_string(msg->attr_stone_list[i].attr_str);
+		break;
 	    }
-	    break;
 	}
     }
     if (msg->reconfig) {

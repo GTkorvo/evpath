@@ -15,10 +15,11 @@ static char *filter_func = "{\n\
 	int hop_count;\n\
 	static int event_count = 0;\n\
 	int reconfig = attr_ivalue(stone_attrs, \"DoReconfig\");\n \
+	event_count++;\n\
+	set_int_attr(stone_attrs, \"EventCount\", event_count);\n\
 	if (reconfig && event_count == 5) {\n\
 	    EVdfg_trigger_reconfiguration();\n\
 	}\n\
-	event_count++;\n\
 	hop_count = attr_ivalue(event_attrs, \"hop_count_atom\");\n\
 	hop_count++;\n\
 	set_int_attr(event_attrs, \"hop_count_atom\", hop_count);\n\
@@ -104,12 +105,26 @@ reconfig_handler(EVdfg dfg)
 {
     char *filter;
     EVdfg_stone middle_stone;
+    attr_list prev_stone_attrs;
+    atom_t event_count_atom;
+    int event_count;
     if (!quiet) 
 	printf("Master has been requested to reconfigure\n");
 
 
+    prev_stone_attrs = EVdfg_get_attr_list(reconfig_next);
+    event_count_atom = attr_atom_from_string("EventCount");
+    if (!get_int_attr(prev_stone_attrs, event_count_atom, &event_count)) {
+	printf("Failed to get event count\n");
+    } else {
+	if (!quiet) 
+	    printf("Event count is %d\n", event_count);
+    }
+    if (event_count != 5) {
+	printf("Improper event count from reconfiguring node, test failure, don't reconfigure\n");
+	return;
+    }
     filter = create_filter_action_spec(NULL, new_filter_func);
-
     middle_stone = EVdfg_create_stone(dfg, filter);
     EVdfg_assign_node(middle_stone, nodes[node_count/2-1]);
     if (!quiet)
@@ -132,10 +147,6 @@ be_test_master(int argc, char **argv)
     int i;
     char *filter;
 
-    atom_t reconfiguration_atom = -1;
-    if (reconfiguration_atom == -1) {
-	reconfiguration_atom = attr_atom_from_string("application_reconfiguration_atom");
-    }
     alarm(240);  /* reset time limit to 4 minutes */
     if (argc == 1) {
 	sscanf(argv[0], "%d", &node_count);
@@ -252,7 +263,6 @@ be_test_child(int argc, char **argv)
 {
     CManager cm;
     EVsource src;
-    int die_early = 0;
 
     alarm(240);   /* reset time limit to 4 minutes */
     cm = CManager_create();
@@ -273,10 +283,6 @@ be_test_child(int argc, char **argv)
 	EVdfg_ready_for_shutdown(test_dfg);
     }
 
-    if (argv[1][0] == 'D') {
-      	/* Only the good die young */
-	die_early++;
-    }
     if (EVdfg_source_active(src)) {
 	simple_rec rec;
 	generate_simple_record(&rec);
@@ -284,12 +290,7 @@ be_test_child(int argc, char **argv)
 	EVsubmit(src, &rec, NULL);
     }
     EVfree_source(src);
-    if (die_early) {
-	CMsleep(cm, 45);
-	if (!quiet) printf("Node %s exiting early\n", argv[1]);
-	exit(0);
-    } else {
-	return EVdfg_wait_for_shutdown(test_dfg);
-    }
-    return 0;
+    status = EVdfg_wait_for_shutdown(test_dfg);
+    CManager_close(cm);
+    return status;
 }
