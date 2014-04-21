@@ -422,6 +422,9 @@ libcmenet_LTX_self_check(CManager cm, CMtrans_services svc,
     if (IP == 0) {
 	IP = ntohl(get_self_ip_addr(svc));
     }
+    if (IP == 0) {
+	IP = ntohl(INADDR_LOOPBACK);
+    }
     if (!query_attr(attrs, CM_ENET_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
 	svc->trace_out(cm, "CMself check CMEnet transport found no CM_ENET_HOSTNAME attribute");
