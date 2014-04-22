@@ -196,6 +196,7 @@ be_test_master(int argc, char **argv)
 	    attr_list attrs = create_attr_list();
 	    set_int_attr(attrs, attr_atom_from_string("DoReconfig"), 1);
 	    EVdfg_set_attr_list(tmp, attrs);  /* this one will cause reconfig */
+	    free_attr_list(attrs);
 	    reconfig_prev = last;
 	    reconfig_next = tmp;
 	}
@@ -252,6 +253,7 @@ be_test_master(int argc, char **argv)
 	free(nodes[i]);
     }
     free(nodes);
+    free(stones);
 
     CManager_close(cm);
     return status;

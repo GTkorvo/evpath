@@ -921,6 +921,7 @@ free_dfg(CManager cm, void *vdfg)
 	    }
 	    free(dfg->stones[i]->extra_actions);
 	}
+	if (dfg->stones[i]->attrs) free_attr_list(dfg->stones[i]->attrs);
 	free(dfg->stones[i]);
     }
     if (dfg->master_contact_str) free(dfg->master_contact_str);
