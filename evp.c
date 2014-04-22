@@ -2397,7 +2397,7 @@ INT_EVstone_remove_split_target(CManager cm, EVstone stone_num,
 
     target_stone_list = stone->output_stone_ids;
     if (!target_stone_list) return;
-    while (target_stone_list[target_count] != stone_target) {
+    while ((target_stone_list[target_count] != stone_target) && (target_count < stone->output_count)) {
 	target_count++;
     }
     for ( ; target_count < stone->output_count; target_count++) {
