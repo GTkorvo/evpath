@@ -192,5 +192,6 @@ be_test_child(int argc, char **argv)
     }
 
     EVfree_source(src);
+    EVfree_source(src2);
     return EVdfg_wait_for_shutdown(test_dfg);
 }
