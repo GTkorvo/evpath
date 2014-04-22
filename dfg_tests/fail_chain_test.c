@@ -219,6 +219,7 @@ be_test_master(int argc, char **argv)
 	free(nodes[i]);
     }
     free(nodes);
+    free(stone);
 
     CManager_close(cm);
     return status;
