@@ -2397,10 +2397,16 @@ INT_EVstone_remove_split_target(CManager cm, EVstone stone_num,
 
     target_stone_list = stone->output_stone_ids;
     if (!target_stone_list) return;
+    if (CMtrace_on(cm, EVerbose)) {
+	fprintf(CMTrace_file, "Remoing split target %lx from stone ", stone_target);
+	fprint_stone_identifier(CMTrace_file, evp, stone_num);
+	fprintf(CMTrace_file, "\n");
+    }
     while ((target_stone_list[target_count] != stone_target) && (target_count < stone->output_count)) {
 	target_count++;
+	CMtrace_out(cm, EVerbose, "    Found target to remove at position %d\n", target_count);
     }
-    for ( ; target_count < stone->output_count; target_count++) {
+    for ( ; target_count < stone->output_count-1; target_count++) {
 	/* move them down, overwriting target */
 	target_stone_list[target_count] = target_stone_list[target_count+1];
     }
