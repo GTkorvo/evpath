@@ -146,6 +146,7 @@ be_test_master(int argc, char **argv)
     wait_for_children(nodes);
 
     EVfree_source(source_handle);
+    EVfree_source(source_handle2);
     CManager_close(cm);
     return status;
 }
