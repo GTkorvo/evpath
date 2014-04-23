@@ -6,6 +6,9 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+/** @defgroup ev_dfg EVdfg functions and types
+ * @{
+ */
 /*
 **  Basic approach:
 **  Create a DFG of "virtual stones" to be later deployed.
@@ -32,12 +35,48 @@ extern "C" {
 typedef struct _EVdfg *EVdfg;
 typedef struct _EVdfg_stone *EVdfg_stone;
 
-/* 
-**  Calls to create the actual DFG.
-**  These calls happen in the master/distinguished node.
-*/
+/*!
+ * Create a DFG
+ *
+ * This call is used in both master and client sides of EVdfg.
+ * \param cm The CManager with which to associate the DFG
+ * \return An EVdfg handle, to be used in later calls.
+ */
 extern EVdfg EVdfg_create(CManager cm);
+
+/*
+ * Get the contact list from an EVdfg handle
+ *
+ * This call is used to extract contact information from an EVdfg handle.
+ * Generally this call is made on the Master side of EVdfg, and the contact
+ * information is then provided to the Clients for use in EVdfg_join_dfg()
+ * calls.  The result of this call is a null-terminated string to be owned
+ * by the caller.  (I.E. you should free the string memory when you're done
+ * with it.)
+ * \param dfg The EVdfg handle for which to create contact information.
+ * \return A null-terminated string representing contact information for this EVdfg
+ */
 extern char *EVdfg_get_contact_list(EVdfg dfg);
+
+
+/*!
+ * Join an EVdfg
+ *
+ *  This call is used to join a DFG as a client, though it is also typically
+ *  employed by the master to join the previously created DFG.  In
+ * \param dfg The local EVdfg handle which should join the global DFG.
+ * \param node_name The name with which the client can be identified.  This
+ *  should be unique among the joining nodes in static joining mode
+ *  (I.E. using EVdfg_register_node_list().  In dynamic mode (I.E. where
+ *  EVdfg_node_join_handler() is used), then this name is presented to the
+ *  registered join handler, but it need not be unique.  EVdfg copies this
+ *  string, so it can be free'd after use.
+ * \param master_contact The string contact information for the master
+ *  process.  This is not stored by EVdfg.
+ *
+ */
+extern void EVdfg_join_dfg(EVdfg dfg, char *node_name, char *master_contact);
+
 extern EVdfg_stone EVdfg_create_stone(EVdfg dfg, char *action_spec);
 extern void EVdfg_add_action (EVdfg_stone stone, char *action_spec);
 extern EVdfg_stone EVdfg_create_source_stone(EVdfg dfg, char *source_name);
@@ -63,7 +102,6 @@ extern void EVdfg_node_reconfig_handler (EVdfg dfg, EVdfgReconfigHandlerFunc fun
 
 extern int EVdfg_realize(EVdfg dfg);
 extern int EVdfg_ready_wait(EVdfg dfg);
-extern void EVdfg_join_dfg(EVdfg dfg, char *node_name, char *master_contact);
 
 extern int EVdfg_shutdown(EVdfg dfg, int result);
 extern int EVdfg_force_shutdown(EVdfg dfg, int result);
@@ -99,6 +137,8 @@ EVdfg_register_raw_sink_handler(CManager cm, char *name, EVRawHandlerFunc handle
 
 extern int EVdfg_source_active(EVsource src);
 extern int EVdfg_active_sink_count(EVdfg dfg);
+
+/* @}*/
 
 #ifdef	__cplusplus
 }

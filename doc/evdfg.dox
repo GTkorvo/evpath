@@ -1,0 +1,42 @@
+/*! \page evdfg The EVdfg interface
+
+ \section evdfg-intro EVdfg interface
+
+EVdfg is designed to be a relatively thin layer on top of EVPath that 
+enables whole-system multi-process deployment of Data Flow Graphs implemented
+with EVPath stones.  Like EVPath, EVdfg has abstractions to create stones,
+to assign actions to them, to link stones to each other and to create
+sources and sinks of data.  However, in EVdfg the stones created are a
+virtual representation of the actual data flow graph that is to be realized
+in EVPath, with EVdfg controlling the mapping (and potentially remapping) of
+EVPath stones to the participating processes (nodes).
+
+In particular, in EVdfg a single, differentiated 'Master' process is
+responsible for defining the entire DFG.  Code in the master creates the virtual
+stones, assigns actions to those stones, links them together to create the
+topology, and assigns stones to nodes.  It also determines when sufficient
+client processes have joined the DFG, either by specifying a static list, or
+by making a decision in a handler as each new client process joins.  Once
+all required nodes have joined and the virtual DFG has been created, it is
+<i>realized</i> by the master (I.E. actual EVPath stones are created at the
+appropriate places) and starts running.  The master may also register
+handlers that can be called in the event of new nodes joining, an existing
+node becoming unreachable, or a stone calling for reconfiguration.  In the
+case of each of these, the master may rearrange the set of virtual stones,
+moving some, adding others, changing links, etc. and then can realize the
+changed DFG.  The master can also arbitrate an orderly shutdown of all
+participating processes with an agreed-upon exit value.
+
+Generally, but not necessarily, the master process is also a client and a
+participant in the DFG.  The other participating processes are relatively
+passive.  They identify their capabilities to the master, but do not
+directly contribute stones to the DFG instead accepting the stones that are
+assigned to them.
+
+\subsection The Joining Process
+
+The subroutine EVdfg_join_dfg() is used 
+
+
+*/
+
