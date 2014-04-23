@@ -1771,6 +1771,7 @@ add_queued_constants(cod_parse_context context, FMFormat *formats)
         char *name = malloc(4 + strlen(fmt_name));
         sprintf(name, "%s_ID", fmt_name);
         cod_add_int_constant_to_parse_context(name, i, context);
+	free(name);
     }
 }
 

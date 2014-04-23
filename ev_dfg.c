@@ -54,6 +54,7 @@ char *str_state[] = {"DFG_Joining", "DFG_Starting", "DFG_Running", "DFG_Reconfig
 static void handle_conn_shutdown(EVdfg dfg, int stone);
 static void handle_node_join(EVdfg dfg, char *node_name, char *contact_string, CMConnection conn);
 static void handle_flush_attr_reconfig(EVdfg dfg, EVflush_attrs_reconfig_ptr msg);
+static void free_attrs_msg(EVflush_attrs_reconfig_ptr msg);
 
 static void
 queue_conn_shutdown_message(EVdfg dfg, int stone)
@@ -166,11 +167,13 @@ handle_queued_messages(EVdfg dfg)
 	    dfg->state = DFG_Reconfiguring;
 	    CMtrace_out(cm, EVdfgVerbose, "EVDFG queued conn shutdown -  master DFG state is now %s\n", str_state[dfg->state]);
 	    handle_conn_shutdown(dfg, ((EVconn_shutdown_msg*)msg)->stone);
+	    free(msg);
 	    break;
 	case 2:
 	    dfg->state = DFG_Reconfiguring;
 	    CMtrace_out(cm, EVdfgVerbose, "EVDFG queued node join -  master DFG state is now %s\n", str_state[dfg->state]);
 	    handle_node_join(dfg, ((EVregister_msg*)msg)->node_name, ((EVregister_msg*)msg)->contact_string, conn);
+	    free(msg);
 	    break;
 	case 3:
 	    if (((EVflush_attrs_reconfig_ptr)msg)->reconfig) {
@@ -178,9 +181,9 @@ handle_queued_messages(EVdfg dfg)
 	    }
 	    CMtrace_out(cm, EVdfgVerbose, "EVDFG queued flush_attr_reconfig -  master DFG state is now %s\n", str_state[dfg->state]);
 	    handle_flush_attr_reconfig(dfg, msg);
+	    free_attrs_msg(msg);
 	    break;
 	}
-	free(msg);
 	CMtrace_out(cm, EVdfgVerbose, "EVDFG handle queued end loop -  master DFG state is now %s\n", str_state[dfg->state]);
     }
     CMtrace_out(cm, EVdfgVerbose, "EVDFG handle queued exiting -  master DFG state is now %s\n", str_state[dfg->state]);
