@@ -124,5 +124,8 @@ be_test_child(int argc, char **argv)
 	EVsubmit(src, &rec, NULL);
     }
     EVfree_source(src);
-    return EVdfg_wait_for_shutdown(test_dfg);
+    status = EVdfg_wait_for_shutdown(test_dfg);
+
+    CManager_close(cm);
+    return status;
 }
