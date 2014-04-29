@@ -127,6 +127,7 @@ get_self_ip_addr(CMtrans_services svc)
 	/* choose the first thing that's not a loopback interface */
 	for (if_addr = if_addrs; if_addr != NULL; if_addr = if_addr->ifa_next) {
 	    int family;
+	    uint32_t ret_ip;
 	    if (!if_addr->ifa_addr) continue;
 	    family = if_addr->ifa_addr->sa_family;
 	    if (family != AF_INET) continue;  /* currently not looking for ipv6 */
@@ -137,8 +138,9 @@ get_self_ip_addr(CMtrans_services svc)
 			       if_addr->ifa_name,
 			       inet_ntop(family, tmp, buf, sizeof(buf)));
 	    }
+	    ret_ip = (ntohl(*(uint32_t*)tmp));
 	    free(if_addrs);
-	    return (ntohl(*(uint32_t*)tmp));
+	    return ret_ip;
 	}
     }
 #endif	
