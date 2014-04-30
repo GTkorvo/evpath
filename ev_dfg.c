@@ -688,8 +688,11 @@ INT_EVdfg_assign_canonical_name(EVdfg dfg, char *given_name, char *canonical_nam
     int node;
     for (node = 0; node < dfg->node_count; node++) {
 	if (dfg->nodes[node].name == given_name) {
-	    if (dfg->realized == 1)
+	    if (dfg->realized == 1) {
 		CMtrace_out(dfg->cm, EVdfgVerbose, "Reconfigure canonical name assignment, node = %d\n", node);
+	    } else {
+		CMtrace_out(dfg->cm, EVdfgVerbose, "Canonical name assignment, node = %d, given name was %s, canonical is %s\n", node, given_name, canonical_name);
+	    }
 	    dfg->nodes[node].canonical_name = strdup(canonical_name);
 	}
     }
