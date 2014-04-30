@@ -114,6 +114,7 @@ reconfig_handler(EVdfg dfg)
 
     prev_stone_attrs = EVdfg_get_attr_list(reconfig_next);
     event_count_atom = attr_atom_from_string("EventCount");
+    free_attr_list(prev_stone_attrs);
     if (!get_int_attr(prev_stone_attrs, event_count_atom, &event_count)) {
 	printf("Failed to get event count\n");
     } else {
