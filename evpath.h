@@ -1188,7 +1188,7 @@ EVfree_stone(CManager cm, EVstone stone);
  * \param format_list The list of formats which describe the event data 
  * structure that the function accepts.
  * \param handler The handler function that will be called with data arrives.
- * \param client_data An uninterpreted value that is passed to the hanlder
+ * \param client_data An uninterpreted value that is passed to the handler
  * function when it is called.
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
