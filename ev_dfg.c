@@ -930,6 +930,7 @@ free_dfg(CManager cm, void *vdfg)
 	if (dfg->stones[i]->attrs) free_attr_list(dfg->stones[i]->attrs);
 	free(dfg->stones[i]);
     }
+    if (dfg->queued_messages) free(dfg->queued_messages);
     if (dfg->master_contact_str) free(dfg->master_contact_str);
     if (dfg->shutdown_conditions) free(dfg->shutdown_conditions);
     free(dfg->stones);
