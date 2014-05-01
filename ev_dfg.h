@@ -303,21 +303,178 @@ extern int EVdfg_source_active(EVsource src);
  */
 extern int EVdfg_active_sink_count(EVdfg dfg);
 
+/*!
+ *  Assign a unique, canonical name to a client of a particular given_name.
+ *
+ *  This call is performed by the master, typically in the
+ *  EVdfgJoinHandlerFunc, in order to assign a unique name to clients who may
+ *  not have one previously.  The canonical name is the name to be used in
+ *  EVdfg_assign_node(). 
+ *
+ * \param dfg The DFG under consideration.
+ * \param given_name The original name of the client.
+ * \param canonical_name The canonical name to be assigned to the client.
+ */
+extern void EVdfg_assign_canonical_name(EVdfg dfg, char *given_name, char *canonical_name);
+
+/*!
+ *  Create an EVdfg stone with a specific action associated with it.
+ *
+ *  This call is performed by the master during the Stone Creation and
+ *  Assignment process in order to create an EVdfg_stone.
+ *
+ * \param dfg The DFG under consideration.
+ * \param action_spec An action specifier string such as is created by the
+ *  EVpath create_*_action_spec() routines.  This parameter may be NULL if
+ *  no action is to be initially assigned to the stone.  If non-NULL, EVdfg
+ *  takes ownership of the action_spec string and will free it upon DFG
+ *  termination. 
+ * \return Function returns an EVdfg_stone handle that can be used in
+ *  subsequent calls.
+ */
 extern EVdfg_stone EVdfg_create_stone(EVdfg dfg, char *action_spec);
+
+/*!
+ *  Add an action to an existing EVdfg stone.
+ *
+ *  This call is performed by the master during the Stone Creation and
+ *  Assignment process in order to add an action to an EVdfg_stone. 
+ *
+ * \param stone The EVdfg_stone to which to add the action.
+ * \param action_spec An action specifier string such as is created by the
+ *  EVpath create_*_action_spec() routines.  EVdfg takes ownership of the
+ *  action_spec string and will free it upon DFG termination. 
+ */
 extern void EVdfg_add_action (EVdfg_stone stone, char *action_spec);
+
+/*!
+ *  Create an EVdfg stone that will act as an Event source.
+ *
+ *  This call is performed by the master during the Stone Creation and
+ *  Assignment process in order to create an EVdfg source stone.  No other
+ *  actions should be assigned to an EVdfg source stone.
+ *
+ * \param dfg The DFG under consideration.
+ * \param source_name This value must match some value which has been
+ *  specified in EVdfg_register_source() on the node to which this stone is
+ *  eventually mapped.  (EVdfg can't detect a mismatch until EVdfg_realize()
+ *  is called.)  The source_name string is *not* owned by EVdfg and should
+ *  be free'd by the application if dynamic.
+ * \return Function returns an EVdfg_stone handle that can be used in
+ *  subsequent calls.
+ */
 extern EVdfg_stone EVdfg_create_source_stone(EVdfg dfg, char *source_name);
+
+/*!
+ *  Create an EVdfg stone that will act as an Event sink (terminal stone).
+ *
+ *  This call is performed by the master during the Stone Creation and
+ *  Assignment process in order to create an EVdfg sink stone.
+ *
+ * \param dfg The DFG under consideration.
+ * \param handler_name This value must match some value which has been
+ *  specified in EVdfg_register_sink_handler() on the node to which this
+ *  stone is eventually mapped.  (EVdfg can't detect a mismatch until
+ *  EVdfg_realize() is called.)  The handler_name string is *not* owned by
+ *  EVdfg and should be free'd by the application if dynamic.
+ * \return Function returns an EVdfg_stone handle that can be used in
+ *  subsequent calls.
+ */
 extern EVdfg_stone EVdfg_create_sink_stone(EVdfg dfg, char *handler_name);
+
+/*!
+ *  Add a sink action to an existing EVdfg stone.
+ *
+ *  This call is performed by the master during the Stone Creation and
+ *  Assignment process in order to add a sink (terminal) action to an EVdfg
+ *  stone. 
+ *
+ * \param stone The EVdfg_stone to which to add the sink action.
+ * \param handler_name This value must match some value which has been
+ *  specified in EVdfg_register_sink_handler() on the node to which this
+ *  stone is eventually mapped.  (EVdfg can't detect a mismatch until
+ *  EVdfg_realize() is called.)  The handler_name string is *not* owned by
+ *  EVdfg and should be free'd by the application if dynamic.
+ */
 extern void EVdfg_add_sink_action(EVdfg_stone stone, char *handler_name);
+
+/*!
+ * Enable periodic auto-submits of NULL events on an EVdfg_stone. 
+ * 
+ * This function is the analog of the EVenable_auto_stone() function, but at
+ * the EVdfg level.
+ *
+ * \param stone The EVdfg_stone which should receive auto-submits.
+ * \param period_sec The period at which submits should occur, seconds portion.
+ * \param period_usec The period at which submits should occur, microseconds
+ * portion.
+ *  
+ * Autosubmits are intiated on each node just as it is about to return from
+ * EVdfg_ready_wait().
+ */
 extern void EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec, 
 				    int period_usec);
 
-extern void EVdfg_link_port(EVdfg_stone source, int source_port, 
+/*!
+ * Link a particular output port of one stone (the source) to a destination
+ * (target) stone.
+ * 
+ * This function is roughly the analog of the EVstone_set_output function, but at
+ * the EVdfg level.  All non-terminal stones have one or more output ports
+ * from which data will emerge.  EVdfg_link_port() is used to assign each of
+ * these outputs to another EVdfg_stone stone.
+ *
+ * \param source The EVdfg_stone whose ports are to be assigned.
+ * \param output_index The zero-based index of the output which should be assigned.
+ * \param destination The EVdfg_stone which is to receive those events.
+ */
+extern void EVdfg_link_port(EVdfg_stone source, int output_index, 
 			    EVdfg_stone destination);
+
+/*!
+ * Assign a particular EVdfg_stone to a particular client node.
+ * 
+ * This function assigns a particular EVdfg_stone to be instantiated upon a
+ *  particular client node.  The node parameter must match either 1) a
+ *  string specified in EVdfg_register_node_list() (in static joining mode),
+ *  or 2) a canonical name that has been assigned to a node (in dynamic
+ *  joining mode).
+ *
+ * \param stone The EVdfg_stone to be assigned to a particular node.
+ * \param node The node to which it is to be assigned.  EVdfg does not take
+ *  ownership of this string and it should be free'd by the application if dynamic.
+ */
+extern void EVdfg_assign_node(EVdfg_stone stone, char *node);
+
+/*!
+ * Set the attribute list that will be visible as "stone_attrs" inside EVdfg
+ *  dynamic functions.
+ * 
+ * \param stone The EVdfg_stone affected.
+ * \param attrs The attribute list to be assigned.  EVdfg does an
+ *  add_ref_attr_list() on this list.  Because lists are only free'd when
+ *  the reference count goes to zero, the application should generally call
+ *  free_attr_list() on the list as well.
+ */
 extern void EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs);
+
+/*!
+ * Query the attribute list that is/was visible as "stone_attrs" inside EVdfg
+ *  dynamic functions.
+ * 
+ * \param stone The EVdfg_stone involved.
+ * \return The "stone_attrs" attribute list.  EVdfg does an
+ *  add_ref_attr_list() on this list before returning it.  Because lists are
+ *  only free'd when the reference count goes to zero, the application
+ *  should generally call free_attr_list() when it is finished with it.  
+ *  Unless dynamic reconfiguration is in play, the stone_attrs value
+ *  reported here does not reflect updates from the instantiated stones on
+ *  the client nodes (even if local to the master).  However, for voluntary
+ *  reconfiguration, instance stone attributes are flushed to the master and
+ *  can be interrogated with this call.
+ */
 extern attr_list EVdfg_get_attr_list(EVdfg_stone stone);
 
-extern void EVdfg_assign_node(EVdfg_stone stone, char *node);
-extern void EVdfg_assign_canonical_name(EVdfg dfg, char *given_name, char *canonical_name);
 
 /*!
  *  Vote that this node is ready for shutdown and provide it's contribution

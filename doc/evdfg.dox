@@ -96,7 +96,63 @@ While the client is somewhat simpler:
 \subsubsection dynamic_joining Dynamic Joining mode
 
 There are situations in which the "static joining" scenario described above
-is too rigid.  In particular, the 
+is too rigid.  'Dynamic Joining' mode relaxes several requirements above.
+First, rather than using a static node list (via
+EVdfg_register_node_list()) and creating the entire virtual DFG before all
+the nodes join, the master registers a EVdfgJoinHandlerFunc which is called
+each time a client joins.  This join function may use its own criterion in
+deciding when sufficient clients have joined.  When it decides that enough
+have joined, then it should create the virtual DFG and call
+EVdfg_realize().  In this situation, the requirement that each client
+process specify a unique name to EVdfg_join_dfg() is also relaxed.  Instead,
+each client can specify a generic name (like "client") and the join handler
+can associate a unique canonical name with that client using
+EVdfg_assign_canonical_name().  In this case, the canonical names assigned
+must be unique and are the names used in EVdfg_assign_node().
+
+In dynamic mode, the pseudocode for the client is unchanged (except that the
+specified name need not be unique).  But the code structure for the master
+is changes:
+\code{.c}
+    EVdfg test_dfg;
+    char *str_contact;
+
+    /* CM initialization and EVdfg capability registration occurs here */
+
+    test_dfg = EVdfg_create(cm);
+    str_contact = EVdfg_get_contact_list(test_dfg);
+    EVdfg_node_join_handler (test_dfg, join_handler_func);
+
+    /* We're node "a" in the DFG */
+    EVdfg_join_dfg(test_dfg, "client", str_contact);
+
+    /* Somehow provide str_contact to the other participant(s) */
+
+    /* Wait until everyone has joined */
+    EVdfg_ready_wait(test_dfg);
+\endcode
+The join handler function in dynamic mode will generally follow this form:
+\code{.c}
+void
+join_handler_func(EVdfg dfg, char *identifier, void*cur_unused1, void*cur_unused2)
+{
+    char *canon_name;
+    /* Generate a canonical name for this client in canon_name, then assign */
+    EVdfg_assign_canonical_name(dfg, identifier, canon_name*/
+
+    if ( /* not ready to start running */) return;
+
+    /* EVdfg stone creation and assignment occurs here */
+
+    EVdfg_realize(dfg);
+    /* 
+     * upon return, the DFG will be instantiated and all clients fall out
+     * of EVdfg_ready_wait();
+     */
+}
+\endcode
+The join handler function is also used for dynamic reconfiguration of the
+DFG, described later.
 
 \subsection capability EVdfg Capability Registration
 
@@ -182,6 +238,24 @@ for "simple" data, or for hosting terminal stones that handle "simple" data.
 				(EVSimpleHandlerFunc) simple_handler);
 \endcode
 
+
+\subsection  EVdfg Stone Creation and Assignment
+
+In EVdfg, DFG stone creation occurs much like it does in raw EVPath with a
+few major differences:
+- The entire DFG is created and ports linked between EVdfg_stones without regard
+to what nodes the participating stones might be assigned to.
+- EVdfg_assign_node() is used to actually assign EVdfg_stones to specific nodes.
+- Bridge stones are not directly created.  Instead, EVdfg inserts bridge
+stones transparently when there is a connection between stones assigned to
+different nodes.
+- EVdfg uses 'source stones', first class enties which can be assigned to
+specific nodes like any other EVdfg_stone.
+- EVdfg_stones without any other explicit action associated with them act as
+split stones.
+- While many EVpath action assignment functions have a "target_stone"
+parameter, in EVdfg the links between stones are established with the
+EVdfg_link_port() function.
 
 
 */
