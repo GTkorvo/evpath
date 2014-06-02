@@ -520,7 +520,6 @@ dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg,
     if (dfg->ready_condition != -1) {
 	CMtrace_out(cm, EVdfgVerbose, "Client DFG %p Node id %d is ready, signalling %d\n", dfg, dfg->my_node_id, dfg->ready_condition);
 	INT_CMCondition_signal(cm, dfg->ready_condition);
-	dfg->ready_condition = -1;
     } else {
 	CMtrace_out(cm, EVdfgVerbose, "Client DFG %p Node id %d got ready, reconfig done\n", dfg, dfg->my_node_id);
     }	
@@ -1175,6 +1174,7 @@ INT_EVdfg_ready_wait(EVdfg dfg)
 {
     CMtrace_out(cm, EVdfgVerbose, "DFG %p wait for ready\n", dfg);
     INT_CMCondition_wait(dfg->cm, dfg->ready_condition);
+    dfg->ready_condition = -1;
     CMtrace_out(cm, EVdfgVerbose, "DFG %p ready wait released\n", dfg);
     return 1;
 }
