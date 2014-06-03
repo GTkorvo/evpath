@@ -13,4 +13,6 @@ foreach (TEST ${TESTS} )
     ADD_TEST(dfg_${TEST} dfg_${TEST})
 endforeach()
 
+ADD_TEST(dfg_chain_test_one_proc dfg_chain_test 1)
+ADD_TEST(dfg_dchain_test_one_proc dfg_dchain_test 1)
 
