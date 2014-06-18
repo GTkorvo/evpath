@@ -3,27 +3,49 @@ typedef struct _leaf_element {
     char *FMtype;
 } leaf_element, leaf_elemp;
 
-typedef struct _EVregister_msg {
+/*
+ * Node join is sent by clients to the master at EVdfg_join_dfg()
+ */
+typedef struct _EVnode_join_msg {
     char *node_name;
     char *contact_string;
     int source_count;
     int sink_count;
     leaf_element *sinks;
     leaf_element *sources;
-} EVregister_msg, *EVregister_ptr;
+} EVnode_join_msg, *EVnode_join_ptr;
 
+/*
+ * EVready is sent by master to the clients when the DFG should start
+ */
 typedef struct _EVready_msg {
     int node_id;
 } EVready_msg, *EVready_ptr;
 
-typedef struct _EVstartup_ack_msg {
+/*
+ * Deploy_ack is sent by clients to master after a deploy has been completed
+ */
+typedef struct _EVdeploy_ack_msg {
     char *node_id;
-} EVstartup_ack_msg, *EVstartup_ack_ptr;
+} EVdeploy_ack_msg, *EVdeploy_ack_ptr;
 
+/*
+ * Shutdown sent by master to clients to indicate that it's time to shut down.
+ */
 typedef struct _EVshutdown_msg {
     int value;
 } EVshutdown_msg, *EVshutdown_ptr;
 
+/*
+ * Shutdown_contribution is sent by clients to master to indicate readiness to shutdown
+ */
+typedef struct _EVshutdown_contribution_msg {
+    int value;
+} EVshutdown_contribution_msg, *EVshutdown_contribution_ptr;
+
+/*
+ * conn_shutdown is sent by clients to master to indicate a connection failure
+ */
 typedef struct _EVconn_shutdown_msg {
     int stone;
 } EVconn_shutdown_msg, *EVconn_shutdown_ptr;
@@ -33,6 +55,10 @@ typedef struct _EVattr_stone_struct {
     char *attr_str;
 } EVattr_stone_struct, *EVattr_stone_ptr;
 
+/*
+ * flush_attr_reconfig is sent by clients to master to flush attr values to master 
+ * and/or to start voluntary reconfiguration
+ */
 typedef struct _EVflush_attrs_reconfig_msg {
     int reconfig;
     long count;
@@ -51,22 +77,39 @@ typedef struct _EVdfg_msg_stone {
     char **xactions;
 } *deploy_msg_stone;
 
-typedef struct _EVdfg_stones_msg {
+/*
+ * Deploy is sent by master to clients in order to deploy many stones at once.
+ */
+typedef struct _EVdfg_deploy_msg {
     char *canonical_name;
     int stone_count;
     deploy_msg_stone stone_list;
-} EVdfg_stones_msg, *EVdfg_stones_ptr;
+} EVdfg_deploy_msg, *EVdfg_deploy_ptr;
+
+typedef enum {DFGnode_join=0, DFGdeploy_ack=1, DFGshutdown_contrib=2, DFGconn_shutdown=3, DFGflush_reconfig=4, DFGlast_msg} 
+    EVmaster_msg_type;
+
+/*
+ * data structure used to maintain master's incoming message queue
+ */
+typedef struct _EVdfg_master_msg {
+    EVmaster_msg_type msg_type;
+    CMConnection conn;
+    union {
+	EVnode_join_msg  node_join;
+	EVdeploy_ack_msg deploy_ack;
+	EVshutdown_contribution_msg shutdown_contrib;
+	EVconn_shutdown_msg conn_shutdown;
+	EVflush_attrs_reconfig_msg flush_reconfig;
+    } u;
+    struct _EVdfg_master_msg *next;
+} EVdfg_master_msg, *EVdfg_master_msg_ptr;
+
 
 typedef struct {
     char *name;
     attr_list contact_list;
 } *EVnode_list, EVnode_rec;
-
-typedef struct {
-    int msg_type;
-    void *msg;
-    CMConnection conn;
-} queued_msg;
 
 struct _EVdfg_stone {
     EVdfg dfg;
@@ -104,7 +147,7 @@ typedef struct _EVint_node_rec {
     int needs_ready;
 } *EVint_node_list;
 
-typedef enum {DFG_Joining, DFG_Starting, DFG_Running, DFG_Reconfiguring, DFG_Shutting_Down} DFG_State;
+typedef enum {DFG_Joining=0, DFG_Starting=1, DFG_Running=2, DFG_Reconfiguring=3, DFG_Shutting_Down=4, DFG_Last_State=5} DFG_State;
 extern char *str_state[];
 
 #define STATUS_FAILED -3
@@ -142,8 +185,8 @@ struct _EVdfg {
     int already_shutdown;
     int active_sink_count;
     int deploy_ack_count;
-    int startup_ack_condition;
-    queued_msg *queued_messages;
+    int deploy_ack_condition;
+    EVdfg_master_msg_ptr queued_messages;
 	
     /* reconfig data is below */
     int reconfig;
@@ -187,7 +230,7 @@ extern void INT_EVdfg_reconfig_link_port_to_stone ( EVdfg dfg, int src_stone_ind
 extern void INT_EVdfg_reconfig_transfer_events ( EVdfg dfg, int src_stone_index, int src_port, int dest_stone_index, int dest_port );
 extern void INT_EVdfg_register_node_list ( EVdfg dfg, char** list );
 extern void INT_EVdfg_register_raw_sink_handler ( CManager cm, char *name, EVRawHandlerFunc handler );
-extern void INT_EVdfg_register_sink_handler ( CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler );
+extern void INT_EVdfg_register_sink_handler ( CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler, void *client_data );
 extern void INT_EVdfg_register_source ( char *name, EVsource src );
 extern void INT_EVdfg_set_attr_list ( EVdfg_stone stone, attr_list attrs );
 extern attr_list INT_EVdfg_get_attr_list ( EVdfg_stone stone );

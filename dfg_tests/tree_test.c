@@ -63,7 +63,7 @@ be_test_master(int argc, char **argv)
       EVdfg_register_source("master_source", source_handle);
     } else {
       EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
-				  (EVSimpleHandlerFunc) simple_handler);
+				  (EVSimpleHandlerFunc) simple_handler, NULL);
     }
 
 /*
@@ -101,7 +101,7 @@ be_test_master(int argc, char **argv)
 	n = nbase+j;
 	sprintf(chandle,"handlerN%d", n);
 	EVdfg_register_sink_handler(cm,chandle,simple_format_list, 
-				    (EVSimpleHandlerFunc) simple_handler);
+				    (EVSimpleHandlerFunc) simple_handler, NULL);
 	tmp[j] = EVdfg_create_sink_stone(test_dfg,chandle);
 	EVdfg_link_port(last[j/base],j%2 ,tmp[j]);
 	EVdfg_assign_node(tmp[j], nodes[n-1]);
@@ -168,7 +168,7 @@ be_test_child(int argc, char **argv)
     chandle = malloc(sizeof(char)*(strlen(argv[1]) + 9));
     sprintf(chandle,"handler%s", argv[1]);
     EVdfg_register_sink_handler(cm,chandle, simple_format_list,
-				(EVSimpleHandlerFunc) simple_handler);
+				(EVSimpleHandlerFunc) simple_handler, NULL);
     EVdfg_join_dfg(test_dfg, argv[1], argv[2]);
     EVdfg_ready_wait(test_dfg);
     if (EVdfg_active_sink_count(test_dfg) == 0) {

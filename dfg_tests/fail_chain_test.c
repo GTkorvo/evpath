@@ -149,7 +149,7 @@ be_test_master(int argc, char **argv)
     source_handle = EVcreate_submit_handle(cm, -1, simple_format_list);
     EVdfg_register_source("master_source", source_handle);
     EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
-				(EVSimpleHandlerFunc) simple_handler);
+				(EVSimpleHandlerFunc) simple_handler, NULL);
 
 /*
 **  DFG CREATION
@@ -244,7 +244,7 @@ be_test_child(int argc, char **argv)
     src = EVcreate_submit_handle(cm, -1, simple_format_list);
     EVdfg_register_source("master_source", src);
     EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
-				(EVSimpleHandlerFunc) simple_handler);
+				(EVSimpleHandlerFunc) simple_handler, NULL);
     EVdfg_join_dfg(test_dfg, argv[1], argv[2]);
     EVdfg_ready_wait(test_dfg);
 

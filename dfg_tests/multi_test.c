@@ -166,7 +166,7 @@ be_test_master(int argc, char **argv)
     EVdfg_register_source("a_source", a_handle);
     EVdfg_register_source("b_source", b_handle);
     EVdfg_register_sink_handler(cm, "c_output_handler", c_format_list,
-				(EVSimpleHandlerFunc) output_handler);
+				(EVSimpleHandlerFunc) output_handler, NULL);
 
 /*
 **  DFG CREATION
@@ -251,7 +251,7 @@ be_test_child(int argc, char **argv)
     test_dfg = EVdfg_create(cm);
 
     EVdfg_register_sink_handler(cm, "c_output_handler", c_format_list,
-				(EVSimpleHandlerFunc) output_handler);
+				(EVSimpleHandlerFunc) output_handler, NULL);
     a_handle = EVcreate_submit_handle_free(cm, -1, a_format_list,
 					   data_free, NULL);
     b_handle = EVcreate_submit_handle_free(cm, -1, b_format_list,

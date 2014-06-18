@@ -321,13 +321,13 @@ be_test_master(int argc, char **argv)
     EVdfg_register_source("c_source", c_handle);
     EVdfg_register_source("command_source", command_handle);
     EVdfg_register_sink_handler(cm, "a_output_handler", a_format_list,
-				(EVSimpleHandlerFunc) a_output_handler);
+				(EVSimpleHandlerFunc) a_output_handler, NULL);
     EVdfg_register_sink_handler(cm, "b_output_handler", b_format_list,
-				(EVSimpleHandlerFunc) b_output_handler);
+				(EVSimpleHandlerFunc) b_output_handler, NULL);
     EVdfg_register_sink_handler(cm, "c_output_handler", c_format_list,
-				(EVSimpleHandlerFunc) c_output_handler);
+				(EVSimpleHandlerFunc) c_output_handler, NULL);
     EVdfg_register_sink_handler(cm, "raw_output_handler", NULL,
-				(EVSimpleHandlerFunc) raw_handler);
+				(EVSimpleHandlerFunc) raw_handler, NULL);
 
 /*
 **  DFG CREATION
@@ -520,11 +520,11 @@ be_test_child(int argc, char **argv)
     test_dfg = EVdfg_create(cm);
 
     EVdfg_register_sink_handler(cm, "a_output_handler", a_format_list,
-				(EVSimpleHandlerFunc) a_output_handler);
+				(EVSimpleHandlerFunc) a_output_handler, NULL);
     EVdfg_register_sink_handler(cm, "b_output_handler", b_format_list,
-				(EVSimpleHandlerFunc) b_output_handler);
+				(EVSimpleHandlerFunc) b_output_handler, NULL);
     EVdfg_register_sink_handler(cm, "c_output_handler", c_format_list,
-				(EVSimpleHandlerFunc) c_output_handler);
+				(EVSimpleHandlerFunc) c_output_handler, NULL);
     a_handle = EVcreate_submit_handle_free(cm, -1, a_format_list,
 					   data_free, NULL);
     b_handle = EVcreate_submit_handle_free(cm, -1, b_format_list,

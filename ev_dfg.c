@@ -2,6 +2,7 @@
 #define _GNU_SOURCE
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <strings.h>
@@ -50,88 +51,56 @@
 
 
 char *str_state[] = {"DFG_Joining", "DFG_Starting", "DFG_Running", "DFG_Reconfiguring", "DFG_Shutting_Down"};
+static char *master_msg_str[] = {"DFGnode_join", "DFGdeploy_ack", "DFGshutdown_contrib", "DFGconn_shutdown", 
+			  "DFGflush_reconfig", NULL};
 
-static void handle_conn_shutdown(EVdfg dfg, int stone);
-static void handle_node_join(EVdfg dfg, char *node_name, char *contact_string, CMConnection conn);
-static void handle_flush_attr_reconfig(EVdfg dfg, EVflush_attrs_reconfig_ptr msg);
+
+static void handle_conn_shutdown(EVdfg dfg, EVdfg_master_msg_ptr msg);
+static void handle_node_join(EVdfg dfg, EVdfg_master_msg_ptr msg);
+static void handle_flush_reconfig(EVdfg dfg, EVdfg_master_msg_ptr);
+static void handle_deploy_ack(EVdfg dfg, EVdfg_master_msg_ptr);
+static void handle_shutdown_contrib(EVdfg dfg, EVdfg_master_msg_ptr);
+
+static void
+queue_master_msg(EVdfg dfg, void*vmsg, EVmaster_msg_type msg_type, CMConnection conn, int copy);
+static void free_master_msg(EVdfg_master_msg *msg);
+
 static void free_attrs_msg(EVflush_attrs_reconfig_ptr msg);
+static FMStructDescRec EVdfg_conn_shutdown_format_list[];
+static FMStructDescRec EVdfg_deploy_ack_format_list[];
+static FMStructDescRec EVdfg_flush_attrs_reconfig_format_list[];
+static FMStructDescRec EVdfg_node_join_format_list[];
+static FMStructDescRec EVdfg_ready_format_list[];
+static FMStructDescRec EVdfg_deploy_format_list[];
+static FMStructDescRec EVdfg_deploy_ack_format_list[];
+static FMStructDescRec EVdfg_shutdown_format_list[];
+static FMStructDescRec EVdfg_shutdown_contribution_format_list[];
+
+
+/* msg action model
+ *
+ For each state/ for each master msg one of these possibilities:
+	 handle - dequeue and call handler (may change state, start over )
+	 unexpected - immediate error and discard (continue to next )
+	 leave_queued - (continue to next )
+*/
+static
+char action_model[DFG_Last_State][DFGlast_msg] = {
+/* join		deploy_ack	shutdown_contrib	conn_shutdown	flush_reconfig */
+  {'H', 	'U',	 	'U', 			'U', 		'U'},/* state Joining */
+  {'Q',		'H',		'H',			'Q',		'Q'},/* state Starting */
+  {'H',		'U',		'H',			'H',		'H'},/* state Running */
+  {'Q',		'H',		'H',			'Q',		'Q'},/* state Reconfiguring */
+  {'U',		'U',		'U',			'U',		'U'}/* state Shutting Down */
+};
+
+typedef void (*master_msg_handler_func) (EVdfg dfg, EVdfg_master_msg_ptr msg);
+static master_msg_handler_func master_msg_handler[DFGlast_msg] = {handle_node_join, handle_deploy_ack, handle_shutdown_contrib, handle_conn_shutdown, handle_flush_reconfig};
+static void dfg_master_msg_handler(CManager cm, CMConnection conn, void *vmsg, 
+				   void *client_data, attr_list attrs);
 
 static void
-queue_conn_shutdown_message(EVdfg dfg, int stone)
-{
-    int count = 0;
-    CMtrace_out(cm, EVdfgVerbose, "EVDFG queue_conn_shutdown_message -  master DFG state is %s\n", str_state[dfg->state]);
-    if (dfg->queued_messages == NULL) {
-	dfg->queued_messages = malloc(sizeof(dfg->queued_messages[0]) * 2);
-    } else {
-	while (dfg->queued_messages[count].msg != NULL) count++;
-	dfg->queued_messages = realloc(dfg->queued_messages, 
-				       sizeof(dfg->queued_messages[0]) * (count + 2));
-    }
-    CMtrace_out(dfg->cm, EVdfgVerbose, "Queueing at (position %d) connection shutdown message for stone %x\n", count, stone);
-    dfg->queued_messages[count].msg_type = 1;   /* conn_shutdown */
-    dfg->queued_messages[count].msg = malloc(sizeof(EVconn_shutdown_msg));
-    ((EVconn_shutdown_msg*)dfg->queued_messages[count].msg)->stone = stone;
-    dfg->queued_messages[count].conn = NULL;
-    dfg->queued_messages[count+1].msg_type = 0;
-    dfg->queued_messages[count+1].msg = NULL;
-}
-
-static void
-queue_node_join_message(EVdfg dfg, char *node_name, char *contact_string, CMConnection conn)
-{
-    int count = 0;
-    CMtrace_out(cm, EVdfgVerbose, "EVDFG queue_node_join_message -  master DFG state is %s\n", str_state[dfg->state]);
-    if (dfg->queued_messages == NULL) {
-	dfg->queued_messages = malloc(sizeof(dfg->queued_messages[0]) * 2);
-    } else {
-	while (dfg->queued_messages[count].msg != NULL) count++;
-	dfg->queued_messages = realloc(dfg->queued_messages, 
-				       sizeof(dfg->queued_messages[0]) * (count + 2));
-    }
-    CMtrace_out(dfg->cm, EVdfgVerbose, "Queueing at (position %d) node join message for node %s(%s)\n", count, 
-		node_name, contact_string);
-    dfg->queued_messages[count].msg_type = 2;   /* node_join */
-    dfg->queued_messages[count].msg = malloc(sizeof(EVregister_msg));
-    ((EVregister_msg*)dfg->queued_messages[count].msg)->node_name = strdup(node_name);
-    ((EVregister_msg*)dfg->queued_messages[count].msg)->contact_string = strdup(contact_string);
-    dfg->queued_messages[count].conn = conn;
-    dfg->queued_messages[count+1].msg_type = 0;
-    dfg->queued_messages[count+1].msg = NULL;
-}
-
-static void
-queue_flush_attr_reconfig_message(EVdfg dfg, EVflush_attrs_reconfig_ptr msg, int do_copy)
-{
-    int i, count = 0;
-    EVflush_attrs_reconfig_ptr copy = msg;
-    CMtrace_out(cm, EVdfgVerbose, "EVDFG flush_attr_reconfig_message -  master DFG state is %s\n", str_state[dfg->state]);
-    if (dfg->queued_messages == NULL) {
-	dfg->queued_messages = malloc(sizeof(dfg->queued_messages[0]) * 2);
-    } else {
-	while (dfg->queued_messages[count].msg != NULL) count++;
-	dfg->queued_messages = realloc(dfg->queued_messages, 
-				       sizeof(dfg->queued_messages[0]) * (count + 2));
-    }
-    CMtrace_out(dfg->cm, EVdfgVerbose, "Queueing at (position %d) attr_flush_reconfig (reconfig %d)\n", count, msg->reconfig);
-    dfg->queued_messages[count].msg_type = 3;   /* flush */
-    if (do_copy) {
-	copy = malloc(sizeof(EVflush_attrs_reconfig_msg));
-	copy->reconfig = msg->reconfig;
-	copy->count = msg->count;
-	copy->attr_stone_list = malloc(msg->count * sizeof(EVattr_stone_struct));
-	for (i=0; i < msg->count ; i++) {
-	    copy->attr_stone_list[i] = msg->attr_stone_list[i];
-	    copy->attr_stone_list[i].attr_str = strdup(copy->attr_stone_list[i].attr_str);
-	}
-    }
-    dfg->queued_messages[count].msg = copy;
-    dfg->queued_messages[count+1].msg_type = 0;
-    dfg->queued_messages[count+1].msg = NULL;
-}
-
-static void
-handle_queued_messages(EVdfg dfg)
+handle_queued_messages(CManager cm, void* vdfg)
 {
     /* SHOULD */
     /*  1 - consolidate node failure messages (likely to get several for each node) and handle these first */
@@ -139,54 +108,45 @@ handle_queued_messages(EVdfg dfg)
     /* FOR THE MOMENT */
     /* just do everything in order */
     /* beware the the list might change while we're running a handler */
-    if (dfg->queued_messages == NULL) return;
-    CMtrace_out(cm, EVdfgVerbose, "EVDFG handle_queued_messages -  master DFG state is %s\n", str_state[dfg->state]);
-    if ((dfg->state == DFG_Starting) || (dfg->state == DFG_Reconfiguring)) {
-	CMtrace_out(cm, EVdfgVerbose, "EVDFG handle_queued_messages -  returning because state is inappropriate\n");
-	return;
-    }
-    while (dfg->queued_messages[0].msg != NULL) {
-	int count;
-	int msg_type = dfg->queued_messages[0].msg_type;
-	CMConnection conn = dfg->queued_messages[0].conn;
-	void *msg = dfg->queued_messages[0].msg;
+    EVdfg dfg = (EVdfg) vdfg;
+    EVdfg_master_msg_ptr next;
+    EVdfg_master_msg_ptr *last_ptr;
 
-	if ((dfg->state == DFG_Starting) || (dfg->state == DFG_Reconfiguring)) {
-	    CMtrace_out(cm, EVdfgVerbose, "EVDFG handle_queued_messages -  returning because state is inappropriate\n");
-	    return;
-	}
-	count = 0;
-	while (dfg->queued_messages[count+1].msg != NULL) {
-	    /* copy down */
-	    dfg->queued_messages[count] = dfg->queued_messages[count+1];
-	    count++;
-	}
-	dfg->queued_messages[count].msg = NULL;
-	switch(msg_type) {
-	case 1:
-	    dfg->state = DFG_Reconfiguring;
-	    CMtrace_out(cm, EVdfgVerbose, "EVDFG queued conn shutdown -  master DFG state is now %s\n", str_state[dfg->state]);
-	    handle_conn_shutdown(dfg, ((EVconn_shutdown_msg*)msg)->stone);
-	    free(msg);
+    if (dfg->queued_messages == NULL) return;
+    CManager_lock(dfg->cm);
+    next = dfg->queued_messages;
+    last_ptr = &dfg->queued_messages;
+    while(next != NULL) {
+	CMtrace_out(cm, EVdfgVerbose, "EVDFG handle_queued_messages -  master DFG state is %s\n", str_state[dfg->state]);
+	switch (action_model[dfg->state][next->msg_type]) {
+	case 'H':
+	    CMtrace_out(cm, EVdfgVerbose, "Master Message is type %s, calling handler\n", master_msg_str[next->msg_type]);
+	    *last_ptr = next->next;  /* remove msg from queue */
+	    (*master_msg_handler[next->msg_type])(dfg, next);
+	    free_master_msg(next);
+	    next = dfg->queued_messages;   /* start from scratch in case state changed */
 	    break;
-	case 2:
-	    dfg->state = DFG_Reconfiguring;
-	    CMtrace_out(cm, EVdfgVerbose, "EVDFG queued node join -  master DFG state is now %s\n", str_state[dfg->state]);
-	    handle_node_join(dfg, ((EVregister_msg*)msg)->node_name, ((EVregister_msg*)msg)->contact_string, conn);
-	    free(msg);
+	case 'U':
+	    printf("Master Message is type %s, UNEXPECTED!  Discarding...\n", master_msg_str[next->msg_type]);
+	    *last_ptr = next->next;  /* remove msg from queue */
+	    free_master_msg(next);
+	    next = *last_ptr;
 	    break;
-	case 3:
-	    if (((EVflush_attrs_reconfig_ptr)msg)->reconfig) {
-		dfg->state = DFG_Reconfiguring;
-	    }
-	    CMtrace_out(cm, EVdfgVerbose, "EVDFG queued flush_attr_reconfig -  master DFG state is now %s\n", str_state[dfg->state]);
-	    handle_flush_attr_reconfig(dfg, msg);
-	    free_attrs_msg(msg);
+	case 'Q':
+	    printf("Master Message is type %s, not appropriate now, leaving queued...\n", master_msg_str[next->msg_type]);
+	    next = next->next;
+	    break;
+	default:
+	    printf("Unexpected action type '%c', discarding\n", action_model[dfg->state][next->msg_type]);
+	    *last_ptr = next->next;  /* remove msg from queue */
+	    free_master_msg(next);
+	    next = *last_ptr;
 	    break;
 	}
 	CMtrace_out(cm, EVdfgVerbose, "EVDFG handle queued end loop -  master DFG state is now %s\n", str_state[dfg->state]);
-    }
+    }	    
     CMtrace_out(cm, EVdfgVerbose, "EVDFG handle queued exiting -  master DFG state is now %s\n", str_state[dfg->state]);
+    CManager_unlock(dfg->cm);
 }
 
 EVdfg_stone
@@ -364,132 +324,10 @@ INT_EVdfg_get_attr_list(EVdfg_stone stone)
     return attrs;
 }
 
-FMField EVleaf_element_flds[] = {
-    {"name", "string", sizeof(char*), FMOffset(leaf_element*, name)},
-    {"FMtype", "string", sizeof(char*), FMOffset(leaf_element*, FMtype)},
-    {NULL, NULL, 0, 0}
-};
-
-FMField EVregister_msg_flds[] = {
-    {"node_name", "string", sizeof(char*), FMOffset(EVregister_ptr, node_name)},
-    {"contact_string", "string", sizeof(char*), FMOffset(EVregister_ptr, contact_string)},
-    {"source_count", "integer", sizeof(int), FMOffset(EVregister_ptr, source_count)},
-    {"sink_count", "integer", sizeof(int), FMOffset(EVregister_ptr, sink_count)},
-    {"sources", "source_element[source_count]", sizeof(leaf_element), FMOffset(EVregister_ptr, sources)},
-    {"sinks", "sink_element[sink_count]", sizeof(leaf_element), FMOffset(EVregister_ptr, sinks)},
-    {NULL, NULL, 0, 0}
-};
-
-FMStructDescRec EVdfg_register_format_list[] = {
-    {"EVdfg_register", EVregister_msg_flds, sizeof(EVregister_msg), NULL},
-    {"sink_element", EVleaf_element_flds, sizeof(leaf_element), NULL},
-    {"source_element", EVleaf_element_flds, sizeof(leaf_element), NULL},
-    {NULL, NULL, 0, NULL}
-};
-
-FMField EVready_msg_flds[] = {
-    {"node_id", "integer", sizeof(int), FMOffset(EVready_ptr, node_id)},
-    {NULL, NULL, 0, 0}
-};
-
-FMStructDescRec EVdfg_ready_format_list[] = {
-    {"EVdfg_ready", EVready_msg_flds, sizeof(EVready_msg), NULL},
-    {NULL, NULL, 0, NULL}
-};
-
-FMField EVstartup_ack_msg_flds[] = {
-    {"node_id", "string", sizeof(char*), FMOffset(EVstartup_ack_ptr, node_id)},
-    {NULL, NULL, 0, 0}
-};
-
-FMStructDescRec EVdfg_startup_ack_format_list[] = {
-    {"EVdfg_startup_ack", EVstartup_ack_msg_flds, sizeof(EVstartup_ack_msg), NULL},
-    {NULL, NULL, 0, NULL}
-};
-
-FMField EVshutdown_msg_flds[] = {
-    {"value", "integer", sizeof(int), FMOffset(EVshutdown_ptr, value)},
-    {NULL, NULL, 0, 0}
-};
-
-FMStructDescRec EVdfg_shutdown_format_list[] = {
-    {"EVdfg_shutdown", EVshutdown_msg_flds, sizeof(EVshutdown_msg), NULL},
-    {NULL, NULL, 0, NULL}
-};
-
-FMField EVconn_shutdown_msg_flds[] = {
-    {"stone", "integer", sizeof(int), FMOffset(EVconn_shutdown_ptr, stone)},
-    {NULL, NULL, 0, 0}
-};
-
-FMStructDescRec EVdfg_conn_shutdown_format_list[] = {
-    {"EVdfg_conn_shutdown", EVconn_shutdown_msg_flds, sizeof(EVconn_shutdown_msg), NULL},
-    {NULL, NULL, 0, NULL}
-};
-
-FMField EVattr_stone_flds[] = {
-    {"stone", "integer", sizeof(long), FMOffset(EVattr_stone_ptr, stone)},
-    {"attr_str", "string", sizeof(char*), FMOffset(EVattr_stone_ptr, attr_str)},
-    {NULL, NULL, 0, 0}
-};
-
-FMField EVflush_attrs_reconfig_msg_flds[] = {
-    {"reconfig", "integer", sizeof(int), FMOffset(EVflush_attrs_reconfig_ptr, reconfig)},
-    {"count", "integer", sizeof(long), FMOffset(EVflush_attrs_reconfig_ptr, count)},
-    {"attr_stone_list", "attr_stone_element[count]", sizeof(EVattr_stone_struct), FMOffset(EVflush_attrs_reconfig_ptr, attr_stone_list)},
-    {NULL, NULL, 0, 0}
-};
-
-FMStructDescRec EVdfg_flush_attrs_reconfig_format_list[] = {
-    {"EVflush_attrs_reconfig", EVflush_attrs_reconfig_msg_flds, sizeof(EVflush_attrs_reconfig_msg), NULL},
-    {"attr_stone_element", EVattr_stone_flds, sizeof(EVattr_stone_struct), NULL},
-    {NULL, NULL, 0, NULL}
-};
-
-FMField EVdfg_stone_flds[] = {
-    {"global_stone_id", "integer", sizeof(int), 
-     FMOffset(deploy_msg_stone, global_stone_id)},
-    {"attrs", "string", sizeof(char*), 
-     FMOffset(deploy_msg_stone, attrs)},
-    {"period_secs", "integer", sizeof(int),
-     FMOffset(deploy_msg_stone, period_secs)},
-    {"period_usecs", "integer", sizeof(int),
-     FMOffset(deploy_msg_stone, period_usecs)},
-    {"out_count", "integer", sizeof(int), 
-     FMOffset(deploy_msg_stone, out_count)},
-    {"out_links", "integer[out_count]", sizeof(int), 
-     FMOffset(deploy_msg_stone, out_links)},
-    {"action", "string", sizeof(char*), 
-     FMOffset(deploy_msg_stone, action)},
-    {"extra_actions", "integer", sizeof(int), 
-     FMOffset(deploy_msg_stone, extra_actions)},
-    {"xactions", "string[extra_actions]", sizeof(char*), 
-     FMOffset(deploy_msg_stone, xactions)},
-    {NULL, NULL, 0, 0}
-};
-
-FMField EVdfg_msg_flds[] = {
-    {"canonical_name", "string", sizeof(char*),
-     FMOffset(EVdfg_stones_ptr, canonical_name)},
-    {"stone_count", "integer", sizeof(int),
-     FMOffset(EVdfg_stones_ptr, stone_count)},
-    {"stone_list", "EVdfg_deploy_stone[stone_count]", sizeof(struct _EVdfg_msg_stone), FMOffset(EVdfg_stones_ptr, stone_list)},
-    {NULL, NULL, 0, 0}
-};
-
-FMStructDescRec EVdfg_deploy_format_list[] = {
-    {"EVdfg_deploy", EVdfg_msg_flds, sizeof(EVdfg_stones_msg), NULL},
-    {"EVdfg_deploy_stone", EVdfg_stone_flds, sizeof(struct _EVdfg_msg_stone), NULL},
-    {NULL, NULL, 0, NULL}
-};
 
 static void check_all_nodes_registered(EVdfg dfg);
 static void possibly_signal_shutdown(EVdfg dfg, int value, CMConnection conn);
 static int new_shutdown_condition(EVdfg dfg, CMConnection conn);
-
-static void
-dfg_startup_ack_handler(CManager cm, CMConnection conn, void *vmsg, 
-			void *client_data, attr_list attrs);
 
 static void
 enable_auto_stones(CManager cm, EVdfg dfg)
@@ -500,6 +338,7 @@ enable_auto_stones(CManager cm, EVdfg dfg)
     CMtrace_out(cm, EVdfgVerbose, "ENABLING AUTO STONES, list is %p\n", auto_list);
     while (auto_list && auto_list[i].period_secs != -1) {
         /* everyone is ready, enable auto stones */
+	CMtrace_out(cm, EVdfgVerbose, "auto stone %d, period %d sec, %d usec\n", auto_list[i].stone, auto_list[i].period_secs, auto_list[i].period_usecs);
 	INT_EVenable_auto_stone(cm, auto_list[i].stone, auto_list[i].period_secs, auto_list[i].period_usecs);
 	i++;
     }
@@ -527,8 +366,10 @@ dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg,
 }
 
 static void 
-handle_conn_shutdown(EVdfg dfg, int stone)
+handle_conn_shutdown(EVdfg dfg, EVdfg_master_msg_ptr msg)
 {
+    int stone = msg->u.conn_shutdown.stone;
+
     if (dfg->node_fail_handler != NULL) {
 	int i;
 	int target_stone = -1;
@@ -567,53 +408,6 @@ handle_conn_shutdown(EVdfg dfg, int stone)
 }
 
 static void
-dfg_flush_attr_reconfig_shutdown_handler(CManager cm, CMConnection conn, void *vmsg, 
-			  void *client_data, attr_list attrs)
-{
-    EVdfg dfg = client_data;
-    /* coming in from the network? queue it and handle messages */
-    CManager_lock(cm);
-    queue_flush_attr_reconfig_message(dfg, vmsg, 1 /* copy it */);
-    handle_queued_messages(dfg);
-    CManager_unlock(cm);
-}
-
-static void
-dfg_conn_shutdown_handler(CManager cm, CMConnection conn, void *vmsg, 
-			  void *client_data, attr_list attrs)
-{
-    EVdfg dfg = client_data;
-    EVconn_shutdown_msg *msg = (EVconn_shutdown_msg *)vmsg;
-    
-    (void)cm;
-    (void)conn;
-    (void)attrs;
-    CMtrace_out(cm, EVdfgVerbose, "The master knows about a stone %d failure\n", msg->stone);
-    CManager_lock(cm);
-    switch (dfg->state) {
-    case DFG_Shutting_Down:
-	/* ignore */
-	break;
-    case DFG_Reconfiguring:
-    case DFG_Starting:
-	queue_conn_shutdown_message(dfg, msg->stone);
-	break;
-    case DFG_Joining:
-	printf("This shouldn't happen , connection shutdown during joining phase \n");
-	exit(0);
-	break;
-    case DFG_Running:
-	dfg->state = DFG_Reconfiguring;
-	CMtrace_out(cm, EVdfgVerbose, "EVDFG conn_shutdown_handler -  master DFG state is now %s\n", str_state[dfg->state]);
-	handle_conn_shutdown(dfg, msg->stone);
-	break;
-    }
-    handle_queued_messages(dfg);
-    CMtrace_out(cm, EVdfgVerbose, "EVDFG exit conn shutdown master DFG state is %s\n", str_state[dfg->state]);
-    CManager_unlock(cm);
-}
-
-static void
 dfg_shutdown_handler(CManager cm, CMConnection conn, void *vmsg, 
 		  void *client_data, attr_list attrs)
 {
@@ -642,12 +436,23 @@ dfg_shutdown_handler(CManager cm, CMConnection conn, void *vmsg,
 }
 
 static void
+handle_shutdown_contrib(EVdfg dfg, EVdfg_master_msg_ptr mmsg)
+{
+
+    EVshutdown_contribution_ptr msg =  &mmsg->u.shutdown_contrib;
+    possibly_signal_shutdown(dfg, msg->value, mmsg->conn);
+    CMtrace_out(cm, EVdfgVerbose, "EVDFG exit shutdown master DFG state is %s\n", str_state[dfg->state]);
+}
+
+static void
 dfg_stone_close_handler(CManager cm, CMConnection conn, int stone, 
 		  void *client_data)
 {
     EVdfg dfg = (EVdfg)client_data;
     event_path_data evp = cm->evp;
     int global_stone_id = -1;
+    CMFormat conn_shutdown_msg = INT_CMlookup_format(dfg->cm, EVdfg_conn_shutdown_format_list);
+    EVconn_shutdown_msg msg;
     (void)cm;
     (void)conn;
     CManager_lock(cm);
@@ -666,19 +471,13 @@ dfg_stone_close_handler(CManager cm, CMConnection conn, int stone,
 	CManager_unlock(cm);
 	return;
     }
+    msg.stone = global_stone_id;
     if (dfg->master_connection != NULL) {
-	CMFormat conn_shutdown_msg = INT_CMlookup_format(dfg->cm, EVdfg_conn_shutdown_format_list);
-	EVconn_shutdown_msg msg;
-	msg.stone = global_stone_id;
 	INT_CMwrite(dfg->master_connection, conn_shutdown_msg, &msg);
-	CManager_unlock(dfg->cm);
     } else {
-	EVconn_shutdown_msg msg;
-	msg.stone = global_stone_id;
-	/* the master is detecting a close situation */
-	CManager_unlock(dfg->cm);
-	dfg_conn_shutdown_handler(dfg->cm, NULL, &msg, dfg, NULL);
+	queue_master_msg(dfg, (void*)&msg, DFGconn_shutdown, NULL, /*copy*/0);
     }
+    CManager_unlock(dfg->cm);
 }
 
 extern void
@@ -698,8 +497,9 @@ INT_EVdfg_assign_canonical_name(EVdfg dfg, char *given_name, char *canonical_nam
 }
 
 static void
-handle_flush_attr_reconfig(EVdfg dfg, EVflush_attrs_reconfig_ptr msg)
+handle_flush_reconfig(EVdfg dfg, EVdfg_master_msg_ptr mmsg)
 {
+    EVflush_attrs_reconfig_ptr msg = &mmsg->u.flush_reconfig;
     int i, j;
     assert(CManager_locked(dfg->cm));
     for (i=0; i < msg->count; i++) {
@@ -725,8 +525,11 @@ handle_flush_attr_reconfig(EVdfg dfg, EVflush_attrs_reconfig_ptr msg)
 }
 
 static void
-handle_node_join(EVdfg dfg, char *node_name, char *contact_string, CMConnection conn)
+handle_node_join(EVdfg dfg, EVdfg_master_msg_ptr msg)
 {
+    char *node_name = msg->u.node_join.node_name;
+    char *contact_string = msg->u.node_join.contact_string;
+    CMConnection conn = msg->conn;
     int node;
     int new_node = -1;
 
@@ -786,36 +589,6 @@ handle_node_join(EVdfg dfg, char *node_name, char *contact_string, CMConnection 
     check_all_nodes_registered(dfg);
 }
 
-static void
-node_register_handler(CManager cm, CMConnection conn, void *vmsg, 
-		      void *client_data, attr_list attrs)
-{
-    /* a client join message came in from the network */
-    EVdfg dfg = client_data;
-    EVregister_ptr msg =  vmsg;
-    (void)cm;
-    (void)attrs;
-    CManager_lock(cm);
-    switch (dfg->state) {
-    case DFG_Shutting_Down:
-	/* ignore */
-	break;
-    case DFG_Reconfiguring:
-    case DFG_Starting:
-	queue_node_join_message(dfg, msg->node_name, msg->contact_string, conn);
-	break;
-    case DFG_Running:
-	dfg->state = DFG_Reconfiguring;
-	CMtrace_out(cm, EVdfgVerbose, "EVDFG node join -  master DFG state is now %s\n", str_state[dfg->state]);
-	/* fall thorough */
-    case DFG_Joining:
-	handle_node_join(dfg, msg->node_name, msg->contact_string, conn);
-	break;
-    }
-    handle_queued_messages(dfg);
-    CMtrace_out(cm, EVdfgVerbose, "EVDFG exit join handler -  master DFG state is %s\n", str_state[dfg->state]);
-    CManager_unlock(cm);
-}
 
 static void
 dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg, 
@@ -827,7 +600,7 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
     (void) conn;
     (void) attrs;
     static int first_time_deploy = 1;
-    EVdfg_stones_ptr msg =  vmsg;
+    EVdfg_deploy_ptr msg =  vmsg;
     int i, base = evp->stone_lookup_table_size;
     int auto_stones = 0;
     auto_stone_list *auto_list = malloc(sizeof(auto_stone_list));
@@ -888,11 +661,11 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
     }    
     auto_list[auto_stones].period_secs = -1;
     if (conn != NULL) {
-	CMFormat startup_ack_msg = INT_CMlookup_format(dfg->cm, EVdfg_startup_ack_format_list);
-	EVstartup_ack_msg response_msg;
+	CMFormat deploy_ack_msg = INT_CMlookup_format(dfg->cm, EVdfg_deploy_ack_format_list);
+	EVdeploy_ack_msg response_msg;
 	response_msg.node_id = msg->canonical_name;
-	INT_CMwrite(dfg->master_connection, startup_ack_msg, &response_msg);
-	CMtrace_out(cm, EVdfgVerbose, "Client %d wrote startup ack\n", dfg->my_node_id);
+	INT_CMwrite(dfg->master_connection, deploy_ack_msg, &response_msg);
+	CMtrace_out(cm, EVdfgVerbose, "Client %d wrote deploy ack\n", dfg->my_node_id);
     } else {
       	CMtrace_out(cm, EVdfgVerbose, "Client %d no master conn\n", dfg->my_node_id);
     }
@@ -929,7 +702,11 @@ free_dfg(CManager cm, void *vdfg)
 	if (dfg->stones[i]->attrs) free_attr_list(dfg->stones[i]->attrs);
 	free(dfg->stones[i]);
     }
-    if (dfg->queued_messages) free(dfg->queued_messages);
+    while (dfg->queued_messages) {
+	EVdfg_master_msg_ptr tmp = dfg->queued_messages->next;
+	free_master_msg(dfg->queued_messages);
+	dfg->queued_messages = tmp;
+    }
     if (dfg->master_contact_str) free(dfg->master_contact_str);
     if (dfg->shutdown_conditions) free(dfg->shutdown_conditions);
     free(dfg->stones);
@@ -985,14 +762,14 @@ static void
 flush_and_trigger(EVdfg dfg, int reconfig)
 {
     EVflush_attrs_reconfig_ptr msg = build_attrs_msg(dfg);
+    CMFormat flush_msg = INT_CMlookup_format(dfg->cm, EVdfg_flush_attrs_reconfig_format_list);
     msg->reconfig = reconfig;
     if (dfg->master_connection != NULL) {
 	/* we are a client, send the reconfig to the master */
-	CMFormat flush_msg = INT_CMlookup_format(dfg->cm, EVdfg_flush_attrs_reconfig_format_list);
 	INT_CMwrite(dfg->master_connection, flush_msg, msg);
 	free_attrs_msg(msg);
     } else {
-	queue_flush_attr_reconfig_message(dfg, msg, 0);
+	queue_master_msg(dfg, &flush_msg, DFGflush_reconfig, NULL, /*copy*/ 0);
     }
 }
 
@@ -1040,25 +817,35 @@ INT_EVdfg_create(CManager cm)
     CMtrace_out(cm, EVdfgVerbose, "EVDFG initialization -  master DFG state set to %s\n", str_state[dfg->state]);
     contact_list = INT_CMget_contact_list(cm);
     dfg->master_contact_str = attr_list_to_string(contact_list);
-    dfg->startup_ack_condition = -1;
+    dfg->deploy_ack_condition = -1;
     free_attr_list(contact_list);
     INT_EVregister_close_handler(cm, dfg_stone_close_handler, (void*)dfg);
     INT_EVadd_standard_routines(cm, dfg_extern_string, dfg_extern_map);
-    INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_register_format_list),
-			   node_register_handler, dfg);
+    /*
+     * EVdfg master-handled messages
+     */
+    INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_node_join_format_list),
+			   dfg_master_msg_handler, (void*)(((uintptr_t)dfg)|DFGnode_join));
+    INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_deploy_ack_format_list),
+			   dfg_master_msg_handler, (void*)(((uintptr_t)dfg)|DFGdeploy_ack));
+    INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_shutdown_contribution_format_list),
+			   dfg_master_msg_handler, (void*)(((uintptr_t)dfg)|DFGshutdown_contrib));
+    INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_conn_shutdown_format_list),
+			   dfg_master_msg_handler, (void*)(((uintptr_t)dfg)|DFGconn_shutdown));
+    INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_flush_attrs_reconfig_format_list),
+			   dfg_master_msg_handler, (void*)(((uintptr_t)dfg)|DFGflush_reconfig));
+
+    /*
+     * EVdfg client-handled messages
+     */
     INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_ready_format_list),
 			   dfg_ready_handler, dfg);
-    INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_startup_ack_format_list),
-			   dfg_startup_ack_handler, dfg);
     INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_deploy_format_list),
 			   dfg_deploy_handler, dfg);
     INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_shutdown_format_list),
 			   dfg_shutdown_handler, dfg);
-    INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_conn_shutdown_format_list),
-			   dfg_conn_shutdown_handler, dfg);
-    INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_flush_attrs_reconfig_format_list),
-			   dfg_flush_attr_reconfig_shutdown_handler, dfg);
     INT_CMadd_shutdown_task(cm, free_dfg, dfg, FREE_TASK);
+    INT_CMadd_poll(cm, handle_queued_messages, dfg);
     return dfg;
 }
 
@@ -1182,16 +969,15 @@ INT_EVdfg_ready_wait(EVdfg dfg)
 extern int
 INT_EVdfg_shutdown(EVdfg dfg, int result)
 {
+    CMFormat shutdown_msg = INT_CMlookup_format(dfg->cm, EVdfg_shutdown_contribution_format_list);
+    EVshutdown_contribution_msg msg;
     if (dfg->already_shutdown) printf("Node %d, already shut down BAD!\n", dfg->my_node_id);
-    if (dfg->master_connection != NULL) {
-	/* we are a client, tell the master to shutdown */
-	CMFormat shutdown_msg = INT_CMlookup_format(dfg->cm, EVdfg_shutdown_format_list);
-	EVshutdown_msg msg;
-	msg.value = result;
-	INT_CMwrite(dfg->master_connection, shutdown_msg, &msg);
-	/* and wait until we hear back */
+    msg.value = result;
+    if (dfg->master_connection == NULL) {
+	queue_master_msg(dfg, (void*)&msg, DFGshutdown_contrib, NULL, /*copy*/0);
     } else {
-	possibly_signal_shutdown(dfg, result, NULL);
+	/* we are a client, tell the master to shutdown */
+	INT_CMwrite(dfg->master_connection, shutdown_msg, &msg);
     }
     if (!dfg->already_shutdown) {
 	CManager_unlock(dfg->cm);
@@ -1208,8 +994,8 @@ INT_EVdfg_force_shutdown(EVdfg dfg, int result)
     if (dfg->already_shutdown) printf("Node %d, already contributed to shutdown.  Don't call shutdown twice!\n", dfg->my_node_id);
     if (dfg->master_connection != NULL) {
 	/* we are a client, tell the master to shutdown */
-	CMFormat shutdown_msg = INT_CMlookup_format(dfg->cm, EVdfg_shutdown_format_list);
-	EVshutdown_msg msg;
+	CMFormat shutdown_msg = INT_CMlookup_format(dfg->cm, EVdfg_shutdown_contribution_format_list);
+	EVshutdown_contribution_msg msg;
 	msg.value = result;
 	INT_CMwrite(dfg->master_connection, shutdown_msg, &msg);
 	/* and wait until we hear back */
@@ -1236,8 +1022,8 @@ INT_EVdfg_ready_for_shutdown(EVdfg dfg)
     if (dfg->already_shutdown) return;
     if (dfg->master_connection != NULL) {
 	/* we are a client, tell the master to shutdown */
-	CMFormat shutdown_msg = INT_CMlookup_format(dfg->cm, EVdfg_shutdown_format_list);
-	EVshutdown_msg msg;
+	CMFormat shutdown_msg = INT_CMlookup_format(dfg->cm, EVdfg_shutdown_contribution_format_list);
+	EVshutdown_contribution_msg msg;
 	msg.value = STATUS_NO_CONTRIBUTION;   /* no status contribution */
 	INT_CMwrite(dfg->master_connection, shutdown_msg, &msg);
     } else {
@@ -1275,7 +1061,7 @@ INT_EVdfg_register_source(char *name, EVsource src)
 }
 
 extern void
-INT_EVdfg_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler)
+INT_EVdfg_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler, void* client_data)
 {
     event_path_data evp = cm->evp;
     if (evp->sink_handler_count == 0) {
@@ -1287,6 +1073,7 @@ INT_EVdfg_register_sink_handler(CManager cm, char *name, FMStructDescList list, 
     evp->sink_handlers[evp->sink_handler_count].name = name;
     evp->sink_handlers[evp->sink_handler_count].format_list = list;
     evp->sink_handlers[evp->sink_handler_count].handler = handler;
+    evp->sink_handlers[evp->sink_handler_count].client_data = client_data;
     evp->sink_handler_count++;
 }
 
@@ -1329,6 +1116,13 @@ INT_EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
     CManager cm = dfg->cm;
     event_path_data evp = cm->evp;
     attr_list master_attrs;
+    CMConnection conn;
+    CMFormat register_msg = INT_CMlookup_format(cm, EVdfg_node_join_format_list);
+    EVnode_join_msg msg;
+    attr_list contact_list = INT_CMget_contact_list(cm);
+    char *my_contact_str;
+    int i;
+
     if (dfg->ready_condition != -1) {
 	fprintf(stderr, "EVdfg_join_dfg() called more than once for this DFG.  Don't do that.\n");
 	return;
@@ -1338,49 +1132,43 @@ INT_EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
     dfg->master_contact_str = strdup(master_contact);
     dfg->ready_condition = INT_CMCondition_get(cm, NULL);
     dfg->pending_auto_list = NULL;
+
+    if (contact_list == NULL) {
+	INT_CMlisten(cm);
+	contact_list = INT_CMget_contact_list(cm);
+    }
+
+    my_contact_str = attr_list_to_string(contact_list);
+    free_attr_list(contact_list);
+    
+    msg.node_name = node_name;
+    msg.contact_string = my_contact_str;
+    msg.source_count = evp->source_count;
+    msg.sources = malloc(msg.source_count * sizeof(msg.sources[0]));
+    for (i=0; i < evp->source_count; i++) {
+	msg.sources[i].name = evp->sources[i].name;
+	msg.sources[i].FMtype = NULL;
+    }
+    msg.sink_count = evp->sink_handler_count;
+    msg.sinks = malloc(msg.sink_count * sizeof(msg.sinks[0]));
+    for (i=0; i < evp->sink_handler_count; i++) {
+	msg.sinks[i].name = evp->sink_handlers[i].name;
+	msg.sinks[i].FMtype = NULL;
+    }
+    
     if (INT_CMcontact_self_check(cm, master_attrs) == 1) {
-	/* we are the master */
-	handle_node_join(dfg, node_name, master_contact, NULL);
+	queue_master_msg(dfg, (void*)&msg, DFGnode_join, NULL, /*copy*/0);
     } else {
-	CMConnection conn = INT_CMget_conn(cm, master_attrs);
-	CMFormat register_msg = INT_CMlookup_format(cm, EVdfg_register_format_list);
-	EVregister_msg msg;
-	attr_list contact_list = INT_CMget_contact_list(cm);
-	char *my_contact_str;
-	int i;
+	conn = INT_CMget_conn(cm, master_attrs);
 	if (conn == NULL) {
 	    fprintf(stderr, "failed to contact Master at %s\n", attr_list_to_string(master_attrs));
 	    fprintf(stderr, "Join DFG failed\n");
 	    return;
 	}
-	if (contact_list == NULL) {
-	    INT_CMlisten(cm);
-	    contact_list = INT_CMget_contact_list(cm);
-	}
-
-	my_contact_str = attr_list_to_string(contact_list);
-	free_attr_list(contact_list);
-
-	msg.node_name = node_name;
-	msg.contact_string = my_contact_str;
-	msg.source_count = evp->source_count;
-	msg.sources = malloc(msg.source_count * sizeof(msg.sources[0]));
-	for (i=0; i < evp->source_count; i++) {
-	    msg.sources[i].name = evp->sources[i].name;
-	    msg.sources[i].FMtype = NULL;
-	}
-	msg.sink_count = evp->sink_handler_count;
-	msg.sinks = malloc(msg.sink_count * sizeof(msg.sinks[0]));
-	for (i=0; i < evp->sink_handler_count; i++) {
-	    msg.sinks[i].name = evp->sink_handlers[i].name;
-	    msg.sinks[i].FMtype = NULL;
-	}
-	
 	INT_CMwrite(conn, register_msg, &msg);
-	free(my_contact_str);
 	dfg->master_connection = conn;
-	CMtrace_out(cm, EVdfgVerbose, "DFG %p node name %s\n", dfg, node_name);
     }
+    CMtrace_out(cm, EVdfgVerbose, "DFG %p node name %s\n", dfg, node_name);
     free_attr_list(master_attrs);
 }
 
@@ -1434,7 +1222,7 @@ deploy_to_node(EVdfg dfg, int node)
 {
     int i, j;
     int stone_count = 0;
-    EVdfg_stones_msg msg;
+    EVdfg_deploy_msg msg;
     CMFormat deploy_msg = INT_CMlookup_format(dfg->cm, EVdfg_deploy_format_list);
 
     for (i=dfg->deployed_stone_count; i< dfg->stone_count; i++) {
@@ -1790,21 +1578,105 @@ fdump_dfg_stone(FILE* out, EVdfg_stone s)
 }
 
 static void
-dfg_startup_ack_handler(CManager cm, CMConnection conn, void *vmsg, 
-		  void *client_data, attr_list attrs)
+free_master_msg(EVdfg_master_msg *msg)
 {
-    EVdfg dfg = client_data;
-    EVstartup_ack_ptr msg =  vmsg;
-    (void) conn;
-    (void) attrs;
-    CManager_lock(cm);
+}
+
+static void
+queue_master_msg(EVdfg dfg, void*vmsg, EVmaster_msg_type msg_type, CMConnection conn, int copy)
+{
+    EVdfg_master_msg_ptr msg = malloc(sizeof(EVdfg_master_msg));
+    msg->msg_type = msg_type;
+    msg->conn = conn;
+    switch(msg_type) {
+    case DFGnode_join: {
+	EVnode_join_ptr in = (EVnode_join_ptr)vmsg;
+	if (!copy) {
+	    msg->u.node_join = *in;
+	} else {
+	    int i;
+	    msg->u.node_join.node_name = strdup(in->node_name);
+	    msg->u.node_join.contact_string = strdup(in->node_name);
+	    msg->u.node_join.source_count = in->source_count;
+	    msg->u.node_join.sink_count = in->sink_count;
+	    msg->u.node_join.sinks = (leaf_element*)malloc(sizeof(leaf_element) * in->sink_count);
+	    for (i=0; i < in->sink_count; i++) {
+		leaf_element *l = &in->sinks[i];
+		msg->u.node_join.sinks[i].name = l->name ? strdup(l->name) : NULL;
+		msg->u.node_join.sinks[i].FMtype = l->FMtype ? strdup(l->FMtype) : NULL;
+	    }
+	    msg->u.node_join.sources = (leaf_element*)malloc(sizeof(leaf_element) * in->source_count);
+	    for (i=0; i < in->source_count; i++) {
+		leaf_element *l = &in->sources[i];
+		msg->u.node_join.sources[i].name = l->name ? strdup(l->name) : NULL;
+		msg->u.node_join.sources[i].FMtype = l->FMtype ? strdup(l->FMtype) : NULL;
+	    }
+	}
+	break;
+    }
+    case DFGdeploy_ack: {
+	EVdeploy_ack_ptr in = (EVdeploy_ack_ptr)vmsg;
+	msg->u.deploy_ack = *in;
+	break;
+    }
+    case DFGshutdown_contrib: {
+	EVshutdown_contribution_ptr in = (EVshutdown_contribution_ptr)vmsg;
+	msg->u.shutdown_contrib = *in;
+	break;
+    }
+    case  DFGconn_shutdown: {
+	EVconn_shutdown_ptr in = (EVconn_shutdown_ptr)vmsg;
+	msg->u.conn_shutdown = *in;
+	break;
+    }
+    case DFGflush_reconfig: {
+	EVflush_attrs_reconfig_ptr in = (EVflush_attrs_reconfig_ptr)vmsg;
+	msg->u.flush_reconfig = *in;
+	if (copy) {
+	    int i;
+	    msg->u.flush_reconfig.attr_stone_list = malloc(sizeof(EVattr_stone_struct) * in->count);
+	    for (i=0 ; i < in->count; i++) {
+		msg->u.flush_reconfig.attr_stone_list[i].stone = in->attr_stone_list[i].stone;
+		msg->u.flush_reconfig.attr_stone_list[i].attr_str = strdup(in->attr_stone_list[i].attr_str);
+	    }
+	}
+    }
+    default:
+	assert(FALSE);
+    }
+    msg->next = NULL;
+    if (dfg->queued_messages == NULL) {
+	dfg->queued_messages = msg;
+    } else {
+	EVdfg_master_msg_ptr last = dfg->queued_messages;
+	while (last->next != NULL) last = last->next;
+	last->next = msg;
+    }
+    CMwake_server_thread(dfg->cm);
+}
+
+static void
+dfg_master_msg_handler(CManager cm, CMConnection conn, void *vmsg, 
+		       void *client_data, attr_list attrs)
+{
+    EVdfg dfg = (EVdfg)((uintptr_t)client_data & (~0xf));
+    EVmaster_msg_type msg_type = ((uintptr_t)client_data & 0xf);
+    queue_master_msg(dfg, vmsg, msg_type, conn, /*copy*/1);
+    /* we'll handle this in the poll handler */
+}
+
+static void
+handle_deploy_ack(EVdfg dfg, EVdfg_master_msg_ptr mmsg)
+{
+    EVdeploy_ack_ptr msg =  &mmsg->u.deploy_ack;
+    CManager cm = dfg->cm;
     dfg->deploy_ack_count++;
     CMtrace_out(cm, EVdfgVerbose, "Client %s reports deployed, count %d\n", msg->node_id, dfg->deploy_ack_count);
-    if ((dfg->deploy_ack_count == dfg->node_count) && (dfg->startup_ack_condition != -1)) {
-	CMtrace_out(cm, EVdfgVerbose, "That was the last one, Signalling %d\n", dfg->startup_ack_condition);
-	CMtrace_out(cm, EVdfgVerbose, "EVDFG exit startup ack handler -  master DFG state is %s\n", str_state[dfg->state]);
-	INT_CMCondition_signal(cm, dfg->startup_ack_condition);
-	dfg->startup_ack_condition = -1;
+    if ((dfg->deploy_ack_count == dfg->node_count) && (dfg->deploy_ack_condition != -1)) {
+	CMtrace_out(cm, EVdfgVerbose, "That was the last one, Signalling %d\n", dfg->deploy_ack_condition);
+	CMtrace_out(cm, EVdfgVerbose, "EVDFG exit deploy ack handler -  master DFG state is %s\n", str_state[dfg->state]);
+	INT_CMCondition_signal(cm, dfg->deploy_ack_condition);
+	dfg->deploy_ack_condition = -1;
 	assert(dfg->state == DFG_Starting);
 	dfg->state = DFG_Running;
 	CMtrace_out(cm, EVdfgVerbose, "EVDFG  -  master DFG state set to %s\n", str_state[dfg->state]);
@@ -1814,9 +1686,7 @@ dfg_startup_ack_handler(CManager cm, CMConnection conn, void *vmsg,
 	CMtrace_out(cm, EVdfgVerbose, "EVDFG after reconfiguration -  master DFG state set to %s\n", str_state[dfg->state]);
       }
     }
-    CMtrace_out(cm, EVdfgVerbose, "EVDFG exit startup ack handler -  master DFG state is %s\n", str_state[dfg->state]);
-    handle_queued_messages(dfg);
-    CManager_unlock(cm);
+    CMtrace_out(cm, EVdfgVerbose, "EVDFG exit deploy ack handler -  master DFG state is %s\n", str_state[dfg->state]);
 }
 
 extern void INT_EVdfg_reconfig_transfer_events(EVdfg dfg, int src_stone_index, int src_port, int dest_stone_index, int dest_port) 
@@ -1932,8 +1802,8 @@ perform_deployment(EVdfg dfg)
 	assign_stone_ids(dfg);
 	add_bridge_stones(dfg);
 	dfg->deploy_ack_count = 1;  /* we are number 1 */
-	if (dfg->startup_ack_condition == -1) {
-	    dfg->startup_ack_condition = INT_CMCondition_get(dfg->cm, NULL);
+	if (dfg->deploy_ack_condition == -1) {
+	    dfg->deploy_ack_condition = INT_CMCondition_get(dfg->cm, NULL);
 	}
 	for (i=0; i < dfg->node_count; i++) {
 	    deploy_to_node(dfg, i);
@@ -1948,12 +1818,12 @@ perform_deployment(EVdfg dfg)
 }
 
 static void
-wait_for_startup_acks(EVdfg dfg)
+wait_for_deploy_acks(EVdfg dfg)
 {
     if (dfg->deploy_ack_count != dfg->node_count) {
-	if (dfg->startup_ack_condition != -1)  {
+	if (dfg->deploy_ack_condition != -1)  {
 	    CManager_unlock(dfg->cm);
-	    CMCondition_wait(dfg->cm, dfg->startup_ack_condition);
+	    CMCondition_wait(dfg->cm, dfg->deploy_ack_condition);
 	    CManager_lock(dfg->cm);
 	}
     }
@@ -2135,7 +2005,7 @@ check_all_nodes_registered(EVdfg dfg)
 	
     if (dfg->no_deployment == 0) {
 	perform_deployment(dfg);
-	wait_for_startup_acks(dfg);
+	wait_for_deploy_acks(dfg);
     }
     dfg->no_deployment = 0;
     signal_ready(dfg);
@@ -2143,3 +2013,131 @@ check_all_nodes_registered(EVdfg dfg)
     dfg->old_node_count = dfg->node_count;
 }
 
+static FMField EVleaf_element_flds[] = {
+    {"name", "string", sizeof(char*), FMOffset(leaf_element*, name)},
+    {"FMtype", "string", sizeof(char*), FMOffset(leaf_element*, FMtype)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMField EVnode_join_msg_flds[] = {
+    {"node_name", "string", sizeof(char*), FMOffset(EVnode_join_ptr, node_name)},
+    {"contact_string", "string", sizeof(char*), FMOffset(EVnode_join_ptr, contact_string)},
+    {"source_count", "integer", sizeof(int), FMOffset(EVnode_join_ptr, source_count)},
+    {"sink_count", "integer", sizeof(int), FMOffset(EVnode_join_ptr, sink_count)},
+    {"sources", "source_element[source_count]", sizeof(leaf_element), FMOffset(EVnode_join_ptr, sources)},
+    {"sinks", "sink_element[sink_count]", sizeof(leaf_element), FMOffset(EVnode_join_ptr, sinks)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMStructDescRec EVdfg_node_join_format_list[] = {
+    {"EVdfg_node_join", EVnode_join_msg_flds, sizeof(EVnode_join_msg), NULL},
+    {"sink_element", EVleaf_element_flds, sizeof(leaf_element), NULL},
+    {"source_element", EVleaf_element_flds, sizeof(leaf_element), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
+static FMField EVready_msg_flds[] = {
+    {"node_id", "integer", sizeof(int), FMOffset(EVready_ptr, node_id)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMStructDescRec EVdfg_ready_format_list[] = {
+    {"EVdfg_ready", EVready_msg_flds, sizeof(EVready_msg), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
+static FMField EVdeploy_ack_msg_flds[] = {
+    {"node_id", "string", sizeof(char*), FMOffset(EVdeploy_ack_ptr, node_id)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMStructDescRec EVdfg_deploy_ack_format_list[] = {
+    {"EVdfg_deploy_ack", EVdeploy_ack_msg_flds, sizeof(EVdeploy_ack_msg), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
+static FMField EVshutdown_msg_flds[] = {
+    {"value", "integer", sizeof(int), FMOffset(EVshutdown_ptr, value)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMStructDescRec EVdfg_shutdown_format_list[] = {
+    {"EVdfg_shutdown", EVshutdown_msg_flds, sizeof(EVshutdown_msg), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
+static FMField EVshutdown_contribution_msg_flds[] = {
+    {"value", "integer", sizeof(int), FMOffset(EVshutdown_contribution_ptr, value)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMStructDescRec EVdfg_shutdown_contribution_format_list[] = {
+    {"EVdfg_shutdown_contribution", EVshutdown_contribution_msg_flds, sizeof(EVshutdown_contribution_msg), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
+static FMField EVconn_shutdown_msg_flds[] = {
+    {"stone", "integer", sizeof(int), FMOffset(EVconn_shutdown_ptr, stone)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMStructDescRec EVdfg_conn_shutdown_format_list[] = {
+    {"EVdfg_conn_shutdown", EVconn_shutdown_msg_flds, sizeof(EVconn_shutdown_msg), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
+static FMField EVattr_stone_flds[] = {
+    {"stone", "integer", sizeof(long), FMOffset(EVattr_stone_ptr, stone)},
+    {"attr_str", "string", sizeof(char*), FMOffset(EVattr_stone_ptr, attr_str)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMField EVflush_attrs_reconfig_msg_flds[] = {
+    {"reconfig", "integer", sizeof(int), FMOffset(EVflush_attrs_reconfig_ptr, reconfig)},
+    {"count", "integer", sizeof(long), FMOffset(EVflush_attrs_reconfig_ptr, count)},
+    {"attr_stone_list", "attr_stone_element[count]", sizeof(EVattr_stone_struct), FMOffset(EVflush_attrs_reconfig_ptr, attr_stone_list)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMStructDescRec EVdfg_flush_attrs_reconfig_format_list[] = {
+    {"EVflush_attrs_reconfig", EVflush_attrs_reconfig_msg_flds, sizeof(EVflush_attrs_reconfig_msg), NULL},
+    {"attr_stone_element", EVattr_stone_flds, sizeof(EVattr_stone_struct), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
+static FMField EVdfg_stone_flds[] = {
+    {"global_stone_id", "integer", sizeof(int), 
+     FMOffset(deploy_msg_stone, global_stone_id)},
+    {"attrs", "string", sizeof(char*), 
+     FMOffset(deploy_msg_stone, attrs)},
+    {"period_secs", "integer", sizeof(int),
+     FMOffset(deploy_msg_stone, period_secs)},
+    {"period_usecs", "integer", sizeof(int),
+     FMOffset(deploy_msg_stone, period_usecs)},
+    {"out_count", "integer", sizeof(int), 
+     FMOffset(deploy_msg_stone, out_count)},
+    {"out_links", "integer[out_count]", sizeof(int), 
+     FMOffset(deploy_msg_stone, out_links)},
+    {"action", "string", sizeof(char*), 
+     FMOffset(deploy_msg_stone, action)},
+    {"extra_actions", "integer", sizeof(int), 
+     FMOffset(deploy_msg_stone, extra_actions)},
+    {"xactions", "string[extra_actions]", sizeof(char*), 
+     FMOffset(deploy_msg_stone, xactions)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMField EVdfg_deploy_msg_flds[] = {
+    {"canonical_name", "string", sizeof(char*),
+     FMOffset(EVdfg_deploy_ptr, canonical_name)},
+    {"stone_count", "integer", sizeof(int),
+     FMOffset(EVdfg_deploy_ptr, stone_count)},
+    {"stone_list", "EVdfg_deploy_stone[stone_count]", sizeof(struct _EVdfg_msg_stone), FMOffset(EVdfg_deploy_ptr, stone_list)},
+    {NULL, NULL, 0, 0}
+};
+
+static FMStructDescRec EVdfg_deploy_format_list[] = {
+    {"EVdfg_deploy", EVdfg_deploy_msg_flds, sizeof(EVdfg_deploy_msg), NULL},
+    {"EVdfg_deploy_stone", EVdfg_stone_flds, sizeof(struct _EVdfg_msg_stone), NULL},
+    {NULL, NULL, 0, NULL}
+};

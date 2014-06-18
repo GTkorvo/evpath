@@ -514,7 +514,7 @@ INT_EVassoc_general_action(CManager cm, EVstone stone_num, char*action_spec,
 		ret = INT_EVassoc_terminal_action(cm, stone_num, 
 						  evp->sink_handlers[i].format_list,
 						  evp->sink_handlers[i].handler,
-						  NULL);
+						  evp->sink_handlers[i].client_data);
 		break;
 	    }
 	}

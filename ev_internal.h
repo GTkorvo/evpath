@@ -219,6 +219,7 @@ typedef struct _sink_table_elem {
     char *name;
     FMStructDescList format_list;
     EVSimpleHandlerFunc handler;
+    void *client_data;
 } sink_table_elem;
 
 typedef struct _source_table_elem {

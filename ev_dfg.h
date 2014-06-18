@@ -260,9 +260,11 @@ EVdfg_register_source(char *name, EVsource src);
  *  name/data type.  Sink-handle/name association is actually an
  *  EVPath-level operation, so there is a CM parameter in this call, but no
  *  EVdfg param.
+ * \param client_data An uninterpreted value that is passed to the handler
+ * function when it is called.
  */
 extern void
-EVdfg_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler);
+EVdfg_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler, void* client_data);
 
 /*!
  * Associate a name with a raw sink handle
@@ -399,23 +401,6 @@ extern EVdfg_stone EVdfg_create_sink_stone(EVdfg dfg, char *handler_name);
 extern void EVdfg_add_sink_action(EVdfg_stone stone, char *handler_name);
 
 /*!
- * Enable periodic auto-submits of NULL events on an EVdfg_stone. 
- * 
- * This function is the analog of the EVenable_auto_stone() function, but at
- * the EVdfg level.
- *
- * \param stone The EVdfg_stone which should receive auto-submits.
- * \param period_sec The period at which submits should occur, seconds portion.
- * \param period_usec The period at which submits should occur, microseconds
- * portion.
- *  
- * Autosubmits are intiated on each node just as it is about to return from
- * EVdfg_ready_wait().
- */
-extern void EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec, 
-				    int period_usec);
-
-/*!
  * Link a particular output port of one stone (the source) to a destination
  * (target) stone.
  * 
@@ -445,6 +430,23 @@ extern void EVdfg_link_port(EVdfg_stone source, int output_index,
  *  ownership of this string and it should be free'd by the application if dynamic.
  */
 extern void EVdfg_assign_node(EVdfg_stone stone, char *node);
+
+/*!
+ * Enable periodic auto-submits of NULL events on an EVdfg_stone. 
+ * 
+ * This function is the analog of the EVenable_auto_stone() function, but at
+ * the EVdfg level.
+ *
+ * \param stone The EVdfg_stone which should receive auto-submits.
+ * \param period_sec The period at which submits should occur, seconds portion.
+ * \param period_usec The period at which submits should occur, microseconds
+ * portion.
+ *  
+ * Autosubmits are intiated on each node just as it is about to return from
+ * EVdfg_ready_wait().
+ */
+extern void EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec, 
+				    int period_usec);
 
 /*!
  * Set the attribute list that will be visible as "stone_attrs" inside EVdfg
@@ -482,17 +484,53 @@ extern attr_list EVdfg_get_attr_list(EVdfg_stone stone);
  *
  *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
  *  by every participating node for normal shutdown.  The return value from
- *  these calls will all be the same
+ *  EVdfg_wait_for_shutdown() will be the same on each node and will depend
+ *  upon every node's contribution to the shutdown status.
  *
- * \param dfg The local EVdfg handle which should join the global DFG.
+ * \param dfg The local EVdfg handle for which shutdown is indicated.
  * \param result this node's contribution to the DFG-wide shutdown value
  *
  */
 extern int EVdfg_shutdown(EVdfg dfg, int result);
-extern int EVdfg_force_shutdown(EVdfg dfg, int result);
+
+/*!
+ *  Vote that this node is ready for shutdown and is providing no specific contribution
+ *  to the return value.
+ *
+ *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
+ *  by every participating node for normal shutdown.  The return value from
+ *  EVdfg_wait_for_shutdown() will be the same on each node and will depend
+ *  upon every node's contribution to the shutdown status.
+ *
+ * \param dfg The local EVdfg handle for which shutdown is indicated.
+ *
+ */
 extern void EVdfg_ready_for_shutdown(EVdfg dfg);
+
+/*!
+ *  Wait for EVdfg to determine that the coordinated shutdown time has arrived.
+ *
+ *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
+ *  by every participating node for normal shutdown.  The return value from
+ *  EVdfg_wait_for_shutdown() will be the same on each node and will depend
+ *  upon every node's contribution to the shutdown status.
+ *
+ * \param dfg The local EVdfg handle for which shutdown is indicated.
+ *
+ */
 extern int EVdfg_wait_for_shutdown(EVdfg dfg);
 
+/*!
+ *  Force EVdfg shutdown without necessarilying having contributions from all nodes.
+ *
+ *  Generally this will cause every call to EVdfg_wait_for_shutdown() to
+ *  return the result value here, terminating execution of the EVdfg.
+ *
+ * \param dfg The local EVdfg handle for which shutdown is indicated.
+ * \param result this node's contribution to the DFG-wide shutdown value
+ *
+ */
+extern int EVdfg_force_shutdown(EVdfg dfg, int result);
 /*
   (VERY) tentative reconfiguration interface
 */
