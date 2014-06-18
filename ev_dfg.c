@@ -1141,18 +1141,18 @@ INT_EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
     my_contact_str = attr_list_to_string(contact_list);
     free_attr_list(contact_list);
     
-    msg.node_name = node_name;
+    msg.node_name = strdup(node_name);
     msg.contact_string = my_contact_str;
     msg.source_count = evp->source_count;
     msg.sources = malloc(msg.source_count * sizeof(msg.sources[0]));
     for (i=0; i < evp->source_count; i++) {
-	msg.sources[i].name = evp->sources[i].name;
+	msg.sources[i].name = strdup(evp->sources[i].name);
 	msg.sources[i].FMtype = NULL;
     }
     msg.sink_count = evp->sink_handler_count;
     msg.sinks = malloc(msg.sink_count * sizeof(msg.sinks[0]));
     for (i=0; i < evp->sink_handler_count; i++) {
-	msg.sinks[i].name = evp->sink_handlers[i].name;
+	msg.sinks[i].name = strdup(evp->sink_handlers[i].name);
 	msg.sinks[i].FMtype = NULL;
     }
     
@@ -1167,6 +1167,16 @@ INT_EVdfg_join_dfg(EVdfg dfg, char* node_name, char *master_contact)
 	}
 	INT_CMwrite(conn, register_msg, &msg);
 	dfg->master_connection = conn;
+	for (i=0; i < evp->source_count; i++) {
+	    free(msg.sources[i].name);
+	}
+	free(msg.sources);
+	for (i=0; i < evp->sink_handler_count; i++) {
+	    free(msg.sinks[i].name);
+	}
+	free(msg.sinks);
+	free(msg.contact_string);
+	free(msg.node_name);
     }
     CMtrace_out(cm, EVdfgVerbose, "DFG %p node name %s\n", dfg, node_name);
     free_attr_list(master_attrs);
@@ -1580,6 +1590,42 @@ fdump_dfg_stone(FILE* out, EVdfg_stone s)
 static void
 free_master_msg(EVdfg_master_msg *msg)
 {
+    switch(msg->msg_type) {
+    case DFGnode_join: {
+	EVnode_join_ptr in = &msg->u.node_join;
+	int i;
+	free(in->node_name);
+	free(in->contact_string);
+	for (i=0; i < in->sink_count; i++) {
+	    leaf_element *l = &in->sinks[i];
+	    if(l->name) free(l->name);
+	    if(l->FMtype) free(l->FMtype);
+	}
+	free(in->sinks);
+	for (i=0; i < in->source_count; i++) {
+	    leaf_element *l = &in->sources[i];
+	    if (l->name) free(l->name);
+	    if (l->FMtype) free(l->FMtype);
+	}
+	free(in->sources);
+	break;
+    }
+    case DFGflush_reconfig: {
+	EVflush_attrs_reconfig_ptr in = &msg->u.flush_reconfig;
+	int i;
+	for (i=0 ; i < in->count; i++) {
+	    free(in->attr_stone_list[i].attr_str);
+	}
+	free(in->attr_stone_list);
+	break;
+    }
+    case DFGdeploy_ack:
+    case DFGshutdown_contrib:
+    case DFGconn_shutdown:
+    default:
+	break;
+    }
+    free(msg);
 }
 
 static void
@@ -1596,7 +1642,7 @@ queue_master_msg(EVdfg dfg, void*vmsg, EVmaster_msg_type msg_type, CMConnection 
 	} else {
 	    int i;
 	    msg->u.node_join.node_name = strdup(in->node_name);
-	    msg->u.node_join.contact_string = strdup(in->node_name);
+	    msg->u.node_join.contact_string = strdup(in->contact_string);
 	    msg->u.node_join.source_count = in->source_count;
 	    msg->u.node_join.sink_count = in->sink_count;
 	    msg->u.node_join.sinks = (leaf_element*)malloc(sizeof(leaf_element) * in->sink_count);
