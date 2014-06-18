@@ -80,9 +80,10 @@ static FMStructDescRec EVdfg_shutdown_contribution_format_list[];
 /* msg action model
  *
  For each state/ for each master msg one of these possibilities:
-	 handle - dequeue and call handler (may change state, start over )
-	 unexpected - immediate error and discard (continue to next )
-	 leave_queued - (continue to next )
+	H - handle - dequeue and call handler (may change state, start over )
+	U - unexpected - immediate error and discard (continue to next )
+	I - ignore - discard (continue to next )
+	L - leave_queued - (continue to next )
 */
 static
 char action_model[DFG_Last_State][DFGlast_msg] = {
@@ -91,7 +92,7 @@ char action_model[DFG_Last_State][DFGlast_msg] = {
   {'Q',		'H',		'H',			'Q',		'Q'},/* state Starting */
   {'H',		'U',		'H',			'H',		'H'},/* state Running */
   {'Q',		'H',		'H',			'Q',		'Q'},/* state Reconfiguring */
-  {'U',		'U',		'U',			'U',		'U'}/* state Shutting Down */
+  {'U',		'U',		'U',			'I',		'U'}/* state Shutting Down */
 };
 
 typedef void (*master_msg_handler_func) (EVdfg dfg, EVdfg_master_msg_ptr msg);
@@ -138,6 +139,8 @@ handle_queued_messages(CManager cm, void* vdfg)
 	    break;
 	default:
 	    printf("Unexpected action type '%c', discarding\n", action_model[dfg->state][next->msg_type]);
+	    /* falling through */
+	case 'I':
 	    *last_ptr = next->next;  /* remove msg from queue */
 	    free_master_msg(next);
 	    next = *last_ptr;
@@ -1034,8 +1037,11 @@ INT_EVdfg_ready_for_shutdown(EVdfg dfg)
 extern int 
 INT_EVdfg_wait_for_shutdown(EVdfg dfg)
 {
+//    printf("Wait for shutdown called for node %d\n", dfg->my_node_id);
     if (dfg->already_shutdown) return dfg->shutdown_value;
+//    printf("Wait for shutdown waiting for node %d\n", dfg->my_node_id);
     INT_CMCondition_wait(dfg->cm, new_shutdown_condition(dfg, dfg->master_connection));
+//    printf("Wait for shutdown returning for node %d\n", dfg->my_node_id);
     return dfg->shutdown_value;
 }
 
