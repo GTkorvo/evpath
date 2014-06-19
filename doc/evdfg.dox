@@ -1,4 +1,11 @@
 /*! 
+\example dfg_master.c
+\example dfg_client.c
+\example dfg_master2.c
+\example dfg_master3.c
+\example dfg_client3.c
+\example dfg_master4.c
+
  \page evdfg The EVdfg interface
 
  \section evdfg-intro EVdfg interface
@@ -138,7 +145,7 @@ join_handler_func(EVdfg dfg, char *identifier, void*cur_unused1, void*cur_unused
 {
     char *canon_name;
     /* Generate a canonical name for this client in canon_name, then assign */
-    EVdfg_assign_canonical_name(dfg, identifier, canon_name*/
+    EVdfg_assign_canonical_name(dfg, identifier, canon_name);
 
     if ( /* not ready to start running */) return;
 
@@ -235,11 +242,11 @@ for "simple" data, or for hosting terminal stones that handle "simple" data.
     source_handle = EVcreate_submit_handle(cm, -1, simple_format_list);
     EVdfg_register_source("data_source", source_handle);
     EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
-				(EVSimpleHandlerFunc) simple_handler);
+				(EVSimpleHandlerFunc) simple_handler, NULL);
 \endcode
 
 
-\subsection  EVdfg Stone Creation and Assignment
+\subsection stone_creation EVdfg Stone Creation and Assignment
 
 In EVdfg, DFG stone creation occurs much like it does in raw EVPath with a
 few major differences:
@@ -257,5 +264,182 @@ split stones.
 parameter, in EVdfg the links between stones are established with the
 EVdfg_link_port() function.
 
+These are the basic DFG creation functions:
+<table border> 
+<tr> 
+   <td><b> Function </b></td> 
+   <td><b> Purpose </b></td> 
+</tr> 
 
+<tr> 
+    <td> EVdfg_create_stone() </td> 
+    <td> Create a stone with a specified action </td> 
+</tr> 
+<tr> 
+    <td> EVdfg_add_action() </td> 
+    <td> Add an action to an exiting stone  </td> 
+</tr> 
+<tr> 
+    <td> EVdfg_create_source_stone() </td> 
+    <td> Create a stone to source events </td> 
+</tr> 
+<tr> 
+    <td> EVdfg_create_sink_stone() </td> 
+    <td> Create a stone to be a sink for events  </td> 
+</tr> 
+<tr> 
+    <td> EVdfg_add_sink_action() </td> 
+    <td> Add a sink action to an existing stone  </td> 
+</tr> 
+<tr> 
+    <td> EVdfg_link_port() </td> 
+    <td> Connect the numeric output port on one stone to deliver events to another  </td> 
+</tr> 
+<tr> 
+    <td> EVdfg_assign_node() </td> 
+    <td> Assign an EVdfg_stone to be instantiated at a particular client node  </td> 
+</tr> 
+</table> 
+
+\subsection examples Examples
+\subsubsection two_node Two node - Two stone example
+These functions, together with those described previously are enough to
+create a couple of simple example programs: 
+\ref dfg_master.c "dfg_master.c" 
+\ref dfg_client.c "dfg_client.c" 
+
+In order to run these, first run 'dfg_master' and you should see output like
+this:
+<Pre>
+bash-3.2$ ./dfg_master
+Contact list is "AAIBAClXsP6Cz2UZDW9pXpllAADViN+OAwAAAAUAZW5ldAAA"
+</pre>
+The text within the quotation marks is the contact string for the DFG.  Copy
+it and use it as the first argument to dfg_client, like this:
+<pre>
+bash-3.2$ ./dfg_client "b" "AAIBAClXsP6Cz2UZDW9pXpllAADViN+OAwAAAAUAZW5ldAAA"
+</pre>
+On the master side, you should see the output "I got 318".
+
+Some things to note about these examples:
+- dfg_master creates only two stones, a source and a sink, assigning the
+source to the client and the sink to the master (also participating in the DFG).
+- Both dfg_master and dfg_client both use EVdfg_register_source() and
+EVdfg_register_sink_handler(), so either could host either stone. (Try
+swapping the values in EVdfg_assign_node().)  
+- dfg_master can be the only node participating if you remove "b" from the
+nodes[] array and assign the src stone to "a".  
+- We pass the client name ("b") on the command line so that we can use it in
+the next example as well.
+- This particular example does not terminate.  We'll cover EVdfg's
+termination facilities shortly.
+
+\subsubsection three_node Three node - Three stone example
+
+In order to change the above two node example to something that covers three
+nodes, we only need modify the nodes array:
+	     
+  \snippet dfg_master2.c Changed nodes array
+
+And change the DFG creation section so that it creates three stones for us
+to assign:
+
+  \snippet dfg_master2.c Changed DFG Creation
+
+This example, \ref dfg_master2.c "dfg_master2.c" 
+ is run like the first, but with two clients:
+<pre>
+bash-3.2$ ./dfg_master2
+Contact list is "AAIBAClXsP7AqAF3DW9pXsplAADViN+OAwAAAAUAZW5ldAAA"
+</pre>
+<pre>
+bash-3.2$ ./dfg_client "b" "AAIBAClXsP7AqAF3DW9pXsplAADViN+OAwAAAAUAZW5ldAAA" &
+bash-3.2$ ./dfg_client "c" "AAIBAClXsP7AqAF3DW9pXsplAADViN+OAwAAAAUAZW5ldAAA"
+</pre>
+
+Some things to note about this example:
+- dfg_master creates three stones, a source, an intermediate and a sink,
+assigned to nodes "a", "b" and "c" respectively.
+- Any node could host the source or host the sink.  Node "b" ends up doing
+neither. 
+
+\subsection termination EVdfg Termination
+
+In the previous examples, the final call is CMrun_network(cm), which
+essentially tells EVPath to handle incoming network messages forever.
+However, while not necessarily suitable for all circumstances, EVdfg does
+contain a facility for coordinating shutdown between participating EVdfg
+processes, and even providing them with a common value to pass to exit().
+The facility was designed expressly to support the EVdfg regression tests,
+but it finds use in other circumstances.
+
+The EVdfg shutdown facility generally requires a contribution from all
+participating nodes before it authorizes shutdown, and if any node indicates
+a <tt>Failure</tt> (non-zero) status the all nodes should indicate
+<tt>Failure</tt>. However, what type of
+contribution is appropriate from each node depends upon its circumstances.  
+For example, consider the three node example above.  If it were a regression
+test, it should be considered successful only if the event is submitted and
+received at the destination with the expected value.  
+For the node hosting the source, it is ready for shutdown only after it has
+submitted its event, and if it reaches that point then it considers its
+participation a success.  For the node hosting the sink, it is ready for
+shutdown only after it has the event, and then it considers the test a
+success or failure depending upon the value of received data.  The node
+hosting neither the source nor sink is a bit trickier.  Essentially it
+shouldn't shutdown until the others say they are ready, and it has no
+specific contribution to the determination of success or failure of the
+test.  
+
+In order to support all of these circumstances, EVdfg has some informational
+functions that let the application write shutdown code that doesn't
+explicitly depend upon how the stones are mapped to nodes.  One of these
+functions is the EVdfg_source_active() function that was introduced above.
+Another is EVdfg_active_sink_count(), which returns the number of sinks that
+have been mapped to the current node.  We'll use these, along with the EVdfg
+shutdown functions, EVdfg_shutdown(), EVdfg_ready_for_shutdown() and
+EVdfg_wait_for_shutdown(), in order to cleanly handle shutdown in our
+example programs. 
+
+In particular, in the place of the call to CMrun_network() we'll use the
+following code segment in both master and client:
+  \snippet dfg_client3.c Shutdown code
+Additionally, we add the line:
+<pre>
+    EVdfg_shutdown((EVdfg)client_data, event->integer_field == 318);
+</pre>
+to the simpler_handler function.  With these changes, all processes end up
+in EVdfg_wait_for_shutdown() instead of CMrun_network().  Additionally:
+- node "a", which hosts only the source calls EVdfg_shutdown(dfg, 0)
+<em>after</em> it has done EVsubmit().
+- node "b", which hosts only the intermediate node calls
+EVdfg_ready_for_shutdown() as soon as it starts running.
+- node "c", which hosts the terminal stone, calls none of these calls prior
+to EVdfg_wait_for_shutdown().  But it calls EVdfg_shutdown() in the handler,
+passing in <tt>event->integer_field == 318</tt> as the success value.
+
+That EVdfg_wait_for_shutdown() is in the return statement means that each
+node will exit() with the same result code, which will be a success code if
+the event is delivered properly.
+
+These examples, \ref dfg_master3.c "dfg_master3.c"  and \ref dfg_client3.c "dfg_client3.c"  are 
+run like the three node example above.
+
+Another example, \ref dfg_master4.c "dfg_master4.c" is a "dynamic joining"
+version of dfg_master3.  Run dfg_master4 with two instances of dfg_client3,
+but it doesn't matter what the first argument to dfg_client3 is.  The first
+one to join will be given the canonical name "b" and the second one will be
+given "c".  The second will have the sink stone and show the expected
+output.
+
+\subsection Reconfiguration Reconfiguration
+EVdfg allows reconfiguration, changing the layout and contents of the DFG,
+after the initial realization; either upon node failure (as detected by a
+write file in the DFG), the joining of a new node, or through voluntary
+reconfiguration (via a CoD handler in the DFG calling
+EVdfg_trigger_reconfiguration()).
+
+The mechanism through which this reconfiguration is accomplish is currently
+being rewritten, so documentation will follow.
 */
+

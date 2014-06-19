@@ -201,15 +201,20 @@ extern int CMlisten ARGS((CManager cm));
  * \return the number of transports which successfully initiated connection
  * listen operations (by reporting contact attributes).
  * \note The listen_info value is interpreted by each individual transport.
- * Currently implemented transports that use this include: 
- * - the <b>sockets</b> tranport which uses the CM_IP_PORT attribute to control
+ * An incomplete (and probably dated) list of transports that use this include: 
+ * - the <b>sockets</b> transport which uses the CM_IP_PORT attribute to control
  *   which port it listens on.  If this attribute is not present it listens
  *   on any available port. 
- * - the <b>rudp</b> tranport which uses the CM_UDP_PORT attribute to control
+ * - the <b>rudp</b> transport which uses the CM_UDP_PORT attribute to control
  *   which port it listens on.  If this attribute is not present it listens
  *   on any available port. 
- * - the <b>atm</b> tranport which uses the CM_ATM_SELECTOR and CM_ATM_BHLI
- * attribute to control listens.  These attributes must be present.
+ * - the <b>enet</b> transport which uses the CM_ENET_PORT attribute to control
+ *   which port it listens on.  If this attribute is not present it listens
+ *   on any available port. 
+ * - the <b>udp</b> transport - a raw unreliable UDP transport.
+ * - the <b>multicast</b> transport  - a raw unreliable Multicast transport.
+ * - the <b>nnti</b> transport  - a multi-network RDMA transport.
+ * - the <b>ib</b> transport - kind-of-functional InfiniBand transport.
  */
 extern int CMlisten_specific ARGS((CManager cm, attr_list listen_info));
 
@@ -238,7 +243,7 @@ extern void
 CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
 
 /*!
- * get a specfic subset of the contact information for this CM.
+ * get a specific subset of the contact information for this CM.
  *
  * This call returns the set of attributes that define the contact
  * information for a particular network transport.  If no listen operation
@@ -261,7 +266,7 @@ CMget_specific_contact_list ARGS((CManager cm, attr_list attrs));
  * \param cm The CManager whose contact information should be compared.
  * \param attrs The contact list to compare.
  * \return 1 if for some loaded transport the attrs list matches the contact
- * information in the cm. 0 othewise.
+ * information in the cm. 0 otherwise.
  */
 extern int
 CMcontact_self_check ARGS((CManager cm, attr_list attrs));
@@ -867,7 +872,7 @@ extern int CMCondition_wait ARGS((CManager cm, int condition));
  * \note CM condition values are used to cause a thread or program to wait
  * for a particular situation, usually for a message response to arrive.
  * \note CMCondition_signal() notifies CM that the situation needed to
- * satisfy a particualr condition variable has occurred and any waiting
+ * satisfy a particular condition variable has occurred and any waiting
  * thread should awaken.
  */
 extern void CMCondition_signal ARGS((CManager cm, int condition));
@@ -1210,7 +1215,7 @@ EVassoc_terminal_action(CManager cm, EVstone stone, FMStructDescList format_list
  * \param cm The CManager from which this stone was allocated.
  * \param stone The stone to which to register the action.
  * \param handler The handler function that will be called with data arrives.
- * \param client_data An uninterpreted value that is passed to the hanlder
+ * \param client_data An uninterpreted value that is passed to the handler
  * function when it is called.
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
@@ -1233,7 +1238,7 @@ EVassoc_raw_terminal_action(CManager cm, EVstone stone,
  * \param format_list The list of formats which describe the event data 
  * structure that the function accepts.
  * \param handler The handler function that will be called with data arrives.
- * \param client_data An uninterpreted value that is passed to the hanlder
+ * \param client_data An uninterpreted value that is passed to the handler
  * function when it is called.
  * \return The stone identifier, an integer EVstone value, which can be used
  * in subsequent calls.
@@ -1380,7 +1385,7 @@ EVstone_set_output(CManager cm, EVstone stone, int output_index, EVstone target_
  * structure that the function accepts.
  * \param handler The handler function that will be called with data arrives.
  * \param out_stone The local stone to which output should be directed.
- * \param client_data An uninterpreted value that is passed to the hanlder
+ * \param client_data An uninterpreted value that is passed to the handler
  * function when it is called.
  * \return An action identifier, an integer EVaction value, which can be used
  * in subsequent calls to modify or remove the action.
@@ -1975,7 +1980,7 @@ EVcreate_auto_stone(CManager cm, int period_sec, int period_usec,
 
 /*!
  * Cause a stone to become "stalled" explicitly. In this state, the stone
- * will continue processing events as usual, but will propogate backpressure
+ * will continue processing events as usual, but will propagate backpressure
  * as if it were overloaded.
  *
  * A stone marked as stalled with EVstall_stone will remain stalled
@@ -2155,7 +2160,7 @@ create_filter_action_spec(FMStructDescList format_list, char *function);
  * that the data should be discarded.  A positive value less than the number
  * of output values that have been set with EVaction_set_output() indicates
  * which of the output paths the input data should be submitted to.  Return
- * values larger than the number of output paths have undefined behaviour.
+ * values larger than the number of output paths have undefined behavior.
  */
 /*NOLOCK*/
 extern char *
@@ -2195,7 +2200,7 @@ create_multityped_action_spec(FMStructDescList *input_format_lists, char *functi
  * \param extern_string A string that declares the routines, C-style 
  * \param externs A NULL-terminated structure of type cod_extern_entry.
  * This structure consists of name/address pairs that give transfer
- * adddresses for each routine declared by the extern string.
+ * addresses for each routine declared by the extern string.
  * You must include cod.h for this routine to be visible.
  */
 extern void
@@ -2204,7 +2209,7 @@ EVadd_standard_routines(CManager cm, char *extern_string,
 #endif
 
 /*!
- * Add a set of sructure types that will be visible in COD.
+ * Add a set of structure types that will be visible in COD.
  *
  * \param cm The CManager in which the routines should be visible
  * \param lists A NULL-terminated list of FMStructDescLists.
@@ -2217,7 +2222,7 @@ EVadd_standard_structs(CManager cm, FMStructDescList *lists);
  *
  * \param cm The CManager managing the bridge stones
  * \param handler The routine to be called
- * \param client_data This parameter will be supplied unmodifed to the handler routine upon close.
+ * \param client_data This parameter will be supplied unmodified to the handler routine upon close.
  */
 extern void
 EVregister_close_handler(CManager cm, EVStoneCloseHandlerFunc handler, void *client_data);
@@ -2233,7 +2238,7 @@ void
 EVdump_stone(CManager cm,  EVstone stone_num);
 
 /*!
- * The prototype of a specific immediate handler funcion.
+ * The prototype of a specific immediate handler function.
  *
  * This function prototype is used by the EVPath internal "response"
  * interface.  At some point, the response interface will likely become
@@ -2264,7 +2269,7 @@ EVassoc_conversion_action(CManager cm, int stone_id, int stage, FMFormat target_
  * This function requests that EVPath perform a transport-level performance
  * check (currently of bandwidth) by sending a series of messages of a fixed
  * size, broken up internally into a fixed number of vectors (a la
- * writev()).  Th nature of the test is controled by the 'how' attribute
+ * writev()).  Th nature of the test is controlled by the 'how' attribute
  * list parameter.  In particular, the CM_TRANS_TEST_SIZE attribute controls
  * the message size in bytes, the CM_TRANS_TEST_VECS attribute specifies how
  * many vectors the message is to be broken up into (each vector will be

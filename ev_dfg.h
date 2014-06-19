@@ -477,20 +477,64 @@ extern attr_list EVdfg_get_attr_list(EVdfg_stone stone);
 
 
 /*!
- *  Vote that this node is ready for shutdown and provide it's contribution
- *  to the return value.
+ *  Vote that this node is ready for shutdown, provide it's contribution
+ *  to the return value and wait for the actual shutdown to occur.
  *
  *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
  *  by every participating node for normal shutdown.  The return value from
- *  these calls will all be the same
+ *  all calls (on all nodes) to EVdfg_shutdown() and
+ *  EVdfg_wait_for_shutdown() will all be the same.
  *
- * \param dfg The local EVdfg handle which should join the global DFG.
+ * \param dfg The local EVdfg handle to which a return value is contributed
  * \param result this node's contribution to the DFG-wide shutdown value
- *
+ * \return the DFG-wide shutdown value
  */
 extern int EVdfg_shutdown(EVdfg dfg, int result);
+
+/*!
+ *  Override voting and force shutdown with specific return value.
+ *
+ *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
+ *  by every participating node for normal shutdown.  However, this call
+ *  forces an abnormal shutdown. The return value from all calls (on all
+ *  nodes) to EVdfg_shutdown() and EVdfg_wait_for_shutdown() will all the
+ *  value of this result parameter.
+ *
+ * \param dfg The local EVdfg handle for which shutdown should be forced
+ * \param result this node's contribution to the DFG-wide shutdown value
+ * \return the DFG-wide shutdown value (actually equal to result here)
+ *
+ */
 extern int EVdfg_force_shutdown(EVdfg dfg, int result);
+
+/*!
+ *  Vote that this node is ready for shutdown, but has no specific
+ *  contribution to the final success/failure return value.  This call does
+ *  *not* wait, and should be followed by EVdfg_wait_for_shutdown().
+ *
+ *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
+ *  by every participating node for normal shutdown.  The return value from
+ *  all calls (on all nodes) to EVdfg_shutdown() and
+ *  EVdfg_wait_for_shutdown() will all be the same.
+ *
+ * \param dfg The local EVdfg handle for which is ready for shutdown
+ *
+ */
 extern void EVdfg_ready_for_shutdown(EVdfg dfg);
+
+/*!
+ *  Wait for the actual DFG shutdown to occur.
+ *
+ *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
+ *  by every participating node for normal shutdown.  The return value from
+ *  all calls (on all nodes) to EVdfg_shutdown() and
+ *  EVdfg_wait_for_shutdown() will all be the same.
+ *
+ * \param dfg The local EVdfg handle for which to wait for shutdown
+ * \return the DFG-wide shutdown value
+ */
+ * \return the DFG-wide shutdown value (actually equal to result here)
+ *  
 extern int EVdfg_wait_for_shutdown(EVdfg dfg);
 
 /*
