@@ -114,7 +114,6 @@ handle_queued_messages(CManager cm, void* vdfg)
     EVdfg_master_msg_ptr *last_ptr;
 
     if (dfg->queued_messages == NULL) return;
-    CManager_lock(dfg->cm);
     next = dfg->queued_messages;
     last_ptr = &dfg->queued_messages;
     while(next != NULL) {
@@ -149,7 +148,14 @@ handle_queued_messages(CManager cm, void* vdfg)
 	CMtrace_out(cm, EVdfgVerbose, "EVDFG handle queued end loop -  master DFG state is now %s\n", str_state[dfg->state]);
     }	    
     CMtrace_out(cm, EVdfgVerbose, "EVDFG handle queued exiting -  master DFG state is now %s\n", str_state[dfg->state]);
-    CManager_unlock(dfg->cm);
+}
+
+static void
+handle_queued_messages_lock(CManager cm, void* vdfg)
+{
+    CManager_lock(cm);
+    handle_queued_messages(cm, vdfg);
+    CManager_unlock(cm);
 }
 
 EVdfg_stone
@@ -373,6 +379,8 @@ handle_conn_shutdown(EVdfg dfg, EVdfg_master_msg_ptr msg)
 {
     int stone = msg->u.conn_shutdown.stone;
 
+    dfg->state = DFG_Reconfiguring;
+    CMtrace_out(cm, EVdfgVerbose, "EVDFG conn_shutdown_handler -  master DFG state is now %s\n", str_state[dfg->state]);
     if (dfg->node_fail_handler != NULL) {
 	int i;
 	int target_stone = -1;
@@ -419,20 +427,15 @@ dfg_shutdown_handler(CManager cm, CMConnection conn, void *vmsg,
     (void)cm;
     (void)conn;
     (void)attrs;
+    int i = 0;
     CManager_lock(cm);
-    if (dfg->master_connection == NULL) {
-	/* I got a shutdown message and I'm the master */
-	possibly_signal_shutdown(dfg, msg->value, conn);
-    } else {
-	/* I'm the client, all is done */
-	int i = 0;
-	dfg->shutdown_value = msg->value;
-	dfg->already_shutdown = 1;
-	CMtrace_out(cm, EVdfgVerbose, "Client %d has confirmed shutdown\n", dfg->my_node_id);
-	while (dfg->shutdown_conditions && (dfg->shutdown_conditions[i] != -1)){
-	    CMtrace_out(cm, EVdfgVerbose, "Client %d shutdown signalling %d\n", dfg->my_node_id, dfg->shutdown_conditions[i]);
-	    INT_CMCondition_signal(dfg->cm, dfg->shutdown_conditions[i++]);
-	}
+    /* I'm the client, all is done */
+    dfg->shutdown_value = msg->value;
+    dfg->already_shutdown = 1;
+    CMtrace_out(cm, EVdfgVerbose, "Client %d has confirmed shutdown\n", dfg->my_node_id);
+    while (dfg->shutdown_conditions && (dfg->shutdown_conditions[i] != -1)){
+	CMtrace_out(cm, EVdfgVerbose, "Client %d shutdown signalling %d\n", dfg->my_node_id, dfg->shutdown_conditions[i]);
+	INT_CMCondition_signal(dfg->cm, dfg->shutdown_conditions[i++]);
     }
     CMtrace_out(cm, EVdfgVerbose, "EVDFG exit shutdown master DFG state is %s\n", str_state[dfg->state]);
     CManager_unlock(cm);
@@ -505,6 +508,10 @@ handle_flush_reconfig(EVdfg dfg, EVdfg_master_msg_ptr mmsg)
     EVflush_attrs_reconfig_ptr msg = &mmsg->u.flush_reconfig;
     int i, j;
     assert(CManager_locked(dfg->cm));
+    if (((EVflush_attrs_reconfig_ptr)msg)->reconfig) {
+	dfg->state = DFG_Reconfiguring;
+    }
+    CMtrace_out(cm, EVdfgVerbose, "EVDFG flush_attr_reconfig -  master DFG state is now %s\n", str_state[dfg->state]);
     for (i=0; i < msg->count; i++) {
 	/* go through incoming attributes */
 	for (j=0; j< dfg->stone_count; j++) {
@@ -537,6 +544,11 @@ handle_node_join(EVdfg dfg, EVdfg_master_msg_ptr msg)
     int new_node = -1;
 
     assert(CManager_locked(dfg->cm));
+
+    if (dfg->state == DFG_Running) {
+	dfg->state = DFG_Reconfiguring;
+	CMtrace_out(cm, EVdfgVerbose, "EVDFG node_join -  master DFG state is now %s\n", str_state[dfg->state]);
+    }
 
     if (dfg->node_join_handler == NULL) {
 	/* static node list */
@@ -848,7 +860,7 @@ INT_EVdfg_create(CManager cm)
     INT_CMregister_handler(INT_CMregister_format(cm, EVdfg_shutdown_format_list),
 			   dfg_shutdown_handler, dfg);
     INT_CMadd_shutdown_task(cm, free_dfg, dfg, FREE_TASK);
-    INT_CMadd_poll(cm, handle_queued_messages, dfg);
+    INT_CMadd_poll(cm, handle_queued_messages_lock, dfg);
     return dfg;
 }
 
@@ -1692,6 +1704,7 @@ queue_master_msg(EVdfg dfg, void*vmsg, EVmaster_msg_type msg_type, CMConnection 
 		msg->u.flush_reconfig.attr_stone_list[i].attr_str = strdup(in->attr_stone_list[i].attr_str);
 	    }
 	}
+	break;
     }
     default:
 	assert(FALSE);
@@ -1704,7 +1717,11 @@ queue_master_msg(EVdfg dfg, void*vmsg, EVmaster_msg_type msg_type, CMConnection 
 	while (last->next != NULL) last = last->next;
 	last->next = msg;
     }
-    CMwake_server_thread(dfg->cm);
+    if (dfg->cm->control_list->server_thread != 0) {
+	CMwake_server_thread(dfg->cm);
+    } else {
+	handle_queued_messages(dfg->cm, dfg);
+    }
 }
 
 static void
