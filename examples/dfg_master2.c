@@ -51,7 +51,7 @@ int main(int argc, char **argv)
     source_handle = EVcreate_submit_handle(cm, -1, simple_format_list);
     EVdfg_register_source("event source", source_handle);
     EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
-				(EVSimpleHandlerFunc) simple_handler, (void*)test_dfg);
+				(EVSimpleHandlerFunc) simple_handler);
 
 /*
 **  DFG CREATION

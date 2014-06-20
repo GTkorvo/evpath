@@ -19,12 +19,14 @@ static FMStructDescRec simple_format_list[] =
     {NULL, NULL}
 };
 
+EVdfg test_dfg;
+
 static int
 simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     simple_rec_ptr event = vevent;
     printf("I got %d\n", event->integer_field);
-    EVdfg_shutdown((EVdfg)client_data, event->integer_field == 318);
+    EVdfg_shutdown(test_dfg, event->integer_field == 318);
     return 1;
 }
 
@@ -36,7 +38,6 @@ int main(int argc, char **argv)
 /*! [Changed nodes array] */
     CManager cm;
     char *str_contact;
-    EVdfg test_dfg;
     EVdfg_stone src, mid, sink;
     EVsource source_handle;
 
@@ -52,7 +53,7 @@ int main(int argc, char **argv)
     source_handle = EVcreate_submit_handle(cm, -1, simple_format_list);
     EVdfg_register_source("event source", source_handle);
     EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
-				(EVSimpleHandlerFunc) simple_handler, (void*)test_dfg);
+				(EVSimpleHandlerFunc) simple_handler);
 
 /*
 **  DFG CREATION

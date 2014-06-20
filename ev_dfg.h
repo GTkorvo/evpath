@@ -533,8 +533,6 @@ extern void EVdfg_ready_for_shutdown(EVdfg dfg);
  * \param dfg The local EVdfg handle for which to wait for shutdown
  * \return the DFG-wide shutdown value
  */
- * \return the DFG-wide shutdown value (actually equal to result here)
- *  
 extern int EVdfg_wait_for_shutdown(EVdfg dfg);
 
 /*
