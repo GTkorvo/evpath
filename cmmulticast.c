@@ -299,7 +299,7 @@ libcmmulticast_data_available(void *vtrans, void *vmcd)
     }
     if (mcd->my_addr.sin_port == 0) {
 	unsigned int nl;
-	int IP = get_self_ip_addr(mcd->mtd->svc);
+	int IP = get_self_ip_addr(NULL, mcd->mtd->svc);
 	nl = sizeof(struct sockaddr_in);
 	if (getsockname(mcd->output_fd, (struct sockaddr *) &mcd->my_addr, &nl) != 0)
 	    perror("getsockname");
@@ -451,7 +451,7 @@ attr_list attrs;
     }
     if (mcd->my_addr.sin_port == 0) {
 	unsigned int nl;
-	int IP = get_self_ip_addr(svc);
+	int IP = get_self_ip_addr(NULL, svc);
 	nl = sizeof(struct sockaddr_in);
 	if (getsockname(fd, (struct sockaddr *) &mcd->my_addr, &nl) != 0)
 	    perror("getsockname");

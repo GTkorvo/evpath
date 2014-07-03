@@ -1141,7 +1141,7 @@ attr_list attrs;
     static int IP = 0;
 
     if (IP == 0) {
-	IP = get_self_ip_addr(svc);
+	IP = get_self_ip_addr(cm, svc);
     }
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
@@ -1159,7 +1159,7 @@ attr_list attrs;
 	svc->trace_out(cm, "CMself check CMIB transport found no IP_PORT attribute");
 	return 0;
     }
-    get_qual_hostname(my_host_name, sizeof(my_host_name), svc, NULL, NULL);
+    get_qual_hostname(cm, my_host_name, sizeof(my_host_name), svc, NULL, NULL);
 
     if (host_name && (strcmp(host_name, my_host_name) != 0)) {
 	svc->trace_out(cm, "CMself check - Hostnames don't match");
@@ -1335,14 +1335,14 @@ attr_list listen_info;
 	char host_name[256];
 	int int_port_num = ntohs(sock_addr.sin_port);
 	attr_list ret_list;
-	int IP = get_self_ip_addr(svc);
+	int IP = get_self_ip_addr(cm, svc);
 	int network_added = 0;
 
 	svc->trace_out(cm, "CMIB listen succeeded on port %d, fd %d",
 		       int_port_num, conn_sock);
 	ret_list = create_attr_list();
 #if !NO_DYNAMIC_LINKING
-	get_qual_hostname(host_name, sizeof(host_name), svc, listen_info, 
+	get_qual_hostname(cm, host_name, sizeof(host_name), svc, listen_info, 
 			  &network_added);
 #endif 
 

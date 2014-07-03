@@ -230,7 +230,7 @@ void *void_conn_sock;
 	/* assert CM is locked */
 	assert(CM_LOCKED(svc, sd->cm));
     }
-    svc->trace_out(NULL, "Trying to accept something, socket %d\n", conn_sock);
+    svc->trace_out(sd->cm, "Trying to accept something, socket %d\n", conn_sock);
     linger_val.l_onoff = 1;
     linger_val.l_linger = 60;
     if ((sock = accept(conn_sock, (struct sockaddr *) 0, (unsigned int *) 0)) == SOCKET_ERROR) {
@@ -292,20 +292,20 @@ void *void_conn_sock;
 	}
     }
     if (socket_conn_data->remote_host != NULL) {
-	svc->trace_out(NULL, "Accepted TCP/IP socket connection from host \"%s\"",
+	svc->trace_out(sd->cm, "Accepted TCP/IP socket connection from host \"%s\"",
 		       socket_conn_data->remote_host);
     } else {
-	svc->trace_out(NULL, "Accepted TCP/IP socket connection from UNKNOWN host");
+	svc->trace_out(sd->cm, "Accepted TCP/IP socket connection from UNKNOWN host");
     }
     if (read(sock, (char *) &socket_conn_data->remote_contact_port, 4) != 4) {
-	svc->trace_out(NULL, "Remote host dropped connection without data");
+	svc->trace_out(sd->cm, "Remote host dropped connection without data");
 	return;
     }
     socket_conn_data->remote_contact_port =
 	ntohs(socket_conn_data->remote_contact_port);
     add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
 	     (attr_value) (long)socket_conn_data->remote_contact_port);
-    svc->trace_out(NULL, "Remote host (IP %x) is listening at port %d\n",
+    svc->trace_out(sd->cm, "Remote host (IP %x) is listening at port %d\n",
 		   socket_conn_data->remote_IP,
 		   socket_conn_data->remote_contact_port);
 
@@ -371,7 +371,7 @@ attr_list conn_attr_list;
     socket_client_data_ptr sd = (socket_client_data_ptr) trans->trans_data;
     char *host_name;
     int remote_IP = -1;
-    int IP = get_self_ip_addr(svc);
+    int IP = get_self_ip_addr(cm, svc);
     static int host_ip = 0;
     unsigned int sock_len;
     struct sockaddr sock_addr;
@@ -624,7 +624,7 @@ attr_list attrs;
     static int IP = 0;
 
     if (IP == 0) {
-	IP = get_self_ip_addr(svc);
+	IP = get_self_ip_addr(cm, svc);
 	if (IP == 0) IP = INADDR_LOOPBACK;
     }
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
@@ -643,7 +643,7 @@ attr_list attrs;
 	svc->trace_out(cm, "CMself check TCP/IP transport found no IP_PORT attribute");
 	return 0;
     }
-    get_qual_hostname(my_host_name, sizeof(my_host_name), svc, NULL, NULL);
+    get_qual_hostname(cm, my_host_name, sizeof(my_host_name), svc, NULL, NULL);
 
     if (host_name && (strcmp(host_name, my_host_name) != 0)) {
 	svc->trace_out(cm, "CMself check - Hostnames don't match");
@@ -835,14 +835,14 @@ attr_list listen_info;
 	char host_name[256];
 	int int_port_num = ntohs(sock_addr.sin_port);
 	attr_list ret_list;
-	int IP = get_self_ip_addr(svc);
+	int IP = get_self_ip_addr(cm, svc);
 	int network_added = 0;
 
 	svc->trace_out(cm, "CMSocket listen succeeded on port %d, fd %d",
 		       int_port_num, conn_sock);
 	ret_list = create_attr_list();
 #if !NO_DYNAMIC_LINKING
-	get_qual_hostname(host_name, sizeof(host_name), svc, listen_info, 
+	get_qual_hostname(cm, host_name, sizeof(host_name), svc, listen_info, 
 			  &network_added);
 #endif 
 

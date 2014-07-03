@@ -57,7 +57,7 @@ thread_bridge_transfer(CManager source_cm, event_item *event,
     /* Both CMs are locked now */
     new_event = clone_event(source_cm, event, target_cm);
     internal_path_submit(target_cm, target_stone, new_event);
-    CMtrace_out(cm, EVerbose, "Transferring event %p from cm %p to cm %p, new_event %p\n\n",
+    CMtrace_out(source_cm, EVerbose, "Transferring event %p from cm %p to cm %p, new_event %p\n\n",
 		source_cm, target_cm, event, new_event);
     CManager_unlock(target_cm);
     CMwake_server_thread(target_cm);
@@ -84,6 +84,7 @@ clone_event(CManager cm, event_item *event, CManager target_cm)
     new_event->free_arg = event;
     new_event->free_func = free_master_event;
     new_event->contents = Event_Freeable;
+    new_event->cm = target_cm;
 
     old_ID = get_server_ID_FMformat(event->reference_format, &id_len);
     new_event->reference_format = FMformat_from_ID(target_cm->evp->fmc, old_ID);

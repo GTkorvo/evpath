@@ -79,21 +79,21 @@ INT_CMCondition_get(CManager cm, CMConnection conn)
 }
 
 static void
-CMCondition_trigger(CMCondition cond, CMControlList cl)
+CMCondition_trigger(CManager cm, CMCondition cond, CMControlList cl)
 {
     (void)cl;
     if (cm_control_debug_flag) {
-	fprintf(CMTrace_file, "CMLowLevel Triggering CMcondition %d\n", cond->condition_num);
+	fprintf(cm->CMTrace_file, "CMLowLevel Triggering CMcondition %d\n", cond->condition_num);
     }
     if (cond->waiting) {
 	if (cm_control_debug_flag) {
-	    fprintf(CMTrace_file, "CMLowLevel Triggering CMcondition %d\n", 
+	    fprintf(cm->CMTrace_file, "CMLowLevel Triggering CMcondition %d\n", 
 		   cond->condition_num);
 	}
 	thr_condition_signal(cond->cond_condition);
     }
     if (cm_control_debug_flag) {
-	fprintf(CMTrace_file, "CMLowLevel After trigger for CMcondition %d\n", 
+	fprintf(cm->CMTrace_file, "CMLowLevel After trigger for CMcondition %d\n", 
 	       cond->condition_num);
     }
 }
@@ -108,7 +108,7 @@ CMconn_fail_conditions(CMConnection conn)
     while(cond_list != NULL) {
 	if (cond_list->conn == conn) {
 	    cond_list->failed = 1;
-	    CMCondition_trigger(cond_list, cl);
+	    CMCondition_trigger(conn->cm, cond_list, cl);
 	}
 	cond_list = cond_list->next;
     }
@@ -160,6 +160,7 @@ INT_CMCondition_has_signaled(CManager cm, int condition)
     set_debug_flag(cm);
 
     cond = CMCondition_find(cl, condition);
+    if (!cond) return -1;
     retval = cond->signaled;
     
     return retval;
@@ -174,6 +175,7 @@ INT_CMCondition_has_failed(CManager cm, int condition)
     set_debug_flag(cm);
 
     cond = CMCondition_find(cl, condition);
+    if (!cond) return -1;
     retval = cond->failed;
     
     return retval;
@@ -189,29 +191,29 @@ INT_CMCondition_wait(CManager cm, int condition)
     assert(CManager_locked(cm));
     set_debug_flag(cm);
     if (cm_control_debug_flag) {
-	fprintf(CMTrace_file, "CMLowLevel Waiting for CMcondition %d\n", condition);
+	fprintf(cm->CMTrace_file, "CMLowLevel Waiting for CMcondition %d\n", condition);
     }
     if (cm_control_debug_flag) {
-	fprintf(CMTrace_file, "CMLowLevel locked cl\n");
+	fprintf(cm->CMTrace_file, "CMLowLevel locked cl\n");
     }
     cond = CMCondition_find(cl, condition);
 
     if (cond == NULL) return -1;
     if (cond->signaled) {
 	if (cm_control_debug_flag) {
-	    fprintf(CMTrace_file, "CMcondition %d already signalled\n", condition);
+	    fprintf(cm->CMTrace_file, "CMcondition %d already signalled\n", condition);
 	}
 	return 1;
     }
     if (cond->failed) {
 	if (cm_control_debug_flag) {
-	    fprintf(CMTrace_file, "CMcondition %d already failed\n", condition);
+	    fprintf(cm->CMTrace_file, "CMcondition %d already failed\n", condition);
 	}
 	return 0;
     }
     cond->waiting++;
     if (cm_control_debug_flag) {
-	fprintf(CMTrace_file, "CMLowLevel In condition wait, server thread = %lx\n", 
+	fprintf(cm->CMTrace_file, "CMLowLevel In condition wait, server thread = %lx\n", 
 	       (long)cl->server_thread);
     }
     if (!cl->has_thread) {
@@ -219,18 +221,18 @@ INT_CMCondition_wait(CManager cm, int condition)
 	    cl->cond_polling = 1;
 	    while (!(cond->signaled || cond->failed)) {
 		if (cm_control_debug_flag) {
-		    fprintf(CMTrace_file, "CMLowLevel  Polling for CMcondition %d\n", condition);
+		    fprintf(cm->CMTrace_file, "CMLowLevel  Polling for CMcondition %d\n", condition);
 		}
 		CMcontrol_list_wait(cl);
 	    }
 	    cl->cond_polling = 0;
 	    if (cm_control_debug_flag) {
-		fprintf(CMTrace_file, "CMLowLevel  after Polling for CMcondition %d\n", condition);
+		fprintf(cm->CMTrace_file, "CMLowLevel  after Polling for CMcondition %d\n", condition);
 	    }
 	    /* the poll and handle will set cl->server_thread, restore it */
 	    cl->server_thread =  (thr_thread_t) NULL;
 	    if (cm_control_debug_flag) {
-		fprintf(CMTrace_file, "CMLowLevel  In condition wait, reset server thread = %lx\n", 
+		fprintf(cm->CMTrace_file, "CMLowLevel  In condition wait, reset server thread = %lx\n", 
 		       (long)cl->server_thread);
 	    }
 	} else {
@@ -238,7 +240,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 	       hopefully they'll keep doing it */
 	    /* some other thread is the server thread */
 	    if (cm_control_debug_flag) {
-		fprintf(CMTrace_file, "CMLowLevel Waiting for CMcondition %d\n", 
+		fprintf(cm->CMTrace_file, "CMLowLevel Waiting for CMcondition %d\n", 
 		       condition);
 	    }
 	    assert(CManager_locked(cm));
@@ -246,7 +248,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 	    thr_condition_wait(cond->cond_condition, cm->exchange_lock);
 	    cm->locked++;
 	    if (cm_control_debug_flag) {
-		fprintf(CMTrace_file, "CMLowLevel After wait for CMcondition %d\n", 
+		fprintf(cm->CMTrace_file, "CMLowLevel After wait for CMcondition %d\n", 
 		       condition);
 	    }
 	}
@@ -255,7 +257,7 @@ INT_CMCondition_wait(CManager cm, int condition)
 	cl->cond_polling = 1;
 	while (!(cond->signaled || cond->failed)) {
 	    if (cm_control_debug_flag) {
-		fprintf(CMTrace_file, "CMLowLevel polling for CMcondition %d\n", condition);
+		fprintf(cm->CMTrace_file, "CMLowLevel polling for CMcondition %d\n", condition);
 	    }
 	    CMcontrol_list_wait(cl);
 	    if (cl->closed) cond->failed = 1;
@@ -264,7 +266,7 @@ INT_CMCondition_wait(CManager cm, int condition)
     } else {
 	/* some other thread is the server thread */
 	if (cm_control_debug_flag) {
-	    fprintf(CMTrace_file, "CMLowLevel Waiting for CMcondition %d\n", 
+	    fprintf(cm->CMTrace_file, "CMLowLevel Waiting for CMcondition %d\n", 
 		   condition);
 	}
 	assert(CManager_locked(cm));
@@ -272,14 +274,14 @@ INT_CMCondition_wait(CManager cm, int condition)
 	thr_condition_wait(cond->cond_condition, cm->exchange_lock);
 	cm->locked++;
 	if (cm_control_debug_flag) {
-	    fprintf(CMTrace_file, "CMLowLevel After wait for CMcondition %d\n", 
+	    fprintf(cm->CMTrace_file, "CMLowLevel After wait for CMcondition %d\n", 
 		   condition);
 	}
     }
     result = cond->signaled;
     CMCondition_destroy(cl, condition);
     if (cm_control_debug_flag) {
-	fprintf(CMTrace_file, "CMLowLevel Return from wait CMcondition %d\n", condition);
+	fprintf(cm->CMTrace_file, "CMLowLevel Return from wait CMcondition %d\n", condition);
     }
     return result;
 }
@@ -294,8 +296,9 @@ INT_CMCondition_signal(CManager cm, int condition)
     }
     set_debug_flag(cm);
     cond = CMCondition_find(cl, condition);
+    if (!cond) return;
     cond->signaled = 1;
-    CMCondition_trigger(cond, cl);
+    CMCondition_trigger(cm, cond, cl);
     if (cl->has_thread == 0) cm->abort_read_ahead = 1;
     if (cl->cond_polling) {
 	/* wake the server thread in case we're not him */
@@ -310,6 +313,7 @@ INT_CMCondition_set_client_data(CManager cm, int condition, void *client_data)
     CMControlList cl = cm->control_list;
     set_debug_flag(cm);
     cond = CMCondition_find(cl, condition);
+    if (!cond) return;
     cond->client_data = client_data;
 }
 

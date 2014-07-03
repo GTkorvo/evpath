@@ -94,7 +94,7 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 #if !NO_DYNAMIC_LINKING 
     lt_dladdsearchdir(EVPATH_LIBRARY_BUILD_DIR);
     lt_dladdsearchdir(EVPATH_LIBRARY_INSTALL_DIR);
-    handle = lt_dlopen(libname);
+    handle = CMdlopen(cm->CMTrace_file, libname, 0);
     if (!handle) {
 	if (!quiet) fprintf(stderr, "Failed to load required '%s' dll.\n", trans_name);
 	if (!quiet) fprintf(stderr, "Search path includes '.', '%s', '%s' and any default search paths supported by ld.so\n", 

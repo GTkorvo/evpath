@@ -252,9 +252,9 @@ CMpbio_get_format_rep_callback(void *format_ID, int format_ID_length,
     CMtrace_out(cm, CMFormatVerbose, "CMpbio request for format from host %x, port %d\n", host_IP, host_port);
 #ifndef MODULE
     if (CMtrace_on(cm, CMFormatVerbose)) {
-	fprintf(CMTrace_file, "CMpbio request is for format ");
+	fprintf(cm->CMTrace_file, "CMpbio request is for format ");
 	print_server_ID(format_ID);
-	fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "\n");
     }
 #endif
 
@@ -735,9 +735,9 @@ CM_pbio_query(CMConnection conn, CMTransport trans, char *buffer, long length)
 	    CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio - loaded format\n");
 #ifndef MODULE
 	    if (CMtrace_on(conn->cm, CMFormatVerbose)) {
-		fprintf(CMTrace_file, "CMpbio Preload is format ");
+		fprintf(conn->cm->CMTrace_file, "CMpbio Preload is format ");
 		print_server_ID((unsigned char*)format_ID);
-		fprintf(CMTrace_file, "\n");
+		fprintf(conn->cm->CMTrace_file, "\n");
 	    }
 #endif
 	}

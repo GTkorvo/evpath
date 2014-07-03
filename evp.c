@@ -435,10 +435,10 @@ INT_EVassoc_terminal_action(CManager cm, EVstone stone_num,
     stone->response_cache[action_num].proto_action_id = proto_action_num;
     stone->proto_action_count++;
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Adding Terminal action %d to ", action_num);
-	fprint_stone_identifier(CMTrace_file, evp, stone_num);
-	fprintf(CMTrace_file, "\nStone dump->\n");
-	fdump_stone(CMTrace_file, stone);
+	fprintf(cm->CMTrace_file, "Adding Terminal action %d to ", action_num);
+	fprint_stone_identifier(cm->CMTrace_file, evp, stone_num);
+	fprintf(cm->CMTrace_file, "\nStone dump->\n");
+	fdump_stone(cm->CMTrace_file, stone);
     }
     return action_num;
 }
@@ -561,9 +561,9 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
 
     action_num = add_proto_action(cm, stone, &act);
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Adding Immediate action %d to ", action_num);
-	fprint_stone_identifier(CMTrace_file, evp, stone_num);
-	fprintf(CMTrace_file, "\naction value is \"%s\"\n", action_spec);
+	fprintf(cm->CMTrace_file, "Adding Immediate action %d to ", action_num);
+	fprint_stone_identifier(cm->CMTrace_file, evp, stone_num);
+	fprintf(cm->CMTrace_file, "\naction value is \"%s\"\n", action_spec);
     }
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
@@ -594,9 +594,9 @@ INT_EVassoc_multi_action(CManager cm, EVstone stone_num,
     if (!stone) return -1;
     action_num = stone->proto_action_count;
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Adding Multi action %d to ", action_num);
-	fprint_stone_identifier(CMTrace_file, evp, stone_num);
-	fprintf(CMTrace_file, "\nmulti action is \"%s\"\n", action_spec);
+	fprintf(cm->CMTrace_file, "Adding Multi action %d to ", action_num);
+	fprint_stone_identifier(cm->CMTrace_file, evp, stone_num);
+	fprintf(cm->CMTrace_file, "\nmulti action is \"%s\"\n", action_spec);
     }
 
     stone->proto_actions = realloc(stone->proto_actions, (action_num + 1) * 
@@ -928,9 +928,9 @@ INT_EVassoc_conversion_action(CManager cm, int stone_id, int stage,
     if (CMtrace_on(cm, EVerbose)) {
 	char *target_tmp = global_name_of_FMFormat(target_format);
 	char *incoming_tmp = global_name_of_FMFormat(incoming_format);
-	fprintf(CMTrace_file, "Adding Conversion action %d to ", a);
-	fprint_stone_identifier(CMTrace_file, cm->evp, stone_id);
-	fprintf(CMTrace_file, "\n   Incoming format is %s, target %s\n", incoming_tmp, 
+	fprintf(cm->CMTrace_file, "Adding Conversion action %d to ", a);
+	fprint_stone_identifier(cm->CMTrace_file, cm->evp, stone_id);
+	fprintf(cm->CMTrace_file, "\n   Incoming format is %s, target %s\n", incoming_tmp, 
 	       target_tmp);
     }
     stone->response_cache = realloc(stone->response_cache,
@@ -969,11 +969,11 @@ INT_EVstone_set_output(CManager cm, EVstone stone_num,
     stone = stone_struct(cm->evp, stone_num);
     if (!stone) return -1;
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Setting output %d on ", output_index);
-	fprint_stone_identifier(CMTrace_file, cm->evp, stone_num);
-	fprintf(CMTrace_file, " to forward to ");
-	fprint_stone_identifier(CMTrace_file, cm->evp, output_stone);
-	fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "Setting output %d on ", output_index);
+	fprint_stone_identifier(cm->CMTrace_file, cm->evp, stone_num);
+	fprintf(cm->CMTrace_file, " to forward to ");
+	fprint_stone_identifier(cm->CMTrace_file, cm->evp, output_stone);
+	fprintf(cm->CMTrace_file, "\n");
     }
     output_count = stone->output_count;
     if (output_index >= output_count) {
@@ -1536,9 +1536,9 @@ process_events_stone(CManager cm, int s, action_class c)
     action_state as = evp->as;
 
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Considering events on ");
-	fprint_stone_identifier(CMTrace_file, evp, s);
-	fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "Considering events on ");
+	fprint_stone_identifier(cm->CMTrace_file, evp, s);
+	fprintf(cm->CMTrace_file, "\n");
     }
     if (s == -1) return 0;
     if (as->last_active_stone == s) as->last_active_stone = -1;
@@ -1553,9 +1553,9 @@ process_events_stone(CManager cm, int s, action_class c)
     if (is_bridge_stone(cm, s) && (c != Bridge) && (c != Congestion)) return 0;
     
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Process events ");
-	fprint_stone_identifier(CMTrace_file, evp, s);
-	fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "Process events ");
+	fprint_stone_identifier(cm->CMTrace_file, evp, s);
+	fprintf(cm->CMTrace_file, "\n");
     }
     item = stone->queue->queue_head;
     if (is_bridge_stone(cm, s) && (c == Bridge)) {
@@ -1611,11 +1611,11 @@ process_events_stone(CManager cm, int s, action_class c)
 		resp = &stone->response_cache[resp_id];
 	    }
 	    if (CMtrace_on(cm, EVerbose)) {
-		fprintf(CMTrace_file, "next action event %lx on ", (long)event);
-		fprint_stone_identifier(CMTrace_file, evp, s);
-		fprintf(CMTrace_file, " action %lx\n", (long)resp);
+		fprintf(cm->CMTrace_file, "next action event %lx on ", (long)event);
+		fprint_stone_identifier(cm->CMTrace_file, evp, s);
+		fprintf(cm->CMTrace_file, " action %lx\n", (long)resp);
 		
-		fdump_action(CMTrace_file, stone, resp, resp->proto_action_id, "    ");
+		fdump_action(cm->CMTrace_file, stone, resp, resp->proto_action_id, "    ");
 	    }
             act = &stone->response_cache[resp_id];
             if (c == Immediate_and_Multi && act->action_type != Action_NoAction) {
@@ -1997,10 +1997,10 @@ do_bridge_action(CManager cm, int s)
         backpressure_check(cm, s);
 	if (ret == 0) {
 	    if (CMtrace_on(cm, EVWarning)) {
-		fprintf(CMTrace_file, "Warning!  Write failed for output action %d on stone %x, event likely not transmitted\n", a, s);
-		fprintf(CMTrace_file, "   -  Bridge stone ");
-		fprint_stone_identifier(CMTrace_file, evp, s);
-		fprintf(CMTrace_file, " disabled\n");
+		fprintf(cm->CMTrace_file, "Warning!  Write failed for output action %d on stone %x, event likely not transmitted\n", a, s);
+		fprintf(cm->CMTrace_file, "   -  Bridge stone ");
+		fprint_stone_identifier(cm->CMTrace_file, evp, s);
+		fprintf(cm->CMTrace_file, " disabled\n");
 	    }
 	    if (act->o.bri.conn != NULL) 
 		INT_CMConnection_close(act->o.bri.conn);
@@ -2097,9 +2097,9 @@ INT_EVassoc_anon_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
     stone->response_cache = realloc(stone->response_cache, sizeof(stone->response_cache[0]) * (resp_num + 1));
     response_cache_element *resp;
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Installing anon action response for multi action %d on ", act_num);
-	fprint_stone_identifier(CMTrace_file, evp, stone_id);
-	fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "Installing anon action response for multi action %d on ", act_num);
+	fprint_stone_identifier(cm->CMTrace_file, evp, stone_id);
+	fprintf(cm->CMTrace_file, "\n");
     }
     resp = &stone->response_cache[stone->response_cache_count];
     resp->action_type = stone->proto_actions[act_num].action_type;
@@ -2111,7 +2111,7 @@ INT_EVassoc_anon_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
     resp->reference_format = anon_target;
     if (CMtrace_on(cm, EVerbose)) {
 	char *tmp;
-	fprintf(CMTrace_file, "\tResponse %d for format \"%s\"(%p)", stone->response_cache_count, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
+	fprintf(cm->CMTrace_file, "\tResponse %d for format \"%s\"(%p)", stone->response_cache_count, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
 	free(tmp);
     }
     stone->response_cache_count += 1;
@@ -2135,10 +2135,10 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
     stone->response_cache = realloc(stone->response_cache, sizeof(stone->response_cache[0]) * (resp_num + queue_count));
     response_cache_element *resp;
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Installing %d mutated action responses for multi action %d on ",
+	fprintf(cm->CMTrace_file, "Installing %d mutated action responses for multi action %d on ",
 		queue_count, act_num);
-	fprint_stone_identifier(CMTrace_file, evp, stone_id);
-	fprintf(CMTrace_file, "\n");
+	fprint_stone_identifier(cm->CMTrace_file, evp, stone_id);
+	fprintf(cm->CMTrace_file, "\n");
     }
     for (i=0; i < queue_count; i++) {
 	resp = &stone->response_cache[stone->response_cache_count + i];
@@ -2152,7 +2152,7 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
 	resp->reference_format = reference_formats[i];
 	if (CMtrace_on(cm, EVerbose)) {
 	    char *tmp;
-	    fprintf(CMTrace_file, "\tResponse %d for format \"%s\"(%p)\n", stone->response_cache_count+i, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
+	    fprintf(cm->CMTrace_file, "\tResponse %d for format \"%s\"(%p)\n", stone->response_cache_count+i, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
 	    free(tmp);
 	}
     }
@@ -2228,13 +2228,13 @@ INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list
     conn = INT_CMget_conn(cm, contact_list);
     if (conn == NULL) {
 	if (CMtrace_on(cm, EVWarning)) {
-	    fprintf(CMTrace_file, "EVassoc_bridge_action - failed to contact host at contact point \n\t");
+	    fprintf(cm->CMTrace_file, "EVassoc_bridge_action - failed to contact host at contact point \n\t");
 	    if (contact_list != NULL) {
-		fdump_attr_list(CMTrace_file, contact_list);
+		fdump_attr_list(cm->CMTrace_file, contact_list);
 	    } else {
-		fprintf(CMTrace_file, "NULL\n");
+		fprintf(cm->CMTrace_file, "NULL\n");
 	    }
-	    fprintf(CMTrace_file, "Bridge action association failed for stone %x, outputting to remote stone %x\n",
+	    fprintf(cm->CMTrace_file, "Bridge action association failed for stone %x, outputting to remote stone %x\n",
 		   stone_num, remote_stone);
 	}
 	return -1;
@@ -2242,9 +2242,9 @@ INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list
     INT_CMconn_register_close_handler(conn, stone_close_handler, 
 				      (void*)(long)stone_num);
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Adding bridge action %d to ", action_num);
-	fprint_stone_identifier(CMTrace_file, evp, stone_num);
-	fprintf(CMTrace_file, " remote stone target is %x\n", remote_stone);
+	fprintf(cm->CMTrace_file, "Adding bridge action %d to ", action_num);
+	fprint_stone_identifier(cm->CMTrace_file, evp, stone_num);
+	fprintf(cm->CMTrace_file, " remote stone target is %x\n", remote_stone);
     }
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (action_num + 1) * 
@@ -2273,9 +2273,9 @@ INT_EVassoc_thread_bridge_action(CManager cm, EVstone stone_num,
 
     action_num = stone->proto_action_count;
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Adding thread bridge action %d to ", action_num);
-	fprint_stone_identifier(CMTrace_file, evp, stone_num);
-	fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "Adding thread bridge action %d to ", action_num);
+	fprint_stone_identifier(cm->CMTrace_file, evp, stone_num);
+	fprintf(cm->CMTrace_file, "\n");
     }
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (action_num + 1) * 
@@ -2323,13 +2323,13 @@ INT_EVassoc_split_action(CManager cm, EVstone stone_num,
 	target_count++;
     }
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Adding Split action %d to ", action_num);
-	fprint_stone_identifier(CMTrace_file, evp, stone_num);
-	fprintf(CMTrace_file, ", %d target stones -> ", target_count);
+	fprintf(cm->CMTrace_file, "Adding Split action %d to ", action_num);
+	fprint_stone_identifier(cm->CMTrace_file, evp, stone_num);
+	fprintf(cm->CMTrace_file, ", %d target stones -> ", target_count);
 	for (i=0; i < target_count; i++) {
-	    fprintf(CMTrace_file, "%x, ", target_stone_list[i]);
+	    fprintf(cm->CMTrace_file, "%x, ", target_stone_list[i]);
 	}
-	fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "\n");
     }
     for (i=0; i < target_count; i++) {
 	INT_EVstone_add_split_target(cm, stone_num, target_stone_list[i]);
@@ -2398,9 +2398,9 @@ INT_EVstone_remove_split_target(CManager cm, EVstone stone_num,
     target_stone_list = stone->output_stone_ids;
     if (!target_stone_list) return;
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Removing split target %x from stone ", stone_target);
-	fprint_stone_identifier(CMTrace_file, evp, stone_num);
-	fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "Removing split target %x from stone ", stone_target);
+	fprint_stone_identifier(cm->CMTrace_file, evp, stone_num);
+	fprintf(cm->CMTrace_file, "\n");
     }
     while ((target_stone_list[target_count] != stone_target) && (target_count < stone->output_count)) {
 	target_count++;
@@ -2898,6 +2898,7 @@ EVauto_submit_func(CManager cm, void* vstone)
     event->format = NULL;
     event->free_func = NULL;
     event->attrs = NULL;
+    event->cm = cm;
     internal_path_submit(cm, stone_num, event);
     while (process_local_actions(cm));
     return_event(cm->evp, event);
@@ -2937,7 +2938,7 @@ INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec,
     }
     if (acceptable_action == 0) {
 	printf("Warning!  Enabling auto events on ");
-	fprint_stone_identifier(CMTrace_file, cm->evp, stone_num);
+	fprint_stone_identifier(cm->CMTrace_file, cm->evp, stone_num);
 	printf(", but no acceptable actions found!\n");
     }
     handle = INT_CMadd_periodic_task(cm, period_sec, period_usec,
@@ -2945,9 +2946,9 @@ INT_EVenable_auto_stone(CManager cm, EVstone stone_num, int period_sec,
 				     (void*)(long)stone_num);
     stone->periodic_handle = handle;
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Enabling auto events on ");
-	fprint_stone_identifier(CMTrace_file, cm->evp, stone_num);
-	fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "Enabling auto events on ");
+	fprint_stone_identifier(cm->CMTrace_file, cm->evp, stone_num);
+	fprintf(cm->CMTrace_file, "\n");
     }
 }
 
@@ -3017,11 +3018,12 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     event->encoded_event = buffer;
     event->reference_format = FMFormat_of_original(ffsh);
     event->attrs = CMadd_ref_attr_list(cm, attrs);
+    event->cm = cm;
     event->format = NULL;
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Event coming in from network to ");
-	fprint_stone_identifier(CMTrace_file, evp, stone_id);
-	fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "Event coming in from network to ");
+	fprint_stone_identifier(cm->CMTrace_file, evp, stone_id);
+	fprintf(cm->CMTrace_file, "\n");
     }
     if (CMtrace_on(conn->cm, EVerbose)) {
 	static int dump_char_limit = 256;
@@ -3035,12 +3037,12 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	fprintf(CMTrace_file, "CM - record type %s, contents are:\n  ", global_name_of_FMFormat(event->reference_format));
-	r = FMfdump_encoded_data(CMTrace_file, event->reference_format,
+	fprintf(cm->CMTrace_file, "CM - record type %s, contents are:\n  ", global_name_of_FMFormat(event->reference_format));
+	r = FMfdump_encoded_data(cm->CMTrace_file, event->reference_format,
 				event->encoded_event, dump_char_limit);
 	if (r && !warned) {
-	    fprintf(CMTrace_file, "\n\n  ****  Warning **** CM record dump truncated\n");
-	    fprintf(CMTrace_file, "  To change size limits, set CMDumpSize environment variable.\n\n\n");
+	    fprintf(cm->CMTrace_file, "\n\n  ****  Warning **** CM record dump truncated\n");
+	    fprintf(cm->CMTrace_file, "  To change size limits, set CMDumpSize environment variable.\n\n\n");
 	    warned++;
 	}
     }
@@ -3084,6 +3086,7 @@ reassign_memory_event(CManager cm, event_item *event)
     event->decoded_event = NULL;      /* we're not touching this anymore */
     event->free_func = NULL;   /* if these were present, no longer applicable */
     event->free_arg = NULL;
+    event->cm = cm;
 
     tmp_context = create_FFSContext_FM(cm->evp->fmc);
     format = FFSTypeHandle_from_encode(tmp_context, event->encoded_event);
@@ -3122,6 +3125,7 @@ INT_EVsubmit_general(EVsource source, void *data, EVFreeFunction free_func,
     event->format = source->format;
     event->free_func = free_func;
     event->free_arg = data;
+    event->cm = source->cm;
     event->attrs = CMadd_ref_attr_list(source->cm, attrs);
     internal_path_submit(source->cm, source->local_stone_id, event);
     while (process_local_actions(source->cm));
@@ -3140,6 +3144,7 @@ INT_EVsubmit(EVsource source, void *data, attr_list attrs)
     } else {
 	event->contents = Event_App_Owned;
     }
+    event->cm = source->cm;
     if (source->preencoded) {
 	event->event_encoded = 1;
 	event->encoded_event = data;
@@ -3172,6 +3177,7 @@ INT_EVsubmit_encoded(CManager cm, EVstone stone, void *data, int data_len, attr_
     event->contents = Event_App_Owned;
     event->event_encoded = 1;
     event->encoded_event = data;
+    event->cm = cm;
     event->event_len = data_len;
     event->reference_format = FMFormat_of_original(FFSTypeHandle_from_encode(evp->ffsc, 
 							data));

@@ -17,7 +17,7 @@
 #  pragma warning (disable: 2259)
 #endif
 static void socket_accept_thin_client(void *cmv, void * sockv);
-extern void CMget_qual_hostname(char *buf, int len);
+extern void CMget_qual_hostname(CManager cm, char *buf, int len);
 
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
@@ -77,7 +77,7 @@ EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
 
     int_port_num = (unsigned short)(ntohs(sock_addr.sin_port));
 
-    CMget_qual_hostname(host_name, sizeof(host_name));
+    CMget_qual_hostname(cm, host_name, sizeof(host_name));
 	
     *hostname_p = strdup(host_name);
     *port_p = int_port_num;

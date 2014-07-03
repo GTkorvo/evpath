@@ -131,6 +131,7 @@ typedef struct _CManager {
     CMperf_upcall perf_upcall;
 
     struct _event_path_data *evp;
+    FILE * CMTrace_file;
 } CManager_s;
 
 typedef struct _CMCondition *CMCondition;
@@ -476,7 +477,7 @@ extern CMtrans_services
 INT_CMget_static_trans_services();
 
 extern void INT_CMsleep(CManager cm, int secs);
-extern int INT_CMget_self_ip_addr();
+extern int INT_CMget_self_ip_addr(CManager cm);
 extern attr_list INT_CMConnection_get_attrs(CMConnection conn);
 extern void * INT_CMcreate_compat_info(CMFormat format, char *xform_code,
 			int *len_p);
@@ -516,11 +517,10 @@ extern void INT_EVadd_standard_structs(CManager cm, FMStructDescList *lists);
 extern void INT_EVregister_close_handler(CManager cm, EVStoneCloseHandlerFunc handler, void *client_data );
 extern void CMwake_server_thread(CManager cm);
 extern int CMtrace_val[];
-extern int CMtrace_init(CMTraceType t);
+extern int CMtrace_init(CManager cm, CMTraceType t);
 extern void INT_CMTrace_file_id(int ID);
-extern FILE* CMTrace_file;
-#define CMtrace_on(cm, trace_type)  ((CMtrace_val[0] == -1) ? CMtrace_init(trace_type) : CMtrace_val[trace_type])
-#define CMtrace_out(cm, trace_type, ...) {(CMtrace_on(cm,trace_type) ? (CMtrace_on(cm,CMLowLevelVerbose) ? fprintf(CMTrace_file, "P%lxT%lx - ", (long) getpid(), (long)thr_thread_self()) : 0) , fprintf(CMTrace_file, __VA_ARGS__) : 0);fflush(CMTrace_file);}
+#define CMtrace_on(cm, trace_type)  ((cm->CMTrace_file == NULL) ? CMtrace_init(cm, trace_type) : CMtrace_val[trace_type])
+#define CMtrace_out(cm, trace_type, ...) {(CMtrace_on(cm,trace_type) ? (CMtrace_on(cm,CMLowLevelVerbose) ? fprintf(cm->CMTrace_file, "P%lxT%lx - ", (long) getpid(), (long)thr_thread_self()) : 0) , fprintf(cm->CMTrace_file, __VA_ARGS__) : 0);fflush(cm->CMTrace_file);}
 extern void CMdo_performance_response(CMConnection conn, long length, int func,
 				      int byte_swap, char *buffer);
 extern int

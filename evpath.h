@@ -1049,7 +1049,7 @@ CMregressive_probe_bandwidth ARGS((CMConnection conn, long size, attr_list attrs
  */
 /*NOLOCK*/
 extern int
-CMget_self_ip_addr();
+CMget_self_ip_addr(CManager cm);
 
 /** @defgroup evpath EVPath functions and types
  * @{
