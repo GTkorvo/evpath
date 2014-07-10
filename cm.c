@@ -2335,23 +2335,34 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 	fprintf(stderr, "invalid format in incoming buffer\n");
 	return 0;
     }
-    CMtrace_out(cm, CMDataVerbose, "CM - Receiving record of type %s\n", 
-		name_of_FMformat(FMFormat_of_original(format)));
+    CMtrace_out(cm, CMDataVerbose, "CM - Receiving record of type %s, FFSformat %p\n", 
+		name_of_FMformat(FMFormat_of_original(format)), format);
     for (i=0; i< cm->in_format_count; i++) {
 	if (cm->in_formats[i].format == format) {
 	    cm_format = &cm->in_formats[i];
+	    CMtrace_out(cm, CMDataVerbose, "CM - Found incoming cm_format %p, matching FFSformat %p\n", 
+			cm_format, format);
 	}
     }
     if (cm_format == NULL) {
 	cm_format = CMidentify_rollbackCMformat(cm, data_buffer);
-	if(cm_format)
+	CMtrace_out(cm, CMDataVerbose, "CM - Created cm_format %p, matching FFSformat %p\n", 
+		    cm_format, format);
+	if(cm_format) {
+	    CMtrace_out(cm, CMDataVerbose, "CM - Calling CMcreate_conversion type %s, format %p\n", 
+			name_of_FMformat(FMFormat_of_original(format)), format);
 	    CMcreate_conversion(cm, cm_format);
+	    CMtrace_out(cm, CMDataVerbose, "CM - after CMcreate_conversion format %p, has_conversion is %d\n", 
+			format, FFShas_conversion(format));
+	}
     }
 
     if ((cm_format == NULL) || (cm_format->handler == NULL)) {
 	fprintf(stderr, "CM - No handler for incoming data of this version of format \"%s\"\n",
 		name_of_FMformat(FMFormat_of_original(format)));
 	return 0;
+    } else if (!FFShas_conversion(format)) {
+	CMcreate_conversion(cm, cm_format);
     }
     assert(FFShas_conversion(format));
 
