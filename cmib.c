@@ -742,10 +742,10 @@ void *void_conn_sock;
 	}
     }
     if (ib_conn_data->remote_host != NULL) {
-	svc->trace_out(NULL, "Accepted CMIB socket connection from host \"%s\"",
+	svc->trace_out(sd->cm, "Accepted CMIB socket connection from host \"%s\"",
 		       ib_conn_data->remote_host);
     } else {
-	svc->trace_out(NULL, "Accepted CMIB socket connection from UNKNOWN host");
+	svc->trace_out(sd->cm, "Accepted CMIB socket connection from UNKNOWN host");
     }
 
     //here we read the incoming remote contact port number. 
@@ -758,24 +758,24 @@ void *void_conn_sock;
 
     
     if (read(sock, (char *) &ib_conn_data->remote_contact_port, 4) != 4) {
-	svc->trace_out(NULL, "Remote host dropped connection without data");
+	svc->trace_out(sd->cm, "Remote host dropped connection without data");
 	return;
     }
 
     if (read(sock, (char *) &remote_param, sizeof(remote_param)) != sizeof(remote_param)) {
-	svc->trace_out(NULL, "CMIB Remote host dropped connection without data");
+	svc->trace_out(sd->cm, "CMIB Remote host dropped connection without data");
 	return;
     }
     
     if(write(sock, &param, sizeof(param)) != sizeof(param))
     {
-	svc->trace_out(NULL, "CMIB remote side failed to send its parameters");
+	svc->trace_out(sd->cm, "CMIB remote side failed to send its parameters");
 	return;	
     }
     
     if(connectqp(ib_conn_data, sd, param, remote_param))
     {
-	svc->trace_out(NULL, "CMIB connectqp failed in accept connection");
+	svc->trace_out(sd->cm, "CMIB connectqp failed in accept connection");
 	return;	
     }
     
@@ -784,7 +784,7 @@ void *void_conn_sock;
 	ntohs(ib_conn_data->remote_contact_port);
     add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
 	     (attr_value) (long)ib_conn_data->remote_contact_port);
-    svc->trace_out(NULL, "Remote host (IP %x) is listening at port %d\n",
+    svc->trace_out(sd->cm, "Remote host (IP %x) is listening at port %d\n",
 		   ib_conn_data->remote_IP,
 		   ib_conn_data->remote_contact_port);
 
