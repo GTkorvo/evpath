@@ -299,7 +299,7 @@ preload_pbio_format(CMConnection conn, FMFormat ioformat)
     if (CMtrace_on(conn->cm, CMFormatVerbose)) {
 	int junk;
 	fprintf(conn->cm->CMTrace_file, "CMpbio Preload is format ");
-	print_server_ID((unsigned char *)get_server_ID_FMformat(ioformat, &junk));
+	fprint_server_ID(conn->cm->CMTrace_file, (unsigned char *)get_server_ID_FMformat(ioformat, &junk));
 	fprintf(conn->cm->CMTrace_file, "\n");
     }
 #endif
