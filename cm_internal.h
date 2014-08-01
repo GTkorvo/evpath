@@ -28,15 +28,15 @@
 
 
 #if defined (__INTEL_COMPILER)
-//  Allow extern declarations with no prior decl
+/*  Allow extern declarations with no prior decl */
 #  pragma warning (disable: 1418)
-//  Allow extern declarations in primary source files.
+/*  Allow extern declarations in primary source files. */
 #  pragma warning (disable: 1419)
-//  Don't tell me about unspecified order of evaluation
+/*  Don't tell me about unspecified order of evaluation */
 #  pragma warning (disable: 981)
-//  Don't tell me about floating point equality tests
+/*  Don't tell me about floating point equality tests */
 #  pragma warning (disable: 1572)
-// Assert warning
+/* Assert warning */
 #  pragma warning (disable: 181)
 #endif
 struct _ecl_code_struct;
