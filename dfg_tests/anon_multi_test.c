@@ -17,7 +17,7 @@
 #include "test_support.h"
 
 static int status;
-static EVdfg test_dfg;
+static EVdfg_client test_client;
 
 
 typedef struct _rec_a {
@@ -146,7 +146,7 @@ static void check_termination(int sequence)
 	    result=1;
 	}
     }
-    EVdfg_shutdown(test_dfg, result);
+    EVdfg_shutdown(test_client, result);
 }
 
 static
@@ -277,6 +277,8 @@ be_test_master(int argc, char **argv)
     char *queue_node = "b";
     char *terminal_node = "c";
     atom_t index_atom;
+    EVdfg_master test_master;
+    EVdfg test_dfg;
 
     (void)argc; (void)argv;
     cm = CManager_create();
@@ -330,11 +332,12 @@ be_test_master(int argc, char **argv)
 				(EVSimpleHandlerFunc) raw_handler, NULL);
 
 /*
-**  DFG CREATION
+**  MASTER AND DFG CREATION
 */
-    test_dfg = EVdfg_create(cm);
-    str_contact = EVdfg_get_contact_list(test_dfg);
-    EVdfg_register_node_list(test_dfg, &nodes[0]);
+    test_master = EVdfg_create_master(cm);
+    str_contact = EVdfg_get_contact_list(test_master);
+    EVdfg_register_node_list(test_master, &nodes[0]);
+    test_dfg = EVdfg_create(test_master);
 
     srca = EVdfg_create_source_stone(test_dfg, "a_source");
     srcb = EVdfg_create_source_stone(test_dfg, "b_source");
@@ -361,12 +364,12 @@ be_test_master(int argc, char **argv)
     EVdfg_realize(test_dfg);
 
 /* We're node 0 in the DFG */
-    EVdfg_join_dfg(test_dfg, nodes[0], str_contact);
+    test_client = EVdfg_assoc_client_local(cm, nodes[0], test_master);
 
 /* Fork the others */
     test_fork_children(&nodes[0], str_contact);
 
-    if (EVdfg_ready_wait(test_dfg) != 1) {
+    if (EVdfg_ready_wait(test_client) != 1) {
 	/* dfg initialization failed! */
 	exit(1);
     }
@@ -488,11 +491,11 @@ submit any remaining anon from bottom (oldest)
     }
     CMsleep(cm, 1);
 
-    if (EVdfg_active_sink_count(test_dfg) == 0) {
-	EVdfg_ready_for_shutdown(test_dfg);
+    if (EVdfg_active_sink_count(test_client) == 0) {
+	EVdfg_ready_for_shutdown(test_client);
     }
 
-    status = EVdfg_wait_for_shutdown(test_dfg);
+    status = EVdfg_wait_for_shutdown(test_client);
 
     wait_for_children(nodes);
     free(str_contact);
@@ -517,7 +520,6 @@ be_test_child(int argc, char **argv)
 	printf("Child usage:  evtest  <nodename> <mastercontact>\n");
 	exit(1);
     }
-    test_dfg = EVdfg_create(cm);
 
     EVdfg_register_sink_handler(cm, "a_output_handler", a_format_list,
 				(EVSimpleHandlerFunc) a_output_handler, NULL);
@@ -532,16 +534,16 @@ be_test_child(int argc, char **argv)
     EVdfg_register_source("a_source", a_handle);
     EVdfg_register_source("b_source", b_handle);
 
-    EVdfg_join_dfg(test_dfg, argv[1], argv[2]);
-    EVdfg_ready_wait(test_dfg);
+    test_client = EVdfg_assoc_client(cm, argv[1], argv[2]);
+    EVdfg_ready_wait(test_client);
 
-    if (EVdfg_active_sink_count(test_dfg) == 0) {
-	EVdfg_ready_for_shutdown(test_dfg);
+    if (EVdfg_active_sink_count(test_client) == 0) {
+	EVdfg_ready_for_shutdown(test_client);
     }
 
     count = repeat_count;
 
     /* sources are with the master, don't do submits here */
 
-    return EVdfg_wait_for_shutdown(test_dfg);
+    return EVdfg_wait_for_shutdown(test_client);
 }

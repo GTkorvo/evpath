@@ -8,7 +8,7 @@
 #include "test_support.h"
 
 static int status;
-static EVdfg test_dfg;
+static EVdfg_client test_client;
 static int base=2;
 
 static
@@ -19,7 +19,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     (void)cm;
     (void)client_data;
     checksum_simple_record(event, attrs, quiet);
-    EVdfg_shutdown(test_dfg, 0);
+    EVdfg_shutdown(test_client, 0);
     return 0;
 }
 
@@ -37,6 +37,8 @@ be_test_master(int argc, char **argv)
     int ndig;
     int i,j,nbase,n;
     int fanout=1;
+    EVdfg test_dfg;
+    EVdfg_master test_master;
 
     if (argc == 1) {
 	sscanf(argv[0], "%d", &level_count);
@@ -69,9 +71,10 @@ be_test_master(int argc, char **argv)
 /*
 **  DFG CREATION
 */
-    test_dfg = EVdfg_create(cm);
-    str_contact = EVdfg_get_contact_list(test_dfg);
-    EVdfg_register_node_list(test_dfg, &nodes[0]);
+    test_master = EVdfg_create_master(cm);
+    str_contact = EVdfg_get_contact_list(test_master);
+    EVdfg_register_node_list(test_master, &nodes[0]);
+    test_dfg = EVdfg_create(test_master);
     if (fanout) {
 
       /* create arrays for storing tmp & last*/
@@ -110,20 +113,20 @@ be_test_master(int argc, char **argv)
       EVdfg_realize(test_dfg);
 
 /* We're node 0 in the DFG */
-      EVdfg_join_dfg(test_dfg, nodes[0], str_contact);
+      test_client = EVdfg_assoc_client_local(cm, nodes[0], test_master);
 
     }
 /* Fork the others */
     test_fork_children(&nodes[0], str_contact);
 
-    if (EVdfg_ready_wait(test_dfg) != 1) {
+    if (EVdfg_ready_wait(test_client) != 1) {
       /* dfg initialization failed! */
       exit(1);
     }
 
     
-    if (EVdfg_active_sink_count(test_dfg) == 0) {
-	EVdfg_ready_for_shutdown(test_dfg);
+    if (EVdfg_active_sink_count(test_client) == 0) {
+	EVdfg_ready_for_shutdown(test_client);
     }
 
     if (EVdfg_source_active(source_handle)) {
@@ -132,7 +135,7 @@ be_test_master(int argc, char **argv)
 	EVsubmit(source_handle, &rec, NULL);
     }
 
-    status = EVdfg_wait_for_shutdown(test_dfg);
+    status = EVdfg_wait_for_shutdown(test_client);
     free(str_contact);
     EVfree_source(source_handle);
     wait_for_children(nodes);
@@ -161,7 +164,6 @@ be_test_child(int argc, char **argv)
 	printf("Child usage:  evtest  <nodename> <mastercontact>\n");
 	exit(1);
     }
-    test_dfg = EVdfg_create(cm);
 
     src = EVcreate_submit_handle(cm, -1, simple_format_list);
     EVdfg_register_source("master_source", src);
@@ -169,10 +171,10 @@ be_test_child(int argc, char **argv)
     sprintf(chandle,"handler%s", argv[1]);
     EVdfg_register_sink_handler(cm,chandle, simple_format_list,
 				(EVSimpleHandlerFunc) simple_handler, NULL);
-    EVdfg_join_dfg(test_dfg, argv[1], argv[2]);
-    EVdfg_ready_wait(test_dfg);
-    if (EVdfg_active_sink_count(test_dfg) == 0) {
-	EVdfg_ready_for_shutdown(test_dfg);
+    test_client = EVdfg_assoc_client(cm, argv[1], argv[2]);
+    EVdfg_ready_wait(test_client);
+    if (EVdfg_active_sink_count(test_client) == 0) {
+	EVdfg_ready_for_shutdown(test_client);
     }
 
     if (EVdfg_source_active(src)) {
@@ -182,5 +184,5 @@ be_test_child(int argc, char **argv)
 	EVsubmit(src, &rec, NULL);
     }
     EVfree_source(src);
-    return EVdfg_wait_for_shutdown(test_dfg);
+    return EVdfg_wait_for_shutdown(test_client);
 }

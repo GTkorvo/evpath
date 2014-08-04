@@ -40,6 +40,20 @@ extern "C" {
 typedef struct _EVdfg *EVdfg;
 
 /*!
+ * EVdfg_master is a handle to a DFG master.
+ *
+ * EVdfg_master is an opaque handle
+ */
+typedef struct _EVdfg_master *EVdfg_master;
+
+/*!
+ * EVdfg_client is a handle to a DFG_client.
+ *
+ * EVdfg_client is an opaque handle
+ */
+typedef struct _EVdfg_client *EVdfg_client;
+
+/*!
  * EVdfg_stone is a handle to virtual EVpath stone.
  *
  * EVdfg_stone is an opaque handle.  
@@ -47,40 +61,54 @@ typedef struct _EVdfg *EVdfg;
 typedef struct _EVdfg_stone *EVdfg_stone;
 
 /*!
+ * Create a DFG master
+ *
+ * This call is used in master process of a set of communicating EVdfg
+ * processes.  The master is the unique point of control and
+ * adminstration for client processes and DFGs.
+ *
+ * \param cm The CManager with which to associate the DFG
+ * \return An EVdfg_master handle, to be used in later calls.
+ */
+extern EVdfg_master EVdfg_create_master(CManager cm);
+
+/*!
  * Create a DFG
  *
- * This call is used in both master and client sides of EVdfg.
+ * This call is used in the master process to create a DFG that will be
+ * deployed on the client processes.
  * \param cm The CManager with which to associate the DFG
  * \return An EVdfg handle, to be used in later calls.
  */
-extern EVdfg EVdfg_create(CManager cm);
+extern EVdfg EVdfg_create(EVdfg_master master);
+
 
 /*!
- * Get the contact list from an EVdfg handle
+ * Get the contact list from an EVdfg_master handle
  *
- * This call is used to extract contact information from an EVdfg handle.
- * Generally this call is made on the Master side of EVdfg, and the contact
- * information is then provided to the Clients for use in EVdfg_join_dfg()
- * calls.  The result of this call is a null-terminated string to be owned
- * by the caller.  (I.E. you should free the string memory when you're done
- * with it.)
+ * This call is used to extract contact information from an
+ * EVdfg_master handle.  This call is made on the Master side of EVdfg
+ * and the contact information is then provided to the remote Clients
+ * for use in EVdfg_assoc_client() calls.  The result of this call is a
+ * null-terminated string to be owned by the caller.  (I.E. you should
+ * free the string memory when you're done with it.)
  *
- * \param dfg The EVdfg handle for which to create contact information.
+ * \param master The EVdfg_master handle for which to create contact information.
  * \return A null-terminated string representing contact information for this EVdfg
  */
-extern char *EVdfg_get_contact_list(EVdfg dfg);
-
+extern char *EVdfg_get_contact_list(EVdfg_master master);
 
 /*!
- * Join an EVdfg
+ *  Associate this process as a client to an EVdfg master
  *
- *  This call is used to join a DFG as a client, though it is also typically
- *  employed by the master to join the previously created DFG.  It is used
- *  by both non-master clients and by the master to participate in the DFG
- *  is has created.  In all cases, the master_contact string should be the
- *  same one that came from EVdfg_get_contact_list() on the master.
+ *  This call is used to join a DFG as a client by processes that are
+ *  not the master.  The master_contact string should be the same one
+ *  that came from EVdfg_get_contact_list() on the master.  This call
+ *  cannot be used by the master process to participate in the DFG
+ *  itself.  In that circumstance, EVdfg_assoc_client_local() should be
+ *  used.
  *
- * \param dfg The local EVdfg handle which should join the global DFG.
+ * \param cm The CManager with which to associate the DFG client
  * \param node_name The name with which the client can be identified.  This
  *  should be unique among the joining nodes in static joining mode
  *  (I.E. using EVdfg_register_node_list().  In dynamic mode (I.E. where
@@ -91,15 +119,34 @@ extern char *EVdfg_get_contact_list(EVdfg dfg);
  *  process.  This is not stored by EVdfg.
  *
  */
-extern void EVdfg_join_dfg(EVdfg dfg, char *node_name, char *master_contact);
+extern EVdfg_client EVdfg_assoc_client(CManager cm, char *node_name, char *master_contact);
+
+/*!
+ *  Associate this process as a client to an EVdfg master
+ *
+ *  This call is for the process which hosts the EVdfg master to also
+ *  participate as an EVdfg client.
+ *
+ * \param cm The CManager with which to associate the DFG client
+ * \param node_name The name with which the client can be identified.  This
+ *  should be unique among the joining nodes in static joining mode
+ *  (I.E. using EVdfg_register_node_list().  In dynamic mode (I.E. where
+ *  EVdfg_node_join_handler() is used), then this name is presented to the
+ *  registered join handler, but it need not be unique.  EVdfg copies this
+ *  string, so it can be free'd after use.
+ * \param master The handle for the EVdfg_master.
+ *
+ */
+extern EVdfg_client EVdfg_assoc_client_local(CManager cm, char *node_name, EVdfg_master master);
+
 
 /*!
  *  Supply a static list of client names to the EVdfg master.
  *
  *   This call is used in static joining mode, that is when the set of nodes
- * that will join the DFG is known upfront and each has a predefined unique 
+ * that will join the DFG client set is known upfront and each has a predefined unique 
  * name. 
- * \param dfg The local EVdfg handle for which the set of clients is to be
+ * \param master The EVdfg_master handle for which the set of clients is to be
  * specified. 
  * \param list A NULL-terminated list of NULL-terminated strings.  These
  * names must be unique, and each must be used in an EVdfg_join_dfg() call
@@ -107,7 +154,7 @@ extern void EVdfg_join_dfg(EVdfg dfg, char *node_name, char *master_contact);
  * should be free'd by the calling application if dynamic.
  *
  */
-extern void EVdfg_register_node_list(EVdfg dfg, char** list);
+extern void EVdfg_register_node_list(EVdfg_master master, char** list);
 
 /*!
  * The prototype for an EVdfg client-join handling function.
@@ -130,7 +177,7 @@ extern void EVdfg_register_node_list(EVdfg dfg, char** list);
  * \param available_sinks This parameter is currently a placeholder for
  * information about what sinks the client is capable of hosting.
  */
-typedef void (*EVdfgJoinHandlerFunc) (EVdfg dfg, char *identifier, void* available_sources, void *available_sinks);
+typedef void (*EVdfgJoinHandlerFunc) (EVdfg_master master, char *identifier, void* available_sources, void *available_sinks);
 
 /*!
  * The prototype for an EVdfg client-fail handling function.
@@ -176,7 +223,7 @@ typedef void (*EVdfgReconfigHandlerFunc) (EVdfg dfg);
  * \param dfg The EVdfg handle with which to associate this handler
  * \param func The handler function to associate
  */
-extern void EVdfg_node_join_handler (EVdfg dfg, EVdfgJoinHandlerFunc func);
+extern void EVdfg_node_join_handler (EVdfg_master master, EVdfgJoinHandlerFunc func);
 
 /*!
  * Register a node fail handler function to an EVdfg.
@@ -184,7 +231,7 @@ extern void EVdfg_node_join_handler (EVdfg dfg, EVdfgJoinHandlerFunc func);
  * \param dfg The EVdfg handle with which to associate this handler
  * \param func The handler function to associate
  */
-extern void EVdfg_node_fail_handler (EVdfg dfg, EVdfgFailHandlerFunc func);
+extern void EVdfg_node_fail_handler (EVdfg_master master, EVdfgFailHandlerFunc func);
 
 /*!
  * Register a voluntary reconfiguration handler function to an EVdfg.
@@ -192,7 +239,7 @@ extern void EVdfg_node_fail_handler (EVdfg dfg, EVdfgFailHandlerFunc func);
  * \param dfg The EVdfg handle with which to associate this handler
  * \param func The handler function to associate
  */
-extern void EVdfg_node_reconfig_handler (EVdfg dfg, EVdfgReconfigHandlerFunc func);
+extern void EVdfg_node_reconfig_handler (EVdfg_master master, EVdfgReconfigHandlerFunc func);
 
 /*!
  * Cause the instantiation of a virtual DFG.
@@ -222,7 +269,7 @@ extern int EVdfg_realize(EVdfg dfg);
  *
  * \param dfg The EVdfg handle upon which to wait.
  */
-extern int EVdfg_ready_wait(EVdfg dfg);
+extern int EVdfg_ready_wait(EVdfg_client client);
 
 /*!
  * Associate a name with a source handle
@@ -303,7 +350,7 @@ extern int EVdfg_source_active(EVsource src);
  *
  * \param dfg The DFG under consideration.
  */
-extern int EVdfg_active_sink_count(EVdfg dfg);
+extern int EVdfg_active_sink_count(EVdfg_client client);
 
 /*!
  *  Assign a unique, canonical name to a client of a particular given_name.
@@ -317,7 +364,7 @@ extern int EVdfg_active_sink_count(EVdfg dfg);
  * \param given_name The original name of the client.
  * \param canonical_name The canonical name to be assigned to the client.
  */
-extern void EVdfg_assign_canonical_name(EVdfg dfg, char *given_name, char *canonical_name);
+extern void EVdfg_assign_canonical_name(EVdfg_master master, char *given_name, char *canonical_name);
 
 /*!
  *  Create an EVdfg stone with a specific action associated with it.
@@ -491,7 +538,7 @@ extern attr_list EVdfg_get_attr_list(EVdfg_stone stone);
  * \param result this node's contribution to the DFG-wide shutdown value
  *
  */
-extern int EVdfg_shutdown(EVdfg dfg, int result);
+extern int EVdfg_shutdown(EVdfg_client client, int result);
 
 /*!
  *  Vote that this node is ready for shutdown and is providing no specific contribution
@@ -505,7 +552,7 @@ extern int EVdfg_shutdown(EVdfg dfg, int result);
  * \param dfg The local EVdfg handle for which shutdown is indicated.
  *
  */
-extern void EVdfg_ready_for_shutdown(EVdfg dfg);
+extern void EVdfg_ready_for_shutdown(EVdfg_client client);
 
 /*!
  *  Wait for EVdfg to determine that the coordinated shutdown time has arrived.
@@ -518,7 +565,7 @@ extern void EVdfg_ready_for_shutdown(EVdfg dfg);
  * \param dfg The local EVdfg handle for which shutdown is indicated.
  *
  */
-extern int EVdfg_wait_for_shutdown(EVdfg dfg);
+extern int EVdfg_wait_for_shutdown(EVdfg_client client);
 
 /*!
  *  Force EVdfg shutdown without necessarilying having contributions from all nodes.
@@ -530,7 +577,8 @@ extern int EVdfg_wait_for_shutdown(EVdfg dfg);
  * \param result this node's contribution to the DFG-wide shutdown value
  *
  */
-extern int EVdfg_force_shutdown(EVdfg dfg, int result);
+extern int EVdfg_force_shutdown(EVdfg_client client, int result);
+
 /*
   (VERY) tentative reconfiguration interface
 */

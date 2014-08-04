@@ -9,7 +9,8 @@
 #include "test_support.h"
 
 static int status;
-static EVdfg test_dfg;
+static EVdfg_client test_client;
+static EVdfg_master test_master;
 
 static char *filter_func = "{\n\
 int hop_count;\n\
@@ -31,9 +32,9 @@ on_failure()
     if (received_count != -1) {
 	printf("I'm the sink, got only %d events\n", received_count);
     }
-    for (i=0; i < test_dfg->node_count; i++) {
+    for (i=0; i < test_master->node_count; i++) {
 	printf("NODE %d status is :", i);
-	switch (test_dfg->nodes[i].shutdown_status_contribution) {
+	switch (test_master->nodes[i].shutdown_status_contribution) {
 	case STATUS_UNDETERMINED:
 	    printf("NOT READY FOR SHUTDOWN\n");
 	    break;
@@ -45,7 +46,7 @@ on_failure()
 	    break;
 	default:
 	    printf("READY for shutdown, FAILURE %d\n",
-			test_dfg->nodes[i].shutdown_status_contribution);
+			test_master->nodes[i].shutdown_status_contribution);
 	    break;
 	}	    
     }
@@ -70,7 +71,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     received_count = count;
     if (count == REPEAT_COUNT) {
 	if (!quiet) printf("SINK complete\n");
-        EVdfg_shutdown(test_dfg, 0);
+        EVdfg_shutdown(test_client, 0);
     } else {
 //        printf("."); fflush(stdout);
     }
@@ -122,6 +123,7 @@ be_test_master(int argc, char **argv)
     EVsource source_handle;
     int i;
     char *filter;
+    EVdfg test_dfg;
 
     alarm(240);  /* reset time limit to 4 minutes */
     if (argc == 1) {
@@ -154,10 +156,12 @@ be_test_master(int argc, char **argv)
 /*
 **  DFG CREATION
 */
-    test_dfg = EVdfg_create(cm);
-    str_contact = EVdfg_get_contact_list(test_dfg);
-    EVdfg_node_fail_handler(test_dfg, fail_handler);
-    EVdfg_register_node_list(test_dfg, &nodes[0]);
+    test_master = EVdfg_create_master(cm);
+    str_contact = EVdfg_get_contact_list(test_master);
+    EVdfg_node_fail_handler(test_master, fail_handler);
+    EVdfg_register_node_list(test_master, &nodes[0]);
+    test_dfg = EVdfg_create(test_master);
+
     src = EVdfg_create_source_stone(test_dfg, "master_source");
     EVdfg_assign_node(src, nodes[0]);
 
@@ -178,21 +182,21 @@ be_test_master(int argc, char **argv)
     EVdfg_realize(test_dfg);
 
 /* We're node 0 in the DFG */
-    EVdfg_join_dfg(test_dfg, nodes[0], str_contact);
+    test_client = EVdfg_assoc_client_local(cm, nodes[0], test_master);
 
 /* Fork the others */
     test_fork_children(&nodes[0], str_contact);
 
     free(str_contact);
 
-    if (EVdfg_ready_wait(test_dfg) != 1) {
+    if (EVdfg_ready_wait(test_client) != 1) {
 	/* dfg initialization failed! */
 	exit(1);
     }
 
     
-    if (EVdfg_active_sink_count(test_dfg) == 0) {
-	EVdfg_ready_for_shutdown(test_dfg);
+    if (EVdfg_active_sink_count(test_client) == 0) {
+	EVdfg_ready_for_shutdown(test_client);
     }
 
     if (EVdfg_source_active(source_handle)) {
@@ -212,7 +216,7 @@ be_test_master(int argc, char **argv)
     }
     EVfree_source(source_handle);
 
-    status = EVdfg_wait_for_shutdown(test_dfg);
+    status = EVdfg_wait_for_shutdown(test_client);
 
     wait_for_children(nodes);
     for (i=0; i < node_count; i++) {
@@ -239,17 +243,16 @@ be_test_child(int argc, char **argv)
 	printf("Child usage:  evtest  <nodename> <mastercontact>\n");
 	exit(1);
     }
-    test_dfg = EVdfg_create(cm);
 
     src = EVcreate_submit_handle(cm, -1, simple_format_list);
     EVdfg_register_source("master_source", src);
     EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
 				(EVSimpleHandlerFunc) simple_handler, NULL);
-    EVdfg_join_dfg(test_dfg, argv[1], argv[2]);
-    EVdfg_ready_wait(test_dfg);
+    test_client = EVdfg_assoc_client(cm, argv[1], argv[2]);
+    EVdfg_ready_wait(test_client);
 
-    if (EVdfg_active_sink_count(test_dfg) == 0) {
-	EVdfg_ready_for_shutdown(test_dfg);
+    if (EVdfg_active_sink_count(test_client) == 0) {
+	EVdfg_ready_for_shutdown(test_client);
     }
 
     if (argv[1][0] == 'D') {
@@ -268,7 +271,7 @@ be_test_child(int argc, char **argv)
 	if (!quiet) printf("Node %s exiting early\n", argv[1]);
 	exit(0);
     } else {
-	return EVdfg_wait_for_shutdown(test_dfg);
+	return EVdfg_wait_for_shutdown(test_client);
     }
     return 0;
 }

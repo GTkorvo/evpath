@@ -394,6 +394,12 @@ EOF
 	    if (/EVdfg\W/) {
 		$evdfg = $name;
 	    }
+	    if (/EVdfg_client\W/) {
+		$cmanager = $name. "->cm";
+	    }
+	    if (/EVdfg_master\W/) {
+		$cmanager = $name. "->cm";
+	    }
 	    if (/EVdfg_stone\W/) {
 		$evdfg_stone = $name;
 	    }
@@ -419,9 +425,9 @@ EOF
 		} elsif (defined($cmformat)) {
 		    print INT "\tCManager cm = $cmformat->cm;\n";
 		} elsif (defined($evdfg)) {
-		    print INT "\tCManager cm = $evdfg->cm;\n";
+		    print INT "\tCManager cm = $evdfg->master->cm;\n";
 		} elsif (defined($evdfg_stone)) {
-		    print INT "\tCManager cm = $evdfg_stone->dfg->cm;\n";
+		    print INT "\tCManager cm = $evdfg_stone->dfg->master->cm;\n";
 		} else {
 #		    print INT "\tCManager cm = duh;\n";
 		}

@@ -163,63 +163,81 @@ typedef struct {
     int period_usecs;
 } auto_stone_list;
 
-struct _EVdfg {
+struct _EVdfg_master {
     CManager cm;
-    char *master_contact_str;
-    char *master_command_contact_str;
-    CMConnection master_connection;
-    DFG_State state;
-    int shutdown_value;
-    int ready_condition;
-    auto_stone_list *pending_auto_list;
-    int *shutdown_conditions;
-    int stone_count;
-    EVdfg_stone *stones;
-    int node_count;
-    EVint_node_list nodes;
     EVdfgJoinHandlerFunc node_join_handler;
     EVdfgFailHandlerFunc node_fail_handler;
     EVdfgReconfigHandlerFunc node_reconfig_handler;
-    int my_node_id;
-    int realized;
-    int already_shutdown;
-    int active_sink_count;
-    int deploy_ack_count;
-    int deploy_ack_condition;
     EVdfg_master_msg_ptr queued_messages;
-	
+    EVdfg dfg;
+    DFG_State state;
+    int node_count;
+    EVint_node_list nodes;
+    EVdfg_client client;
+    char *my_contact_str;
+    char *master_command_contact_str;
+
     /* reconfig data is below */
     int reconfig;
-    int deployed_stone_count;
     int old_node_count;
     int sig_reconfig_bool;
-    int transfer_events_count;
-    int delete_count;
-    int **transfer_events_list;
-    int **delete_list;
 	
     int no_deployment;
 };
 
-extern int INT_EVdfg_active_sink_count ( EVdfg dfg );
+struct _EVdfg_client {
+    CManager cm;
+    int *shutdown_conditions;
+    char *master_contact_str;
+    int shutdown_value;
+    int ready_condition;
+    CMConnection master_connection;
+    EVdfg_master master;
+    int my_node_id;
+    EVdfg dfg;
+    int already_shutdown;
+    int active_sink_count;
+    auto_stone_list *pending_auto_list;
+};
+
+struct _EVdfg {
+    EVdfg_client client;
+    EVdfg_master master;
+    int stone_count;
+    int deployed_stone_count;
+    EVdfg_stone *stones;
+    int realized;
+    int deploy_ack_count;
+    int deploy_ack_condition;
+	
+    int transfer_events_count;
+    int delete_count;
+    int **transfer_events_list;
+    int **delete_list;
+};
+
+extern int INT_EVdfg_active_sink_count ( EVdfg_client client );
 extern void INT_EVdfg_add_action ( EVdfg_stone stone, char *action_spec );
 extern void INT_EVdfg_add_sink_action(EVdfg_stone stone, char *sink_name);
-extern void INT_EVdfg_assign_canonical_name ( EVdfg dfg, char *given_name, char *canonical_name );
+extern void INT_EVdfg_assign_canonical_name ( EVdfg_master master, char *given_name, char *canonical_name );
 extern void INT_EVdfg_assign_node ( EVdfg_stone stone, char *node );
-extern EVdfg INT_EVdfg_create ( CManager cm );
+extern EVdfg_master INT_EVdfg_create_master ( CManager cm );
+extern EVdfg_client INT_EVdfg_assoc_client ( CManager cm, char *node_name, char *master_contact );
+extern EVdfg_client INT_EVdfg_assoc_client_local ( CManager cm, char *node_name, EVdfg_master master );
+extern EVdfg INT_EVdfg_create ( EVdfg_master master );
 extern EVdfg_stone INT_EVdfg_create_sink_stone ( EVdfg dfg, char *handler_name );
 extern EVdfg_stone INT_EVdfg_create_source_stone ( EVdfg, char *source_name );
 extern EVdfg_stone INT_EVdfg_create_stone ( EVdfg dfg, char *action_spec );
 extern void INT_EVdfg_enable_auto_stone ( EVdfg_stone stone, int period_sec, int period_usec );
 extern void INT_EVdfg_freeze_next_bridge_stone ( EVdfg dfg, int stone_index );
-extern char* INT_EVdfg_get_contact_list ( EVdfg dfg );
+extern char* INT_EVdfg_get_contact_list ( EVdfg_master master );
 extern void INT_EVdfg_join_dfg ( EVdfg dfg, char *node_name, char *master_contact );
 extern void INT_EVdfg_link_port ( EVdfg_stone source, int source_port, EVdfg_stone destination );
-extern void INT_EVdfg_node_fail_handler ( EVdfg dfg, EVdfgFailHandlerFunc func );
-extern void INT_EVdfg_node_reconfig_handler ( EVdfg dfg, EVdfgReconfigHandlerFunc func );
-extern void INT_EVdfg_node_join_handler ( EVdfg dfg, EVdfgJoinHandlerFunc func );
-extern void INT_EVdfg_ready_for_shutdown ( EVdfg dfg );
-extern int INT_EVdfg_ready_wait ( EVdfg dfg );
+extern void INT_EVdfg_node_fail_handler ( EVdfg_master master, EVdfgFailHandlerFunc func );
+extern void INT_EVdfg_node_reconfig_handler ( EVdfg_master master, EVdfgReconfigHandlerFunc func );
+extern void INT_EVdfg_node_join_handler ( EVdfg_master master, EVdfgJoinHandlerFunc func );
+extern void INT_EVdfg_ready_for_shutdown ( EVdfg_client client );
+extern int INT_EVdfg_ready_wait ( EVdfg_client client );
 extern int INT_EVdfg_realize ( EVdfg dfg );
 extern void INT_EVdfg_reconfig_delete_link ( EVdfg dfg, int src_index, int dest_index );
 extern void INT_EVdfg_reconfig_insert ( EVdfg dfg, int src_stone_id, EVdfg_stone new_stone, int dest_stone_id, EVevent_list q_event );
@@ -228,14 +246,14 @@ extern void INT_EVdfg_reconfig_link_port ( EVdfg_stone src, int port, EVdfg_ston
 extern void INT_EVdfg_reconfig_link_port_from_stone ( EVdfg dfg, EVdfg_stone src_stone, int port, int target_index, EVevent_list q_events );
 extern void INT_EVdfg_reconfig_link_port_to_stone ( EVdfg dfg, int src_stone_index, int port, EVdfg_stone target_stone, EVevent_list q_events );
 extern void INT_EVdfg_reconfig_transfer_events ( EVdfg dfg, int src_stone_index, int src_port, int dest_stone_index, int dest_port );
-extern void INT_EVdfg_register_node_list ( EVdfg dfg, char** list );
+extern void INT_EVdfg_register_node_list ( EVdfg_master master, char** list );
 extern void INT_EVdfg_register_raw_sink_handler ( CManager cm, char *name, EVRawHandlerFunc handler );
 extern void INT_EVdfg_register_sink_handler ( CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler, void *client_data );
 extern void INT_EVdfg_register_source ( char *name, EVsource src );
 extern void INT_EVdfg_set_attr_list ( EVdfg_stone stone, attr_list attrs );
 extern attr_list INT_EVdfg_get_attr_list ( EVdfg_stone stone );
-extern int INT_EVdfg_shutdown ( EVdfg dfg, int result );
-extern int INT_EVdfg_force_shutdown ( EVdfg dfg, int result );
+extern int INT_EVdfg_shutdown ( EVdfg_client client, int result );
+extern int INT_EVdfg_force_shutdown ( EVdfg_client client, int result );
 extern int INT_EVdfg_source_active ( EVsource src );
-extern int INT_EVdfg_wait_for_shutdown ( EVdfg dfg );
+extern int INT_EVdfg_wait_for_shutdown ( EVdfg_client client );
 
