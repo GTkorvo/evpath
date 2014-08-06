@@ -1150,7 +1150,7 @@ extern EVdfg_client
 dfg_assoc_client(CManager cm, char* node_name, char *master_contact, EVdfg_master master)
 {
     event_path_data evp = cm->evp;
-    attr_list master_attrs;
+    attr_list master_attrs = NULL;
     CMConnection conn;
     CMFormat register_msg = NULL;
     EVnode_join_msg msg;
@@ -1249,7 +1249,7 @@ dfg_assoc_client(CManager cm, char* node_name, char *master_contact, EVdfg_maste
 	free(msg.node_name);
     }
     CMtrace_out(cm, EVdfgVerbose, "DFG %p node name %s\n", client, node_name);
-    free_attr_list(master_attrs);
+    if (master_attrs) free_attr_list(master_attrs);
     return client;
 }
 
@@ -1376,7 +1376,7 @@ deploy_to_node(EVdfg dfg, int node)
 	INT_CMwrite(dfg->master->nodes[node].conn, deploy_msg, &msg);
     } else {
 	CManager_unlock(dfg->master->cm);
-	dfg_deploy_handler(dfg->master->cm, NULL, &msg, dfg, NULL);
+	dfg_deploy_handler(dfg->master->cm, NULL, &msg, dfg->master->client, NULL);
 	CManager_lock(dfg->master->cm);
     }
     for(i=0 ; i < msg.stone_count; i++) {
