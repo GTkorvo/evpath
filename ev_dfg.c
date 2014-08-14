@@ -185,153 +185,356 @@ INT_EVdfg_create_sink_stone(EVdfg dfg, char *sink_name)
     return INT_EVdfg_create_stone(dfg, &act[0]);
 }
 
+static int
+EVdfg_perform_act_on_state(EVdfg_configuration state, EVdfg_config_action act, int build_queue);
+
+static void
+EVdfg_add_act_to_queue(EVdfg_configuration state, EVdfg_config_action act)
+{
+    if (state->pending_action_queue == NULL) {
+	state->pending_action_count = 0;
+	state->pending_action_queue = malloc(sizeof(state->pending_action_queue[0]));
+    } else {
+	state->pending_action_queue = realloc(state->pending_action_queue, 
+					      sizeof(state->pending_action_queue[0]) * state->pending_action_count+1);
+    }
+    state->pending_action_queue[state->pending_action_count++] = act;
+}
+
 void
 INT_EVdfg_add_action(EVdfg_stone stone, char *action)
 {
-    if (stone->action == NULL) {
-	stone->action = action;
-	return;
-    }
-    if (stone->extra_actions == NULL) {
-	stone->extra_actions = malloc(sizeof(stone->extra_actions[0]));
-    } else {
-	stone->extra_actions = realloc(stone->extra_actions,
-				       stone->action_count * sizeof(stone->extra_actions[0]));
-    }
-    stone->extra_actions[stone->action_count - 1] = action;
-    stone->action_count++;
+    EVdfg_config_action act;
+    act.type = ACT_add_action;
+    act.u.create.stone_id = stone->stone_id;
+    act.u.create.action = action;
+    EVdfg_perform_act_on_state(stone->dfg->working_state, act, 1 /* add to queue */);
 }
 
 EVdfg_stone
 INT_EVdfg_create_stone(EVdfg dfg, char *action)
 {
     EVdfg_stone stone = malloc(sizeof(struct _EVdfg_stone));
+    EVdfg_config_action act;
     stone->dfg = dfg;
-    stone->node = -1;
-    stone->bridge_stone = 0;
-    stone->stone_id = -1;
-    stone->attrs = NULL;
-    stone->period_secs = -1;
-    stone->period_usecs = -1;
-    stone->out_count = 0;
-    stone->out_links = NULL;
-    stone->action_count = 1;
-    stone->action = action;
-    stone->extra_actions = NULL;
-    stone->new_out_count = 0;
-    stone->invalid = 0;
-    stone->frozen = 0;
-    stone->bridge_target = NULL;
-    stone->pending_events = NULL;
-    stone->processed_pending_events = NULL;
-	
-    if (dfg->stone_count == 0) {
-	dfg->stones = malloc(sizeof(dfg->stones[0]));
-    } else {
-	dfg->stones = realloc(dfg->stones, 
-			      sizeof(dfg->stones[0]) * (dfg->stone_count + 1));
-    }
-    stone->stone_id = 0x80000000 | dfg->stone_count;
-    dfg->stones[dfg->stone_count++] = stone;
+    stone->stone_id = 0x80000000 | dfg->stone_count++;
+    act.type = ACT_create;
+    act.u.create.stone_id = stone->stone_id;
+    act.u.create.action = action;
+    EVdfg_perform_act_on_state(dfg->working_state, act, 1 /* add to queue */);
     return stone;
+}
+
+static
+EVdfg_stone_state find_stone_state(int stone_id, EVdfg_configuration config)
+{
+    int i = 0;
+    for (i=0; i < config->stone_count ; i++) {
+	if (stone_id == config->stones[i]->stone_id) 
+	    return config->stones[i];
+    }
+    return NULL;
+}
+
+int
+EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, int build_queue)
+{
+    int bridge = 0;
+    int ret_val = 0;
+    switch(act.type) {
+    case ACT_create_bridge:
+	bridge = 1;
+	/* falling through */
+    case ACT_create: {
+	EVdfg_stone_state stone = malloc(sizeof(*stone));
+	stone->node = -1;
+	stone->bridge_stone = 0;
+	stone->attrs = NULL;
+	stone->period_secs = -1;
+	stone->period_usecs = -1;
+	stone->out_count = 0;
+	stone->out_links = NULL;
+	stone->action_count = 1;
+	stone->extra_actions = NULL;
+	stone->new_out_count = 0;
+	stone->invalid = 0;
+	stone->frozen = 0;
+	stone->bridge_target = -1;
+	stone->pending_events = NULL;
+	stone->processed_pending_events = NULL;
+	if (bridge) {
+	    stone->bridge_stone = 1;
+	    stone->stone_id = act.u.bridge.stone_id;
+	    stone->action = act.u.bridge.action;
+	    stone->bridge_target = act.u.bridge.target_id;
+	} else {
+	    stone->stone_id = act.u.create.stone_id;
+	    stone->action = act.u.create.action;
+	}
+	if (config->stone_count == 0) {
+	    config->stones = malloc(sizeof(config->stones[0]));
+	} else {
+	    config->stones = realloc(config->stones, 
+				     sizeof(config->stones[0]) * (config->stone_count + 1));
+	}
+	config->stones[config->stone_count++] = stone;
+	if (build_queue) {
+	    EVdfg_add_act_to_queue(config, act);
+	}
+	break;
+    }
+    case ACT_add_action: {
+	EVdfg_stone_state stone = find_stone_state(act.u.create.stone_id, config);
+	if (!stone) {
+	    return 0;
+	}
+	if (stone->action == NULL) {
+	    stone->action = act.u.create.action;
+	    break;
+	}
+	if (stone->extra_actions == NULL) {
+	    stone->extra_actions = malloc(sizeof(stone->extra_actions[0]));
+	} else {
+	    stone->extra_actions = realloc(stone->extra_actions,
+					   stone->action_count * sizeof(stone->extra_actions[0]));
+	}
+	stone->extra_actions[stone->action_count - 1] = act.u.create.action;
+	stone->action_count++;
+	if (build_queue) {
+	    EVdfg_add_act_to_queue(config, act);
+	}
+	break;
+    }
+    case ACT_set_auto_period: {
+	EVdfg_stone_state stone = find_stone_state(act.u.period.stone_id, config);
+	if (!stone) {
+	    return 0;
+	}
+	stone->period_secs = act.u.period.secs;
+	stone->period_usecs = act.u.period.usecs;
+	if (build_queue) {
+	    EVdfg_add_act_to_queue(config, act);
+	}
+	break;
+    }
+    case ACT_link_port: {
+	EVdfg_stone_state src = find_stone_state(act.u.link.stone_id, config);
+	if (!src) {
+	    return 0;
+	}
+	if (src->out_count == 0) {
+	    src->out_links = malloc(sizeof(src->out_links[0]) * (act.u.link.port+1));
+	    memset(src->out_links, 0, sizeof(src->out_links[0]) * (act.u.link.port+1));
+	    src->out_count = act.u.link.port + 1;
+	} else if (src->out_count < act.u.link.port + 1) {
+	    src->out_links = realloc(src->out_links,
+				     sizeof(src->out_links[0]) * (act.u.link.port+1));
+	    memset(&src->out_links[src->out_count], 0, sizeof(src->out_links[0]) * (act.u.link.port+1-src->out_count));
+	    src->out_count = act.u.link.port + 1;
+	}
+	if (build_queue) {
+	    if (src->out_links[act.u.link.port] != 0) {
+		EVdfg_config_action dact;
+		dact.type = ACT_unlink_port;
+		dact.u.link.stone_id = src->stone_id;
+		dact.u.link.port = act.u.link.port;
+		EVdfg_perform_act_on_state(config, dact, build_queue);
+	    }
+	}
+	src->out_links[act.u.link.port] = act.u.link.dest_id;
+	break;
+    }
+    case ACT_unlink_port: {
+	EVdfg_stone_state src = find_stone_state(act.u.link.stone_id, config);
+	EVdfg_stone_state dest;
+	int i=0;
+	if (!src) {
+	    return 0;
+	}
+	if (src->out_count <= act.u.link.port) return 0;
+	if (src->out_links[act.u.link.port] == 0) return 0;
+	dest = find_stone_state(src->out_links[act.u.link.port], config);
+	if (!dest) {
+	    return 0;
+	}
+	if (dest->bridge_stone) {
+	    /* this stone only exists because of this link, destroy it */
+	    EVdfg_config_action dact;
+	    dact.type = ACT_destroy;
+	    dact.u.create.stone_id = dest->stone_id;
+	    EVdfg_perform_act_on_state(config, dact, build_queue);
+	}
+	src->out_links[act.u.link.port] = 0;
+	break;
+    }
+    case ACT_set_attrs: {
+	EVdfg_stone_state stone = find_stone_state(act.u.attrs.stone_id, config);
+	if (!stone) {
+	    return 0;
+	}
+	if (stone->attrs != NULL) {
+	    free_attr_list(stone->attrs);
+	}
+	stone->attrs = act.u.attrs.attrs;
+	if (build_queue) {
+	    EVdfg_add_act_to_queue(config, act);
+	}
+	break;
+    }
+    case ACT_assign_node: {
+	EVdfg_stone_state stone = find_stone_state(act.u.attrs.stone_id, config);
+	if (!stone) {
+	    return 0;
+	}
+	stone->node = act.u.assign.dest_node;
+	if (build_queue) {
+	    EVdfg_add_act_to_queue(config, act);
+	}
+	break;
+    }
+    default:
+	printf("Bad action\n");
+	return 0;
+	break;
+    }
+    return ret_val;
 }
 
 extern void 
 INT_EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec, 
 			int period_usec)
 {
-    stone->period_secs = period_sec;
-    stone->period_usecs = period_usec;
+    EVdfg_config_action act;
+    act.type = ACT_set_auto_period;
+    act.u.period.stone_id = stone->stone_id;
+    act.u.period.secs = period_sec;
+    act.u.period.usecs = period_usec;
+    (void)EVdfg_perform_act_on_state(stone->dfg->working_state, act, 1 /* add to queue */);
 }
 
 
-static void fdump_dfg_stone(FILE* out, EVdfg_stone s);
+static void fdump_dfg_stone(FILE* out, EVdfg_stone_state s);
 
-static void 
-reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events)
-{
-    if (src->new_out_count == 0) {
-        src->new_out_links = malloc(sizeof(src->new_out_links[0]));
-        memset(src->new_out_links, 0, sizeof(src->new_out_links[0]));
-        src->new_out_count = 1;
-	src->new_out_ports = malloc(sizeof(src->new_out_ports[0]));
-    } else {
-        src->new_out_links = realloc(src->new_out_links,
-				     sizeof(src->new_out_links[0]) * (src->new_out_count+1));
-        memset(&src->new_out_links[src->new_out_count], 0, sizeof(src->new_out_links[0]));
-        ++(src->new_out_count);
-	src->new_out_ports = realloc(src->new_out_ports, sizeof(src->new_out_ports[0]) * (src->new_out_count));
-    }
-    src->new_out_links[src->new_out_count - 1] = dest;
-    src->processed_pending_events = q_events;
-    src->new_out_ports[src->new_out_count - 1] = port;
-}
+/* static void  */
+/* reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events) */
+/* { */
+/*     if (src->new_out_count == 0) { */
+/*         src->new_out_links = malloc(sizeof(src->new_out_links[0])); */
+/*         memset(src->new_out_links, 0, sizeof(src->new_out_links[0])); */
+/*         src->new_out_count = 1; */
+/* 	src->new_out_ports = malloc(sizeof(src->new_out_ports[0])); */
+/*     } else { */
+/*         src->new_out_links = realloc(src->new_out_links, */
+/* 				     sizeof(src->new_out_links[0]) * (src->new_out_count+1)); */
+/*         memset(&src->new_out_links[src->new_out_count], 0, sizeof(src->new_out_links[0])); */
+/*         ++(src->new_out_count); */
+/* 	src->new_out_ports = realloc(src->new_out_ports, sizeof(src->new_out_ports[0]) * (src->new_out_count)); */
+/*     } */
+/*     src->new_out_links[src->new_out_count - 1] = dest; */
+/*     src->processed_pending_events = q_events; */
+/*     src->new_out_ports[src->new_out_count - 1] = port; */
+/* } */
 
 
-extern void INT_EVdfg_reconfig_link_port_to_stone(EVdfg dfg, int src_stone_index, int port, EVdfg_stone target_stone, EVevent_list q_events) {
-	reconfig_link_port(dfg->stones[src_stone_index], port, target_stone, q_events);
-}
+/* extern void INT_EVdfg_reconfig_link_port_to_stone(EVdfg dfg, int src_stone_index, int port, EVdfg_stone target_stone, EVevent_list q_events) { */
+/* 	reconfig_link_port(dfg->stones[src_stone_index], port, target_stone, q_events); */
+/* } */
 
-extern void INT_EVdfg_reconfig_link_port_from_stone(EVdfg dfg, EVdfg_stone src_stone, int port, int target_index, EVevent_list q_events) {
-	reconfig_link_port(src_stone, port, dfg->stones[target_index], q_events);
-}
+/* extern void INT_EVdfg_reconfig_link_port_from_stone(EVdfg dfg, EVdfg_stone src_stone, int port, int target_index, EVevent_list q_events) { */
+/* 	reconfig_link_port(src_stone, port, dfg->stones[target_index], q_events); */
+/* } */
 
-extern void INT_EVdfg_reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events) {
-	reconfig_link_port(src, port, dest, q_events);
-}
+/* extern void INT_EVdfg_reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events) { */
+/* 	reconfig_link_port(src, port, dest, q_events); */
+/* } */
 
-extern void INT_EVdfg_reconfig_insert(EVdfg dfg, int src_stone_index, EVdfg_stone new_stone, int dest_stone_index, EVevent_list q_events) {
-    reconfig_link_port(dfg->stones[src_stone_index], 0, new_stone, q_events);
-    reconfig_link_port(new_stone, 0, dfg->stones[dest_stone_index], NULL);
-    CMtrace_out(dfg->cm, EVdfgVerbose, "Inside reconfig_insert, sin = %d, min = %d, din = %d : \n", dfg->stones[src_stone_index]->node, new_stone->node, dfg->stones[dest_stone_index]->node);
-}
+/* extern void INT_EVdfg_reconfig_insert(EVdfg dfg, int src_stone_index, EVdfg_stone new_stone, int dest_stone_index, EVevent_list q_events) { */
+/*     reconfig_link_port(dfg->stones[src_stone_index], 0, new_stone, q_events); */
+/*     reconfig_link_port(new_stone, 0, dfg->stones[dest_stone_index], NULL); */
+/*     CMtrace_out(dfg->cm, EVdfgVerbose, "Inside reconfig_insert, sin = %d, min = %d, din = %d : \n", dfg->stones[src_stone_index]->node, new_stone->node, dfg->stones[dest_stone_index]->node); */
+/* } */
 
-extern void INT_EVdfg_reconfig_insert_on_port(EVdfg dfg, EVdfg_stone src_stone, int port, EVdfg_stone new_stone, EVevent_list q_events)
-{
-    EVdfg_stone dest_stone = src_stone->out_links[port];
-    (void)dfg;
-    reconfig_link_port(src_stone, port, new_stone, q_events);
-    /* link port on the new stone to the old destination */
-    reconfig_link_port(new_stone, port, dest_stone, NULL);
-    CMtrace_out(dfg->cm, EVdfgVerbose, "Inside reconfig_insert_on_port, sin = %d, min = %d, din = %d : \n", src_stone->node, new_stone->node, dest_stone->node);
-    printf("Inside reconfig_insert_on_port, sin = %x, min = %x, din = %x : \n", src_stone->stone_id, new_stone->stone_id, dest_stone->stone_id);
-}
+/* extern void INT_EVdfg_reconfig_insert_on_port(EVdfg dfg, EVdfg_stone src_stone, int port, EVdfg_stone new_stone, EVevent_list q_events) */
+/* { */
+/*     EVdfg_stone dest_stone = src_stone->out_links[port]; */
+/*     (void)dfg; */
+/*     reconfig_link_port(src_stone, port, new_stone, q_events); */
+/*     /\* link port on the new stone to the old destination *\/ */
+/*     reconfig_link_port(new_stone, port, dest_stone, NULL); */
+/*     CMtrace_out(dfg->cm, EVdfgVerbose, "Inside reconfig_insert_on_port, sin = %d, min = %d, din = %d : \n", src_stone->node, new_stone->node, dest_stone->node); */
+/*     printf("Inside reconfig_insert_on_port, sin = %x, min = %x, din = %x : \n", src_stone->stone_id, new_stone->stone_id, dest_stone->stone_id); */
+/* } */
 
-extern void
+extern int
 INT_EVdfg_link_port(EVdfg_stone src, int port, EVdfg_stone dest)
 {
-    if (port < 0) return;
-    if (src->out_count == 0) {
-	src->out_links = malloc(sizeof(src->out_links[0]) * (port+1));
-	memset(src->out_links, 0, sizeof(src->out_links[0]) * (port+1));
-	src->out_count = port + 1;
-    } else if (src->out_count < port + 1) {
-	src->out_links = realloc(src->out_links,
-				 sizeof(src->out_links[0]) * (port+1));
-	memset(&src->out_links[src->out_count], 0, sizeof(src->out_links[0]) * (port+1-src->out_count));
-	src->out_count = port + 1;
-    }
-    src->out_links[port] = dest;
+    EVdfg_config_action act;
+    if (port < 0) return 0;
+    act.type = ACT_link_port;
+    act.u.link.stone_id = src->stone_id;
+    act.u.link.port = port;
+    act.u.link.dest_id = dest->stone_id;
+    return EVdfg_perform_act_on_state(src->dfg->working_state, act, 1 /* add to queue */);
 }
 
-extern void
+extern int
+INT_EVdfg_link_dest(EVdfg_stone src, EVdfg_stone dest)
+{
+    EVdfg_config_action act;
+    act.type = ACT_link_dest;
+    act.u.link.stone_id = src->stone_id;
+    act.u.link.dest_id = dest->stone_id;
+    return EVdfg_perform_act_on_state(src->dfg->working_state, act, 1 /* add to queue */);
+}
+
+extern int
+INT_EVdfg_unlink_port(EVdfg_stone src, int port)
+{
+    EVdfg_config_action act;
+    if (port < 0) return 0;
+    act.type = ACT_unlink_port;
+    act.u.link.stone_id = src->stone_id;
+    act.u.link.port = port;
+    return EVdfg_perform_act_on_state(src->dfg->working_state, act, 1 /* add to queue */);
+}
+
+extern int
+INT_EVdfg_unlink_dest(EVdfg_stone src, EVdfg_stone dest)
+{
+    EVdfg_config_action act;
+    act.type = ACT_unlink_dest;
+    act.u.link.stone_id = src->stone_id;
+    act.u.link.dest_id = dest->stone_id;
+    return EVdfg_perform_act_on_state(src->dfg->working_state, act, 1 /* add to queue */);
+}
+
+extern int
 INT_EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs)
 {
-    if (stone->attrs != NULL) {
-	fprintf(stderr, "Warning, attributes for stone %p previously set, overwriting\n", stone);
-    }
+    EVdfg_config_action act;
+    act.type = ACT_set_attrs;
+    act.u.attrs.stone_id = stone->stone_id;
+    act.u.attrs.attrs = attrs;
     add_ref_attr_list(attrs);
-    stone->attrs = attrs;
+    return EVdfg_perform_act_on_state(stone->dfg->working_state, act, 1 /* add to queue */);
 }
 
 extern attr_list
 INT_EVdfg_get_attr_list(EVdfg_stone stone)
 {
-    attr_list attrs = stone->attrs;
-    if (attrs) {
-	add_ref_attr_list(attrs);
+    if (stone->dfg->deployed_state) {
+	EVdfg_stone_state dstone = find_stone_state(stone->stone_id, stone->dfg->deployed_state);
+	if (dstone) {
+	    return dstone->attrs;
+	}
     }
-    return attrs;
+    if (stone->dfg->working_state) {
+	EVdfg_stone_state wstone = find_stone_state(stone->stone_id, stone->dfg->deployed_state);
+	if (wstone) {
+	    return wstone->attrs;
+	}
+    }	
+    return NULL;
 }
 
 
@@ -392,9 +595,10 @@ handle_conn_shutdown(EVdfg_master master, EVdfg_master_msg_ptr msg)
 	CMtrace_out(cm, EVdfgVerbose, "IN CONN_SHUTDOWN_HANDLER\n");
 	for (i=0; i< dfg->stone_count; i++) {
 	    int j;
-	    for (j = 0; j < dfg->stones[i]->out_count; j++) {
-		if (dfg->stones[i]->out_links[j]->stone_id == stone) {
-		    EVdfg_stone out_stone = dfg->stones[i]->out_links[j];
+	    for (j = 0; j < dfg->deployed_state->stones[i]->out_count; j++) {
+		if (dfg->deployed_state->stones[i]->out_links[j] == stone) {
+		    int out_stone_id = dfg->deployed_state->stones[i]->out_links[j];
+		    EVdfg_stone_state out_stone = find_stone_state(out_stone_id, dfg->deployed_state);
 		    CMtrace_out(cm, EVdfgVerbose, "Found reporting stone as output %d of stone %d\n",
 				j, i);
 		    parse_bridge_action_spec(out_stone->action, 
@@ -404,8 +608,8 @@ handle_conn_shutdown(EVdfg_master master, EVdfg_master_msg_ptr msg)
 	    }
 	}
 	for (i=0; i< dfg->stone_count; i++) {
-	    if (dfg->stones[i]->stone_id == target_stone) {
-		int node = dfg->stones[i]->node;
+	    if (dfg->deployed_state->stones[i]->stone_id == target_stone) {
+		int node = dfg->deployed_state->stones[i]->node;
 		CMtrace_out(cm, EVdfgVerbose, "Dead node is %d, name %s\n", node,
 			    master->nodes[node].canonical_name);
 		failed_node = master->nodes[node].canonical_name;
@@ -520,11 +724,11 @@ handle_flush_reconfig(EVdfg_master master, EVdfg_master_msg_ptr mmsg)
     for (i=0; i < msg->count; i++) {
 	/* go through incoming attributes */
 	for (j=0; j< dfg->stone_count; j++) {
-	    if (dfg->stones[j]->stone_id == msg->attr_stone_list[i].stone) {
-		if (dfg->stones[j]->attrs != NULL) {
-		    free_attr_list(dfg->stones[j]->attrs);
+	    if (dfg->deployed_state->stones[j]->stone_id == msg->attr_stone_list[i].stone) {
+		if (dfg->deployed_state->stones[j]->attrs != NULL) {
+		    free_attr_list(dfg->deployed_state->stones[j]->attrs);
 		}
-		dfg->stones[j]->attrs = attr_list_from_string(msg->attr_stone_list[i].attr_str);
+		dfg->deployed_state->stones[j]->attrs = attr_list_from_string(msg->attr_stone_list[i].attr_str);
 		break;
 	    }
 	}
@@ -701,34 +905,20 @@ free_dfg(CManager cm, void *vdfg)
 {
     EVdfg dfg = vdfg;
     int i;
-    /* for (i=0; i < dfg->node_count; i++) { */
-    /* 	free(dfg->nodes[i].name); */
-    /* 	free(dfg->nodes[i].canonical_name); */
-    /* 	if (dfg->nodes[i].str_contact_list) free(dfg->nodes[i].str_contact_list); */
-    /* 	if (dfg->nodes[i].contact_list) free_attr_list(dfg->nodes[i].contact_list); */
+    /* for (i=0; i < dfg->stone_count; i++) { */
+    /* 	if (dfg->stones[i]->out_links) free(dfg->stones[i]->out_links); */
+    /* 	if (dfg->stones[i]->action) free(dfg->stones[i]->action); */
+    /* 	if (dfg->stones[i]->extra_actions) { */
+    /* 	    int j; */
+    /* 	    for (j=0; j < dfg->stones[i]->action_count-1; j++) { */
+    /* 		free(dfg->stones[i]->extra_actions[j]); */
+    /* 	    } */
+    /* 	    free(dfg->stones[i]->extra_actions); */
+    /* 	} */
+    /* 	if (dfg->stones[i]->attrs) free_attr_list(dfg->stones[i]->attrs); */
+    /* 	free(dfg->stones[i]); */
     /* } */
-    /* free(dfg->nodes); */
-    for (i=0; i < dfg->stone_count; i++) {
-	if (dfg->stones[i]->out_links) free(dfg->stones[i]->out_links);
-	if (dfg->stones[i]->action) free(dfg->stones[i]->action);
-	if (dfg->stones[i]->extra_actions) {
-	    int j;
-	    for (j=0; j < dfg->stones[i]->action_count-1; j++) {
-		free(dfg->stones[i]->extra_actions[j]);
-	    }
-	    free(dfg->stones[i]->extra_actions);
-	}
-	if (dfg->stones[i]->attrs) free_attr_list(dfg->stones[i]->attrs);
-	free(dfg->stones[i]);
-    }
-    /* while (dfg->queued_messages) { */
-    /* 	EVdfg_master_msg_ptr tmp = dfg->queued_messages->next; */
-    /* 	free_master_msg(dfg->queued_messages); */
-    /* 	dfg->queued_messages = tmp; */
-    /* } */
-    /* if (dfg->master_contact_str) free(dfg->master_contact_str); */
-    /* if (dfg->shutdown_conditions) free(dfg->shutdown_conditions); */
-    free(dfg->stones);
+    /* free(dfg->stones); */
     free(dfg);
 }
 
@@ -843,6 +1033,16 @@ INT_EVdfg_create_master(CManager cm)
     return master;
 }
 
+static EVdfg_configuration
+new_dfg_configuration(EVdfg master)
+{
+    EVdfg_configuration ret = malloc(sizeof(*ret));
+    memset(ret, 0, sizeof(*ret));
+    ret->stone_count = 0;
+    ret->stones = NULL;
+    return ret;
+}
+
 extern EVdfg
 INT_EVdfg_create(EVdfg_master master)
 {
@@ -864,6 +1064,7 @@ INT_EVdfg_create(EVdfg_master master)
     master->state = DFG_Joining;
     CMtrace_out(cm, EVdfgVerbose, "EVDFG initialization -  master DFG state set to %s\n", str_state[master->state]);
 
+    dfg->working_state = new_dfg_configuration(dfg);
     INT_CMadd_shutdown_task(master->cm, free_dfg, dfg, FREE_TASK);
     return dfg;
 }
@@ -894,31 +1095,31 @@ extern char *INT_EVdfg_get_contact_list(EVdfg_master master)
 }
 
 static void
-check_connectivity(EVdfg dfg)
+check_connectivity(EVdfg_configuration state, EVdfg_master master)
 {
     int i;
-    for (i=0; i< dfg->stone_count; i++) {
-	CMtrace_out(dfg->cm, EVdfgVerbose, "Stone %d - assigned to node %s, action %s\n", i, 
-		    dfg->master->nodes[dfg->stones[i]->node].canonical_name, (dfg->stones[i]->action ? dfg->stones[i]->action : "NULL"));
-	if (dfg->stones[i]->node == -1) {
+    for (i=0; i< state->stone_count; i++) {
+	CMtrace_out(state->cm, EVdfgVerbose, "Stone %d - assigned to node %s, action %s\n", i, 
+		    master->nodes[state->stones[i]->node].canonical_name, (state->stones[i]->action ? state->stones[i]->action : "NULL"));
+	if (state->stones[i]->node == -1) {
 	    printf("Warning, stone %d has not been assigned to any node.  This stone will not be deployed.\n", i);
 	    printf("    This stones particulars are:\n");
-	    fdump_dfg_stone(stdout, dfg->stones[i]);
+	    fdump_dfg_stone(stdout, state->stones[i]);
 	}
-	if (dfg->stones[i]->action_count == 0) {
-	    printf("Warning, stone %d (assigned to node %s) has no actions registered", i, dfg->master->nodes[dfg->stones[i]->node].canonical_name);
+	if (state->stones[i]->action_count == 0) {
+	    printf("Warning, stone %d (assigned to node %s) has no actions registered", i, master->nodes[state->stones[i]->node].canonical_name);
 	    continue;
 	}
-	if ((dfg->stones[i]->out_count == 0) && (dfg->stones[i]->new_out_count == 0)) {
-	    char *action_spec = dfg->stones[i]->action;
+	if ((state->stones[i]->out_count == 0) && (state->stones[i]->new_out_count == 0)) {
+	    char *action_spec = state->stones[i]->action;
 	    switch(action_type(action_spec)) {
 	    case Action_Terminal:
 	    case Action_Bridge:
 		break;
 	    default:
-		printf("Warning, stone %d (assigned to node %s) has no outputs connected to other stones\n", i, dfg->master->nodes[dfg->stones[i]->node].canonical_name);
+		printf("Warning, stone %d (assigned to node %s) has no outputs connected to other stones\n", i, master->nodes[state->stones[i]->node].canonical_name);
 		printf("    This stones particulars are:\n");
-		fdump_dfg_stone(stdout, dfg->stones[i]);
+		fdump_dfg_stone(stdout, state->stones[i]);
 		break;
 	    }
 	}
@@ -928,7 +1129,7 @@ check_connectivity(EVdfg dfg)
 extern int
 INT_EVdfg_realize(EVdfg dfg)
 {
-    check_connectivity(dfg);
+    check_connectivity(dfg->working_state, dfg->master);
 //    check_types(dfg);
 
     if (dfg->realized == 1) {
@@ -975,7 +1176,11 @@ INT_EVdfg_assign_node(EVdfg_stone stone, char *node_name)
     if (dfg->realized == 1) {
 	CMtrace_out(dfg->cm, EVdfgVerbose, "assign node, node# = %d\n", node);
     }
-    stone->node = node;
+    EVdfg_config_action act;
+    act.type = ACT_assign_node;
+    act.u.assign.stone_id = stone->stone_id;
+    act.u.assign.dest_node = node;
+    (void) EVdfg_perform_act_on_state(stone->dfg->working_state, act, 1 /* add to queue */);
 }
 
 extern int 
@@ -1265,37 +1470,53 @@ INT_EVdfg_assoc_client(CManager cm, char* node_name, char *master_contact_str)
     return dfg_assoc_client(cm, node_name, master_contact_str, NULL);
 }
 
-static EVdfg_stone
-create_bridge_stone(EVdfg dfg, EVdfg_stone target)
+static int
+create_bridge_stone(EVdfg dfg, EVdfg_stone_state target)
 {
-    EVdfg_stone stone = NULL;
+    EVdfg_stone_state bstone;
+    EVdfg_config_action act;
+
     char *contact = dfg->master->nodes[target->node].str_contact_list;
     char *action;
     if (dfg->master->nodes[target->node].self) {
 	contact = dfg->master->my_contact_str;
     }
     action = INT_create_bridge_action_spec(target->stone_id, contact);
-    stone = INT_EVdfg_create_stone(dfg, action);
-    stone->bridge_stone = 1;
-    stone->bridge_target = target;
-	
-    return stone;
+    act.type = ACT_create_bridge;
+    act.u.bridge.stone_id = -1;  /* anonymous */
+    act.u.bridge.action = action;
+    act.u.bridge.target_id = target->stone_id;
+    act.u.bridge.stone_id = 0x80000000 | dfg->stone_count++;
+    EVdfg_perform_act_on_state(dfg->working_state, act, 1 /* add to queue */);
+    return act.u.bridge.stone_id;
 }
 
 static void
-add_bridge_stones(EVdfg dfg)
+add_bridge_stones(EVdfg dfg, EVdfg_configuration config)
 {
     int i;
-    for (i=0; i< dfg->stone_count; i++) {
+    for (i=0; i< config->stone_count; i++) {
 	int j;
-	for (j = 0; j < dfg->stones[i]->out_count; j++) {
-	    EVdfg_stone cur = dfg->stones[i];
-	    EVdfg_stone target = cur->out_links[j];
+	for (j = 0; j < config->stones[i]->out_count; j++) {
+	    EVdfg_stone_state cur = config->stones[i];
+	    EVdfg_stone_state target = NULL;
+	    int k;
+	    for (k = 0; k < config->stone_count; k++) {
+		if (config->stones[k]->stone_id == cur->out_links[j]) {
+		    target = config->stones[k];
+		}
+	    }
 	    if (target && (!cur->bridge_stone) && (cur->node != target->node)) {
+		EVdfg_stone_state bridge = NULL;
 		cur->out_links[j] = create_bridge_stone(dfg, target);
 		/* put the bridge stone where the source stone is */
-		cur->out_links[j]->node = cur->node;
-		CMtrace_out(dfg->cm, EVdfgVerbose, "Created bridge stone %p, target node is %d, assigned to node %d\n", cur->out_links[j], target->node, cur->node);
+		for (k = 0; k < config->stone_count; k++) {
+		    if (config->stones[k]->stone_id == cur->out_links[j]) {
+			bridge = config->stones[k];
+		    }
+		}
+		bridge->node = cur->node;
+		CMtrace_out(config->cm, EVdfgVerbose, "Created bridge stone %x, target node is %d, assigned to node %d\n", cur->out_links[j], target->node, cur->node);
 	    }
 	}
     }
@@ -1311,7 +1532,7 @@ assign_stone_ids(EVdfg dfg)
 }
 
 static void
-deploy_to_node(EVdfg dfg, int node)
+deploy_to_node(EVdfg dfg, int node, EVdfg_configuration config)
 {
     int i, j;
     int stone_count = 0;
@@ -1319,7 +1540,7 @@ deploy_to_node(EVdfg dfg, int node)
     CMFormat deploy_msg = INT_CMlookup_format(dfg->master->cm, EVdfg_deploy_format_list);
 
     for (i=dfg->deployed_stone_count; i< dfg->stone_count; i++) {
-	if (dfg->stones[i]->node == node) {
+	if (config->stones[i]->node == node) {
 	    stone_count++;
 	}
     }
@@ -1337,9 +1558,9 @@ deploy_to_node(EVdfg dfg, int node)
     memset(msg.stone_list, 0, stone_count * sizeof(msg.stone_list[0]));
     j = 0;
     for (i=dfg->deployed_stone_count; i< dfg->stone_count; i++) {
-	if (dfg->stones[i]->node == node) {
+	if (config->stones[i]->node == node) {
 	    deploy_msg_stone mstone = &msg.stone_list[j];
-	    EVdfg_stone dstone = dfg->stones[i];
+	    EVdfg_stone_state dstone = config->stones[i];
 	    int k;
 	    mstone->global_stone_id = dstone->stone_id;
 	    mstone->attrs = NULL;
@@ -1351,8 +1572,8 @@ deploy_to_node(EVdfg dfg, int node)
 	    mstone->out_count = dstone->out_count;
 	    mstone->out_links = malloc(sizeof(mstone->out_links[0])*mstone->out_count);
 	    for (k=0; k< dstone->out_count; k++) {
-		if (dstone->out_links[k] != NULL) {
-		    mstone->out_links[k] = dstone->out_links[k]->stone_id;
+		if (dstone->out_links[k] != -1) {
+		    mstone->out_links[k] = dstone->out_links[k];
 		} else {
 		    mstone->out_links[k] = -1;
 		}
@@ -1388,269 +1609,269 @@ deploy_to_node(EVdfg dfg, int node)
 }
 
 
-void reconfig_delete_link(EVdfg dfg, int src_index, int dest_index) {
-    int i;
+/* void reconfig_delete_link(EVdfg dfg, int src_index, int dest_index) { */
+/*     int i; */
 	
-    EVdfg_stone src = dfg->stones[src_index];
-    EVdfg_stone dest = dfg->stones[dest_index];
-    EVdfg_stone temp_stone = NULL;
+/*     EVdfg_stone src = dfg->stones[src_index]; */
+/*     EVdfg_stone dest = dfg->stones[dest_index]; */
+/*     EVdfg_stone temp_stone = NULL; */
 	
-    for (i = 0; i < src->out_count; ++i) {
-	if (src->bridge_stone == 0) {
-	    if (src->out_links[i]->bridge_stone) {
-		temp_stone = src->out_links[i];
-		if (temp_stone->bridge_target == dest) {
-		    if (src->node == 0) {
-			//EVfreeze_stone(dfg->cm, temp_stone->stone_id);
-			//transfer_events = EVextract_stone_events(dfg->cm, temp_stone->stone_id);
-			if (src->frozen == 0) {
-			    EVfreeze_stone(dfg->client->cm, src->stone_id);
-			}
-			EVstone_remove_split_target(dfg->client->cm, src->stone_id, temp_stone->stone_id);
-			//	    EVfreeze_stone(dfg->cm, temp_stone->stone_id);
-			//	    transfer_events = EVextract_stone_events(dfg->cm, temp_stone->stone_id);
-			EVfree_stone(dfg->client->cm, temp_stone->stone_id);
-		    } else {
-			if (src->frozen == 0) {
-			    REVfreeze_stone(dfg->master->nodes[src->node].conn, src->stone_id);
-			}
-			REVstone_remove_split_target(dfg->master->nodes[src->node].conn, src->stone_id, temp_stone->stone_id);
-			//	    REVfreeze_stone(dfg->nodes[temp_stone->node].conn, temp_stone->stone_id);
+/*     for (i = 0; i < src->out_count; ++i) { */
+/* 	if (src->bridge_stone == 0) { */
+/* 	    if (src->out_links[i]->bridge_stone) { */
+/* 		temp_stone = src->out_links[i]; */
+/* 		if (temp_stone->bridge_target == dest) { */
+/* 		    if (src->node == 0) { */
+/* 			//EVfreeze_stone(dfg->cm, temp_stone->stone_id); */
+/* 			//transfer_events = EVextract_stone_events(dfg->cm, temp_stone->stone_id); */
+/* 			if (src->frozen == 0) { */
+/* 			    EVfreeze_stone(dfg->client->cm, src->stone_id); */
+/* 			} */
+/* 			EVstone_remove_split_target(dfg->client->cm, src->stone_id, temp_stone->stone_id); */
+/* 			//	    EVfreeze_stone(dfg->cm, temp_stone->stone_id); */
+/* 			//	    transfer_events = EVextract_stone_events(dfg->cm, temp_stone->stone_id); */
+/* 			EVfree_stone(dfg->client->cm, temp_stone->stone_id); */
+/* 		    } else { */
+/* 			if (src->frozen == 0) { */
+/* 			    REVfreeze_stone(dfg->master->nodes[src->node].conn, src->stone_id); */
+/* 			} */
+/* 			REVstone_remove_split_target(dfg->master->nodes[src->node].conn, src->stone_id, temp_stone->stone_id); */
+/* 			//	    REVfreeze_stone(dfg->nodes[temp_stone->node].conn, temp_stone->stone_id); */
 			
-			CMtrace_out(dfg->cm, EVdfgVerbose, "deleting remotely.. sounds good till here.. src->node = %d, src_index = %d\n", src->node, src_index);
-			fflush(stdout);
+/* 			CMtrace_out(dfg->cm, EVdfgVerbose, "deleting remotely.. sounds good till here.. src->node = %d, src_index = %d\n", src->node, src_index); */
+/* 			fflush(stdout); */
 			
-			//	    transfer_events = REVextract_stone_events(dfg->nodes[temp_stone->node].conn, temp_stone->stone_id);
+/* 			//	    transfer_events = REVextract_stone_events(dfg->nodes[temp_stone->node].conn, temp_stone->stone_id); */
 			
-			CMtrace_out(dfg->cm, EVdfgVerbose, "exracted events in delete..\n");
-			fflush(stdout);
+/* 			CMtrace_out(dfg->cm, EVdfgVerbose, "exracted events in delete..\n"); */
+/* 			fflush(stdout); */
 			
-			REVfree_stone(dfg->master->nodes[src->node].conn, temp_stone->stone_id);
-			//free(temp-stone);
-		    }
-		    //temp_stone = NULL;
-		    src->out_links[i]->invalid = 1;
-		    src->frozen = 1;
-		    break;
-		}
-	    } else {
-		if(src->out_links[i] == dest && src->out_links[i]->invalid == 0) {
-		    if (src->node == 0) {
-			if (src->frozen == 0) {
-			    EVfreeze_stone(dfg->client->cm, src->stone_id);
-			}
-			EVstone_remove_split_target(dfg->client->cm, src->stone_id, dest->stone_id);
-		    } else {
-			if (src->frozen == 0) {
-			    REVfreeze_stone(dfg->master->nodes[src->node].conn, src->stone_id);
-			}
-			REVstone_remove_split_target(dfg->master->nodes[src->node].conn, src->stone_id, dest->stone_id);
-		    }
-		    src->out_links[i]->invalid = 1;
-		    src->frozen = 1;
-		    break;
-		}
-	    }
-	}
-    }
+/* 			REVfree_stone(dfg->master->nodes[src->node].conn, temp_stone->stone_id); */
+/* 			//free(temp-stone); */
+/* 		    } */
+/* 		    //temp_stone = NULL; */
+/* 		    src->out_links[i]->invalid = 1; */
+/* 		    src->frozen = 1; */
+/* 		    break; */
+/* 		} */
+/* 	    } else { */
+/* 		if(src->out_links[i] == dest && src->out_links[i]->invalid == 0) { */
+/* 		    if (src->node == 0) { */
+/* 			if (src->frozen == 0) { */
+/* 			    EVfreeze_stone(dfg->client->cm, src->stone_id); */
+/* 			} */
+/* 			EVstone_remove_split_target(dfg->client->cm, src->stone_id, dest->stone_id); */
+/* 		    } else { */
+/* 			if (src->frozen == 0) { */
+/* 			    REVfreeze_stone(dfg->master->nodes[src->node].conn, src->stone_id); */
+/* 			} */
+/* 			REVstone_remove_split_target(dfg->master->nodes[src->node].conn, src->stone_id, dest->stone_id); */
+/* 		    } */
+/* 		    src->out_links[i]->invalid = 1; */
+/* 		    src->frozen = 1; */
+/* 		    break; */
+/* 		} */
+/* 	    } */
+/* 	} */
+/*     } */
    
-}
+/* } */
 
 
-static void reconfig_deploy(EVdfg dfg) 
-{
-    int i;
-    int j;
-    EVstone new_bridge_stone_id = -1;
-    EVdfg_stone temp_stone = NULL;
-    EVdfg_stone cur = NULL;
-    EVdfg_stone target = NULL;
+/* static void reconfig_deploy(EVdfg dfg)  */
+/* { */
+/*     int i; */
+/*     int j; */
+/*     EVstone new_bridge_stone_id = -1; */
+/*     EVdfg_stone temp_stone = NULL; */
+/*     EVdfg_stone cur = NULL; */
+/*     EVdfg_stone target = NULL; */
 	
 	
-    for (i = 0; i < dfg->master->node_count; ++i) {
-	deploy_to_node(dfg, i);
-    }
+/*     for (i = 0; i < dfg->master->node_count; ++i) { */
+/* 	deploy_to_node(dfg, i); */
+/*     } */
 	
-    CManager_unlock(dfg->master->cm);
-    for (i = 0; i < dfg->stone_count; ++i) {
-	if (dfg->stones[i]->new_out_count > 0) {
-	    cur = dfg->stones[i];
-	    CMtrace_out(dfg->cm, EVdfgVerbose, "Reconfig_deploy, stone %d, (%x)\n", i, cur->stone_id);
-	    if (cur->frozen == 0) {
-		CMtrace_out(dfg->cm, EVdfgVerbose, "Freezing stone %d, (%x)\n", i, cur->stone_id);
-		if (cur->node == 0) {
-		    /* Master */
-		    EVfreeze_stone(dfg->master->cm, cur->stone_id);
-		} else {
-		    REVfreeze_stone(dfg->master->nodes[cur->node].conn, cur->stone_id);
-		}
-		cur->frozen = 1;
-	    }
-	    for (j = 0; j < cur->new_out_count; ++j) {
-		CMtrace_out(dfg->cm, EVdfgVerbose, " stone %d (%x) has new out link\n", i, cur->stone_id);
-		if (cur->new_out_ports[j] < cur->out_count) {
-		    temp_stone = cur->out_links[cur->new_out_ports[j]];
-		} else {
-		    temp_stone = NULL;
-		}
-		INT_EVdfg_link_port(cur, cur->new_out_ports[j], cur->new_out_links[j]);
+/*     CManager_unlock(dfg->master->cm); */
+/*     for (i = 0; i < dfg->stone_count; ++i) { */
+/* 	if (dfg->stones[i]->new_out_count > 0) { */
+/* 	    cur = dfg->stones[i]; */
+/* 	    CMtrace_out(dfg->cm, EVdfgVerbose, "Reconfig_deploy, stone %d, (%x)\n", i, cur->stone_id); */
+/* 	    if (cur->frozen == 0) { */
+/* 		CMtrace_out(dfg->cm, EVdfgVerbose, "Freezing stone %d, (%x)\n", i, cur->stone_id); */
+/* 		if (cur->node == 0) { */
+/* 		    /\* Master *\/ */
+/* 		    EVfreeze_stone(dfg->master->cm, cur->stone_id); */
+/* 		} else { */
+/* 		    REVfreeze_stone(dfg->master->nodes[cur->node].conn, cur->stone_id); */
+/* 		} */
+/* 		cur->frozen = 1; */
+/* 	    } */
+/* 	    for (j = 0; j < cur->new_out_count; ++j) { */
+/* 		CMtrace_out(dfg->cm, EVdfgVerbose, " stone %d (%x) has new out link\n", i, cur->stone_id); */
+/* 		if (cur->new_out_ports[j] < cur->out_count) { */
+/* 		    temp_stone = cur->out_links[cur->new_out_ports[j]]; */
+/* 		} else { */
+/* 		    temp_stone = NULL; */
+/* 		} */
+/* 		INT_EVdfg_link_port(cur, cur->new_out_ports[j], cur->new_out_links[j]); */
 		
-		target = cur->out_links[cur->new_out_ports[j]];
-		if (target && (cur->bridge_stone == 0) && (cur->node != target->node)) {
-		    cur->out_links[cur->new_out_ports[j]] = create_bridge_stone(dfg, target);
-		    CMtrace_out(dfg->cm, EVdfgVerbose, "Created bridge stone (reconfig_deploy) %p, target node %d, assigned to node %d\n", cur->out_links[j], target->node, cur->node);
-		    /* put the bridge stone where the source stone is */
-		    cur->out_links[cur->new_out_ports[j]]->node = cur->node;
-		    cur->out_links[cur->new_out_ports[j]]->pending_events = cur->processed_pending_events;
-		    if (cur->node == 0) {
-			new_bridge_stone_id = EVcreate_bridge_action(dfg->client->cm, dfg->master->nodes[target->node].contact_list, target->stone_id);
-			cur->out_links[cur->new_out_ports[j]]->stone_id = new_bridge_stone_id;
-			EVstone_add_split_target(dfg->client->cm, cur->stone_id, new_bridge_stone_id);
-		    } else {
-			new_bridge_stone_id = REVcreate_bridge_action(dfg->master->nodes[cur->node].conn, dfg->master->nodes[target->node].contact_list, target->stone_id);
-			REVstone_add_split_target(dfg->master->nodes[cur->node].conn, cur->stone_id, new_bridge_stone_id);
-		    }
-		} else {
-		    if (cur->node == 0) {
-			EVstone_add_split_target(dfg->client->cm, cur->stone_id, target->stone_id);
-		    }
-		    else {
-			REVstone_add_split_target(dfg->master->nodes[cur->node].conn, cur->stone_id, target->stone_id);
-		    }
-		}
+/* 		target = cur->out_links[cur->new_out_ports[j]]; */
+/* 		if (target && (cur->bridge_stone == 0) && (cur->node != target->node)) { */
+/* 		    cur->out_links[cur->new_out_ports[j]] = create_bridge_stone(dfg, target); */
+/* 		    CMtrace_out(dfg->cm, EVdfgVerbose, "Created bridge stone (reconfig_deploy) %p, target node %d, assigned to node %d\n", cur->out_links[j], target->node, cur->node); */
+/* 		    /\* put the bridge stone where the source stone is *\/ */
+/* 		    cur->out_links[cur->new_out_ports[j]]->node = cur->node; */
+/* 		    cur->out_links[cur->new_out_ports[j]]->pending_events = cur->processed_pending_events; */
+/* 		    if (cur->node == 0) { */
+/* 			new_bridge_stone_id = EVcreate_bridge_action(dfg->client->cm, dfg->master->nodes[target->node].contact_list, target->stone_id); */
+/* 			cur->out_links[cur->new_out_ports[j]]->stone_id = new_bridge_stone_id; */
+/* 			EVstone_add_split_target(dfg->client->cm, cur->stone_id, new_bridge_stone_id); */
+/* 		    } else { */
+/* 			new_bridge_stone_id = REVcreate_bridge_action(dfg->master->nodes[cur->node].conn, dfg->master->nodes[target->node].contact_list, target->stone_id); */
+/* 			REVstone_add_split_target(dfg->master->nodes[cur->node].conn, cur->stone_id, new_bridge_stone_id); */
+/* 		    } */
+/* 		} else { */
+/* 		    if (cur->node == 0) { */
+/* 			EVstone_add_split_target(dfg->client->cm, cur->stone_id, target->stone_id); */
+/* 		    } */
+/* 		    else { */
+/* 			REVstone_add_split_target(dfg->master->nodes[cur->node].conn, cur->stone_id, target->stone_id); */
+/* 		    } */
+/* 		} */
 		
-		if (temp_stone != NULL) {
-		    if (temp_stone->invalid == 0) {
-			if (temp_stone->frozen == 0) {
-			    if (temp_stone->node == 0) {
-				EVfreeze_stone(dfg->client->cm, temp_stone->stone_id);
-				EVtransfer_events(dfg->client->cm, temp_stone->stone_id, cur->out_links[cur->new_out_ports[j]]->stone_id);
-			    } else {
-				REVfreeze_stone(dfg->master->nodes[temp_stone->node].conn, temp_stone->stone_id);
-				REVtransfer_events(dfg->master->nodes[temp_stone->node].conn, temp_stone->stone_id, cur->out_links[cur->new_out_ports[j]]->stone_id);
-			    }
-			}
-			if (cur->node == 0) {
-			    EVstone_remove_split_target(dfg->client->cm, cur->stone_id, temp_stone->stone_id);
-			} else {
-			    REVstone_remove_split_target(dfg->master->nodes[cur->node].conn, cur->stone_id, temp_stone->stone_id);
-			}
+/* 		if (temp_stone != NULL) { */
+/* 		    if (temp_stone->invalid == 0) { */
+/* 			if (temp_stone->frozen == 0) { */
+/* 			    if (temp_stone->node == 0) { */
+/* 				EVfreeze_stone(dfg->client->cm, temp_stone->stone_id); */
+/* 				EVtransfer_events(dfg->client->cm, temp_stone->stone_id, cur->out_links[cur->new_out_ports[j]]->stone_id); */
+/* 			    } else { */
+/* 				REVfreeze_stone(dfg->master->nodes[temp_stone->node].conn, temp_stone->stone_id); */
+/* 				REVtransfer_events(dfg->master->nodes[temp_stone->node].conn, temp_stone->stone_id, cur->out_links[cur->new_out_ports[j]]->stone_id); */
+/* 			    } */
+/* 			} */
+/* 			if (cur->node == 0) { */
+/* 			    EVstone_remove_split_target(dfg->client->cm, cur->stone_id, temp_stone->stone_id); */
+/* 			} else { */
+/* 			    REVstone_remove_split_target(dfg->master->nodes[cur->node].conn, cur->stone_id, temp_stone->stone_id); */
+/* 			} */
 
-			if (temp_stone->bridge_stone) {
-			    if (cur->node == 0) {
-				CMtrace_out(dfg->client->cm, EVdfgVerbose, "\nreconfig_deploy: Locally freeing..\n");
-				fflush(stdout);
-				EVfree_stone(dfg->client->cm, temp_stone->stone_id);
-			    } else {
-				CMtrace_out(dfg->cm, EVdfgVerbose, "reconfig_deploy: Remotely freeing..\n");
-				fflush(stdout);
-				REVfree_stone(dfg->master->nodes[temp_stone->node].conn, temp_stone->stone_id);
-			    }
-			    //free(temp_stone);
-			    //temp_stone = NULL;
-			}
-			temp_stone->invalid = 1;
-		    }
-		}
-	    }
-	}
-    }
+/* 			if (temp_stone->bridge_stone) { */
+/* 			    if (cur->node == 0) { */
+/* 				CMtrace_out(dfg->client->cm, EVdfgVerbose, "\nreconfig_deploy: Locally freeing..\n"); */
+/* 				fflush(stdout); */
+/* 				EVfree_stone(dfg->client->cm, temp_stone->stone_id); */
+/* 			    } else { */
+/* 				CMtrace_out(dfg->cm, EVdfgVerbose, "reconfig_deploy: Remotely freeing..\n"); */
+/* 				fflush(stdout); */
+/* 				REVfree_stone(dfg->master->nodes[temp_stone->node].conn, temp_stone->stone_id); */
+/* 			    } */
+/* 			    //free(temp_stone); */
+/* 			    //temp_stone = NULL; */
+/* 			} */
+/* 			temp_stone->invalid = 1; */
+/* 		    } */
+/* 		} */
+/* 	    } */
+/* 	} */
+/*     } */
     
     
-    /* ****** Transferring events ******
-     */
+/*     /\* ****** Transferring events ****** */
+/*      *\/ */
     
-    for (i = 0; i < dfg->transfer_events_count; ++i) {
-	EVdfg_stone temp = dfg->stones[dfg->transfer_events_list[i][0]];
-	EVdfg_stone src = temp->out_links[dfg->transfer_events_list[i][1]];
-	EVdfg_stone dest;
+/*     for (i = 0; i < dfg->transfer_events_count; ++i) { */
+/* 	EVdfg_stone temp = dfg->stones[dfg->transfer_events_list[i][0]]; */
+/* 	EVdfg_stone src = temp->out_links[dfg->transfer_events_list[i][1]]; */
+/* 	EVdfg_stone dest; */
 	
-	CMtrace_out(dfg->cm, EVdfgVerbose, " Transfering events\n");
-	if (temp->node == 0) {
-	    if (temp->frozen == 0) {
-		EVfreeze_stone(dfg->client->cm, temp->stone_id);
-		temp->frozen = 1;
-	    }
-	    if (src->frozen == 0) {
-		EVfreeze_stone(dfg->client->cm, src->stone_id);
-		src->frozen = 1;
-	    }
-	} else {
-	    if (temp->frozen == 0) {
-		REVfreeze_stone(dfg->master->nodes[temp->node].conn, temp->stone_id);
-		temp->frozen = 1;
-	    }
-	    if (src->frozen == 0) {
-		REVfreeze_stone(dfg->master->nodes[src->node].conn, src->stone_id);
-		src->frozen = 1;
-	    }
-	}
+/* 	CMtrace_out(dfg->cm, EVdfgVerbose, " Transfering events\n"); */
+/* 	if (temp->node == 0) { */
+/* 	    if (temp->frozen == 0) { */
+/* 		EVfreeze_stone(dfg->client->cm, temp->stone_id); */
+/* 		temp->frozen = 1; */
+/* 	    } */
+/* 	    if (src->frozen == 0) { */
+/* 		EVfreeze_stone(dfg->client->cm, src->stone_id); */
+/* 		src->frozen = 1; */
+/* 	    } */
+/* 	} else { */
+/* 	    if (temp->frozen == 0) { */
+/* 		REVfreeze_stone(dfg->master->nodes[temp->node].conn, temp->stone_id); */
+/* 		temp->frozen = 1; */
+/* 	    } */
+/* 	    if (src->frozen == 0) { */
+/* 		REVfreeze_stone(dfg->master->nodes[src->node].conn, src->stone_id); */
+/* 		src->frozen = 1; */
+/* 	    } */
+/* 	} */
 	
-	temp = dfg->stones[dfg->transfer_events_list[i][2]];
-	dest = temp->out_links[dfg->transfer_events_list[i][3]];
+/* 	temp = dfg->stones[dfg->transfer_events_list[i][2]]; */
+/* 	dest = temp->out_links[dfg->transfer_events_list[i][3]]; */
 	
-	if (src->node == 0) {
-	    EVtransfer_events(dfg->client->cm, src->stone_id, dest->stone_id);
-	} else {
-	    REVtransfer_events(dfg->master->nodes[src->node].conn, src->stone_id, dest->stone_id);
-	}
-    }
+/* 	if (src->node == 0) { */
+/* 	    EVtransfer_events(dfg->client->cm, src->stone_id, dest->stone_id); */
+/* 	} else { */
+/* 	    REVtransfer_events(dfg->master->nodes[src->node].conn, src->stone_id, dest->stone_id); */
+/* 	} */
+/*     } */
     
-    /* ****** Deleting links ******
-     */
+/*     /\* ****** Deleting links ****** */
+/*      *\/ */
     
-    for (i = 0; i < dfg->delete_count; ++i) {
-	CMtrace_out(dfg->cm, EVdfgVerbose, " Deleting a link\n");
-	reconfig_delete_link(dfg, dfg->delete_list[i][0], dfg->delete_list[i][1]);
-    }
+/*     for (i = 0; i < dfg->delete_count; ++i) { */
+/* 	CMtrace_out(dfg->cm, EVdfgVerbose, " Deleting a link\n"); */
+/* 	reconfig_delete_link(dfg, dfg->delete_list[i][0], dfg->delete_list[i][1]); */
+/*     } */
     
-    for (i = 0; i < dfg->stone_count; ++i) {
-        cur = dfg->stones[i];
-	if (cur->frozen == 1 && cur->invalid == 0) {
-	    if (dfg->stones[i]->new_out_count > 0) {
-		free(cur->new_out_links);
-		free(cur->new_out_ports);
-		cur->new_out_count = 0;
-	    }
-	    if (cur->node == 0) {
-		//	    if (cur->pending_events != NULL) {
-		//	      printf("\nResubmitting events locally! Cheers!\n");
-		//	      fflush(EVsubmit);
-		//	      stdout_encoded(dfg->cm, cur->stone_id, cur->pending_events->buffer, cur->pending_events->length, dfg->nodes[0].contact_list);
-		//	    }
-		EVunfreeze_stone(dfg->client->cm, cur->stone_id);
-	    } else {
-		//	    if (cur->pending_events != NULL) {
-		//	      printf("\nResubmitting events remotely! Cheers!\n");
-		//	      fflush(stdout);
-		//REVsubmit_encoded(dfg->nodes[cur->node].conn, cur->stone_id, cur->pending_events->buffer, cur->pending_events->length, dfg->nodes[cur->node].contact_list);
-		//            }
-		REVunfreeze_stone(dfg->master->nodes[cur->node].conn, cur->stone_id);
-	    }
-	    cur->frozen = 0;
-	}
-    }
+/*     for (i = 0; i < dfg->stone_count; ++i) { */
+/*         cur = dfg->stones[i]; */
+/* 	if (cur->frozen == 1 && cur->invalid == 0) { */
+/* 	    if (dfg->stones[i]->new_out_count > 0) { */
+/* 		free(cur->new_out_links); */
+/* 		free(cur->new_out_ports); */
+/* 		cur->new_out_count = 0; */
+/* 	    } */
+/* 	    if (cur->node == 0) { */
+/* 		//	    if (cur->pending_events != NULL) { */
+/* 		//	      printf("\nResubmitting events locally! Cheers!\n"); */
+/* 		//	      fflush(EVsubmit); */
+/* 		//	      stdout_encoded(dfg->cm, cur->stone_id, cur->pending_events->buffer, cur->pending_events->length, dfg->nodes[0].contact_list); */
+/* 		//	    } */
+/* 		EVunfreeze_stone(dfg->client->cm, cur->stone_id); */
+/* 	    } else { */
+/* 		//	    if (cur->pending_events != NULL) { */
+/* 		//	      printf("\nResubmitting events remotely! Cheers!\n"); */
+/* 		//	      fflush(stdout); */
+/* 		//REVsubmit_encoded(dfg->nodes[cur->node].conn, cur->stone_id, cur->pending_events->buffer, cur->pending_events->length, dfg->nodes[cur->node].contact_list); */
+/* 		//            } */
+/* 		REVunfreeze_stone(dfg->master->nodes[cur->node].conn, cur->stone_id); */
+/* 	    } */
+/* 	    cur->frozen = 0; */
+/* 	} */
+/*     } */
     
     
-    CManager_lock(dfg->client->cm);
-    if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
-	for (i = 0; i < dfg->stone_count; ++i) {
-	    fprintf(CMTrace_file, "Stone# %d : ", i);
-	    fdump_dfg_stone(CMTrace_file, dfg->stones[i]);
-	}
-    }
-    dfg->deployed_stone_count = dfg->stone_count;
+/*     CManager_lock(dfg->client->cm); */
+/*     if (CMtrace_on(dfg->cm, EVdfgVerbose)) { */
+/* 	for (i = 0; i < dfg->stone_count; ++i) { */
+/* 	    fprintf(CMTrace_file, "Stone# %d : ", i); */
+/* 	    fdump_dfg_stone(CMTrace_file, dfg->stones[i]); */
+/* 	} */
+/*     } */
+/*     dfg->deployed_stone_count = dfg->stone_count; */
 
-}
+/* } */
 
 static void
-dump_dfg_stone(EVdfg_stone s)
+dump_dfg_stone(EVdfg_stone_state s)
 {
     fdump_dfg_stone(stdout, s);
 }
 
 static void
-fdump_dfg_stone(FILE* out, EVdfg_stone s)
+fdump_dfg_stone(FILE* out, EVdfg_stone_state s)
 {
     int i;
 
@@ -1660,14 +1881,14 @@ fdump_dfg_stone(FILE* out, EVdfg_stone s)
     if (s->bridge_stone) fprintf(out, "      bridge_stone\n");
     fprintf(out, " out_count %d : ", s->out_count);
     for (i=0; i < s->out_count; i++) {
-	fprintf(out, "%p, ", s->out_links[i]);
+	fprintf(out, "%x, ", s->out_links[i]);
     }
     fprintf(out, "\n action_count %d, action = \"%s\"\n", s->action_count, (s->action ? s->action : "NULL"));
     fprintf(out, "new_out_count %d : ", s->new_out_count);
     for (i=0; i < s->new_out_count; i++) {
 	fprintf(out, "(port %d) -> %p, ", s->new_out_ports[i], s->new_out_links[i]);
     }
-    fprintf(out, "\nbridge_target %p\n", s->bridge_target);
+    fprintf(out, "\nbridge_target %x\n", s->bridge_target);
 }
 
 static void
@@ -1843,88 +2064,88 @@ extern void INT_EVdfg_reconfig_transfer_events(EVdfg dfg, int src_stone_index, i
     ++dfg->transfer_events_count;
 }
 
-static void reconfig_add_bridge_stones(EVdfg dfg) 
-{	
-    int i;
-    int j;
-    int k;
-    EVdfg_stone cur = NULL;
+/* static void reconfig_add_bridge_stones(EVdfg dfg)  */
+/* {	 */
+/*     int i; */
+/*     int j; */
+/*     int k; */
+/*     EVdfg_stone cur = NULL; */
 	
-    for (i = dfg->deployed_stone_count; i < dfg->stone_count; ++i) {
-	if (dfg->stones[i]->bridge_stone == 0) {
-	    cur = dfg->stones[i];
-	    for (k = 0; k < dfg->master->node_count; ++k) {
-		if (k == cur->node && cur->new_out_count !=0 ) {
-		    for (j = 0; j < cur->new_out_count; ++j) {
-			INT_EVdfg_link_port(cur, cur->new_out_ports[j], cur->new_out_links[j]);
-		    }
+/*     for (i = dfg->deployed_stone_count; i < dfg->stone_count; ++i) { */
+/* 	if (dfg->stones[i]->bridge_stone == 0) { */
+/* 	    cur = dfg->stones[i]; */
+/* 	    for (k = 0; k < dfg->master->node_count; ++k) { */
+/* 		if (k == cur->node && cur->new_out_count !=0 ) { */
+/* 		    for (j = 0; j < cur->new_out_count; ++j) { */
+/* 			INT_EVdfg_link_port(cur, cur->new_out_ports[j], cur->new_out_links[j]); */
+/* 		    } */
 		    
-		    free(cur->new_out_links);
-		    free(cur->new_out_ports);
+/* 		    free(cur->new_out_links); */
+/* 		    free(cur->new_out_ports); */
 		    
-		    cur->new_out_links = NULL;
-		    cur->new_out_ports = NULL;
+/* 		    cur->new_out_links = NULL; */
+/* 		    cur->new_out_ports = NULL; */
 		    
-		    cur->new_out_count = 0;
-		    for (j = 0; j < cur->out_count; ++j) {
-			EVdfg_stone temp_stone, target = cur->out_links[j];
-			if (target->bridge_stone) {
-			    temp_stone = target;
-			    target = target->bridge_target;
-			}
-			if (target && (!cur->bridge_stone) && (cur->node != target->node)) {
-			    cur->out_links[j] = create_bridge_stone(dfg, target);
-			    /* put the bridge stone where the source stone is */
-			    cur->out_links[j]->node = cur->node;
-			    printf("Built bridge stone %x\n", cur->out_links[j]->stone_id);
-			}
-		    }
-		    break;
-		}
-	    }
-	}
-    }
-}
+/* 		    cur->new_out_count = 0; */
+/* 		    for (j = 0; j < cur->out_count; ++j) { */
+/* 			EVdfg_stone temp_stone, target = cur->out_links[j]; */
+/* 			if (target->bridge_stone) { */
+/* 			    temp_stone = target; */
+/* 			    target = target->bridge_target; */
+/* 			} */
+/* 			if (target && (!cur->bridge_stone) && (cur->node != target->node)) { */
+/* 			    cur->out_links[j] = create_bridge_stone(dfg, target); */
+/* 			    /\* put the bridge stone where the source stone is *\/ */
+/* 			    cur->out_links[j]->node = cur->node; */
+/* 			    printf("Built bridge stone %x\n", cur->out_links[j]->stone_id); */
+/* 			} */
+/* 		    } */
+/* 		    break; */
+/* 		} */
+/* 	    } */
+/* 	} */
+/*     } */
+/* } */
 
 
-extern void INT_EVdfg_reconfig_delete_link(EVdfg dfg, int src_index, int dest_index)
-{
-    if (dfg->delete_count == 0) {
-	dfg->delete_list = malloc(sizeof(int *));
-    } else {
-	dfg->delete_list = realloc(dfg->delete_list, (dfg->delete_count + 1) * sizeof(int *));
-    }
+/* extern void INT_EVdfg_reconfig_delete_link(EVdfg dfg, int src_index, int dest_index) */
+/* { */
+/*     if (dfg->delete_count == 0) { */
+/* 	dfg->delete_list = malloc(sizeof(int *)); */
+/*     } else { */
+/* 	dfg->delete_list = realloc(dfg->delete_list, (dfg->delete_count + 1) * sizeof(int *)); */
+/*     } */
 	
-    dfg->delete_list[dfg->delete_count] = malloc(2 * sizeof(int));
+/*     dfg->delete_list[dfg->delete_count] = malloc(2 * sizeof(int)); */
 	
-    dfg->delete_list[dfg->delete_count][0] = src_index;
-    dfg->delete_list[dfg->delete_count][1] = dest_index;
+/*     dfg->delete_list[dfg->delete_count][0] = src_index; */
+/*     dfg->delete_list[dfg->delete_count][1] = dest_index; */
 	
-    ++dfg->delete_count;
-}
+/*     ++dfg->delete_count; */
+/* } */
 
 
-extern
-void INT_REVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index)
-{
-    REVfreeze_stone(dfg->master->nodes[dfg->stones[stone_index]->node].conn, dfg->stones[stone_index]->out_links[0]->stone_id);
+/* extern */
+/* void INT_REVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index) */
+/* { */
+/*     REVfreeze_stone(dfg->master->nodes[dfg->stones[stone_index]->node].conn, dfg->stones[stone_index]->out_links[0]->stone_id); */
 
-    if (dfg->realized == 1) {
-	dfg->master->reconfig = 0;
-    }
-    dfg->master->no_deployment = 1;
-}
+/*     if (dfg->realized == 1) { */
+/* 	dfg->master->reconfig = 0; */
+/*     } */
+/*     dfg->master->no_deployment = 1; */
+/* } */
 
-extern
-void INT_EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index) 
-{
-    EVfreeze_stone(dfg->client->cm, dfg->stones[stone_index]->out_links[0]->stone_id);
+/* extern */
+/* void INT_EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index)  */
+/* { */
+/*     EVfreeze_stone(dfg->client->cm, dfg->stones[stone_index]->out_links[0]->stone_id); */
 	
-    if (dfg->realized == 1) {
-	dfg->master->reconfig = 0;
-    }
-    dfg->master->no_deployment = 1;
-}
+/*     if (dfg->realized == 1) { */
+/* 	dfg->master->reconfig = 0; */
+/*     } */
+/*     dfg->master->no_deployment = 1; */
+/* } */
 
 static void
 perform_deployment(EVdfg dfg)
@@ -1936,21 +2157,21 @@ perform_deployment(EVdfg dfg)
 	assert(master->state == DFG_Joining);
 	master->state = DFG_Starting;
 	CMtrace_out(cm, EVdfgVerbose, "EVDFG check all nodes registered -  master DFG state is %s\n", str_state[master->state]);
-	assign_stone_ids(dfg);
-	add_bridge_stones(dfg);
+	add_bridge_stones(dfg, dfg->working_state);
 	dfg->deploy_ack_count = 1;  /* we are number 1 */
 	if (dfg->deploy_ack_condition == -1) {
 	    dfg->deploy_ack_condition = INT_CMCondition_get(dfg->client->cm, NULL);
 	}
 	for (i=0; i < dfg->master->node_count; i++) {
-	    deploy_to_node(dfg, i);
+	    deploy_to_node(dfg, i, dfg->working_state);
 	    dfg->master->nodes[i].needs_ready = 1;   /* everyone needs a ready the first time through */
 	}
     } else {
         CMtrace_out(cm, EVdfgVerbose, "EVDFG perform_deployment -  master DFG state set to %s\n", str_state[master->state]);
 	assert(master->state == DFG_Reconfiguring);
-	reconfig_add_bridge_stones(dfg);
-	reconfig_deploy(dfg);
+	printf("Would have done reconfig add bridge stones \n");
+/*	reconfig_add_bridge_stones(dfg);
+	reconfig_deploy(dfg);*/
     }
 }
 
@@ -2128,6 +2349,56 @@ extern void INT_EVdfg_node_reconfig_handler(EVdfg_master master, EVdfgReconfigHa
 }
 
 static void
+free_dfg_state(EVdfg_configuration state)
+{
+    int i;
+    for (i=0; i < state->stone_count; i++) {
+    	if (state->stones[i]->out_links) free(state->stones[i]->out_links);
+    	if (state->stones[i]->action) free(state->stones[i]->action);
+    	if (state->stones[i]->extra_actions) {
+    	    int j;
+    	    for (j=0; j < state->stones[i]->action_count-1; j++) {
+    		free(state->stones[i]->extra_actions[j]);
+    	    }
+    	    free(state->stones[i]->extra_actions);
+    	}
+    	if (state->stones[i]->attrs) free_attr_list(state->stones[i]->attrs);
+    	free(state->stones[i]);
+    }
+    free(state->stones);
+    free(state);
+}
+
+static EVdfg_configuration
+copy_dfg_state(EVdfg_configuration state)
+{
+    int i;
+    EVdfg_configuration ret = malloc(sizeof(*ret));
+    ret->stone_count = state->stone_count;
+    ret->stones = malloc(sizeof(ret->stones[0])*state->stone_count);
+    for (i=0; i < state->stone_count; i++) {
+	ret->stones[i] = malloc(sizeof(*ret->stones[i]));
+	ret->stones[i] = state->stones[i];
+    	if (state->stones[i]->out_links) {
+	    ret->stones[i]->out_links = malloc(sizeof(ret->stones[i]->out_links[0]) * ret->stones[i]->out_count);
+	    memcpy(ret->stones[i]->out_links, state->stones[i]->out_links,
+		   sizeof(ret->stones[i]->out_links[0]) * ret->stones[i]->out_count);
+	}
+    	if (state->stones[i]->action) ret->stones[i]->action = strdup(state->stones[i]->action);
+    	if (state->stones[i]->extra_actions) {
+    	    int j;
+	    ret->stones[i]->extra_actions = malloc(sizeof(char*) * state->stones[i]->action_count);
+    	    for (j=0; j < state->stones[i]->action_count-1; j++) {
+		if (state->stones[i]->extra_actions[j]) 
+		    ret->stones[i]->extra_actions[j] = strdup(state->stones[i]->extra_actions[j]);
+    	    }
+    	}
+    	if (state->stones[i]->attrs) add_ref_attr_list(state->stones[i]->attrs);
+    }
+    return ret;
+}
+
+static void
 check_all_nodes_registered(EVdfg_master master)
 {
     int i;
@@ -2154,6 +2425,12 @@ check_all_nodes_registered(EVdfg_master master)
 	wait_for_deploy_acks(dfg);
     }
     master->no_deployment = 0;
+    if (dfg->deployed_state) {
+	free_dfg_state(dfg->deployed_state);
+    }
+    dfg->deployed_state = dfg->working_state;
+    dfg->working_state = copy_dfg_state(dfg->deployed_state);
+    
     signal_ready(dfg);
     dfg->deployed_stone_count = dfg->stone_count;
     master->old_node_count = master->node_count;

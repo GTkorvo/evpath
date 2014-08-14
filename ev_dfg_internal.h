@@ -113,6 +113,47 @@ typedef struct {
 
 struct _EVdfg_stone {
     EVdfg dfg;
+    int stone_id;
+};
+
+typedef enum {ACT_create, ACT_add_action, ACT_set_auto_period, ACT_link_port, ACT_link_dest, 
+	      ACT_unlink_port, ACT_unlink_dest, ACT_set_attrs, ACT_destroy,
+	      ACT_assign_node, ACT_create_bridge} EVconfig_action_type;
+
+typedef struct _EVdfg_config_action {
+    EVconfig_action_type type;
+    union {
+	struct {
+	    int stone_id;
+	    char *action;
+	} create;
+	struct {
+	    int stone_id;
+	    char *action;
+	    int target_id;
+	} bridge;
+	struct {
+	    int stone_id;
+	    int secs;
+	    int usecs;
+	} period;
+	struct {
+	    int stone_id;
+	    int port;
+	    int dest_id;
+	} link;
+	struct {
+	    int stone_id;
+	    attr_list attrs;
+	} attrs;
+	struct {
+	    int stone_id;
+	    int dest_node;
+	} assign;
+    } u;
+} EVdfg_config_action;
+
+typedef struct _EVdfg_stone_state {
     int node;
     int bridge_stone;
     int stone_id;
@@ -120,21 +161,28 @@ struct _EVdfg_stone {
     int period_secs;
     int period_usecs;
     int out_count;
-    EVdfg_stone *out_links;
+    int *out_links;
     int action_count;
     char *action;
     char **extra_actions;
+    int bridge_target;
 	
     /* dynamic reconfiguration structures below */
     EVdfg_stone *new_out_links;
-    EVdfg_stone bridge_target;
     EVevent_list pending_events;
     EVevent_list processed_pending_events;
     int new_out_count;
     int *new_out_ports;
     int invalid;
     int frozen;
-};
+} *EVdfg_stone_state;
+
+typedef struct _EVdfg_configuration {
+    int stone_count;
+    EVdfg_stone_state *stones;
+    int pending_action_count;
+    struct _EVdfg_config_action *pending_action_queue;
+} *EVdfg_configuration;
 
 typedef struct _EVint_node_rec {
     char *name;
@@ -209,6 +257,8 @@ struct _EVdfg {
     int realized;
     int deploy_ack_count;
     int deploy_ack_condition;
+    EVdfg_configuration deployed_state;
+    EVdfg_configuration working_state;
 	
     int transfer_events_count;
     int delete_count;
@@ -232,7 +282,10 @@ extern void INT_EVdfg_enable_auto_stone ( EVdfg_stone stone, int period_sec, int
 extern void INT_EVdfg_freeze_next_bridge_stone ( EVdfg dfg, int stone_index );
 extern char* INT_EVdfg_get_contact_list ( EVdfg_master master );
 extern void INT_EVdfg_join_dfg ( EVdfg dfg, char *node_name, char *master_contact );
-extern void INT_EVdfg_link_port ( EVdfg_stone source, int source_port, EVdfg_stone destination );
+extern int INT_EVdfg_link_port ( EVdfg_stone source, int source_port, EVdfg_stone destination );
+extern int INT_EVdfg_link_dest ( EVdfg_stone source, EVdfg_stone destination );
+extern int INT_EVdfg_unlink_port ( EVdfg_stone source, int source_port );
+extern int INT_EVdfg_unlink_dest ( EVdfg_stone source, EVdfg_stone destination );
 extern void INT_EVdfg_node_fail_handler ( EVdfg_master master, EVdfgFailHandlerFunc func );
 extern void INT_EVdfg_node_reconfig_handler ( EVdfg_master master, EVdfgReconfigHandlerFunc func );
 extern void INT_EVdfg_node_join_handler ( EVdfg_master master, EVdfgJoinHandlerFunc func );
@@ -250,7 +303,7 @@ extern void INT_EVdfg_register_node_list ( EVdfg_master master, char** list );
 extern void INT_EVdfg_register_raw_sink_handler ( CManager cm, char *name, EVRawHandlerFunc handler );
 extern void INT_EVdfg_register_sink_handler ( CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler, void *client_data );
 extern void INT_EVdfg_register_source ( char *name, EVsource src );
-extern void INT_EVdfg_set_attr_list ( EVdfg_stone stone, attr_list attrs );
+extern int INT_EVdfg_set_attr_list ( EVdfg_stone stone, attr_list attrs );
 extern attr_list INT_EVdfg_get_attr_list ( EVdfg_stone stone );
 extern int INT_EVdfg_shutdown ( EVdfg_client client, int result );
 extern int INT_EVdfg_force_shutdown ( EVdfg_client client, int result );

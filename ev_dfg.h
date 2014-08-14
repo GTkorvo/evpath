@@ -448,6 +448,21 @@ extern EVdfg_stone EVdfg_create_sink_stone(EVdfg dfg, char *handler_name);
 extern void EVdfg_add_sink_action(EVdfg_stone stone, char *handler_name);
 
 /*!
+ * Link an output port of one stone (the source) to a destination
+ * (target) stone.
+ * 
+ * This function is roughly the analog of the EVstone_set_output function, but at
+ * the EVdfg level.  All non-terminal stones have one or more output ports
+ * from which data will emerge.  EVdfg_link_port() is used to assign each of
+ * these outputs to another EVdfg_stone stone.
+ *
+ * \param source The EVdfg_stone whose ports are to be assigned.
+ * \param output_index The zero-based index of the output which should be assigned.
+ * \param destination The EVdfg_stone which is to receive those events.
+ */
+extern void EVdfg_link_dest(EVdfg_stone source, EVdfg_stone destination);
+
+/*!
  * Link a particular output port of one stone (the source) to a destination
  * (target) stone.
  * 
@@ -462,6 +477,28 @@ extern void EVdfg_add_sink_action(EVdfg_stone stone, char *handler_name);
  */
 extern void EVdfg_link_port(EVdfg_stone source, int output_index, 
 			    EVdfg_stone destination);
+
+/*!
+ * Unlink a particular output port of one stone (the source).
+ * 
+ * The output port should have been previously set with EVdfg_link_port.
+ *
+ * \param source The EVdfg_stone whose ports are to be assigned.
+ * \param output_index The zero-based index of the output which should be assigned.
+ * \return returns true on success, false if the particular port was not previously set
+ */
+extern void EVdfg_unlink_port(EVdfg_stone source, int output_index);
+
+/*!
+ * Unlink the output port of one stone (the source) so that it no longer
+ * directs events to a particular destination (target) stone.
+ * 
+ * \param source The EVdfg_stone whose ports are to be assigned.
+ * \param destination The EVdfg_stone which should no longer receive those events.
+ * \return returns true on success, false if the destination stone was not
+ * found on the output links of the source
+ */
+extern int EVdfg_unlink_dest(EVdfg_stone source, EVdfg_stone destination);
 
 /*!
  * Assign a particular EVdfg_stone to a particular client node.
@@ -583,15 +620,15 @@ extern int EVdfg_force_shutdown(EVdfg_client client, int result);
   (VERY) tentative reconfiguration interface
 */
 
-extern void EVdfg_reconfig_insert(EVdfg dfg, int src_stone_id, EVdfg_stone new_stone, int dest_stone_id, EVevent_list q_event);
-extern void EVdfg_reconfig_delete_link(EVdfg dfg, int src_index, int dest_index);
-extern void EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index);
-extern void EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index);
-extern void EVdfg_reconfig_link_port_to_stone(EVdfg dfg, int src_stone_index, int port, EVdfg_stone target_stone, EVevent_list q_events);
-extern void EVdfg_reconfig_link_port_from_stone(EVdfg dfg, EVdfg_stone src_stone, int port, int target_index, EVevent_list q_events);
-extern void EVdfg_reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events);
-extern void EVdfg_reconfig_transfer_events(EVdfg dfg, int src_stone_index, int src_port, int dest_stone_index, int dest_port);
-extern void EVdfg_reconfig_insert_on_port(EVdfg dfg, EVdfg_stone src_stone, int port, EVdfg_stone new_stone, EVevent_list q_events);
+/* extern void EVdfg_reconfig_insert(EVdfg dfg, int src_stone_id, EVdfg_stone new_stone, int dest_stone_id, EVevent_list q_event); */
+/* extern void EVdfg_reconfig_delete_link(EVdfg dfg, int src_index, int dest_index); */
+/* extern void EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index); */
+/* extern void EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index); */
+/* extern void EVdfg_reconfig_link_port_to_stone(EVdfg dfg, int src_stone_index, int port, EVdfg_stone target_stone, EVevent_list q_events); */
+/* extern void EVdfg_reconfig_link_port_from_stone(EVdfg dfg, EVdfg_stone src_stone, int port, int target_index, EVevent_list q_events); */
+/* extern void EVdfg_reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events); */
+/* extern void EVdfg_reconfig_transfer_events(EVdfg dfg, int src_stone_index, int src_port, int dest_stone_index, int dest_port); */
+/* extern void EVdfg_reconfig_insert_on_port(EVdfg dfg, EVdfg_stone src_stone, int port, EVdfg_stone new_stone, EVevent_list q_events); */
 
 /* @}*/
 
