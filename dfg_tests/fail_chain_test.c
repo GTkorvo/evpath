@@ -109,7 +109,7 @@ fail_handler(EVdfg dfg, char *failed_node_name, int failed_stone)
     dest_node = failed_node+1;
     while ((dest_stone = stones[dest_node]) == NULL) dest_node++;
     
-    EVdfg_reconfig_link_port(stones[failed_node-1], 0, dest_stone, NULL);
+    EVdfg_link_port(stones[failed_node-1], 0, dest_stone);
     if (!quiet) printf("Linking stone %p on node %d to stone on node %d\n", stones[failed_node+1], failed_node-1, dest_node);
     EVdfg_realize(dfg);
 }
