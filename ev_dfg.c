@@ -196,7 +196,7 @@ EVdfg_add_act_to_queue(EVdfg_configuration state, EVdfg_config_action act)
 	state->pending_action_queue = malloc(sizeof(state->pending_action_queue[0]));
     } else {
 	state->pending_action_queue = realloc(state->pending_action_queue, 
-					      sizeof(state->pending_action_queue[0]) * state->pending_action_count+1);
+					      sizeof(state->pending_action_queue[0]) * (state->pending_action_count+1));
     }
     state->pending_action_queue[state->pending_action_count++] = act;
 }
@@ -2378,9 +2378,9 @@ copy_dfg_state(EVdfg_configuration state)
     ret->stones = malloc(sizeof(ret->stones[0])*state->stone_count);
     for (i=0; i < state->stone_count; i++) {
 	ret->stones[i] = malloc(sizeof(*ret->stones[i]));
-	ret->stones[i] = state->stones[i];
+	*(ret->stones[i]) = *(state->stones[i]);
     	if (state->stones[i]->out_links) {
-	    ret->stones[i]->out_links = malloc(sizeof(ret->stones[i]->out_links[0]) * ret->stones[i]->out_count);
+	    ret->stones[i]->out_links = malloc(sizeof(ret->stones[i]->out_links[0]) * state->stones[i]->out_count);
 	    memcpy(ret->stones[i]->out_links, state->stones[i]->out_links,
 		   sizeof(ret->stones[i]->out_links[0]) * ret->stones[i]->out_count);
 	}
