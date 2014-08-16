@@ -116,38 +116,34 @@ struct _EVdfg_stone {
     int stone_id;
 };
 
-typedef enum {ACT_create, ACT_add_action, ACT_set_auto_period, ACT_link_port, ACT_link_dest, 
+typedef enum {ACT_no_op, ACT_create, ACT_add_action, ACT_set_auto_period, ACT_link_port, ACT_link_dest, 
 	      ACT_unlink_port, ACT_unlink_dest, ACT_set_attrs, ACT_destroy,
 	      ACT_assign_node, ACT_create_bridge} EVconfig_action_type;
 
 typedef struct _EVdfg_config_action {
     EVconfig_action_type type;
+    int stone_id;
+    int node_for_action;
     union {
 	struct {
-	    int stone_id;
 	    char *action;
 	} create;
 	struct {
-	    int stone_id;
 	    char *action;
 	    int target_id;
 	} bridge;
 	struct {
-	    int stone_id;
 	    int secs;
 	    int usecs;
 	} period;
 	struct {
-	    int stone_id;
 	    int port;
 	    int dest_id;
 	} link;
 	struct {
-	    int stone_id;
 	    attr_list attrs;
 	} attrs;
 	struct {
-	    int stone_id;
 	    int dest_node;
 	} assign;
     } u;

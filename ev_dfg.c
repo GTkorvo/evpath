@@ -187,6 +187,11 @@ INT_EVdfg_create_sink_stone(EVdfg dfg, char *sink_name)
 
 static int
 EVdfg_perform_act_on_state(EVdfg_configuration state, EVdfg_config_action act, int build_queue);
+static void fdump_dfg_config_action(FILE* out, EVdfg_config_action a);
+static void dump_dfg_config_action(EVdfg_config_action a)
+{
+    fdump_dfg_config_action(stdout, a);
+}
 
 static void
 EVdfg_add_act_to_queue(EVdfg_configuration state, EVdfg_config_action act)
@@ -194,11 +199,20 @@ EVdfg_add_act_to_queue(EVdfg_configuration state, EVdfg_config_action act)
     if (state->pending_action_queue == NULL) {
 	state->pending_action_count = 0;
 	state->pending_action_queue = malloc(sizeof(state->pending_action_queue[0]));
-    } else {
-	state->pending_action_queue = realloc(state->pending_action_queue, 
-					      sizeof(state->pending_action_queue[0]) * (state->pending_action_count+1));
+	state->pending_action_queue[state->pending_action_count++] = act;
+	return;
     }
-    state->pending_action_queue[state->pending_action_count++] = act;
+    state->pending_action_queue = realloc(state->pending_action_queue, 
+					  sizeof(state->pending_action_queue[0]) * (state->pending_action_count+1));
+    if (act.type == ACT_create_bridge) {
+	/* insert at beginning */
+	memmove(&state->pending_action_queue[1], state->pending_action_queue, 
+		sizeof(state->pending_action_queue[0]) * state->pending_action_count);
+	state->pending_action_queue[0] = act;
+	state->pending_action_count++;
+    } else {
+	state->pending_action_queue[state->pending_action_count++] = act;
+    }
 }
 
 void
@@ -206,7 +220,7 @@ INT_EVdfg_add_action(EVdfg_stone stone, char *action)
 {
     EVdfg_config_action act;
     act.type = ACT_add_action;
-    act.u.create.stone_id = stone->stone_id;
+    act.stone_id = stone->stone_id;
     act.u.create.action = action;
     EVdfg_perform_act_on_state(stone->dfg->working_state, act, 1 /* add to queue */);
 }
@@ -219,7 +233,7 @@ INT_EVdfg_create_stone(EVdfg dfg, char *action)
     stone->dfg = dfg;
     stone->stone_id = 0x80000000 | dfg->stone_count++;
     act.type = ACT_create;
-    act.u.create.stone_id = stone->stone_id;
+    act.stone_id = stone->stone_id;
     act.u.create.action = action;
     EVdfg_perform_act_on_state(dfg->working_state, act, 1 /* add to queue */);
     return stone;
@@ -234,6 +248,107 @@ EVdfg_stone_state find_stone_state(int stone_id, EVdfg_configuration config)
 	    return config->stones[i];
     }
     return NULL;
+}
+
+static void
+assign_actions_to_nodes(EVdfg_configuration config, EVdfg_master master)
+{
+    int i;
+    for (i=0; i < config->pending_action_count; i++) {
+	EVdfg_config_action act = config->pending_action_queue[i];
+	EVdfg_stone_state stone = find_stone_state(act.stone_id, config);
+	int node = stone->node;
+	if (master->nodes[node].shutdown_status_contribution == STATUS_FAILED) {
+	    if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
+		printf("Skipping action because node failed -> ");
+		fdump_dfg_config_action(stdout, act);
+	    }
+	    config->pending_action_queue[i].type = ACT_no_op;
+	} else {
+	    if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
+		printf("Assigning action to node %d -> ", node);
+		fdump_dfg_config_action(stdout, act);
+	    }
+	    config->pending_action_queue[i].node_for_action = node;
+	}
+    }
+}
+	
+static void
+remove_actions_for_node(EVdfg_configuration config, int node)
+{
+    int i;
+    for (i=0; i < config->pending_action_count; i++) {
+	EVdfg_config_action act = config->pending_action_queue[i];
+	if (act.node_for_action == node) {
+	    if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
+		fdump_dfg_config_action(stdout, act);
+	    }
+	    config->pending_action_queue[i].type = ACT_no_op;
+	}
+    }
+}
+	
+static void
+perform_actions_on_nodes(EVdfg_configuration config, EVdfg_master master)
+{
+    CManager cm = master->cm;
+    int i;
+    for (i=0; i < config->pending_action_count; i++) {
+	EVdfg_config_action act = config->pending_action_queue[i];
+	int local = 0;
+	if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
+	    fdump_dfg_config_action(stdout, act);
+	}
+	if (master->nodes[act.node_for_action].self) {
+	    local = 1;
+	}
+	switch(act.type) {
+	case ACT_no_op: break;
+	case ACT_create_bridge:
+	    if (local) {
+		EVdfg_stone_state dest = find_stone_state(act.u.bridge.target_id, config);
+		int bs = INT_EVcreate_bridge_action(cm, master->nodes[dest->node].contact_list, act.u.bridge.target_id);
+		add_stone_to_lookup(cm->evp, bs, act.stone_id);
+	    }
+	case ACT_create: {
+	    break;
+	}
+	case ACT_add_action: {
+	    break;
+	}
+	case ACT_set_auto_period: {
+	    break;
+	}
+	case ACT_link_port: {
+	    if (local) {
+		INT_EVstone_set_output(cm, act.stone_id, act.u.link.port, act.u.link.dest_id);
+	    }
+	    break;
+	}
+	case ACT_unlink_port: {
+	    if (local) {
+		INT_EVstone_set_output(cm, act.stone_id, act.u.link.port, act.u.link.dest_id);
+	    }
+	    break;
+	}
+	case ACT_set_attrs: {
+	    break;
+	}
+	case ACT_assign_node: {
+	    break;
+	}
+	case ACT_destroy: {
+	    if (local) {
+		INT_EVdestroy_stone(cm, act.stone_id);
+	    }
+	    break;
+	}
+	default:
+	    printf("Bad action\n");
+	    break;
+	}
+    }
 }
 
 int
@@ -264,11 +379,12 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	stone->processed_pending_events = NULL;
 	if (bridge) {
 	    stone->bridge_stone = 1;
-	    stone->stone_id = act.u.bridge.stone_id;
+	    stone->stone_id = act.stone_id;
 	    stone->action = act.u.bridge.action;
 	    stone->bridge_target = act.u.bridge.target_id;
+	    stone->node = act.node_for_action;
 	} else {
-	    stone->stone_id = act.u.create.stone_id;
+	    stone->stone_id = act.stone_id;
 	    stone->action = act.u.create.action;
 	}
 	if (config->stone_count == 0) {
@@ -284,7 +400,7 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	break;
     }
     case ACT_add_action: {
-	EVdfg_stone_state stone = find_stone_state(act.u.create.stone_id, config);
+	EVdfg_stone_state stone = find_stone_state(act.stone_id, config);
 	if (!stone) {
 	    return 0;
 	}
@@ -306,7 +422,7 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	break;
     }
     case ACT_set_auto_period: {
-	EVdfg_stone_state stone = find_stone_state(act.u.period.stone_id, config);
+	EVdfg_stone_state stone = find_stone_state(act.stone_id, config);
 	if (!stone) {
 	    return 0;
 	}
@@ -318,7 +434,7 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	break;
     }
     case ACT_link_port: {
-	EVdfg_stone_state src = find_stone_state(act.u.link.stone_id, config);
+	EVdfg_stone_state src = find_stone_state(act.stone_id, config);
 	if (!src) {
 	    return 0;
 	}
@@ -336,16 +452,19 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	    if (src->out_links[act.u.link.port] != 0) {
 		EVdfg_config_action dact;
 		dact.type = ACT_unlink_port;
-		dact.u.link.stone_id = src->stone_id;
+		dact.stone_id = src->stone_id;
 		dact.u.link.port = act.u.link.port;
 		EVdfg_perform_act_on_state(config, dact, build_queue);
 	    }
 	}
 	src->out_links[act.u.link.port] = act.u.link.dest_id;
+	if (build_queue) {
+	    EVdfg_add_act_to_queue(config, act);
+	}
 	break;
     }
     case ACT_unlink_port: {
-	EVdfg_stone_state src = find_stone_state(act.u.link.stone_id, config);
+	EVdfg_stone_state src = find_stone_state(act.stone_id, config);
 	EVdfg_stone_state dest;
 	int i=0;
 	if (!src) {
@@ -361,14 +480,17 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	    /* this stone only exists because of this link, destroy it */
 	    EVdfg_config_action dact;
 	    dact.type = ACT_destroy;
-	    dact.u.create.stone_id = dest->stone_id;
+	    dact.stone_id = dest->stone_id;
 	    EVdfg_perform_act_on_state(config, dact, build_queue);
 	}
 	src->out_links[act.u.link.port] = 0;
+	if (build_queue) {
+	    EVdfg_add_act_to_queue(config, act);
+	}
 	break;
     }
     case ACT_set_attrs: {
-	EVdfg_stone_state stone = find_stone_state(act.u.attrs.stone_id, config);
+	EVdfg_stone_state stone = find_stone_state(act.stone_id, config);
 	if (!stone) {
 	    return 0;
 	}
@@ -382,11 +504,21 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	break;
     }
     case ACT_assign_node: {
-	EVdfg_stone_state stone = find_stone_state(act.u.attrs.stone_id, config);
+	EVdfg_stone_state stone = find_stone_state(act.stone_id, config);
 	if (!stone) {
 	    return 0;
 	}
 	stone->node = act.u.assign.dest_node;
+	if (build_queue) {
+	    EVdfg_add_act_to_queue(config, act);
+	}
+	break;
+    }
+    case ACT_destroy: {
+	EVdfg_stone_state stone = find_stone_state(act.stone_id, config);
+	if (!stone) {
+	    return 0;
+	}
 	if (build_queue) {
 	    EVdfg_add_act_to_queue(config, act);
 	}
@@ -400,13 +532,68 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
     return ret_val;
 }
 
+static void
+fdump_dfg_config_action(FILE *out, EVdfg_config_action act)
+{
+    switch(act.type) {
+    case ACT_no_op:
+	fprintf(out, "Action is NO_OP\n");
+	break;
+    case ACT_create_bridge:
+	fprintf(out, "Action is CREATE_BRIDGE, stone_id = %x, target %x, action %s\n",
+		act.stone_id, act.u.bridge.target_id, act.u.bridge.action);
+	break;
+    case ACT_create:
+	fprintf(out, "Action is CREATE_STONE, stone_id = %x, action %s\n",
+		act.stone_id, act.u.create.action);
+	break;
+    case ACT_add_action:
+	fprintf(out, "Action is ADD_ACTION, stone_id = %x, action %s\n",
+		act.stone_id, act.u.create.action);
+	break;
+    case ACT_set_auto_period:
+	fprintf(out, "Action is SET_AUTO_PERIOD, stone_id = %x, secs %d, usecs %d\n",
+		act.stone_id, act.u.period.secs, act.u.period.usecs);
+	break;
+    case ACT_link_port:
+	fprintf(out, "Action is LINK_PORT, src_stone_id = %x, port %d, dest_stone_id %x\n",
+		act.stone_id, act.u.link.port, act.u.link.dest_id);
+	break;
+    case ACT_link_dest:
+	fprintf(out, "Action is LINK_DEST, src_stone_id = %x, dest_stone_id %x\n",
+		act.stone_id, act.u.link.dest_id);
+	break;
+    case ACT_unlink_port:
+	fprintf(out, "Action is UNLINK_PORT, src_stone_id = %x, port %d\n",
+		act.stone_id, act.u.link.port);
+	break;
+    case ACT_unlink_dest:
+	fprintf(out, "Action is UNLINK_DEST, src_stone_id = %x, dest %x\n",
+		act.stone_id, act.u.link.dest_id);
+	break;
+    case ACT_set_attrs: 
+	fprintf(out, "Action is SET_ATTRS, stone_id = %x, attrs ",
+		act.stone_id);
+	fdump_attr_list(out, act.u.attrs.attrs);
+	break;
+    case ACT_assign_node:
+	fprintf(out, "Action is ASSIGN_NODE, stone_id = %x, node = %d\n",
+		act.stone_id, act.u.assign.dest_node);
+	break;
+    case ACT_destroy:
+	fprintf(out, "Action is DESTROY, stone_id = %x\n",
+		act.stone_id);
+	break;
+    }
+}
+
 extern void 
 INT_EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec, 
 			int period_usec)
 {
     EVdfg_config_action act;
     act.type = ACT_set_auto_period;
-    act.u.period.stone_id = stone->stone_id;
+    act.stone_id = stone->stone_id;
     act.u.period.secs = period_sec;
     act.u.period.usecs = period_usec;
     (void)EVdfg_perform_act_on_state(stone->dfg->working_state, act, 1 /* add to queue */);
@@ -414,6 +601,7 @@ INT_EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec,
 
 
 static void fdump_dfg_stone(FILE* out, EVdfg_stone_state s);
+
 
 /* static void  */
 /* reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events) */
@@ -471,7 +659,7 @@ INT_EVdfg_link_port(EVdfg_stone src, int port, EVdfg_stone dest)
     EVdfg_config_action act;
     if (port < 0) return 0;
     act.type = ACT_link_port;
-    act.u.link.stone_id = src->stone_id;
+    act.stone_id = src->stone_id;
     act.u.link.port = port;
     act.u.link.dest_id = dest->stone_id;
     return EVdfg_perform_act_on_state(src->dfg->working_state, act, 1 /* add to queue */);
@@ -482,7 +670,7 @@ INT_EVdfg_link_dest(EVdfg_stone src, EVdfg_stone dest)
 {
     EVdfg_config_action act;
     act.type = ACT_link_dest;
-    act.u.link.stone_id = src->stone_id;
+    act.stone_id = src->stone_id;
     act.u.link.dest_id = dest->stone_id;
     return EVdfg_perform_act_on_state(src->dfg->working_state, act, 1 /* add to queue */);
 }
@@ -493,7 +681,7 @@ INT_EVdfg_unlink_port(EVdfg_stone src, int port)
     EVdfg_config_action act;
     if (port < 0) return 0;
     act.type = ACT_unlink_port;
-    act.u.link.stone_id = src->stone_id;
+    act.stone_id = src->stone_id;
     act.u.link.port = port;
     return EVdfg_perform_act_on_state(src->dfg->working_state, act, 1 /* add to queue */);
 }
@@ -503,7 +691,7 @@ INT_EVdfg_unlink_dest(EVdfg_stone src, EVdfg_stone dest)
 {
     EVdfg_config_action act;
     act.type = ACT_unlink_dest;
-    act.u.link.stone_id = src->stone_id;
+    act.stone_id = src->stone_id;
     act.u.link.dest_id = dest->stone_id;
     return EVdfg_perform_act_on_state(src->dfg->working_state, act, 1 /* add to queue */);
 }
@@ -513,7 +701,7 @@ INT_EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs)
 {
     EVdfg_config_action act;
     act.type = ACT_set_attrs;
-    act.u.attrs.stone_id = stone->stone_id;
+    act.stone_id = stone->stone_id;
     act.u.attrs.attrs = attrs;
     add_ref_attr_list(attrs);
     return EVdfg_perform_act_on_state(stone->dfg->working_state, act, 1 /* add to queue */);
@@ -1178,7 +1366,7 @@ INT_EVdfg_assign_node(EVdfg_stone stone, char *node_name)
     }
     EVdfg_config_action act;
     act.type = ACT_assign_node;
-    act.u.assign.stone_id = stone->stone_id;
+    act.stone_id = stone->stone_id;
     act.u.assign.dest_node = node;
     (void) EVdfg_perform_act_on_state(stone->dfg->working_state, act, 1 /* add to queue */);
 }
@@ -1471,7 +1659,7 @@ INT_EVdfg_assoc_client(CManager cm, char* node_name, char *master_contact_str)
 }
 
 static int
-create_bridge_stone(EVdfg dfg, EVdfg_stone_state target)
+create_bridge_stone(EVdfg dfg, EVdfg_stone_state target, int node)
 {
     EVdfg_stone_state bstone;
     EVdfg_config_action act;
@@ -1483,12 +1671,12 @@ create_bridge_stone(EVdfg dfg, EVdfg_stone_state target)
     }
     action = INT_create_bridge_action_spec(target->stone_id, contact);
     act.type = ACT_create_bridge;
-    act.u.bridge.stone_id = -1;  /* anonymous */
     act.u.bridge.action = action;
     act.u.bridge.target_id = target->stone_id;
-    act.u.bridge.stone_id = 0x80000000 | dfg->stone_count++;
+    act.stone_id = 0x80000000 | dfg->stone_count++;
+    act.node_for_action = node;
     EVdfg_perform_act_on_state(dfg->working_state, act, 1 /* add to queue */);
-    return act.u.bridge.stone_id;
+    return act.stone_id;
 }
 
 static void
@@ -1508,11 +1696,19 @@ add_bridge_stones(EVdfg dfg, EVdfg_configuration config)
 	    }
 	    if (target && (!cur->bridge_stone) && (cur->node != target->node)) {
 		EVdfg_stone_state bridge = NULL;
-		cur->out_links[j] = create_bridge_stone(dfg, target);
+		cur->out_links[j] = create_bridge_stone(dfg, target, cur->node);
 		/* put the bridge stone where the source stone is */
 		for (k = 0; k < config->stone_count; k++) {
 		    if (config->stones[k]->stone_id == cur->out_links[j]) {
 			bridge = config->stones[k];
+		    }
+		}
+		for (k = 0; k < config->pending_action_count; k++) {
+		    EVdfg_config_action act = config->pending_action_queue[k];
+		    if (((act.type == ACT_link_port) || (act.type == ACT_link_dest)) &&
+			(act.u.link.dest_id == target->stone_id)) {
+			config->pending_action_queue[k].u.link.dest_id = bridge->stone_id;
+			break;
 		    }
 		}
 		bridge->node = cur->node;
@@ -2169,9 +2365,21 @@ perform_deployment(EVdfg dfg)
     } else {
         CMtrace_out(cm, EVdfgVerbose, "EVDFG perform_deployment -  master DFG state set to %s\n", str_state[master->state]);
 	assert(master->state == DFG_Reconfiguring);
-	printf("Would have done reconfig add bridge stones \n");
-/*	reconfig_add_bridge_stones(dfg);
-	reconfig_deploy(dfg);*/
+    for (i=0; i < dfg->working_state->pending_action_count; i++) {
+	EVdfg_config_action act = dfg->working_state->pending_action_queue[i];
+	if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
+	    fdump_dfg_config_action(stdout, act);
+	}
+    }
+	assign_actions_to_nodes(dfg->working_state, dfg->master);
+	add_bridge_stones(dfg, dfg->working_state);
+//	add_unfreeze_actions(dfg, dfg->working_state);
+	for (i=dfg->master->old_node_count; i < dfg->master->node_count; i++) {
+	    deploy_to_node(dfg, i, dfg->working_state);
+	    dfg->master->nodes[i].needs_ready = 1;   /* everyone needs a ready the first time through */
+	    remove_actions_for_node(dfg->working_state, i);
+	}
+	perform_actions_on_nodes(dfg->working_state, dfg->master);
     }
 }
 
@@ -2374,6 +2582,7 @@ copy_dfg_state(EVdfg_configuration state)
 {
     int i;
     EVdfg_configuration ret = malloc(sizeof(*ret));
+    memset(ret, 0, sizeof(*ret));
     ret->stone_count = state->stone_count;
     ret->stones = malloc(sizeof(ret->stones[0])*state->stone_count);
     for (i=0; i < state->stone_count; i++) {

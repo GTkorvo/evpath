@@ -69,6 +69,7 @@ join_handler(EVdfg_master master, char *identifier, void* available_sources, voi
     char *canon_name;
     EVdfg_stone last, tmp, sink;
     static EVdfg_stone src;
+    static EVdfg_stone first;
     static int graph_already_realized = 0;
     (void) available_sources;
     (void) available_sinks;
@@ -95,7 +96,7 @@ join_handler(EVdfg_master master, char *identifier, void* available_sources, voi
 	src = EVdfg_create_source_stone(dfg, "master_source");
 	
 	last = src;
-
+	
 	EVdfg_assign_node(src, "origin");
 	for (i=1; i < static_node_count -1; i++) {
 	    char str[10];
@@ -106,8 +107,10 @@ join_handler(EVdfg_master master, char *identifier, void* available_sources, voi
 	    sprintf(str, "client%d", i);
 	    EVdfg_assign_node(tmp, str);
 	    last = tmp;
+	    if (i==1) first = tmp;
 	}
 	sink = EVdfg_create_sink_stone(dfg, "simple_handler");
+	if (first == NULL) first = sink;
 	EVdfg_link_port(last, 0, sink);
 	EVdfg_assign_node(sink, "terminal");
 
@@ -125,11 +128,9 @@ join_handler(EVdfg_master master, char *identifier, void* available_sources, voi
 	EVdfg_assign_node(middle_stone, canon_name);
 		
 	free(canon_name);
-	    //      EVdfg_reconfig_link_port_to_stone(dfg, stone_index, 0, middle_stone, NULL);
-	    //      EVdfg_reconfig_link_port_from_stone(dfg, middle_stone, 0, 2, NULL);
-		
-	printf("Doing reconfig\n");
-	EVdfg_reconfig_insert_on_port(dfg, src, 0, middle_stone, NULL);
+	EVdfg_unlink_port(src, 0);
+	EVdfg_link_port(src, 0, middle_stone);
+	EVdfg_link_port(middle_stone, 0, first);
 	EVdfg_realize(dfg);
     }
 }

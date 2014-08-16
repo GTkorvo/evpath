@@ -132,7 +132,9 @@ reconfig_handler(EVdfg dfg)
     if (!quiet)
 	printf("new stone deployed to node %s\n", nodes[node_count/2]);
 		
-    EVdfg_reconfig_insert_on_port(dfg, reconfig_prev, 0, middle_stone, NULL);
+    EVdfg_unlink_port(reconfig_prev, 0);
+    EVdfg_link_port(reconfig_prev, 0, middle_stone);
+    EVdfg_link_port(middle_stone, 0, reconfig_next);
     EVdfg_realize(dfg);
     if (!quiet) 
 	printf("realized\n");

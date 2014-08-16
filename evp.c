@@ -90,6 +90,24 @@ remove_stone_from_lookup(event_path_data evp, int stone_num)
     }
 }
 
+extern void
+add_stone_to_lookup(event_path_data evp, int stone_num, int global_stone_num)
+{
+    int i, stone = -1;
+    int base = evp->stone_lookup_table_size;
+    if (evp->stone_lookup_table_size == 0) {
+	evp->stone_lookup_table = 
+	    malloc(sizeof(evp->stone_lookup_table[0]));
+    } else {
+	evp->stone_lookup_table = 
+	    realloc(evp->stone_lookup_table,
+		    sizeof(evp->stone_lookup_table[0]) * (1+base));
+    }
+    evp->stone_lookup_table[base].global_id = global_stone_num;
+    evp->stone_lookup_table[base].local_id = stone_num;
+    evp->stone_lookup_table_size++;
+}
+
 extern int
 lookup_global_stone(event_path_data evp, int stone_num)
 {
