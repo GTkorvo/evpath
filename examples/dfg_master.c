@@ -27,7 +27,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     return 1;
 }
 
-/* this file is evpath/examples/net_recv.c */
+/* this file is evpath/examples/dfg_master.c */
 int main(int argc, char **argv)
 {
     char *nodes[] = {"a", "b", NULL};
