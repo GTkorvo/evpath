@@ -219,7 +219,6 @@ struct _EVdfg_master {
     EVint_node_list nodes;
     EVdfg_client client;
     char *my_contact_str;
-    char *master_command_contact_str;
 
     /* reconfig data is below */
     int reconfig;

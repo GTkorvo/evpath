@@ -64,6 +64,7 @@ static void handle_shutdown_contrib(EVdfg_master master, EVdfg_master_msg_ptr);
 static void
 queue_master_msg(EVdfg_master master, void*vmsg, EVmaster_msg_type msg_type, CMConnection conn, int copy);
 static void free_master_msg(EVdfg_master_msg *msg);
+static void free_dfg_state(EVdfg_configuration state);
 
 static void free_attrs_msg(EVflush_attrs_reconfig_ptr msg);
 static FMStructDescRec EVdfg_conn_shutdown_format_list[];
@@ -235,6 +236,8 @@ INT_EVdfg_create_stone(EVdfg dfg, char *action)
     act.type = ACT_create;
     act.stone_id = stone->stone_id;
     act.u.create.action = action;
+    dfg->stones = realloc(dfg->stones, sizeof(dfg->stones[0]) * dfg->stone_count);
+    dfg->stones[dfg->stone_count-1] = stone;
     EVdfg_perform_act_on_state(dfg->working_state, act, 1 /* add to queue */);
     return stone;
 }
@@ -713,12 +716,14 @@ INT_EVdfg_get_attr_list(EVdfg_stone stone)
     if (stone->dfg->deployed_state) {
 	EVdfg_stone_state dstone = find_stone_state(stone->stone_id, stone->dfg->deployed_state);
 	if (dstone) {
+	    if (dstone->attrs) add_ref_attr_list(dstone->attrs);
 	    return dstone->attrs;
 	}
     }
     if (stone->dfg->working_state) {
 	EVdfg_stone_state wstone = find_stone_state(stone->stone_id, stone->dfg->deployed_state);
 	if (wstone) {
+	    if (wstone->attrs) add_ref_attr_list(wstone->attrs);
 	    return wstone->attrs;
 	}
     }	
@@ -921,7 +926,6 @@ handle_flush_reconfig(EVdfg_master master, EVdfg_master_msg_ptr mmsg)
 		    free_attr_list(dfg->working_state->stones[j]->attrs);
 		}
 		dfg->working_state->stones[j]->attrs = attr_list_from_string(msg->attr_stone_list[i].attr_str);
-		printf("Got attr list:"); dump_attr_list(dfg->working_state->stones[j]->attrs);
 		break;
 	    }
 	}
@@ -1094,24 +1098,45 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
 }
 
 static void
+free_master(CManager cm, void *vmaster)
+{
+    EVdfg_master master = (EVdfg_master)vmaster;
+    int i;
+    for (i=0; i < master->node_count; i++) {
+	if (master->nodes[i].name) free(master->nodes[i].name);
+	if (master->nodes[i].canonical_name) 
+	    free(master->nodes[i].canonical_name);
+	if (master->nodes[i].contact_list) 
+	    free_attr_list(master->nodes[i].contact_list);
+	if (master->nodes[i].str_contact_list) 
+	    free(master->nodes[i].str_contact_list);
+    }
+    free(master->nodes);
+    if (master->my_contact_str) free(master->my_contact_str);
+    free(master);
+}
+
+static void
+free_client(CManager cm, void *vclient)
+{
+    EVdfg_client client = (EVdfg_client)vclient;
+    int i;
+    if (client->master_contact_str) free(client->master_contact_str);
+    if (client->shutdown_conditions) free(client->shutdown_conditions);
+    free(client);
+}
+
+static void
 free_dfg(CManager cm, void *vdfg)
 {
     EVdfg dfg = vdfg;
     int i;
-    /* for (i=0; i < dfg->stone_count; i++) { */
-    /* 	if (dfg->stones[i]->out_links) free(dfg->stones[i]->out_links); */
-    /* 	if (dfg->stones[i]->action) free(dfg->stones[i]->action); */
-    /* 	if (dfg->stones[i]->extra_actions) { */
-    /* 	    int j; */
-    /* 	    for (j=0; j < dfg->stones[i]->action_count-1; j++) { */
-    /* 		free(dfg->stones[i]->extra_actions[j]); */
-    /* 	    } */
-    /* 	    free(dfg->stones[i]->extra_actions); */
-    /* 	} */
-    /* 	if (dfg->stones[i]->attrs) free_attr_list(dfg->stones[i]->attrs); */
-    /* 	free(dfg->stones[i]); */
-    /* } */
-    /* free(dfg->stones); */
+    for (i=0; i < dfg->stone_count; i++) {
+	if (dfg->stones[i]) free(dfg->stones[i]);
+    }
+    if (dfg->stones) free(dfg->stones);
+    if (dfg->deployed_state) free_dfg_state(dfg->deployed_state);
+    if (dfg->working_state) free_dfg_state(dfg->working_state);
     free(dfg);
 }
 
@@ -1223,6 +1248,7 @@ INT_EVdfg_create_master(CManager cm)
 			   dfg_master_msg_handler, (void*)(((uintptr_t)master)|DFGflush_reconfig));
 
     INT_CMadd_poll(cm, handle_queued_messages_lock, master);
+    INT_CMadd_shutdown_task(cm, free_master, master, FREE_TASK);
     return master;
 }
 
@@ -1258,6 +1284,7 @@ INT_EVdfg_create(EVdfg_master master)
     CMtrace_out(cm, EVdfgVerbose, "EVDFG initialization -  master DFG state set to %s\n", str_state[master->state]);
 
     dfg->working_state = new_dfg_configuration(dfg);
+    dfg->stones = malloc(sizeof(dfg->stones[0]));
     INT_CMadd_shutdown_task(master->cm, free_dfg, dfg, FREE_TASK);
     return dfg;
 }
@@ -1268,6 +1295,7 @@ extern char *INT_EVdfg_get_contact_list(EVdfg_master master)
     attr_list listen_list, contact_list = NULL;
     atom_t CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
     CManager cm = master->cm;
+    char *tmp;
 
     /* use enet transport if available */
     listen_list = create_attr_list();
@@ -1282,9 +1310,9 @@ extern char *INT_EVdfg_get_contact_list(EVdfg_master master)
 	    contact_list = INT_CMget_contact_list(cm);
 	}
     }
-    master->master_command_contact_str = attr_list_to_string(contact_list);
+    tmp = attr_list_to_string(contact_list);
     free_attr_list(contact_list);
-    return master->master_command_contact_str;
+    return tmp;
 }
 
 static void
@@ -1648,6 +1676,7 @@ dfg_assoc_client(CManager cm, char* node_name, char *master_contact, EVdfg_maste
     }
     CMtrace_out(cm, EVdfgVerbose, "DFG %p node name %s\n", client, node_name);
     if (master_attrs) free_attr_list(master_attrs);
+    INT_CMadd_shutdown_task(cm, free_client, client, FREE_TASK);
     return client;
 }
 
@@ -1679,6 +1708,8 @@ create_bridge_stone(EVdfg dfg, EVdfg_stone_state target, int node)
     act.u.bridge.action = action;
     act.u.bridge.target_id = target->stone_id;
     act.stone_id = 0x80000000 | dfg->stone_count++;
+    dfg->stones = realloc(dfg->stones, sizeof(dfg->stones[0]) * dfg->stone_count);
+    dfg->stones[dfg->stone_count-1] = NULL;  /* not a user-visible stone */
     act.node_for_action = node;
     EVdfg_perform_act_on_state(dfg->working_state, act, 1 /* add to queue */);
     return act.stone_id;
@@ -2442,21 +2473,24 @@ perform_deployment(EVdfg dfg)
     } else {
         CMtrace_out(cm, EVdfgVerbose, "EVDFG perform_deployment -  master DFG state set to %s\n", str_state[master->state]);
 	assert(master->state == DFG_Reconfiguring);
-    for (i=0; i < dfg->working_state->pending_action_count; i++) {
-	EVdfg_config_action act = dfg->working_state->pending_action_queue[i];
-	if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
-	    fdump_dfg_config_action(stdout, act);
-	}
-    }
 	assign_actions_to_nodes(dfg->working_state, dfg->master);
 	add_bridge_stones(dfg, dfg->working_state);
 //	add_unfreeze_actions(dfg, dfg->working_state);
+	if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
+	    fprintf(stdout, "EVDFG pending actions to be done on nodes\n");
+	    for (i=0; i < dfg->working_state->pending_action_count; i++) {
+		EVdfg_config_action act = dfg->working_state->pending_action_queue[i];
+		fdump_dfg_config_action(stdout, act);
+	    }
+	}
 	for (i=dfg->master->old_node_count; i < dfg->master->node_count; i++) {
 	    deploy_to_node(dfg, i, dfg->working_state);
 	    dfg->master->nodes[i].needs_ready = 1;   /* everyone needs a ready the first time through */
 	    remove_actions_for_node(dfg->working_state, i);
 	}
 	perform_actions_on_nodes(dfg->working_state, dfg->master);
+	free(dfg->working_state->pending_action_queue);
+	dfg->working_state->pending_action_queue = NULL;
     }
 }
 
@@ -2650,6 +2684,7 @@ free_dfg_state(EVdfg_configuration state)
     	if (state->stones[i]->attrs) free_attr_list(state->stones[i]->attrs);
     	free(state->stones[i]);
     }
+    if (state->pending_action_queue) free(state->pending_action_queue);
     free(state->stones);
     free(state);
 }
