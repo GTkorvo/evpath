@@ -169,7 +169,7 @@ enet_service_network(CManager cm, void *void_trans)
 	}           
         case ENET_EVENT_TYPE_DISCONNECT: {
 	    enet_conn_data_ptr enet_conn_data = event.peer -> data;
-	    svc->trace_out(NULL, "Got a disconnect on connection %p\n",
+	    svc->trace_out(cm, "Got a disconnect on connection %p\n",
 		event.peer -> data);
 
             enet_conn_data = event.peer -> data;
@@ -255,14 +255,14 @@ enet_accept_conn(enet_client_data_ptr sd, transport_entry trans,
     enet_conn_data->remote_contact_port = address->port;
 
     if (enet_conn_data->remote_host != NULL) {
-	svc->trace_out(NULL, "Accepted ENET RUDP connection from host \"%s\"",
+	svc->trace_out(trans->cm, "Accepted ENET RUDP connection from host \"%s\"",
 		       enet_conn_data->remote_host);
     } else {
-	svc->trace_out(NULL, "Accepted ENET RUDP connection from UNKNOWN host");
+	svc->trace_out(trans->cm, "Accepted ENET RUDP connection from UNKNOWN host");
     }
     add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
 	     (attr_value) (long)enet_conn_data->remote_contact_port);
-    svc->trace_out(NULL, "Remote host (IP %x) is listening at port %d\n",
+    svc->trace_out(trans->cm, "Remote host (IP %x) is listening at port %d\n",
 		   enet_conn_data->remote_IP,
 		   enet_conn_data->remote_contact_port);
     free_attr_list(conn_attr_list);
@@ -420,7 +420,7 @@ libcmenet_LTX_self_check(CManager cm, CMtrans_services svc,
     static int IP = 0;
 
     if (IP == 0) {
-	IP = ntohl(get_self_ip_addr(svc));
+	IP = ntohl(get_self_ip_addr(cm, svc));
     }
     if (IP == 0) {
 	IP = ntohl(INADDR_LOOPBACK);
@@ -507,7 +507,7 @@ build_listen_attrs(CManager cm, CMtrans_services svc, enet_client_data_ptr sd,
 {
     char host_name[256];
     attr_list ret_list;
-    int IP = ntohl(get_self_ip_addr(svc));
+    int IP = ntohl(get_self_ip_addr(cm, svc));
     int network_added = 0;
     char *network_string;
     
@@ -515,7 +515,7 @@ build_listen_attrs(CManager cm, CMtrans_services svc, enet_client_data_ptr sd,
 		       int_port_num);
     ret_list = create_attr_list();
 #if !NO_DYNAMIC_LINKING
-    get_qual_hostname(host_name, sizeof(host_name), svc, listen_info, 
+    get_qual_hostname(cm, host_name, sizeof(host_name), svc, listen_info, 
 		      &network_added);
 #endif 
 

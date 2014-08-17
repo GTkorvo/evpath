@@ -656,11 +656,11 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
     ev_state.out_stones = out_stones;
 
     if (CMtrace_on(cm, EVerbose)) {
-	fprintf(CMTrace_file, "Input Transform Event is :\n");
+	fprintf(cm->CMTrace_file, "Input Transform Event is :\n");
 	if (event->reference_format) {
-	    FMfdump_data(CMTrace_file, event->reference_format, event->decoded_event, 10240);
+	    FMfdump_data(cm->CMTrace_file, event->reference_format, event->decoded_event, 10240);
 	} else {
-	    fprintf(CMTrace_file, "       ****  UNFORMATTED  ****\n");
+	    fprintf(cm->CMTrace_file, "       ****  UNFORMATTED  ****\n");
 	}
     }
     memset(out_event, 0, instance->u.transform.out_size);
@@ -681,8 +681,8 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	struct _EVSource s;
 	if (CMtrace_on(cm, EVerbose)) {
 	    FMFormat f = instance->u.transform.out_format;
-	    fprintf(CMTrace_file, " Transform function returned %d, submitting further\n", ret);
-	    FMfdump_data(CMTrace_file, f, out_event, 10240);
+	    fprintf(cm->CMTrace_file, " Transform function returned %d, submitting further\n", ret);
+	    FMfdump_data(cm->CMTrace_file, f, out_event, 10240);
 	}
 	s.local_stone_id = out_stones[0];
 	s.cm = cm;
@@ -1520,6 +1520,7 @@ internal_cod_submit_attr(cod_exec_context ec, int port, void *data, void *type_i
 	event->free_func = NULL;
 	event->free_arg = event;
 	event->attrs = add_ref_attr_list(attrs);
+	event->cm = cm;
 	cod_encode_event(cm, event);  /* map to memory we trust */
 	event->event_encoded = 1;
 	event->decoded_event = NULL;  /* lose old data */
@@ -1907,11 +1908,11 @@ extract_symbol_name(char *filter)
 }
 
 static void*
-load_dll_symbol(char *path, char *symbol_name)
+load_dll_symbol(CManager cm, char *path, char *symbol_name)
 {
     lt_dlhandle handle;
 
-    handle = lt_dlopen(path);
+    handle = CMdlopen(cm->CMTrace_file, path, 0);
     if (!handle) {
     	fprintf(stderr, "failed opening %s\n", path);
 	    return NULL;
@@ -2000,7 +2001,7 @@ generate_filter_code(CManager cm, struct response_spec *mrd, stone_type stone,
 		free(instance);
 		return NULL;
 	    }
-	    instance->u.filter.func_ptr = (int(*)(void*,attr_list)) load_dll_symbol(path, symbol_name);
+	    instance->u.filter.func_ptr = (int(*)(void*,attr_list)) load_dll_symbol(cm, path, symbol_name);
 	    if (instance->u.filter.func_ptr == NULL) {
 		fprintf(stderr, "Failed to load symbol \"%s\" from file \"%s\"\n",
 			symbol_name, path);
@@ -2036,7 +2037,7 @@ generate_filter_code(CManager cm, struct response_spec *mrd, stone_type stone,
 		return NULL;
 	    }
 	    instance->u.transform.func_ptr =
-		(int(*)(void*,void*,attr_list,attr_list)) load_dll_symbol(path, symbol_name);
+		(int(*)(void*,void*,attr_list,attr_list)) load_dll_symbol(cm, path, symbol_name);
 	    if (instance->u.transform.func_ptr == NULL) {
 		fprintf(stderr, "Failed to load symbol \"%s\" from file \"%s\"\n",
 			symbol_name, path);

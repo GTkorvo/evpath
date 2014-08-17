@@ -34,10 +34,8 @@ CMset_dlopen_verbose(int verbose)
     dlopen_verbose = verbose;
 }
 
-extern FILE * CMTrace_file;
-
 void *
-CMdlopen(char *in_lib, int mode)
+CMdlopen(void *CMTrace_filev, char *in_lib, int mode)
 {
 #if NO_DYNAMIC_LINKING
     return NULL;
@@ -47,6 +45,7 @@ CMdlopen(char *in_lib, int mode)
     void *handle;
     char *tmp;
     char *lib;
+    FILE *CMTrace_file = (FILE*)CMTrace_filev;
     if (dlopen_verbose == -1) {
 	dlopen_verbose = (getenv("CMTransportVerbose") != NULL);
     }

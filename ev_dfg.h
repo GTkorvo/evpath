@@ -563,19 +563,35 @@ extern attr_list EVdfg_get_attr_list(EVdfg_stone stone);
 
 
 /*!
- *  Vote that this node is ready for shutdown and provide it's contribution
- *  to the return value.
+ *  Vote that this node is ready for shutdown, provide it's contribution
+ *  to the return value and wait for the actual shutdown to occur.
  *
  *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
  *  by every participating node for normal shutdown.  The return value from
- *  EVdfg_wait_for_shutdown() will be the same on each node and will depend
- *  upon every node's contribution to the shutdown status.
+ *  all calls (on all nodes) to EVdfg_shutdown() and
+ *  EVdfg_wait_for_shutdown() will all be the same.
  *
- * \param dfg The local EVdfg handle for which shutdown is indicated.
+ * \param dfg The EVdfg handle to which a return value is contributed
  * \param result this node's contribution to the DFG-wide shutdown value
- *
+ * \return the DFG-wide shutdown value
  */
 extern int EVdfg_shutdown(EVdfg_client client, int result);
+
+/*!
+ *  Override voting and force shutdown with specific return value.
+ *
+ *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
+ *  by every participating node for normal shutdown.  However, this call
+ *  forces an abnormal shutdown. The return value from all calls (on all
+ *  nodes) to EVdfg_shutdown() and EVdfg_wait_for_shutdown() will all the
+ *  value of this result parameter.
+ *
+ * \param client The EVdfg_client handle for which shutdown should be forced
+ * \param result this node's contribution to the DFG-wide shutdown value
+ * \return the DFG-wide shutdown value (actually equal to result here)
+ *
+ */
+extern int EVdfg_force_shutdown(EVdfg_client client, int result);
 
 /*!
  *  Vote that this node is ready for shutdown and is providing no specific contribution
@@ -586,7 +602,7 @@ extern int EVdfg_shutdown(EVdfg_client client, int result);
  *  EVdfg_wait_for_shutdown() will be the same on each node and will depend
  *  upon every node's contribution to the shutdown status.
  *
- * \param dfg The local EVdfg handle for which shutdown is indicated.
+ * \param client The EVdfg_client handle for which shutdown is indicated.
  *
  */
 extern void EVdfg_ready_for_shutdown(EVdfg_client client);
@@ -599,7 +615,7 @@ extern void EVdfg_ready_for_shutdown(EVdfg_client client);
  *  EVdfg_wait_for_shutdown() will be the same on each node and will depend
  *  upon every node's contribution to the shutdown status.
  *
- * \param dfg The local EVdfg handle for which shutdown is indicated.
+ * \param client The EVdfg_client handle for which shutdown is indicated.
  *
  */
 extern int EVdfg_wait_for_shutdown(EVdfg_client client);
@@ -610,27 +626,11 @@ extern int EVdfg_wait_for_shutdown(EVdfg_client client);
  *  Generally this will cause every call to EVdfg_wait_for_shutdown() to
  *  return the result value here, terminating execution of the EVdfg.
  *
- * \param dfg The local EVdfg handle for which shutdown is indicated.
+ * \param client The EVdfg_client handle for which shutdown is indicated.
  * \param result this node's contribution to the DFG-wide shutdown value
  *
  */
 extern int EVdfg_force_shutdown(EVdfg_client client, int result);
-
-/*
-  (VERY) tentative reconfiguration interface
-*/
-
-/* extern void EVdfg_reconfig_insert(EVdfg dfg, int src_stone_id, EVdfg_stone new_stone, int dest_stone_id, EVevent_list q_event); */
-/* extern void EVdfg_reconfig_delete_link(EVdfg dfg, int src_index, int dest_index); */
-/* extern void EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index); */
-/* extern void EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index); */
-/* extern void EVdfg_reconfig_link_port_to_stone(EVdfg dfg, int src_stone_index, int port, EVdfg_stone target_stone, EVevent_list q_events); */
-/* extern void EVdfg_reconfig_link_port_from_stone(EVdfg dfg, EVdfg_stone src_stone, int port, int target_index, EVevent_list q_events); */
-/* extern void EVdfg_reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events); */
-/* extern void EVdfg_reconfig_transfer_events(EVdfg dfg, int src_stone_index, int src_port, int dest_stone_index, int dest_port); */
-/* extern void EVdfg_reconfig_insert_on_port(EVdfg dfg, EVdfg_stone src_stone, int port, EVdfg_stone new_stone, EVevent_list q_events); */
-
-/* @}*/
 
 #ifdef	__cplusplus
 }

@@ -262,15 +262,15 @@ assign_actions_to_nodes(EVdfg_configuration config, EVdfg_master master)
 	EVdfg_stone_state stone = find_stone_state(act.stone_id, config);
 	int node = stone->node;
 	if (master->nodes[node].shutdown_status_contribution == STATUS_FAILED) {
-	    if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
+	    if (CMtrace_on(master->cm, EVdfgVerbose)) {
 		printf("Skipping action because node failed -> ");
-		fdump_dfg_config_action(stdout, act);
+		fdump_dfg_config_action(master->cm->CMTrace_file, act);
 	    }
 	    config->pending_action_queue[i].type = ACT_no_op;
 	} else {
-	    if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
+	    if (CMtrace_on(master->cm, EVdfgVerbose)) {
 		printf("Assigning action to node %d -> ", node);
-		fdump_dfg_config_action(stdout, act);
+		fdump_dfg_config_action(master->cm->CMTrace_file, act);
 	    }
 	    config->pending_action_queue[i].node_for_action = node;
 	}
@@ -278,14 +278,14 @@ assign_actions_to_nodes(EVdfg_configuration config, EVdfg_master master)
 }
 	
 static void
-remove_actions_for_node(EVdfg_configuration config, int node)
+remove_actions_for_node(EVdfg_configuration config, int node, EVdfg_master master)
 {
     int i;
     for (i=0; i < config->pending_action_count; i++) {
 	EVdfg_config_action act = config->pending_action_queue[i];
 	if (act.node_for_action == node) {
-	    if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
-		fdump_dfg_config_action(stdout, act);
+	    if (CMtrace_on(master->cm, EVdfgVerbose)) {
+		fdump_dfg_config_action(master->cm->CMTrace_file, act);
 	    }
 	    config->pending_action_queue[i].type = ACT_no_op;
 	}
@@ -303,8 +303,8 @@ perform_actions_on_nodes(EVdfg_configuration config, EVdfg_master master)
     for (i=0; i < config->pending_action_count; i++) {
 	EVdfg_config_action act = config->pending_action_queue[i];
 	int local = 0;
-	if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
-	    fdump_dfg_config_action(stdout, act);
+	if (CMtrace_on(cm, EVdfgVerbose)) {
+	    fdump_dfg_config_action(master->cm->CMTrace_file, act);
 	}
 	if (master->nodes[act.node_for_action].self) {
 	    local = 1;
@@ -779,31 +779,31 @@ handle_conn_shutdown(EVdfg_master master, EVdfg_master_msg_ptr msg)
 
     master->state = DFG_Reconfiguring;
     
-    CMtrace_out(cm, EVdfgVerbose, "EVDFG conn_shutdown_handler -  master DFG state is now %s\n", str_state[master->state]);
+    CMtrace_out(master->cm, EVdfgVerbose, "EVDFG conn_shutdown_handler -  master DFG state is now %s\n", str_state[master->state]);
     if (master->node_fail_handler != NULL) {
 	int i;
 	int target_stone = -1;
 	char *failed_node = NULL;
 	char *contact_str = NULL;
-	CMtrace_out(cm, EVdfgVerbose, "IN CONN_SHUTDOWN_HANDLER\n");
+	CMtrace_out(master->cm, EVdfgVerbose, "IN CONN_SHUTDOWN_HANDLER\n");
 	for (i=0; i< dfg->stone_count; i++) {
 	    int j;
 	    for (j = 0; j < dfg->deployed_state->stones[i]->out_count; j++) {
 		if (dfg->deployed_state->stones[i]->out_links[j] == stone) {
 		    int out_stone_id = dfg->deployed_state->stones[i]->out_links[j];
 		    EVdfg_stone_state out_stone = find_stone_state(out_stone_id, dfg->deployed_state);
-		    CMtrace_out(cm, EVdfgVerbose, "Found reporting stone as output %d of stone %d\n",
+		    CMtrace_out(master->cm, EVdfgVerbose, "Found reporting stone as output %d of stone %d\n",
 				j, i);
 		    parse_bridge_action_spec(out_stone->action, 
 					     &target_stone, &contact_str);
-		    CMtrace_out(cm, EVdfgVerbose, "Dead stone is %d\n", target_stone);
+		    CMtrace_out(master->cm, EVdfgVerbose, "Dead stone is %d\n", target_stone);
 		}
 	    }
 	}
 	for (i=0; i< dfg->stone_count; i++) {
 	    if (dfg->deployed_state->stones[i]->stone_id == target_stone) {
 		int node = dfg->deployed_state->stones[i]->node;
-		CMtrace_out(cm, EVdfgVerbose, "Dead node is %d, name %s\n", node,
+		CMtrace_out(master->cm, EVdfgVerbose, "Dead node is %d, name %s\n", node,
 			    master->nodes[node].canonical_name);
 		failed_node = master->nodes[node].canonical_name;
 		master->nodes[node].shutdown_status_contribution = STATUS_FAILED;
@@ -848,7 +848,7 @@ handle_shutdown_contrib(EVdfg_master master, EVdfg_master_msg_ptr mmsg)
 
     EVshutdown_contribution_ptr msg =  &mmsg->u.shutdown_contrib;
     possibly_signal_shutdown(master, msg->value, mmsg->conn);
-    CMtrace_out(cm, EVdfgVerbose, "EVDFG exit shutdown master DFG state is %s\n", str_state[master->state]);
+    CMtrace_out(master->cm, EVdfgVerbose, "EVDFG exit shutdown master DFG state is %s\n", str_state[master->state]);
 }
 
 static void
@@ -913,7 +913,7 @@ handle_flush_reconfig(EVdfg_master master, EVdfg_master_msg_ptr mmsg)
     if (((EVflush_attrs_reconfig_ptr)msg)->reconfig) {
 	master->state = DFG_Reconfiguring;
     }
-    CMtrace_out(cm, EVdfgVerbose, "EVDFG flush_attr_reconfig -  master DFG state is now %s\n", str_state[master->state]);
+    CMtrace_out(master->cm, EVdfgVerbose, "EVDFG flush_attr_reconfig -  master DFG state is now %s\n", str_state[master->state]);
     for (i=0; i < msg->count; i++) {
 	/* go through incoming attributes */
 	for (j=0; j< dfg->stone_count; j++) {
@@ -953,7 +953,7 @@ handle_node_join(EVdfg_master master, EVdfg_master_msg_ptr msg)
 
     if (master->state == DFG_Running) {
 	master->state = DFG_Reconfiguring;
-	CMtrace_out(cm, EVdfgVerbose, "EVDFG node_join -  master DFG state is now %s\n", str_state[master->state]);
+	CMtrace_out(master->cm, EVdfgVerbose, "EVDFG node_join -  master DFG state is now %s\n", str_state[master->state]);
     }
 
     if (master->node_join_handler == NULL) {
@@ -1006,7 +1006,7 @@ handle_node_join(EVdfg_master master, EVdfg_master_msg_ptr msg)
 	    master->nodes[n].contact_list = attr_list_from_string(master->nodes[n].str_contact_list);
 	}
     }
-    CMtrace_out(cm, EVdfgVerbose, "Client \"%s\" has joined DFG, contact %s\n", node_name, master->nodes[new_node].str_contact_list);
+    CMtrace_out(master->cm, EVdfgVerbose, "Client \"%s\" has joined DFG, contact %s\n", node_name, master->nodes[new_node].str_contact_list);
     check_all_nodes_registered(master);
 }
 
@@ -1281,7 +1281,7 @@ INT_EVdfg_create(EVdfg_master master)
     master->sig_reconfig_bool = 0;
     master->old_node_count = 1;
     master->state = DFG_Joining;
-    CMtrace_out(cm, EVdfgVerbose, "EVDFG initialization -  master DFG state set to %s\n", str_state[master->state]);
+    CMtrace_out(master->cm, EVdfgVerbose, "EVDFG initialization -  master DFG state set to %s\n", str_state[master->state]);
 
     dfg->working_state = new_dfg_configuration(dfg);
     dfg->stones = malloc(sizeof(dfg->stones[0]));
@@ -1320,7 +1320,7 @@ check_connectivity(EVdfg_configuration state, EVdfg_master master)
 {
     int i;
     for (i=0; i< state->stone_count; i++) {
-	CMtrace_out(state->cm, EVdfgVerbose, "Stone %d - assigned to node %s, action %s\n", i, 
+	CMtrace_out(master->cm, EVdfgVerbose, "Stone %d - assigned to node %s, action %s\n", i, 
 		    master->nodes[state->stones[i]->node].canonical_name, (state->stones[i]->action ? state->stones[i]->action : "NULL"));
 	if (state->stones[i]->node == -1) {
 	    printf("Warning, stone %d has not been assigned to any node.  This stone will not be deployed.\n", i);
@@ -1395,7 +1395,7 @@ INT_EVdfg_assign_node(EVdfg_stone stone, char *node_name)
     }
 	
     if (dfg->realized == 1) {
-	CMtrace_out(dfg->cm, EVdfgVerbose, "assign node, node# = %d\n", node);
+	CMtrace_out(master->cm, EVdfgVerbose, "assign node, node# = %d\n", node);
     }
     EVdfg_config_action act;
     act.type = ACT_assign_node;
@@ -1407,10 +1407,10 @@ INT_EVdfg_assign_node(EVdfg_stone stone, char *node_name)
 extern int 
 INT_EVdfg_ready_wait(EVdfg_client client)
 {
-    CMtrace_out(cm, EVdfgVerbose, "DFG %p wait for ready\n", client);
+    CMtrace_out(client->cm, EVdfgVerbose, "DFG %p wait for ready\n", client);
     INT_CMCondition_wait(client->cm, client->ready_condition);
     client->ready_condition = -1;
-    CMtrace_out(cm, EVdfgVerbose, "DFG %p ready wait released\n", client);
+    CMtrace_out(client->cm, EVdfgVerbose, "DFG %p ready wait released\n", client);
     return 1;
 }
 
@@ -1748,7 +1748,7 @@ add_bridge_stones(EVdfg dfg, EVdfg_configuration config)
 		    }
 		}
 		bridge->node = cur->node;
-		CMtrace_out(config->cm, EVdfgVerbose, "Created bridge stone %x, target node is %d, assigned to node %d\n", cur->out_links[j], target->node, cur->node);
+		CMtrace_out(dfg->master->cm, EVdfgVerbose, "Created bridge stone %x, target node is %d, assigned to node %d\n", cur->out_links[j], target->node, cur->node);
 	    }
 	}
     }
@@ -1810,7 +1810,7 @@ build_deploy_msg_for_node_stones(EVdfg_configuration config, int act_num, EVdfg_
     int node = orig_act.node_for_action;
     CMFormat deploy_msg = INT_CMlookup_format(master->cm, EVdfg_deploy_format_list);
 
-    CMtrace_out(cm, EVdfgVerbose, "Master in deploy_msg_for_node for client %s, node %d\n",
+    CMtrace_out(master->cm, EVdfgVerbose, "Master in deploy_msg_for_node for client %s, node %d\n",
 		master->nodes[node].canonical_name, node);
     memset(&msg, 0, sizeof(msg));
     msg.canonical_name = master->nodes[node].canonical_name;
@@ -1879,7 +1879,7 @@ deploy_to_node(EVdfg dfg, int node, EVdfg_configuration config)
 	    stone_count++;
 	}
     }
-    CMtrace_out(cm, EVdfgVerbose, "Master in deploy_to_node for client %s, node %d, stones to deploy %d\n",
+    CMtrace_out(dfg->master->cm, EVdfgVerbose, "Master in deploy_to_node for client %s, node %d, stones to deploy %d\n",
 		dfg->master->nodes[node].canonical_name, node, stone_count);
     if (stone_count == 0) {
         dfg->deploy_ack_count++;
@@ -1911,262 +1911,6 @@ deploy_to_node(EVdfg dfg, int node, EVdfg_configuration config)
     }
     free(msg.stone_list);
 }
-
-
-/* void reconfig_delete_link(EVdfg dfg, int src_index, int dest_index) { */
-/*     int i; */
-	
-/*     EVdfg_stone src = dfg->stones[src_index]; */
-/*     EVdfg_stone dest = dfg->stones[dest_index]; */
-/*     EVdfg_stone temp_stone = NULL; */
-	
-/*     for (i = 0; i < src->out_count; ++i) { */
-/* 	if (src->bridge_stone == 0) { */
-/* 	    if (src->out_links[i]->bridge_stone) { */
-/* 		temp_stone = src->out_links[i]; */
-/* 		if (temp_stone->bridge_target == dest) { */
-/* 		    if (src->node == 0) { */
-/* 			//EVfreeze_stone(dfg->cm, temp_stone->stone_id); */
-/* 			//transfer_events = EVextract_stone_events(dfg->cm, temp_stone->stone_id); */
-/* 			if (src->frozen == 0) { */
-/* 			    EVfreeze_stone(dfg->client->cm, src->stone_id); */
-/* 			} */
-/* 			EVstone_remove_split_target(dfg->client->cm, src->stone_id, temp_stone->stone_id); */
-/* 			//	    EVfreeze_stone(dfg->cm, temp_stone->stone_id); */
-/* 			//	    transfer_events = EVextract_stone_events(dfg->cm, temp_stone->stone_id); */
-/* 			EVfree_stone(dfg->client->cm, temp_stone->stone_id); */
-/* 		    } else { */
-/* 			if (src->frozen == 0) { */
-/* 			    REVfreeze_stone(dfg->master->nodes[src->node].conn, src->stone_id); */
-/* 			} */
-/* 			REVstone_remove_split_target(dfg->master->nodes[src->node].conn, src->stone_id, temp_stone->stone_id); */
-/* 			//	    REVfreeze_stone(dfg->nodes[temp_stone->node].conn, temp_stone->stone_id); */
-			
-/* 			CMtrace_out(dfg->cm, EVdfgVerbose, "deleting remotely.. sounds good till here.. src->node = %d, src_index = %d\n", src->node, src_index); */
-/* 			fflush(stdout); */
-			
-/* 			//	    transfer_events = REVextract_stone_events(dfg->nodes[temp_stone->node].conn, temp_stone->stone_id); */
-			
-/* 			CMtrace_out(dfg->cm, EVdfgVerbose, "exracted events in delete..\n"); */
-/* 			fflush(stdout); */
-			
-/* 			REVfree_stone(dfg->master->nodes[src->node].conn, temp_stone->stone_id); */
-/* 			//free(temp-stone); */
-/* 		    } */
-/* 		    //temp_stone = NULL; */
-/* 		    src->out_links[i]->invalid = 1; */
-/* 		    src->frozen = 1; */
-/* 		    break; */
-/* 		} */
-/* 	    } else { */
-/* 		if(src->out_links[i] == dest && src->out_links[i]->invalid == 0) { */
-/* 		    if (src->node == 0) { */
-/* 			if (src->frozen == 0) { */
-/* 			    EVfreeze_stone(dfg->client->cm, src->stone_id); */
-/* 			} */
-/* 			EVstone_remove_split_target(dfg->client->cm, src->stone_id, dest->stone_id); */
-/* 		    } else { */
-/* 			if (src->frozen == 0) { */
-/* 			    REVfreeze_stone(dfg->master->nodes[src->node].conn, src->stone_id); */
-/* 			} */
-/* 			REVstone_remove_split_target(dfg->master->nodes[src->node].conn, src->stone_id, dest->stone_id); */
-/* 		    } */
-/* 		    src->out_links[i]->invalid = 1; */
-/* 		    src->frozen = 1; */
-/* 		    break; */
-/* 		} */
-/* 	    } */
-/* 	} */
-/*     } */
-   
-/* } */
-
-
-/* static void reconfig_deploy(EVdfg dfg)  */
-/* { */
-/*     int i; */
-/*     int j; */
-/*     EVstone new_bridge_stone_id = -1; */
-/*     EVdfg_stone temp_stone = NULL; */
-/*     EVdfg_stone cur = NULL; */
-/*     EVdfg_stone target = NULL; */
-	
-	
-/*     for (i = 0; i < dfg->master->node_count; ++i) { */
-/* 	deploy_to_node(dfg, i); */
-/*     } */
-	
-/*     CManager_unlock(dfg->master->cm); */
-/*     for (i = 0; i < dfg->stone_count; ++i) { */
-/* 	if (dfg->stones[i]->new_out_count > 0) { */
-/* 	    cur = dfg->stones[i]; */
-/* 	    CMtrace_out(dfg->cm, EVdfgVerbose, "Reconfig_deploy, stone %d, (%x)\n", i, cur->stone_id); */
-/* 	    if (cur->frozen == 0) { */
-/* 		CMtrace_out(dfg->cm, EVdfgVerbose, "Freezing stone %d, (%x)\n", i, cur->stone_id); */
-/* 		if (cur->node == 0) { */
-/* 		    /\* Master *\/ */
-/* 		    EVfreeze_stone(dfg->master->cm, cur->stone_id); */
-/* 		} else { */
-/* 		    REVfreeze_stone(dfg->master->nodes[cur->node].conn, cur->stone_id); */
-/* 		} */
-/* 		cur->frozen = 1; */
-/* 	    } */
-/* 	    for (j = 0; j < cur->new_out_count; ++j) { */
-/* 		CMtrace_out(dfg->cm, EVdfgVerbose, " stone %d (%x) has new out link\n", i, cur->stone_id); */
-/* 		if (cur->new_out_ports[j] < cur->out_count) { */
-/* 		    temp_stone = cur->out_links[cur->new_out_ports[j]]; */
-/* 		} else { */
-/* 		    temp_stone = NULL; */
-/* 		} */
-/* 		INT_EVdfg_link_port(cur, cur->new_out_ports[j], cur->new_out_links[j]); */
-		
-/* 		target = cur->out_links[cur->new_out_ports[j]]; */
-/* 		if (target && (cur->bridge_stone == 0) && (cur->node != target->node)) { */
-/* 		    cur->out_links[cur->new_out_ports[j]] = create_bridge_stone(dfg, target); */
-/* 		    CMtrace_out(dfg->cm, EVdfgVerbose, "Created bridge stone (reconfig_deploy) %p, target node %d, assigned to node %d\n", cur->out_links[j], target->node, cur->node); */
-/* 		    /\* put the bridge stone where the source stone is *\/ */
-/* 		    cur->out_links[cur->new_out_ports[j]]->node = cur->node; */
-/* 		    cur->out_links[cur->new_out_ports[j]]->pending_events = cur->processed_pending_events; */
-/* 		    if (cur->node == 0) { */
-/* 			new_bridge_stone_id = EVcreate_bridge_action(dfg->client->cm, dfg->master->nodes[target->node].contact_list, target->stone_id); */
-/* 			cur->out_links[cur->new_out_ports[j]]->stone_id = new_bridge_stone_id; */
-/* 			EVstone_add_split_target(dfg->client->cm, cur->stone_id, new_bridge_stone_id); */
-/* 		    } else { */
-/* 			new_bridge_stone_id = REVcreate_bridge_action(dfg->master->nodes[cur->node].conn, dfg->master->nodes[target->node].contact_list, target->stone_id); */
-/* 			REVstone_add_split_target(dfg->master->nodes[cur->node].conn, cur->stone_id, new_bridge_stone_id); */
-/* 		    } */
-/* 		} else { */
-/* 		    if (cur->node == 0) { */
-/* 			EVstone_add_split_target(dfg->client->cm, cur->stone_id, target->stone_id); */
-/* 		    } */
-/* 		    else { */
-/* 			REVstone_add_split_target(dfg->master->nodes[cur->node].conn, cur->stone_id, target->stone_id); */
-/* 		    } */
-/* 		} */
-		
-/* 		if (temp_stone != NULL) { */
-/* 		    if (temp_stone->invalid == 0) { */
-/* 			if (temp_stone->frozen == 0) { */
-/* 			    if (temp_stone->node == 0) { */
-/* 				EVfreeze_stone(dfg->client->cm, temp_stone->stone_id); */
-/* 				EVtransfer_events(dfg->client->cm, temp_stone->stone_id, cur->out_links[cur->new_out_ports[j]]->stone_id); */
-/* 			    } else { */
-/* 				REVfreeze_stone(dfg->master->nodes[temp_stone->node].conn, temp_stone->stone_id); */
-/* 				REVtransfer_events(dfg->master->nodes[temp_stone->node].conn, temp_stone->stone_id, cur->out_links[cur->new_out_ports[j]]->stone_id); */
-/* 			    } */
-/* 			} */
-/* 			if (cur->node == 0) { */
-/* 			    EVstone_remove_split_target(dfg->client->cm, cur->stone_id, temp_stone->stone_id); */
-/* 			} else { */
-/* 			    REVstone_remove_split_target(dfg->master->nodes[cur->node].conn, cur->stone_id, temp_stone->stone_id); */
-/* 			} */
-
-/* 			if (temp_stone->bridge_stone) { */
-/* 			    if (cur->node == 0) { */
-/* 				CMtrace_out(dfg->client->cm, EVdfgVerbose, "\nreconfig_deploy: Locally freeing..\n"); */
-/* 				fflush(stdout); */
-/* 				EVfree_stone(dfg->client->cm, temp_stone->stone_id); */
-/* 			    } else { */
-/* 				CMtrace_out(dfg->cm, EVdfgVerbose, "reconfig_deploy: Remotely freeing..\n"); */
-/* 				fflush(stdout); */
-/* 				REVfree_stone(dfg->master->nodes[temp_stone->node].conn, temp_stone->stone_id); */
-/* 			    } */
-/* 			    //free(temp_stone); */
-/* 			    //temp_stone = NULL; */
-/* 			} */
-/* 			temp_stone->invalid = 1; */
-/* 		    } */
-/* 		} */
-/* 	    } */
-/* 	} */
-/*     } */
-    
-    
-/*     /\* ****** Transferring events ****** */
-/*      *\/ */
-    
-/*     for (i = 0; i < dfg->transfer_events_count; ++i) { */
-/* 	EVdfg_stone temp = dfg->stones[dfg->transfer_events_list[i][0]]; */
-/* 	EVdfg_stone src = temp->out_links[dfg->transfer_events_list[i][1]]; */
-/* 	EVdfg_stone dest; */
-	
-/* 	CMtrace_out(dfg->cm, EVdfgVerbose, " Transfering events\n"); */
-/* 	if (temp->node == 0) { */
-/* 	    if (temp->frozen == 0) { */
-/* 		EVfreeze_stone(dfg->client->cm, temp->stone_id); */
-/* 		temp->frozen = 1; */
-/* 	    } */
-/* 	    if (src->frozen == 0) { */
-/* 		EVfreeze_stone(dfg->client->cm, src->stone_id); */
-/* 		src->frozen = 1; */
-/* 	    } */
-/* 	} else { */
-/* 	    if (temp->frozen == 0) { */
-/* 		REVfreeze_stone(dfg->master->nodes[temp->node].conn, temp->stone_id); */
-/* 		temp->frozen = 1; */
-/* 	    } */
-/* 	    if (src->frozen == 0) { */
-/* 		REVfreeze_stone(dfg->master->nodes[src->node].conn, src->stone_id); */
-/* 		src->frozen = 1; */
-/* 	    } */
-/* 	} */
-	
-/* 	temp = dfg->stones[dfg->transfer_events_list[i][2]]; */
-/* 	dest = temp->out_links[dfg->transfer_events_list[i][3]]; */
-	
-/* 	if (src->node == 0) { */
-/* 	    EVtransfer_events(dfg->client->cm, src->stone_id, dest->stone_id); */
-/* 	} else { */
-/* 	    REVtransfer_events(dfg->master->nodes[src->node].conn, src->stone_id, dest->stone_id); */
-/* 	} */
-/*     } */
-    
-/*     /\* ****** Deleting links ****** */
-/*      *\/ */
-    
-/*     for (i = 0; i < dfg->delete_count; ++i) { */
-/* 	CMtrace_out(dfg->cm, EVdfgVerbose, " Deleting a link\n"); */
-/* 	reconfig_delete_link(dfg, dfg->delete_list[i][0], dfg->delete_list[i][1]); */
-/*     } */
-    
-/*     for (i = 0; i < dfg->stone_count; ++i) { */
-/*         cur = dfg->stones[i]; */
-/* 	if (cur->frozen == 1 && cur->invalid == 0) { */
-/* 	    if (dfg->stones[i]->new_out_count > 0) { */
-/* 		free(cur->new_out_links); */
-/* 		free(cur->new_out_ports); */
-/* 		cur->new_out_count = 0; */
-/* 	    } */
-/* 	    if (cur->node == 0) { */
-/* 		//	    if (cur->pending_events != NULL) { */
-/* 		//	      printf("\nResubmitting events locally! Cheers!\n"); */
-/* 		//	      fflush(EVsubmit); */
-/* 		//	      stdout_encoded(dfg->cm, cur->stone_id, cur->pending_events->buffer, cur->pending_events->length, dfg->nodes[0].contact_list); */
-/* 		//	    } */
-/* 		EVunfreeze_stone(dfg->client->cm, cur->stone_id); */
-/* 	    } else { */
-/* 		//	    if (cur->pending_events != NULL) { */
-/* 		//	      printf("\nResubmitting events remotely! Cheers!\n"); */
-/* 		//	      fflush(stdout); */
-/* 		//REVsubmit_encoded(dfg->nodes[cur->node].conn, cur->stone_id, cur->pending_events->buffer, cur->pending_events->length, dfg->nodes[cur->node].contact_list); */
-/* 		//            } */
-/* 		REVunfreeze_stone(dfg->master->nodes[cur->node].conn, cur->stone_id); */
-/* 	    } */
-/* 	    cur->frozen = 0; */
-/* 	} */
-/*     } */
-    
-    
-/*     CManager_lock(dfg->client->cm); */
-/*     if (CMtrace_on(dfg->cm, EVdfgVerbose)) { */
-/* 	for (i = 0; i < dfg->stone_count; ++i) { */
-/* 	    fprintf(CMTrace_file, "Stone# %d : ", i); */
-/* 	    fdump_dfg_stone(CMTrace_file, dfg->stones[i]); */
-/* 	} */
-/*     } */
-/*     dfg->deployed_stone_count = dfg->stone_count; */
-
-/* } */
 
 static void
 dump_dfg_stone(EVdfg_stone_state s)
@@ -2460,7 +2204,7 @@ perform_deployment(EVdfg dfg)
     if (dfg->master->sig_reconfig_bool == 0) {
 	assert(master->state == DFG_Joining);
 	master->state = DFG_Starting;
-	CMtrace_out(cm, EVdfgVerbose, "EVDFG check all nodes registered -  master DFG state is %s\n", str_state[master->state]);
+	CMtrace_out(master->cm, EVdfgVerbose, "EVDFG check all nodes registered -  master DFG state is %s\n", str_state[master->state]);
 	add_bridge_stones(dfg, dfg->working_state);
 	dfg->deploy_ack_count = 1;  /* we are number 1 */
 	if (dfg->deploy_ack_condition == -1) {
@@ -2471,22 +2215,22 @@ perform_deployment(EVdfg dfg)
 	    dfg->master->nodes[i].needs_ready = 1;   /* everyone needs a ready the first time through */
 	}
     } else {
-        CMtrace_out(cm, EVdfgVerbose, "EVDFG perform_deployment -  master DFG state set to %s\n", str_state[master->state]);
+        CMtrace_out(master->cm, EVdfgVerbose, "EVDFG perform_deployment -  master DFG state set to %s\n", str_state[master->state]);
 	assert(master->state == DFG_Reconfiguring);
 	assign_actions_to_nodes(dfg->working_state, dfg->master);
 	add_bridge_stones(dfg, dfg->working_state);
 //	add_unfreeze_actions(dfg, dfg->working_state);
-	if (CMtrace_on(dfg->cm, EVdfgVerbose)) {
-	    fprintf(stdout, "EVDFG pending actions to be done on nodes\n");
+	if (CMtrace_on(master->cm, EVdfgVerbose)) {
+	    fprintf(master->cm->CMTrace_file, "EVDFG pending actions to be done on nodes\n");
 	    for (i=0; i < dfg->working_state->pending_action_count; i++) {
 		EVdfg_config_action act = dfg->working_state->pending_action_queue[i];
-		fdump_dfg_config_action(stdout, act);
+		fdump_dfg_config_action(master->cm->CMTrace_file, act);
 	    }
 	}
 	for (i=dfg->master->old_node_count; i < dfg->master->node_count; i++) {
 	    deploy_to_node(dfg, i, dfg->working_state);
 	    dfg->master->nodes[i].needs_ready = 1;   /* everyone needs a ready the first time through */
-	    remove_actions_for_node(dfg->working_state, i);
+	    remove_actions_for_node(dfg->working_state, i, master);
 	}
 	perform_actions_on_nodes(dfg->working_state, dfg->master);
 	free(dfg->working_state->pending_action_queue);
@@ -2512,13 +2256,13 @@ reconfig_signal_ready(EVdfg dfg)
     int i;
     CMFormat ready_msg = INT_CMlookup_format(dfg->master->cm, EVdfg_ready_format_list);
     EVready_msg msg;
-    CMtrace_out(cm, EVdfgVerbose, "Master signaling DFG %p ready for operation\n",
+    CMtrace_out(dfg->master->cm, EVdfgVerbose, "Master signaling DFG %p ready for operation\n",
 				dfg);
     for (i=dfg->master->old_node_count; i < dfg->master->node_count; i++) {
 	if (dfg->master->nodes[i].conn != NULL) {
 	    msg.node_id = i;
 	    INT_CMwrite(dfg->master->nodes[i].conn, ready_msg, &msg);
-	    CMtrace_out(cm, EVdfgVerbose, "Master - ready sent to node \"%s\"\n",
+	    CMtrace_out(dfg->master->cm, EVdfgVerbose, "Master - ready sent to node \"%s\"\n",
 			dfg->master->nodes[i].name);
 	}
     }
@@ -2530,18 +2274,18 @@ signal_ready(EVdfg dfg)
     int i;
     CMFormat ready_msg = INT_CMlookup_format(dfg->master->cm, EVdfg_ready_format_list);
     EVready_msg msg;
-    CMtrace_out(cm, EVdfgVerbose, "Master signaling DFG %p ready for operation\n",
+    CMtrace_out(dfg->master->cm, EVdfgVerbose, "Master signaling DFG %p ready for operation\n",
 		dfg);
     for (i=0; i < dfg->master->node_count; i++) {
 	if (!dfg->master->nodes[i].needs_ready) {
-	    CMtrace_out(cm, EVdfgVerbose, "Master - ready not required for node %d \"%s\"\n", i, 
+	    CMtrace_out(dfg->master->cm, EVdfgVerbose, "Master - ready not required for node %d \"%s\"\n", i, 
 			dfg->master->nodes[i].name);
 	    continue;
 	}
 	if (dfg->master->nodes[i].conn != NULL) {
 	    msg.node_id = i;
 	    INT_CMwrite(dfg->master->nodes[i].conn, ready_msg, &msg);
-	    CMtrace_out(cm, EVdfgVerbose, "Master - ready sent to node %d \"%s\"\n", i, 
+	    CMtrace_out(dfg->master->cm, EVdfgVerbose, "Master - ready sent to node %d \"%s\"\n", i, 
 			dfg->master->nodes[i].name);
 	} else {
 	    if (!dfg->master->nodes[i].self) {
@@ -2550,7 +2294,7 @@ signal_ready(EVdfg dfg)
 	    }
 	    CManager_unlock(dfg->client->cm);
 	    msg.node_id = i;
-	    CMtrace_out(cm, EVdfgVerbose, "Master DFG %p is ready, local signalling %d\n", dfg, dfg->client->ready_condition);
+	    CMtrace_out(dfg->master->cm, EVdfgVerbose, "Master DFG %p is ready, local signalling %d\n", dfg, dfg->client->ready_condition);
 	    dfg_ready_handler(dfg->client->cm, NULL, &msg, dfg->client, NULL);
 	    CManager_lock(dfg->client->cm);
 	}
@@ -2583,32 +2327,32 @@ possibly_signal_shutdown(EVdfg_master master, int value, CMConnection conn)
 	value ^= STATUS_FORCE;   /* yes, that's xor-assign */
     }
     if (force_shutdown) {
-	CMtrace_out(cm, EVdfgVerbose, "Client %d signals %d, forces shutdown\n", signal_from_client, value);
+	CMtrace_out(master->cm, EVdfgVerbose, "Client %d signals %d, forces shutdown\n", signal_from_client, value);
     } else {
-	CMtrace_out(cm, EVdfgVerbose, "Client %d signals %d, See if we're all ready to signal shutdown\n", signal_from_client, value);
+	CMtrace_out(master->cm, EVdfgVerbose, "Client %d signals %d, See if we're all ready to signal shutdown\n", signal_from_client, value);
     }
     master->nodes[signal_from_client].shutdown_status_contribution = value;
     int contributed_status = 0;
     for (i=0; i < master->node_count; i++) {
-	CMtrace_out(cm, EVdfgVerbose, "NODE %d status is :", i);
+	CMtrace_out(master->cm, EVdfgVerbose, "NODE %d status is :", i);
 	switch (master->nodes[i].shutdown_status_contribution) {
 	case STATUS_UNDETERMINED:
-	    CMtrace_out(cm, EVdfgVerbose, "NOT READY FOR SHUTDOWN\n");
+	    CMtrace_out(master->cm, EVdfgVerbose, "NOT READY FOR SHUTDOWN\n");
 	    shutdown = 0;
 	    break;
 	case STATUS_NO_CONTRIBUTION:
-	    CMtrace_out(cm, EVdfgVerbose, "READY for shutdown, no status\n");
+	    CMtrace_out(master->cm, EVdfgVerbose, "READY for shutdown, no status\n");
 	    break;
 	case STATUS_SUCCESS:
-	    CMtrace_out(cm, EVdfgVerbose, "READY for shutdown, SUCCESS\n");
+	    CMtrace_out(master->cm, EVdfgVerbose, "READY for shutdown, SUCCESS\n");
 	    contributed_status = 1;
 	    break;
 	case STATUS_FAILED:
-	    CMtrace_out(cm, EVdfgVerbose, "ALREADY FAILED\n");
+	    CMtrace_out(master->cm, EVdfgVerbose, "ALREADY FAILED\n");
 	    contributed_status = 1;
 	    break;
 	default:
-	    CMtrace_out(cm, EVdfgVerbose, "READY for shutdown, FAILURE %d\n",
+	    CMtrace_out(master->cm, EVdfgVerbose, "READY for shutdown, FAILURE %d\n",
 			master->nodes[i].shutdown_status_contribution);
 	    status |= master->nodes[i].shutdown_status_contribution;
 	    break;
@@ -2617,24 +2361,24 @@ possibly_signal_shutdown(EVdfg_master master, int value, CMConnection conn)
     if (force_shutdown) {
 	shutdown = 1;
 	status = value;
-	CMtrace_out(cm, EVdfgVerbose, "DFG undergoing forced shutdown\n");
+	CMtrace_out(master->cm, EVdfgVerbose, "DFG undergoing forced shutdown\n");
     }
     if (!shutdown) {
-	CMtrace_out(cm, EVdfgVerbose, "DFG not ready for shutdown\n");
+	CMtrace_out(master->cm, EVdfgVerbose, "DFG not ready for shutdown\n");
 	return;
     }
     if (!contributed_status) {
-	CMtrace_out(cm, EVdfgVerbose, "DFG nobody has contributed status - not ready for shutdown\n");
+	CMtrace_out(master->cm, EVdfgVerbose, "DFG nobody has contributed status - not ready for shutdown\n");
 	return;
     }
-    CMtrace_out(cm, EVdfgVerbose, "DFG shutdown with value %d\n", status);
+    CMtrace_out(master->cm, EVdfgVerbose, "DFG shutdown with value %d\n", status);
     master->state = DFG_Shutting_Down;
-    CMtrace_out(cm, EVdfgVerbose, "EVDFG possibly signal shutdown -  master DFG state is %s\n", str_state[master->state]);
+    CMtrace_out(master->cm, EVdfgVerbose, "EVDFG possibly signal shutdown -  master DFG state is %s\n", str_state[master->state]);
     msg.value = status;
     for (i=0; i < master->node_count; i++) {
 	if (master->nodes[i].conn != NULL) {
 	    INT_CMwrite(master->nodes[i].conn, shutdown_msg, &msg);
-	    CMtrace_out(cm, EVdfgVerbose, "DFG shutdown message sent to client \"%s\"(%d)\n", master->nodes[i].canonical_name, i);
+	    CMtrace_out(master->cm, EVdfgVerbose, "DFG shutdown message sent to client \"%s\"(%d)\n", master->nodes[i].canonical_name, i);
 	} else {
 	    if (!master->nodes[i].self) {
 		printf("Failure, no connection, not self, node %d\n", i);
@@ -2646,10 +2390,10 @@ possibly_signal_shutdown(EVdfg_master master, int value, CMConnection conn)
     i = 0;
     master->client->already_shutdown = 1;
     while(master->client->shutdown_conditions && (master->client->shutdown_conditions[i] != -1)) {
-	CMtrace_out(cm, EVdfgVerbose, "Client %d shutdown signalling %d\n", master->client->my_node_id, master->client->shutdown_conditions[i]);
+	CMtrace_out(master->cm, EVdfgVerbose, "Client %d shutdown signalling %d\n", master->client->my_node_id, master->client->shutdown_conditions[i]);
 	INT_CMCondition_signal(master->cm, master->client->shutdown_conditions[i++]);
     }
-    CMtrace_out(cm, EVdfgVerbose, "Master DFG shutdown\n");
+    CMtrace_out(master->cm, EVdfgVerbose, "Master DFG shutdown\n");
 }
 
 extern void INT_EVdfg_node_join_handler(EVdfg_master master, EVdfgJoinHandlerFunc func)

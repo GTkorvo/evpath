@@ -538,8 +538,8 @@ CMinternal_listen(CManager cm, attr_list listen_info, int try_others)
 					  listen_info);
 	    add_contact_list(cm, attrs);
 	    if (CMtrace_on(cm, CMConnectionVerbose)) {
-		fprintf(CMTrace_file, "Adding contact list -> ");
-		fdump_attr_list(CMTrace_file, attrs);
+		fprintf(cm->CMTrace_file, "Adding contact list -> ");
+		fdump_attr_list(cm->CMTrace_file, attrs);
 	    }
 	    if (attrs != NULL) {
 		success++;
@@ -717,6 +717,8 @@ INT_CManager_create()
     cm->locked = 0;
     cm->closed = 0;
     cm->abort_read_ahead = 0;
+    cm->CMTrace_file = NULL;
+    CMtrace_init(cm, EVerbose);
     CMinit_local_formats(cm);
     thr_mutex_init(cm->context_lock);
 
@@ -752,7 +754,7 @@ INT_CManager_create()
     return cm;
 }
 
-extern void CMControlList_free(CMControlList cl);
+static void CMControlList_free(CManager cm, CMControlList cl);
 
 static void
 CManager_free(CManager cm)
@@ -868,7 +870,7 @@ INT_CManager_close(CManager cm)
 	}
 	CMtrace_out(cm, CMFreeVerbose, "Freeing CManager %p\n", cm);
 	cl->free_reference_count = 1;
-	CMControlList_free(cl);
+	CMControlList_free(cm, cl);
 	CManager_unlock(cm);
 	CManager_free(cm);
     } else {
@@ -1287,17 +1289,17 @@ CMwake_server_thread(CManager cm)
     (cl->wake_select)((void*)&CMstatic_trans_svcs, &cl->select_data);
 }
 
-extern void
-CMControlList_free(CMControlList cl)
+static void
+CMControlList_free(CManager cm, CMControlList cl)
 {
     cl->free_reference_count--;
     if (CMtrace_val[CMFreeVerbose]) {
-	fprintf(CMTrace_file, "CMControlList_free, %lx, ref count now %d\n", (long)cl,
+	fprintf(cm->CMTrace_file, "CMControlList_free, %lx, ref count now %d\n", (long)cl,
 	       cl->free_reference_count);
     }
     if(cl->free_reference_count == 0) {
 	if (CMtrace_val[CMFreeVerbose]) {
-	    fprintf(CMTrace_file, "CMControlList_free freeing %lx\n", (long)cl);
+	    fprintf(cm->CMTrace_file, "CMControlList_free freeing %lx\n", (long)cl);
 	}
 	if (cl->polling_function_list != NULL) {
 	    INT_CMfree(cl->polling_function_list);
@@ -1310,15 +1312,15 @@ CMControlList_free(CMControlList cl)
 #include "qual_hostname.c"
 
 extern void
-CMget_qual_hostname(char *buf, int len)
+CMget_qual_hostname(CManager cm, char *buf, int len)
 {
-    get_qual_hostname(buf, len, &CMstatic_trans_svcs, NULL, NULL);
+    get_qual_hostname(cm, buf, len, &CMstatic_trans_svcs, NULL, NULL);
 }
 
 extern int
-INT_CMget_self_ip_addr()
+INT_CMget_self_ip_addr(CManager cm)
 {
-    return get_self_ip_addr(&CMstatic_trans_svcs);
+    return get_self_ip_addr(cm, &CMstatic_trans_svcs);
 }
 
 #define CURRENT_HANDSHAKE_VERSION 1
@@ -1481,11 +1483,11 @@ INT_CMinitiate_conn(CManager cm, attr_list attrs)
     if (!cm->initialized) CMinitialize(cm);
     conn = CMinternal_initiate_conn(cm, attrs);
     if (CMtrace_on(cm, CMConnectionVerbose)) {
-	fprintf(CMTrace_file, "CMinitiate_conn returning ");
+	fprintf(cm->CMTrace_file, "CMinitiate_conn returning ");
 	if (conn != NULL) {
-	    fdump_CMConnection(CMTrace_file, conn);
+	    fdump_CMConnection(cm->CMTrace_file, conn);
 	} else {
-	    fprintf(CMTrace_file, "NULL\n");
+	    fprintf(cm->CMTrace_file, "NULL\n");
 	}
     }
     return conn;
@@ -1504,8 +1506,8 @@ CMinternal_get_conn(CManager cm, attr_list attrs)
     CMConnection conn = NULL;
     assert(CManager_locked(cm));
     if (CMtrace_on(cm, CMConnectionVerbose)) {
-	fprintf(CMTrace_file, "In CMinternal_get_conn, attrs ");
-	if (attrs) fdump_attr_list(CMTrace_file, attrs); else fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "In CMinternal_get_conn, attrs ");
+	if (attrs) fdump_attr_list(cm->CMTrace_file, attrs); else fprintf(cm->CMTrace_file, "\n");
     }
     for (i=0; i<cm->connection_count; i++) {
 	CMConnection tmp = cm->connections[i];
@@ -1523,11 +1525,11 @@ CMinternal_get_conn(CManager cm, attr_list attrs)
 	conn->ref_count++;
     }
     if (CMtrace_on(cm, CMConnectionVerbose)) {
-	fprintf(CMTrace_file, "CMinternal_get_conn returning ");
+	fprintf(cm->CMTrace_file, "CMinternal_get_conn returning ");
 	if (conn != NULL) {
-	    fdump_CMConnection(CMTrace_file, conn);
+	    fdump_CMConnection(cm->CMTrace_file, conn);
 	} else {
-	    fprintf(CMTrace_file, "NULL\n");
+	    fprintf(cm->CMTrace_file, "NULL\n");
 	}
     }
     return conn;
@@ -2290,8 +2292,8 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
     if (attr_length != 0) {
 	attrs = CMdecode_attr_from_xmit(conn->cm, base);
 	if (CMtrace_on(conn->cm, CMDataVerbose)) {
-	    fprintf(CMTrace_file, "CM - Incoming read attributes -> ");
-	    fdump_attr_list(CMTrace_file, attrs);
+	    fprintf(cm->CMTrace_file, "CM - Incoming read attributes -> ");
+	    fdump_attr_list(cm->CMTrace_file, attrs);
 	}
     }
     if (event_msg) {
@@ -2333,23 +2335,34 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 	fprintf(stderr, "invalid format in incoming buffer\n");
 	return 0;
     }
-    CMtrace_out(cm, CMDataVerbose, "CM - Receiving record of type %s\n", 
-		name_of_FMformat(FMFormat_of_original(format)));
+    CMtrace_out(cm, CMDataVerbose, "CM - Receiving record of type %s, FFSformat %p\n", 
+		name_of_FMformat(FMFormat_of_original(format)), format);
     for (i=0; i< cm->in_format_count; i++) {
 	if (cm->in_formats[i].format == format) {
 	    cm_format = &cm->in_formats[i];
+	    CMtrace_out(cm, CMDataVerbose, "CM - Found incoming cm_format %p, matching FFSformat %p\n", 
+			cm_format, format);
 	}
     }
     if (cm_format == NULL) {
 	cm_format = CMidentify_rollbackCMformat(cm, data_buffer);
-	if(cm_format)
+	CMtrace_out(cm, CMDataVerbose, "CM - Created cm_format %p, matching FFSformat %p\n", 
+		    cm_format, format);
+	if(cm_format) {
+	    CMtrace_out(cm, CMDataVerbose, "CM - Calling CMcreate_conversion type %s, format %p\n", 
+			name_of_FMformat(FMFormat_of_original(format)), format);
 	    CMcreate_conversion(cm, cm_format);
+	    CMtrace_out(cm, CMDataVerbose, "CM - after CMcreate_conversion format %p, has_conversion is %d\n", 
+			format, FFShas_conversion(format));
+	}
     }
 
     if ((cm_format == NULL) || (cm_format->handler == NULL)) {
 	fprintf(stderr, "CM - No handler for incoming data of this version of format \"%s\"\n",
 		name_of_FMformat(FMFormat_of_original(format)));
 	return 0;
+    } else if (!FFShas_conversion(format)) {
+	CMcreate_conversion(cm, cm_format);
     }
     assert(FFShas_conversion(format));
 
@@ -2384,8 +2397,8 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	fprintf(CMTrace_file, "CM - record type %s, contents are:\n  ", name_of_FMformat(FMFormat_of_original(cm_format->format)));
-	r = FMfdump_data(CMTrace_file, FMFormat_of_original(cm_format->format), decode_buffer, dump_char_limit);
+	fprintf(cm->CMTrace_file, "CM - record type %s, contents are:\n  ", name_of_FMformat(FMFormat_of_original(cm_format->format)));
+	r = FMfdump_data(cm->CMTrace_file, FMFormat_of_original(cm_format->format), decode_buffer, dump_char_limit);
 	if (r && !warned) {
 	    printf("\n\n  ****  Warning **** CM record dump truncated\n");
 	    printf("  To change size limits, set CMDumpSize environment variable.\n\n\n");
@@ -2829,6 +2842,7 @@ INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data,
     int do_write = 1;
     void *encoded_attrs = NULL;
     int attrs_present = 0;
+    CManager cm = conn->cm;
 
     /* ensure conn is open */
     if (conn->closed != 0) {
@@ -2872,17 +2886,17 @@ INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data,
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	fprintf(CMTrace_file, "CM - Writing record of type %s\n",
+	fprintf(cm->CMTrace_file, "CM - Writing record of type %s\n",
 	       name_of_FMformat(format->fmformat));
 	if (attrs != NULL) {
-	    fprintf(CMTrace_file, "CM - write attributes are:");
-	    fdump_attr_list(CMTrace_file, attrs);
+	    fprintf(cm->CMTrace_file, "CM - write attributes are:");
+	    fdump_attr_list(cm->CMTrace_file, attrs);
 	}
-	fprintf(CMTrace_file, "CM - record type %s, contents are:\n  ", name_of_FMformat(format->fmformat));
-	r = FMfdump_data(CMTrace_file, format->fmformat, data, dump_char_limit);
+	fprintf(cm->CMTrace_file, "CM - record type %s, contents are:\n  ", name_of_FMformat(format->fmformat));
+	r = FMfdump_data(cm->CMTrace_file, format->fmformat, data, dump_char_limit);
 	if (r && !warned) {
-	    fprintf(CMTrace_file, "\n\n  ****  Warning **** CM record dump truncated\n");
-	    fprintf(CMTrace_file, "  To change size limits, set CMDumpSize environment variable.\n\n\n");
+	    fprintf(cm->CMTrace_file, "\n\n  ****  Warning **** CM record dump truncated\n");
+	    fprintf(cm->CMTrace_file, "  To change size limits, set CMDumpSize environment variable.\n\n\n");
 	    warned++;
 	}
     }
@@ -2961,6 +2975,7 @@ internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
     int do_write = 1;
     void *encoded_attrs = NULL;
     int attrs_present = 0;
+    CManager cm = conn->cm;
 
     /* ensure conn is open */
     if (conn->closed != 0) {
@@ -2996,27 +3011,27 @@ internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	fprintf(CMTrace_file, "CM - Writing record %lx of type %s\n", (long)event,
+	fprintf(cm->CMTrace_file, "CM - Writing record %lx of type %s\n", (long)event,
 	       name_of_FMformat(format->fmformat));
 	if (attrs != NULL) {
-	    fprintf(CMTrace_file, "CM - write attributes are:");
-	    fdump_attr_list(CMTrace_file, attrs);
+	    fprintf(cm->CMTrace_file, "CM - write attributes are:");
+	    fdump_attr_list(cm->CMTrace_file, attrs);
 	} else {
-	    fprintf(CMTrace_file, "CM - write attrs NULL\n");
+	    fprintf(cm->CMTrace_file, "CM - write attrs NULL\n");
 	}
-	fprintf(CMTrace_file, "CM - record type %s, contents ", name_of_FMformat(format->fmformat));
+	fprintf(cm->CMTrace_file, "CM - record type %s, contents ", name_of_FMformat(format->fmformat));
 	if (event->decoded_event) {
-	    fprintf(CMTrace_file, "DECODED are:\n  ");
-	    r = FMfdump_data(CMTrace_file, format->fmformat, event->decoded_event,
+	    fprintf(cm->CMTrace_file, "DECODED are:\n  ");
+	    r = FMfdump_data(cm->CMTrace_file, format->fmformat, event->decoded_event,
 			     dump_char_limit);
 	} else {
-	    fprintf(CMTrace_file, "ENCODED are:\n  ");
-	    r = FMfdump_encoded_data(CMTrace_file, format->fmformat,
+	    fprintf(cm->CMTrace_file, "ENCODED are:\n  ");
+	    r = FMfdump_encoded_data(cm->CMTrace_file, format->fmformat,
 				     event->encoded_event, dump_char_limit);
 	}	    
 	if (r && !warned) {
-	    fprintf(CMTrace_file, "\n\n  ****  Warning **** CM record dump truncated\n");
-	    fprintf(CMTrace_file, "  To change size limits, set CMDumpSize environment variable.\n\n\n");
+	    fprintf(cm->CMTrace_file, "\n\n  ****  Warning **** CM record dump truncated\n");
+	    fprintf(cm->CMTrace_file, "  To change size limits, set CMDumpSize environment variable.\n\n\n");
 	    warned++;
 	}
     }
@@ -3310,7 +3325,7 @@ CM_init_select(CMControlList cl, CManager cm)
     libname = malloc(strlen("libcmselect") + strlen(MODULE_EXT) + 1);
     strcpy(libname, "libcmselect");
     strcat(libname, MODULE_EXT);
-    handle = lt_dlopen(libname);
+    handle = CMdlopen(cm->CMTrace_file, libname, 0);
     free(libname);
     if (!handle) {
 	fprintf(stderr, "Failed to load required select dll.\n");

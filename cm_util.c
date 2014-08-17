@@ -22,21 +22,20 @@
 #include "cm_internal.h"
 #include "cercs_env.h"
 
-int CMtrace_val[CMLastTraceType] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 extern void EVfprint_version(FILE* out);
 extern void CMset_dlopen_verbose(int verbose);
 
-FILE * CMTrace_file = NULL;
+int CMtrace_val[CMLastTraceType] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
-static long CMTrace_file_num = -1;
+static int CMTrace_file_num = -1;
 
 extern void INT_CMTrace_file_id(int ID)
 {
     CMTrace_file_num = ID;
 }
 
-extern int CMtrace_init(CMTraceType trace_type)
+extern int CMtrace_init(CManager cm, CMTraceType trace_type)
 {
     int i, trace = 0;
     char *str;
@@ -69,31 +68,37 @@ extern int CMtrace_init(CMTraceType trace_type)
     }
     if (CMTrace_file_num != -1) {
 	char name[40];
-	sprintf(name, "CMTrace_output.%d", (int)CMTrace_file_num);
-	CMTrace_file = fopen(name, "w");
-	if (CMTrace_file == NULL) {
-	    printf("Failed to open trace file %s\n", name);
-	    CMTrace_file = stdout;
+	static int cm_count = 0;
+	if (cm_count == 0) {
+	    sprintf(name, "CMTrace_output.%d", (int)CMTrace_file_num);
 	} else {
-	    fprintf(CMTrace_file, "Trace flags set : \n");
-	    if (CMtrace_val[CMAlwaysTrace]) fprintf(CMTrace_file, "CMAlwaysTrace, ");
-	    if (CMtrace_val[CMControlVerbose]) fprintf(CMTrace_file, "CMControlVerbose, ");
-	    if (CMtrace_val[CMConnectionVerbose]) fprintf(CMTrace_file, "CMConnectionVerbose, ");
-	    if (CMtrace_val[CMLowLevelVerbose]) fprintf(CMTrace_file, "CMLowLevelVerbose, ");
-	    if (CMtrace_val[CMDataVerbose]) fprintf(CMTrace_file, "CMDataVerbose, ");
-	    if (CMtrace_val[CMTransportVerbose]) fprintf(CMTrace_file, "CMTransportVerbose, ");
-	    if (CMtrace_val[CMFormatVerbose]) fprintf(CMTrace_file, "CMFormatVerbose, ");
-	    if (CMtrace_val[CMFreeVerbose]) fprintf(CMTrace_file, "CMFreeVerbose, ");
-	    if (CMtrace_val[CMAttrVerbose]) fprintf(CMTrace_file, "CMAttrVerbose, ");
-	    if (CMtrace_val[CMBufferVerbose]) fprintf(CMTrace_file, "CMBufferVerbose, ");
-	    if (CMtrace_val[EVerbose]) fprintf(CMTrace_file, "EVerbose, ");
-	    if (CMtrace_val[EVWarning]) fprintf(CMTrace_file, "EVWarning, ");
-	    if (CMtrace_val[CMIBTransportVerbose]) fprintf(CMTrace_file, "CMIBTransportVerbose, ");
-	    if (CMtrace_val[EVdfgVerbose]) fprintf(CMTrace_file, "EVdfgVerbose, ");
-	    fprintf(CMTrace_file, "\n");
+	    sprintf(name, "CMTrace_output.%d_%d", (int)CMTrace_file_num, cm_count);
+	}
+	cm_count++;
+	cm->CMTrace_file = fopen(name, "w");
+	if (cm->CMTrace_file == NULL) {
+	    printf("Failed to open trace file %s\n", name);
+	    cm->CMTrace_file = stdout;
+	} else {
+	    fprintf(cm->CMTrace_file, "Trace flags set : \n");
+	    if (CMtrace_val[CMAlwaysTrace]) fprintf(cm->CMTrace_file, "CMAlwaysTrace, ");
+	    if (CMtrace_val[CMControlVerbose]) fprintf(cm->CMTrace_file, "CMControlVerbose, ");
+	    if (CMtrace_val[CMConnectionVerbose]) fprintf(cm->CMTrace_file, "CMConnectionVerbose, ");
+	    if (CMtrace_val[CMLowLevelVerbose]) fprintf(cm->CMTrace_file, "CMLowLevelVerbose, ");
+	    if (CMtrace_val[CMDataVerbose]) fprintf(cm->CMTrace_file, "CMDataVerbose, ");
+	    if (CMtrace_val[CMTransportVerbose]) fprintf(cm->CMTrace_file, "CMTransportVerbose, ");
+	    if (CMtrace_val[CMFormatVerbose]) fprintf(cm->CMTrace_file, "CMFormatVerbose, ");
+	    if (CMtrace_val[CMFreeVerbose]) fprintf(cm->CMTrace_file, "CMFreeVerbose, ");
+	    if (CMtrace_val[CMAttrVerbose]) fprintf(cm->CMTrace_file, "CMAttrVerbose, ");
+	    if (CMtrace_val[CMBufferVerbose]) fprintf(cm->CMTrace_file, "CMBufferVerbose, ");
+	    if (CMtrace_val[EVerbose]) fprintf(cm->CMTrace_file, "EVerbose, ");
+	    if (CMtrace_val[EVWarning]) fprintf(cm->CMTrace_file, "EVWarning, ");
+	    if (CMtrace_val[CMIBTransportVerbose]) fprintf(cm->CMTrace_file, "CMIBTransportVerbose, ");
+	    if (CMtrace_val[EVdfgVerbose]) fprintf(cm->CMTrace_file, "EVdfgVerbose, ");
+	    fprintf(cm->CMTrace_file, "\n");
 	}
     } else {
-	CMTrace_file = stdout;
+	cm->CMTrace_file = stdout;
     }
     for (i = 0; i < sizeof(CMtrace_val)/sizeof(CMtrace_val[0]); i++) {
 	if (i!=EVWarning) trace |= CMtrace_val[i];
@@ -103,9 +108,9 @@ extern int CMtrace_init(CMTraceType trace_type)
     }
 
     if (trace != 0) {
-	EVfprint_version(CMTrace_file);
+	EVfprint_version(cm->CMTrace_file);
     }
-    fflush(CMTrace_file);
+    fflush(cm->CMTrace_file);
     return CMtrace_val[trace_type];
 }
 
@@ -113,7 +118,7 @@ extern int CMtrace_init(CMTraceType trace_type)
 CMtrace_on(CManager cm, CMTraceType trace_type)
 {
     if (CMtrace_val[0] == -1) {
-	CMtrace_init();
+	CMtrace_init(cm);
     }
 
     return CMtrace_val[trace_type];
@@ -134,9 +139,9 @@ CMtrace_out(CManager cm, CMTraceType trace_type, char *format, ...)
 #else
 	va_start(ap);
 #endif
-	vfprintf(CMTrace_file, format, ap);
+	vfprintf(cm->CMTrace_file, format, ap);
 	va_end(ap);
-	fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "\n");
     }
 #endif
 }
@@ -152,10 +157,10 @@ CMtransport_trace(CManager cm, char *format, ...)
 #else
 	va_start(ap);
 #endif
-	vfprintf(CMTrace_file, format, ap);
+	vfprintf(cm->CMTrace_file, format, ap);
 	va_end(ap);
 	(void)cm;
-	fprintf(CMTrace_file, "\n");
+	fprintf(cm->CMTrace_file, "\n");
     }
 #endif
 }

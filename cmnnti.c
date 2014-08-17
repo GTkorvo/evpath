@@ -993,7 +993,7 @@ attr_list attrs;
     static int IP = 0;
 
     if (IP == 0) {
-	IP = get_self_ip_addr(svc);
+	IP = get_self_ip_addr(cm, svc);
     }
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
@@ -1005,7 +1005,7 @@ attr_list attrs;
 	svc->trace_out(cm, "CMself check NNTI transport found no NNTI_PORT attribute");
 	return 0;
     }
-    get_qual_hostname(my_host_name, sizeof(my_host_name), svc, NULL, NULL);
+    get_qual_hostname(cm, my_host_name, sizeof(my_host_name), svc, NULL, NULL);
 
     if (host_name && (strcmp(host_name, my_host_name) != 0)) {
 	svc->trace_out(cm, "CMself check - Hostnames don't match");

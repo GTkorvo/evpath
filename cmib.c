@@ -88,12 +88,6 @@
 #  pragma warning (disable: 177)
 #endif
 
-typedef struct func_list_item {
-    select_list_func func;
-    void *arg1;
-    void *arg2;
-} FunctionListElement;
-
 struct request
 {
     int magic;    
@@ -108,15 +102,32 @@ struct response
     uint32_t max_length;    
 };
 
+struct piggyback
+{
+    uint32_t total_length;
+    char  body[4];
+};
+
+enum {msg_request = 0, msg_response = 1, msg_piggyback = 2} msg_type;
+
+struct control_message
+{
+    int type;
+    union {
+	struct request req;
+	struct response resp;
+	struct piggyback pb;
+    } u;
+};
+
 struct ibparam
 {
     int lid;
     int psn;
     int qpn;
     int port;
-    //anything else?
+    /*anything else? */
 };
-
 
 int page_size = 0;
 int perftrace =0;
@@ -194,7 +205,16 @@ typedef struct tbuffer_
 LIST_HEAD(tblist, tbuffer_) memlist;
 LIST_HEAD(inuselist, tbuffer_) uselist;
 
-    
+char *ibv_wc_opcode_str[] = {
+    "IBV_WC_SEND",
+    "IBV_WC_RDMA_WRITE",
+    "IBV_WC_RDMA_READ",
+    "IBV_WC_COMP_SWAP",
+    "IBV_WC_FETCH_ADD",
+    "IBV_WC_BIND_MW",
+    "IBV_WC_RECV_RDMA_WITH_IMM"
+};
+
 static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
 			      ib_client_data_ptr sd);
 static int connectqp(ib_conn_data_ptr ib_conn_data,
@@ -243,8 +263,9 @@ static atom_t CM_TRANSPORT = -1;
 static double getlocaltime()
 {
     struct timeval t;
+    double dt;
     gettimeofday(&t, NULL);
-    double dt = (double) t.tv_usec / 1e6 + t.tv_sec;
+    dt = (double) t.tv_usec / 1e6 + t.tv_sec;
     return dt;
 }
 
@@ -313,8 +334,6 @@ inline static struct ibv_device * IB_getdevice(char *name)
     {
 	for(; (ib_dev= *dev_list); ++dev_list)
 	{
-	    printf("device name = %s\n", 
-		   ibv_get_device_name(ib_dev));
 	    if(!strcmp(ibv_get_device_name(ib_dev), name))
 	    {
 		break;
@@ -328,9 +347,6 @@ inline static struct ibv_device * IB_getdevice(char *name)
     }
     else
 	ib_dev = *dev_list; //return very first device so obtained
-    if(ib_dev)
-      printf("device name = %s\n", 
-	     ibv_get_device_name(ib_dev));
 
     return ib_dev; //could be null
 }
@@ -351,7 +367,6 @@ check_host(hostname, sin_addr)
 char *hostname;
 void *sin_addr;
 {
-#ifdef HAS_STRUCT_HOSTENT
     struct hostent *host_addr;
     host_addr = gethostbyname(hostname);
     if (host_addr == NULL) {
@@ -369,11 +384,6 @@ void *sin_addr;
 	memcpy(sin_addr, host_addr->h_addr, host_addr->h_length);
     }
     return 1;
-#else
-    /* VxWorks ? */
-    *((int *) sin_addr) = hostGetByName(hostname);
-    return (*(int *) sin_addr) != -1;
-#endif
 }
 
 static ib_conn_data_ptr 
@@ -442,42 +452,93 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     int iget;
     ib_client_data_ptr sd = (ib_client_data_ptr) trans->trans_data;
     CMtrans_services svc = sd->svc;
-    struct request req;
-    struct response rep;
+    struct control_message msg;
+    struct control_message rep;
     struct ibv_mr *mr;
     int retval = 0;
     struct ibv_wc wc;
     double start =0, end = 0;
-    struct ibv_send_wr *badwr;
-    
-    
+    ib_conn_data_ptr scd;
+    tbuffer *tb;
+
     da_t = getlocaltime();
     
-    ib_conn_data_ptr scd = (ib_conn_data_ptr) svc->get_transport_data(conn);
+    scd = (ib_conn_data_ptr) svc->get_transport_data(conn);
 
     start = getlocaltime();    
-    iget = read(scd->fd, (char *) &req, sizeof(struct request));
+//    iget = read(scd->fd, (char *) &req, sizeof(struct request));
+    iget = read(scd->fd, (char *) &msg, sizeof(struct control_message));
     
 
     if (iget == 0) {
 	svc->connection_close(conn);
 	return;
     }
-    if (iget != sizeof(struct request)) {
+    if (iget != sizeof(struct control_message)) {
 	int lerrno = errno;
 	svc->trace_out(scd->sd->cm, "CMIB iget was %d, errno is %d, returning 0 for read",
 		       iget, lerrno);
     }
 
-    if (req.magic != 0xdeadbeef) {
-	printf("Dead beef panic, 0x%x\n", req.magic);
+    switch(msg.type) {
+    case msg_piggyback: {
+	// read rest and deliver up
+	int msg_offset = ((int) (((char *) (&(((struct control_message *)NULL)->u.pb.body[0]))) - ((char *) NULL)));
+	CMbuffer cb = svc->get_data_buffer(trans->cm, msg.u.pb.total_length - msg_offset);
+
+	memcpy(cb->buffer, &msg.u.pb.body[0], sizeof(struct control_message)-msg_offset);
+	int left = msg.u.pb.total_length - sizeof(struct control_message);
+	char *buffer = (char*)cb->buffer + sizeof(struct control_message)-msg_offset;
+	int requested_len = left;
+	while (left > 0) {
+	    int lerrno;
+	    iget = read(scd->fd, (char *) buffer + requested_len - left,
+		    left);
+	    lerrno = errno;
+	    if (iget == -1) {
+		if ((lerrno != EWOULDBLOCK) &&
+		    (lerrno != EAGAIN) &&
+		    (lerrno != EINTR)) {
+		    /* serious error */
+		    svc->trace_out(scd->sd->cm, "CMSocket iget was -1, errno is %d, returning %d for read", 
+				   lerrno, requested_len - left);
+		    svc->connection_close(conn);
+		    return;
+		}
+	    }
+	    if (iget == 0) {
+		svc->connection_close(conn);
+		return;
+	    }
+	    left -= iget;
+	}
+	scd->read_buffer_len = msg.u.pb.total_length - msg_offset;
+	scd->read_buffer = cb;
+	trans->data_available(trans, conn);
+	svc->return_data_buffer(trans->cm, scd->read_buffer);
+	return;
+	break;
+    }
+    case msg_response:
+	// bad shit, can't handle this here
+	printf("got msg_response in data available, can't handle this\n");
+	break;
+    case msg_request:
+	assert(msg.type == msg_request);
+	break;
+    default:
+	printf("Bad message type\n");
+    }
+    assert(msg.type == msg_request);
+    if (msg.u.req.magic != 0xdeadbeef) {
+	printf("Dead beef panic, 0x%x\n", msg.u.req.magic);
     } 
     end = getlocaltime();
     read_t = end - start;
     
     
 
-    //find the memory for it and create the resonse
+    //find the memory for it and create the response
 
     // if(scd->read_buffer)
     // 	free(scd->read_buffer);    
@@ -490,14 +551,15 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     // 		    IBV_ACCESS_REMOTE_READ);
     start = getlocaltime();
     
-    tbuffer *tb = findMemory(scd, scd->sd, svc, req.length);
+    tb = findMemory(scd, scd->sd, svc, msg.u.req.length);
     if(tb == NULL)
     {
 	svc->trace_out(scd->sd->cm, "Failed to get memory\n");
-	rep.remote_addr = 0;
-	rep.rkey = 0;
-	rep.max_length = 0;
-	if (write(scd->fd, &rep, sizeof(struct response)) != sizeof(struct response)) {
+	rep.type = msg_response;
+	rep.u.resp.remote_addr = 0;
+	rep.u.resp.rkey = 0;
+	rep.u.resp.max_length = 0;
+	if (write(scd->fd, &rep, sizeof(struct control_message)) != sizeof(struct control_message)) {
 	    svc->trace_out(scd->sd->cm, "Write failed\n");
 	    return;
 	}
@@ -505,15 +567,16 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     }
     
     scd->read_buffer = tb->buf->buffer;
-    scd->read_buffer_len = req.length;
+    scd->read_buffer_len = msg.u.req.length;
     scd->tb = tb;    
     mr = tb->mr;
     
   
     //create response
-    rep.remote_addr = int64_from_ptr(scd->read_buffer);
-    rep.rkey = mr->rkey;
-    rep.max_length = scd->read_buffer_len;
+    rep.type = msg_response;
+    rep.u.resp.remote_addr = int64_from_ptr(scd->read_buffer);
+    rep.u.resp.rkey = mr->rkey;
+    rep.u.resp.max_length = scd->read_buffer_len;
 
     end = getlocaltime();
     find_t = end - start;
@@ -551,7 +614,7 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     // 	    retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);	    
     // 	}	
     // }while(iget == 0);
-    if (write(scd->fd, &rep, sizeof(struct response)) != sizeof(struct response)) {
+    if (write(scd->fd, &rep, sizeof(struct control_message)) != sizeof(struct control_message)) {
         svc->trace_out(scd->sd->cm, "Write failed\n");
 	return;
     }
@@ -621,10 +684,10 @@ wait_on_q:
     if(perftrace)
     {	
 	fprintf(stderr, "%d %f %f %f %f %f %f %f %f\n",
-		req.length, da_t,
+		msg.u.req.length, da_t,
 		read_t, find_t, write_t, wait_t, call_t,
-		(req.length/(read_t + find_t + write_t + wait_t))/(1024*1024),
-		(req.length/(read_t + find_t + write_t + wait_t + call_t))/(1024*1024));
+		(msg.u.req.length/(read_t + find_t + write_t + wait_t))/(1024*1024),
+		(msg.u.req.length/(read_t + find_t + write_t + wait_t + call_t))/(1024*1024));
     }
     
     
@@ -653,6 +716,7 @@ void *void_conn_sock;
     int delay_value = 1;
     CMConnection conn;
     attr_list conn_attr_list = NULL;
+    struct ibparam param, remote_param;
 
     //ib stuff
     struct ibv_qp_init_attr  qp_init_attr;
@@ -728,7 +792,6 @@ void *void_conn_sock;
 	add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
 		 (attr_value) (long)ib_conn_data->remote_IP);
 	if (sock_addr.sa_family == AF_INET) {
-#ifdef HAS_STRUCT_HOSTENT
 	    struct hostent *host;
 	    struct sockaddr_in *in_sock = (struct sockaddr_in *) &sock_addr;
 	    host = gethostbyaddr((char *) &in_sock->sin_addr,
@@ -738,19 +801,17 @@ void *void_conn_sock;
 		add_attr(conn_attr_list, CM_PEER_HOSTNAME, Attr_String,
 			 (attr_value) strdup(host->h_name));
 	    }
-#endif
 	}
     }
     if (ib_conn_data->remote_host != NULL) {
-	svc->trace_out(NULL, "Accepted CMIB socket connection from host \"%s\"",
+	svc->trace_out(sd->cm, "Accepted CMIB socket connection from host \"%s\"",
 		       ib_conn_data->remote_host);
     } else {
-	svc->trace_out(NULL, "Accepted CMIB socket connection from UNKNOWN host");
+	svc->trace_out(sd->cm, "Accepted CMIB socket connection from UNKNOWN host");
     }
 
     //here we read the incoming remote contact port number. 
     //in IB we'll extend this to include ib connection parameters
-    struct ibparam param, remote_param;
     param.lid  = sd->lid;
     param.qpn  = ib_conn_data->dataqp->qp_num;
     param.port = sd->port;
@@ -758,24 +819,22 @@ void *void_conn_sock;
 
     
     if (read(sock, (char *) &ib_conn_data->remote_contact_port, 4) != 4) {
-	svc->trace_out(NULL, "Remote host dropped connection without data");
+	svc->trace_out(sd->cm, "Remote host dropped connection without data");
 	return;
     }
-
     if (read(sock, (char *) &remote_param, sizeof(remote_param)) != sizeof(remote_param)) {
-	svc->trace_out(NULL, "CMIB Remote host dropped connection without data");
+	svc->trace_out(sd->cm, "CMIB Remote host dropped connection without data");
 	return;
     }
-    
     if(write(sock, &param, sizeof(param)) != sizeof(param))
     {
-	svc->trace_out(NULL, "CMIB remote side failed to send its parameters");
+	svc->trace_out(sd->cm, "CMIB remote side failed to send its parameters");
 	return;	
     }
     
     if(connectqp(ib_conn_data, sd, param, remote_param))
     {
-	svc->trace_out(NULL, "CMIB connectqp failed in accept connection");
+	svc->trace_out(sd->cm, "CMIB connectqp failed in accept connection");
 	return;	
     }
     
@@ -784,7 +843,7 @@ void *void_conn_sock;
 	ntohs(ib_conn_data->remote_contact_port);
     add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
 	     (attr_value) (long)ib_conn_data->remote_contact_port);
-    svc->trace_out(NULL, "Remote host (IP %x) is listening at port %d\n",
+    svc->trace_out(sd->cm, "Remote host (IP %x) is listening at port %d\n",
 		   ib_conn_data->remote_IP,
 		   ib_conn_data->remote_contact_port);
 
@@ -853,6 +912,7 @@ int no_more_redirect;
     unsigned int sock_len;
     struct sockaddr sock_addr;
     struct sockaddr_in *sock_addri = (struct sockaddr_in *) &sock_addr;
+    struct ibparam param, remote_param;
 
     //ib stuff
 
@@ -1015,7 +1075,6 @@ int no_more_redirect;
 	
     }
 
-    struct ibparam param, remote_param;
     param.lid  = sd->lid;
     param.qpn  = ib_conn_data->dataqp->qp_num;
     param.port = sd->port;
@@ -1068,7 +1127,6 @@ int no_more_redirect;
 	add_attr(conn_attr_list, CM_PEER_CONN_PORT, Attr_Int4,
 		 (attr_value) (long)int_port_num);
 	if (sock_addr.sa_family == AF_INET) {
-#ifdef HAS_STRUCT_HOSTENT
 	    struct hostent *host;
 	    struct sockaddr_in *in_sock = (struct sockaddr_in *) &sock_addr;
 	    host = gethostbyaddr((char *) &in_sock->sin_addr,
@@ -1078,7 +1136,6 @@ int no_more_redirect;
 		add_attr(conn_attr_list, CM_PEER_HOSTNAME, Attr_String,
 			 (attr_value) strdup(host->h_name));
 	    }
-#endif
 	}
     }
 
@@ -1141,7 +1198,7 @@ attr_list attrs;
     static int IP = 0;
 
     if (IP == 0) {
-	IP = get_self_ip_addr(svc);
+	IP = get_self_ip_addr(cm, svc);
     }
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
@@ -1159,7 +1216,7 @@ attr_list attrs;
 	svc->trace_out(cm, "CMself check CMIB transport found no IP_PORT attribute");
 	return 0;
     }
-    get_qual_hostname(my_host_name, sizeof(my_host_name), svc, NULL, NULL);
+    get_qual_hostname(cm, my_host_name, sizeof(my_host_name), svc, NULL, NULL);
 
     if (host_name && (strcmp(host_name, my_host_name) != 0)) {
 	svc->trace_out(cm, "CMself check - Hostnames don't match");
@@ -1281,12 +1338,12 @@ attr_list listen_info;
 	}
     } else {
 	/* port num is free.  Constrain to range 26000 : 26100 */
-	srand48(time(NULL));
 	int low_bound = 26000;
 	int high_bound = 26100;
 	int size = high_bound - low_bound;
 	int tries = 10;
 	int result = SOCKET_ERROR;
+	srand48(time(NULL));
 	while (tries > 0) {
 	    int target = low_bound + size * drand48();
 	    sock_addr.sin_port = htons(target);
@@ -1335,14 +1392,14 @@ attr_list listen_info;
 	char host_name[256];
 	int int_port_num = ntohs(sock_addr.sin_port);
 	attr_list ret_list;
-	int IP = get_self_ip_addr(svc);
+	int IP = get_self_ip_addr(cm, svc);
 	int network_added = 0;
 
 	svc->trace_out(cm, "CMIB listen succeeded on port %d, fd %d",
 		       int_port_num, conn_sock);
 	ret_list = create_attr_list();
 #if !NO_DYNAMIC_LINKING
-	get_qual_hostname(host_name, sizeof(host_name), svc, listen_info, 
+	get_qual_hostname(cm, host_name, sizeof(host_name), svc, listen_info, 
 			  &network_added);
 #endif 
 
@@ -1416,6 +1473,8 @@ ib_conn_data_ptr scd;
 int *len_ptr;
 {
   *len_ptr = scd->read_buffer_len;
+  if (scd->read_buffer) 
+      return scd->read_buffer;
   if(scd->tb)
       return scd->tb->buf;
   return NULL;  
@@ -1445,9 +1504,9 @@ attr_list attrs;
     int iget = 0;
     int i;
     struct iovec * iov = (struct iovec*) iovs;
-    struct ibv_mr **mrlist;
-    struct ibv_send_wr *wr;
-    int mrlen, wrlen;
+    struct ibv_mr **mrlist = NULL;
+    struct ibv_send_wr *wr = NULL;
+    int mrlen = 0, wrlen = 0;
     struct ibv_send_wr *bad_wr;    
     int retval  = 0;
     struct ibv_wc wc;
@@ -1460,6 +1519,25 @@ attr_list attrs;
     
     for (i = 0; i < iovcnt; i++)
 	left += iov[i].iov_len;
+
+    if (left < 10*1024) {
+	int msg_offset = ((int) (((char *) (&(((struct control_message *)NULL)->u.pb.body[0]))) - ((char *) NULL)));
+	struct control_message *msg = malloc(msg_offset + left);
+
+	char *point;
+	msg->type = msg_piggyback;
+	msg->u.pb.total_length = left + msg_offset;
+	point = &msg->u.pb.body[0];
+	for (i = 0; i < iovcnt; i++) {
+	    memcpy(point, iov[i].iov_base, iov[i].iov_len);
+	    point += iov[i].iov_len;
+	}
+	if (write(fd, msg, msg->u.pb.total_length) != msg->u.pb.total_length) {
+	    goto send_error;
+	}
+	free(msg);
+	return iovcnt;
+    }
 
     struct request req;
     struct response rep;

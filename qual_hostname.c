@@ -44,7 +44,7 @@ static int ipv4_is_loopback(int addr)
  */
 
 static int
-get_self_ip_addr(CMtrans_services svc)
+get_self_ip_addr(void *cm, CMtrans_services svc)
 {
     struct hostent *host;
     char hostname_buf[256];
@@ -83,7 +83,7 @@ get_self_ip_addr(CMtrans_services svc)
 		ipv6_count++;
 	    }
 	    if (svc) {
-	        svc->trace_out(NULL, "CM<transport> IP possibility -> %s : %s",
+	        svc->trace_out(cm, "CM<transport> IP possibility -> %s : %s",
 			       if_addr->ifa_name,
 			       inet_ntop(family, tmp, buf, sizeof(buf)));
 	    }
@@ -97,7 +97,7 @@ get_self_ip_addr(CMtrans_services svc)
 		if (strcmp(if_addr->ifa_name, interface) != 0) continue;
 		tmp = &((struct sockaddr_in *)if_addr->ifa_addr)->sin_addr;
 		if (svc) {
-		    svc->trace_out(NULL, "CM<transport> Interface specified, returning ->%s : %s",
+		    svc->trace_out(cm, "CM<transport> Interface specified, returning ->%s : %s",
 				   if_addr->ifa_name,
 				   inet_ntop(family, tmp, buf, sizeof(buf)));
 		}
@@ -114,7 +114,7 @@ get_self_ip_addr(CMtrans_services svc)
 		struct in_addr *in = *(struct in_addr **) p;
 		if (!ipv4_is_loopback(ntohl(in->s_addr))) {
 		    if (svc)
-			svc->trace_out(NULL, "CM<transport> Prefer IP associated with hostname net -> %d.%d.%d.%d",
+			svc->trace_out(cm, "CM<transport> Prefer IP associated with hostname net -> %d.%d.%d.%d",
 				       *((unsigned char *) &in->s_addr),
 				       *(((unsigned char *) &in->s_addr) + 1),
 				       *(((unsigned char *) &in->s_addr) + 2),
@@ -134,7 +134,7 @@ get_self_ip_addr(CMtrans_services svc)
 	    if ((if_addr->ifa_flags & IFF_LOOPBACK) != 0)  continue;
 	    tmp = &((struct sockaddr_in *)if_addr->ifa_addr)->sin_addr;
 	    if (svc) {
-		svc->trace_out(NULL, "CM<transport> get_self_ip_addr returning first avail -> %s : %s",
+		svc->trace_out(cm, "CM<transport> get_self_ip_addr returning first avail -> %s : %s",
 			       if_addr->ifa_name,
 			       inet_ntop(family, tmp, buf, sizeof(buf)));
 	    }
@@ -151,7 +151,7 @@ get_self_ip_addr(CMtrans_services svc)
 	    struct in_addr *in = *(struct in_addr **) p;
 	    if (!ipv4_is_loopback(ntohl(in->s_addr))) {
 		if (svc)
-		    svc->trace_out(NULL, "CM<transport> - Get self IP addr %lx, net %d.%d.%d.%d",
+		    svc->trace_out(cm, "CM<transport> - Get self IP addr %lx, net %d.%d.%d.%d",
 				   ntohl(in->s_addr),
 				   *((unsigned char *) &in->s_addr),
 				   *(((unsigned char *) &in->s_addr) + 1),
@@ -187,19 +187,19 @@ get_self_ip_addr(CMtrans_services svc)
 	    sai = (struct sockaddr_in *) &(ifr->ifr_addr);
 	    if (ifr->ifr_flags & IFF_LOOPBACK) {
 		if (svc)
-		    svc->trace_out(NULL, "CM<transport> - Get self IP addr %lx, rejected, loopback",
+		    svc->trace_out(cm, "CM<transport> - Get self IP addr %lx, rejected, loopback",
 				   ntohl(sai->sin_addr.s_addr));
 		continue;
 	    }
 	    if (!(ifr->ifr_flags & IFF_UP)) {
 		if (svc)
-		    svc->trace_out(NULL, "CM<transport> - Get self IP addr %lx, rejected, not UP",
+		    svc->trace_out(cm, "CM<transport> - Get self IP addr %lx, rejected, not UP",
 				   ntohl(sai->sin_addr.s_addr));
 		continue;
 	    }
 	    if (!(ifr->ifr_flags & IFF_RUNNING)) {
 		if (svc)
-		    svc->trace_out(NULL, "CM<transport> - Get self IP addr %lx, rejected, not RUNNING",
+		    svc->trace_out(cm, "CM<transport> - Get self IP addr %lx, rejected, not RUNNING",
 				   ntohl(sai->sin_addr.s_addr));
 		continue;
 	    }
@@ -214,7 +214,7 @@ get_self_ip_addr(CMtrans_services svc)
 		continue;
 	    rv = ntohl(sai->sin_addr.s_addr);
 	    if (svc)
-		svc->trace_out(NULL, "CM<transport> - Get self IP addr DHCP %lx, net %d.%d.%d.%d",
+		svc->trace_out(cm, "CM<transport> - Get self IP addr DHCP %lx, net %d.%d.%d.%d",
 			       ntohl(sai->sin_addr.s_addr),
 			       *((unsigned char *) &sai->sin_addr.s_addr),
 			       *(((unsigned char *) &sai->sin_addr.s_addr) + 1),
@@ -233,10 +233,10 @@ get_self_ip_addr(CMtrans_services svc)
     if (rv == 0) {
 	char *c = cercs_getenv("CM_LAST_RESORT_IP_ADDR");
 	if (svc)
-	    svc->trace_out(NULL, "CM<transport> - Get self IP addr at last resort");
+	    svc->trace_out(cm, "CM<transport> - Get self IP addr at last resort");
 	if (c != NULL) {
 	    if (svc)
-		svc->trace_out(NULL, "CM<transport> - Translating last resort %s", c);
+		svc->trace_out(cm, "CM<transport> - Translating last resort %s", c);
 	    rv = inet_addr(c);
 	}
     }
@@ -247,8 +247,17 @@ get_self_ip_addr(CMtrans_services svc)
     return rv;
 }
 
+static int
+is_private_IP(int IP)
+{
+    if ((IP & 0xffff0000) == 0xC0A80000) return 1;	/* equal 192.168.x.x */
+    if ((IP & 0xffff0000) == 0xB6100000) return 1;	/* equal 182.16.x.x */
+    if ((IP & 0xff000000) == 0x0A000000) return 1;	/* equal 10.x.x.x */
+    return 0;
+}
+
 static void
-get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
+get_qual_hostname(void *cm, char *buf, int len, CMtrans_services svc, attr_list attrs,
 		  int *network_p)
 {
     struct hostent *host = NULL;
@@ -293,7 +302,7 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 #endif
 	buf[len - 1] = '\0';
     }
-    svc->trace_out(NULL, "CM<transport> - Tentative Qualified hostname %s", buf);
+    svc->trace_out(cm, "CM<transport> - Tentative Qualified hostname %s", buf);
     if (memchr(buf, '.', strlen(buf)) == NULL) {
 	/* useless hostname if it's not fully qualified */
 	buf[0] = 0;
@@ -309,7 +318,7 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 	    struct in_addr *in = *(struct in_addr **) p;
 	    if (!ipv4_is_loopback(ntohl(in->s_addr))) {
 		good_addr++;
-		svc->trace_out(NULL,
+		svc->trace_out(cm,
 			       "CM<transport> - Hostname gets good addr %lx, %d.%d.%d.%d",
 			       ntohl(in->s_addr),
 			       *((unsigned char *) &in->s_addr),
@@ -329,14 +338,17 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
     if (buf[0] == 0) {
 	/* bloody hell, what do you have to do? */
 	struct in_addr IP;
-	IP.s_addr = htonl(get_self_ip_addr(svc));
-	svc->trace_out(NULL, "CM<transport> - No hostname yet, trying gethostbyaddr on IP %lx", IP);
-	host = gethostbyaddr((char *) &IP, sizeof(IP), AF_INET);
-	if (host != NULL) {
-	    svc->trace_out(NULL, "     result was %s", host->h_name);
-	    strncpy(buf, host->h_name, len);
-	} else {
-	    svc->trace_out(NULL, "     FAILED");
+	IP.s_addr = htonl(get_self_ip_addr(cm, svc));
+	svc->trace_out(cm, "CM<transport> - No hostname yet, trying gethostbyaddr on IP %lx", IP);
+	extern int h_errno;
+	if (!is_private_IP(ntohl(IP.s_addr))) {
+	    host = gethostbyaddr((char *) &IP, sizeof(IP), AF_INET);
+	    if (host != NULL) {
+		svc->trace_out(cm, "     result was %s", host->h_name);
+		strncpy(buf, host->h_name, len);
+	    } else {
+		svc->trace_out(cm, "     FAILED, errno %d", h_errno);
+	    }
 	}
     }
     if (network_string == NULL) {
@@ -345,9 +357,9 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 	    CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
 	}
 	if (!get_string_attr(attrs, CM_NETWORK_POSTFIX, &network_string)) {
-	    svc->trace_out(NULL, "TCP/IP transport found no NETWORK POSTFIX attribute");
+	    svc->trace_out(cm, "TCP/IP transport found no NETWORK POSTFIX attribute");
 	} else {
-	    svc->trace_out(NULL, "TCP/IP transport found NETWORK POSTFIX attribute %s", network_string);
+	    svc->trace_out(cm, "TCP/IP transport found NETWORK POSTFIX attribute %s", network_string);
 	}
     }
     if (network_string != NULL) {
@@ -372,22 +384,22 @@ get_qual_hostname(char *buf, int len, CMtrans_services svc, attr_list attrs,
 	(memchr(buf, '.', strlen(buf)) == NULL)) {
 	/* just use the bloody IP address */
 	struct in_addr IP;
-	IP.s_addr = htonl(get_self_ip_addr(svc));
+	IP.s_addr = htonl(get_self_ip_addr(cm, svc));
 	if (IP.s_addr != 0) {
 	    struct in_addr ip;
 	    char *tmp;
-	    ip.s_addr = htonl(get_self_ip_addr(svc));
+	    ip.s_addr = htonl(get_self_ip_addr(cm, svc));
 	    tmp = inet_ntoa(ip);
 	    strncpy(buf, tmp, len);
 	} else {
 	    static int warn_once = 0;
 	    if (warn_once == 0) {
 		warn_once++;
-		svc->trace_out(NULL, "Attempts to establish your fully qualified hostname, or indeed any\nuseful network name, have failed horribly.  using localhost.\n");
+		svc->trace_out(cm, "Attempts to establish your fully qualified hostname, or indeed any\nuseful network name, have failed horribly.  using localhost.\n");
 	    }
 	    strncpy(buf, "localhost", len);
 	}
     }
-    svc->trace_out(NULL, "CM<transport> - GetQualHostname returning %s", buf);
+    svc->trace_out(cm, "CM<transport> - GetQualHostname returning %s", buf);
 }
 

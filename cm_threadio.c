@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <atl.h>
 #include <evpath.h>
 #include <assert.h>
