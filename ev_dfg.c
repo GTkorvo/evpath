@@ -290,6 +290,9 @@ remove_actions_for_node(EVdfg_configuration config, int node)
 }
 	
 static void
+build_deploy_msg_for_node_stones(EVdfg_configuration config, int act_num, EVdfg_master master);
+
+static void
 perform_actions_on_nodes(EVdfg_configuration config, EVdfg_master master)
 {
     CManager cm = master->cm;
@@ -306,14 +309,11 @@ perform_actions_on_nodes(EVdfg_configuration config, EVdfg_master master)
 	switch(act.type) {
 	case ACT_no_op: break;
 	case ACT_create_bridge:
-	    if (local) {
-		EVdfg_stone_state dest = find_stone_state(act.u.bridge.target_id, config);
-		int bs = INT_EVcreate_bridge_action(cm, master->nodes[dest->node].contact_list, act.u.bridge.target_id);
-		add_stone_to_lookup(cm->evp, bs, act.stone_id);
-	    }
-	case ACT_create: {
+	case ACT_create:
+	    /* build and send deploy msg for this stone and all stones created on it's node */
+	    /* kill all actions related to this stone (add_action, link_port, set_attrs, assign_node) */
+	    build_deploy_msg_for_node_stones(config, i, master);
 	    break;
-	}
 	case ACT_add_action: {
 	    break;
 	}
@@ -917,6 +917,11 @@ handle_flush_reconfig(EVdfg_master master, EVdfg_master_msg_ptr mmsg)
 		    free_attr_list(dfg->deployed_state->stones[j]->attrs);
 		}
 		dfg->deployed_state->stones[j]->attrs = attr_list_from_string(msg->attr_stone_list[i].attr_str);
+		if (dfg->working_state->stones[j]->attrs != NULL) {
+		    free_attr_list(dfg->working_state->stones[j]->attrs);
+		}
+		dfg->working_state->stones[j]->attrs = attr_list_from_string(msg->attr_stone_list[i].attr_str);
+		printf("Got attr list:"); dump_attr_list(dfg->working_state->stones[j]->attrs);
 		break;
 	    }
 	}
@@ -1728,9 +1733,112 @@ assign_stone_ids(EVdfg dfg)
 }
 
 static void
+add_stone_to_deploy_msg(EVdfg_configuration config, EVdfg_deploy_msg *msg, EVdfg_stone_state dstone) 	    
+{
+    deploy_msg_stone mstone;
+    int k;
+    msg->stone_list = realloc(msg->stone_list, (msg->stone_count +1) * sizeof(msg->stone_list[0]));
+    memset(&msg->stone_list[msg->stone_count], 0, sizeof(msg->stone_list[0]));
+    mstone = &msg->stone_list[msg->stone_count];
+    mstone->global_stone_id = dstone->stone_id;
+    mstone->attrs = NULL;
+    if (dstone->attrs != NULL) {
+	mstone->attrs = attr_list_to_string(dstone->attrs);
+    }
+    mstone->period_secs = dstone->period_secs;
+    mstone->period_usecs = dstone->period_usecs;
+    mstone->out_count = dstone->out_count;
+    mstone->out_links = malloc(sizeof(mstone->out_links[0])*mstone->out_count);
+    for (k=0; k< dstone->out_count; k++) {
+	if (dstone->out_links[k] != -1) {
+	    mstone->out_links[k] = dstone->out_links[k];
+	} else {
+	    mstone->out_links[k] = -1;
+	}
+    }
+    mstone->action = dstone->action;
+    if (dstone->action_count > 1) {
+	mstone->extra_actions = dstone->action_count - 1;
+	mstone->xactions = malloc(sizeof(mstone->xactions[0])*mstone->extra_actions);
+	for (k=0; k < mstone->extra_actions; k++) {
+	    mstone->xactions[k] = dstone->extra_actions[k];
+	}
+    } else {
+	mstone->extra_actions = 0;
+	mstone->xactions = NULL;
+    }
+    msg->stone_count++;
+}
+
+static void
+build_deploy_msg_for_node_stones(EVdfg_configuration config, int act_num, EVdfg_master master)
+{
+    EVdfg_config_action orig_act = config->pending_action_queue[act_num];
+    int i;
+    EVdfg_deploy_msg msg;
+    int node = orig_act.node_for_action;
+    CMFormat deploy_msg = INT_CMlookup_format(master->cm, EVdfg_deploy_format_list);
+
+    CMtrace_out(cm, EVdfgVerbose, "Master in deploy_msg_for_node for client %s, node %d\n",
+		master->nodes[node].canonical_name, node);
+    memset(&msg, 0, sizeof(msg));
+    msg.canonical_name = master->nodes[node].canonical_name;
+    msg.stone_count = 0;
+    msg.stone_list = malloc(sizeof(msg.stone_list[0]));
+    for (i=act_num; i< config->pending_action_count; i++) {
+	EVdfg_config_action act = config->pending_action_queue[i];
+	switch (act.type) {
+	case ACT_no_op: break;
+	case ACT_create_bridge:
+	case ACT_create:
+	    /* build and send deploy msg for this stone and all stones created on it's node */
+	    /* kill all actions related to this stone (add_action, link_port, set_attrs, assign_node) */
+	    if (act.node_for_action == node) {
+		int j;
+		for (j=0; j < config->stone_count; j++) {
+		    if (config->stones[j]->stone_id == act.stone_id) {
+			add_stone_to_deploy_msg(config, &msg, config->stones[j]);
+		    }
+		}
+		for (j=i; j < config->pending_action_count; j++) {
+		    if (config->pending_action_queue[j].stone_id == act.stone_id) {
+			config->pending_action_queue[j].type = ACT_no_op;
+		    }
+		}
+	    }
+	    break;
+	case ACT_add_action:
+	case ACT_set_auto_period:
+	case ACT_link_port:
+	case ACT_unlink_port:
+	case ACT_set_attrs:
+	case ACT_assign_node:
+	case ACT_destroy:
+	    break;
+	default:
+	    printf("Bad action\n");
+	    break;
+	}
+    }
+    if (master->nodes[node].conn) {
+	INT_CMwrite(master->nodes[node].conn, deploy_msg, &msg);
+    } else {
+	CManager_unlock(master->cm);
+	dfg_deploy_handler(master->cm, NULL, &msg, master->client, NULL);
+	CManager_lock(master->cm);
+    }
+    for(i=0 ; i < msg.stone_count; i++) {
+	free(msg.stone_list[i].out_links);
+	if (msg.stone_list[i].attrs) free(msg.stone_list[i].attrs);
+	if (msg.stone_list[i].xactions) free(msg.stone_list[i].xactions);
+    }
+    free(msg.stone_list);
+}
+
+static void
 deploy_to_node(EVdfg dfg, int node, EVdfg_configuration config)
 {
-    int i, j;
+    int i;
     int stone_count = 0;
     EVdfg_deploy_msg msg;
     CMFormat deploy_msg = INT_CMlookup_format(dfg->master->cm, EVdfg_deploy_format_list);
@@ -1749,43 +1857,12 @@ deploy_to_node(EVdfg dfg, int node, EVdfg_configuration config)
     }
     memset(&msg, 0, sizeof(msg));
     msg.canonical_name = dfg->master->nodes[node].canonical_name;
-    msg.stone_count = stone_count;
-    msg.stone_list = malloc(stone_count * sizeof(msg.stone_list[0]));
-    memset(msg.stone_list, 0, stone_count * sizeof(msg.stone_list[0]));
-    j = 0;
+    msg.stone_count = 0;
+    msg.stone_list = malloc(sizeof(msg.stone_list[0]));
     for (i=dfg->deployed_stone_count; i< dfg->stone_count; i++) {
 	if (config->stones[i]->node == node) {
-	    deploy_msg_stone mstone = &msg.stone_list[j];
 	    EVdfg_stone_state dstone = config->stones[i];
-	    int k;
-	    mstone->global_stone_id = dstone->stone_id;
-	    mstone->attrs = NULL;
-	    if (dstone->attrs != NULL) {
-		mstone->attrs = attr_list_to_string(dstone->attrs);
-	    }
-	    mstone->period_secs = dstone->period_secs;
-	    mstone->period_usecs = dstone->period_usecs;
-	    mstone->out_count = dstone->out_count;
-	    mstone->out_links = malloc(sizeof(mstone->out_links[0])*mstone->out_count);
-	    for (k=0; k< dstone->out_count; k++) {
-		if (dstone->out_links[k] != -1) {
-		    mstone->out_links[k] = dstone->out_links[k];
-		} else {
-		    mstone->out_links[k] = -1;
-		}
-	    }
-	    mstone->action = dstone->action;
-	    if (dstone->action_count > 1) {
-		mstone->extra_actions = dstone->action_count - 1;
-		mstone->xactions = malloc(sizeof(mstone->xactions[0])*mstone->extra_actions);
-		for (k=0; k < mstone->extra_actions; k++) {
-		    mstone->xactions[k] = dstone->extra_actions[k];
-		}
-	    } else {
-		mstone->extra_actions = 0;
-		mstone->xactions = NULL;
-	    }
-	    j++;
+	    add_stone_to_deploy_msg(config, &msg, dstone);
 	}
     }
     dfg->master->nodes[node].needs_ready = 1;
