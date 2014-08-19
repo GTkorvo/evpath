@@ -34,7 +34,9 @@ int main(int argc, char **argv)
     char *str_contact;
     EVdfg_stone src, sink;
     EVsource source_handle;
-    EVdfg_client test_client;
+    EVclient test_client;
+    EVclient_sinks sink_capabilities;
+    EVclient_sources source_capabilities;
 
     (void)argc; (void)argv;
     cm = CManager_create();
@@ -45,20 +47,20 @@ int main(int argc, char **argv)
 */
 
     source_handle = EVcreate_submit_handle(cm, -1, simple_format_list);
-    EVdfg_register_source("event source", source_handle);
-    EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
+    source_capabilities = EVclient_register_source("event source", source_handle);
+    sink_capabilities = EVclient_register_sink_handler(cm, "simple_handler", simple_format_list,
 				(EVSimpleHandlerFunc) simple_handler, NULL);
 
     /* We're node argv[1] in the set of process clients, contact list is argv[2] */
-    test_client = EVdfg_assoc_client(cm, argv[1], argv[2]);
+    test_client = EVclient_assoc(cm, argv[1], argv[2], source_capabilities, sink_capabilities);
 
-    if (EVdfg_ready_wait(test_client) != 1) {
+    if (EVclient_ready_wait(test_client) != 1) {
 	/* initialization failed! */
 	exit(1);
     }
 
     
-    if (EVdfg_source_active(source_handle)) {
+    if (EVclient_source_active(source_handle)) {
 	simple_rec rec;
 	rec.integer_field = 318;
 	/* submit would be quietly ignored if source is not active */

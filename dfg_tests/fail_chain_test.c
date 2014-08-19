@@ -9,8 +9,8 @@
 #include "test_support.h"
 
 static int status;
-static EVdfg_client test_client;
-static EVdfg_master test_master;
+static EVclient test_client;
+static EVmaster test_master;
 
 static char *filter_func = "{\n\
 int hop_count;\n\
@@ -71,7 +71,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     received_count = count;
     if (count == REPEAT_COUNT) {
 	if (!quiet) printf("SINK complete\n");
-        EVdfg_shutdown(test_client, 0);
+        EVclient_shutdown(test_client, 0);
     } else {
 //        printf("."); fflush(stdout);
     }
@@ -124,6 +124,8 @@ be_test_master(int argc, char **argv)
     int i;
     char *filter;
     EVdfg test_dfg;
+    EVclient_sinks sink_capabilities;
+    EVclient_sources source_capabilities;
 
     alarm(240);  /* reset time limit to 4 minutes */
     if (argc == 1) {
@@ -148,18 +150,18 @@ be_test_master(int argc, char **argv)
 **  LOCAL DFG SUPPORT   Sources and sinks that might or might not be utilized.
 */
 
-    source_handle = EVcreate_submit_handle(cm, -1, simple_format_list);
-    EVdfg_register_source("master_source", source_handle);
-    EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
+    source_handle = EVcreate_submit_handle(cm, DFG_SOURCE, simple_format_list);
+    source_capabilities = EVclient_register_source("master_source", source_handle);
+    sink_capabilities = EVclient_register_sink_handler(cm, "simple_handler", simple_format_list,
 				(EVSimpleHandlerFunc) simple_handler, NULL);
 
 /*
 **  DFG CREATION
 */
-    test_master = EVdfg_create_master(cm);
-    str_contact = EVdfg_get_contact_list(test_master);
-    EVdfg_node_fail_handler(test_master, fail_handler);
-    EVdfg_register_node_list(test_master, &nodes[0]);
+    test_master = EVmaster_create(cm);
+    str_contact = EVmaster_get_contact_list(test_master);
+    EVmaster_node_fail_handler(test_master, fail_handler);
+    EVmaster_register_node_list(test_master, &nodes[0]);
     test_dfg = EVdfg_create(test_master);
 
     src = EVdfg_create_source_stone(test_dfg, "master_source");
@@ -182,24 +184,24 @@ be_test_master(int argc, char **argv)
     EVdfg_realize(test_dfg);
 
 /* We're node 0 in the DFG */
-    test_client = EVdfg_assoc_client_local(cm, nodes[0], test_master);
+    test_client = EVclient_assoc_local(cm, nodes[0], test_master, source_capabilities, sink_capabilities);
 
 /* Fork the others */
     test_fork_children(&nodes[0], str_contact);
 
     free(str_contact);
 
-    if (EVdfg_ready_wait(test_client) != 1) {
+    if (EVclient_ready_wait(test_client) != 1) {
 	/* dfg initialization failed! */
 	exit(1);
     }
 
     
-    if (EVdfg_active_sink_count(test_client) == 0) {
-	EVdfg_ready_for_shutdown(test_client);
+    if (EVclient_active_sink_count(test_client) == 0) {
+	EVclient_ready_for_shutdown(test_client);
     }
 
-    if (EVdfg_source_active(source_handle)) {
+    if (EVclient_source_active(source_handle)) {
 	for (i=0 ; i < REPEAT_COUNT + 5; i++) {
 	    simple_rec rec;
 	    atom_t hop_count_atom;
@@ -216,7 +218,7 @@ be_test_master(int argc, char **argv)
     }
     EVfree_source(source_handle);
 
-    status = EVdfg_wait_for_shutdown(test_client);
+    status = EVclient_wait_for_shutdown(test_client);
 
     wait_for_children(nodes);
     for (i=0; i < node_count; i++) {
@@ -236,6 +238,8 @@ be_test_child(int argc, char **argv)
     CManager cm;
     EVsource src;
     int die_early = 0;
+    EVclient_sinks sink_capabilities;
+    EVclient_sources source_capabilities;
 
     alarm(240);   /* reset time limit to 4 minutes */
     cm = CManager_create();
@@ -244,22 +248,22 @@ be_test_child(int argc, char **argv)
 	exit(1);
     }
 
-    src = EVcreate_submit_handle(cm, -1, simple_format_list);
-    EVdfg_register_source("master_source", src);
-    EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
+    src = EVcreate_submit_handle(cm, DFG_SOURCE, simple_format_list);
+    source_capabilities = EVclient_register_source("master_source", src);
+    sink_capabilities = EVclient_register_sink_handler(cm, "simple_handler", simple_format_list,
 				(EVSimpleHandlerFunc) simple_handler, NULL);
-    test_client = EVdfg_assoc_client(cm, argv[1], argv[2]);
-    EVdfg_ready_wait(test_client);
+    test_client = EVclient_assoc(cm, argv[1], argv[2], source_capabilities, sink_capabilities);
+    EVclient_ready_wait(test_client);
 
-    if (EVdfg_active_sink_count(test_client) == 0) {
-	EVdfg_ready_for_shutdown(test_client);
+    if (EVclient_active_sink_count(test_client) == 0) {
+	EVclient_ready_for_shutdown(test_client);
     }
 
     if (argv[1][0] == 'D') {
       	/* Only the good die young */
 	die_early++;
     }
-    if (EVdfg_source_active(src)) {
+    if (EVclient_source_active(src)) {
 	simple_rec rec;
 	generate_simple_record(&rec);
 	/* submit would be quietly ignored if source is not active */
@@ -271,7 +275,7 @@ be_test_child(int argc, char **argv)
 	if (!quiet) printf("Node %s exiting early\n", argv[1]);
 	exit(0);
     } else {
-	return EVdfg_wait_for_shutdown(test_client);
+	return EVclient_wait_for_shutdown(test_client);
     }
     return 0;
 }

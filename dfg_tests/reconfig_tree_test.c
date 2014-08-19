@@ -34,7 +34,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     static int count;
     checksum_simple_record(event, attrs, quiet);
     if (++count == 300) {
-		EVdfg_shutdown(dfg, 0);
+		EVclient_shutdown(dfg, 0);
     }
     printf("\nStatic configuration working, ready for reconfiguration! All the best!\n");
     fflush(stdout);
@@ -77,9 +77,9 @@ join_handler(EVdfg dfg, char *identifier, void* available_sources, void *availab
 	EVdfg_stone terminal = NULL;
 	
 	canon_name = strdup("origin");
-	EVdfg_assign_canonical_name(dfg, identifier, canon_name);
+	EVmaster_assign_canonical_name(dfg, identifier, canon_name);
 	
-	EVdfg_register_sink_handler(cm, "thandler", simple_format_list, (EVSimpleHandlerFunc) simple_handler);
+	EVclient_register_sink_handler(cm, "thandler", simple_format_list, (EVSimpleHandlerFunc) simple_handler);
 	terminal = EVdfg_create_sink_stone(dfg, "thandler");
 	
 	EVdfg_link_port(last[0], 0, terminal);
@@ -102,7 +102,7 @@ join_handler(EVdfg dfg, char *identifier, void* available_sources, void *availab
 		tmp[j] = EVdfg_create_stone(dfg, NULL);
 		
 		sprintf(canon_name, "client%d", joined_node_count);
-		EVdfg_assign_canonical_name(dfg, identifier, canon_name);
+		EVmaster_assign_canonical_name(dfg, identifier, canon_name);
 		EVdfg_assign_node(tmp[j], canon_name);
 		
 		EVdfg_reconfig_link_port(last[j / base], j % base, tmp[j], NULL);
@@ -121,11 +121,11 @@ join_handler(EVdfg dfg, char *identifier, void* available_sources, void *availab
 	    } else {
 		thandle = strdup("thandler");
 		//	sprintf(thandle, "thandler%d", joined_node_count);
-		EVdfg_register_sink_handler(cm, thandle, simple_format_list, (EVSimpleHandlerFunc) simple_handler);
+		EVclient_register_sink_handler(cm, thandle, simple_format_list, (EVSimpleHandlerFunc) simple_handler);
 		tmp[k] = EVdfg_create_sink_stone(dfg, thandle);
 		
 		sprintf(canon_name, "terminal_node%d", joined_node_count);
-		EVdfg_assign_canonical_name(dfg, identifier, canon_name);
+		EVmaster_assign_canonical_name(dfg, identifier, canon_name);
 		EVdfg_assign_node(tmp[k], canon_name);
 		
 		EVdfg_reconfig_link_port(last[k / base], k % base, tmp[k], NULL);
@@ -168,11 +168,11 @@ be_test_master(int argc, char **argv)
     printf("\nMaster's contact = %s\n", str_contact);
     fflush(stdout);
 	
-    source_handle = EVcreate_submit_handle(cm, -1 ,simple_format_list);
-    EVdfg_register_source("master_source", source_handle);
+    source_handle = EVcreate_submit_handle(cm, DFG_SOURCE ,simple_format_list);
+    source_capabilities = EVclient_register_source("master_source", source_handle);
 	
     dfg = EVdfg_create(cm);
-    EVdfg_node_join_handler(dfg, join_handler);;
+    EVmaster_node_join_handler(dfg, join_handler);;
 	
     last[0] = EVdfg_create_source_stone(dfg, "master_source");
 	
@@ -185,17 +185,17 @@ be_test_master(int argc, char **argv)
     
     EVdfg_join_dfg(dfg, "origin", str_contact);
     
-    if (EVdfg_ready_wait(dfg) != 1) {
+    if (EVclient_ready_wait(dfg) != 1) {
 	/* dfg initialization failed! */
 	exit(1);
     }
     
 	
-    if (EVdfg_active_sink_count(dfg) == 0) {
-	EVdfg_ready_for_shutdown(dfg);
+    if (EVclient_active_sink_count(dfg) == 0) {
+	EVclient_ready_for_shutdown(dfg);
     }
 	
-    if (EVdfg_source_active(source_handle)) {
+    if (EVclient_source_active(source_handle)) {
 	simple_rec rec;
 	for (i = 0; i < 300; ++i) {
 	    CMsleep(cm, 1);
@@ -205,7 +205,7 @@ be_test_master(int argc, char **argv)
 	}
     }
     
-    status = EVdfg_wait_for_shutdown(dfg);
+    status = EVclient_wait_for_shutdown(dfg);
     
     wait_for_children(nodes);
     
@@ -239,14 +239,11 @@ be_test_child(int argc, char **argv)
     }
     reconfig_list[reconfig_node_count + 1] = NULL;
 	
-    src = EVcreate_submit_handle(cm, -1, simple_format_list);
-    EVdfg_register_source("master_source", src);
-	//    chandle = malloc(sizeof(char)*(strlen(argv[1]) + 9));
-	//    sprintf(chandle,"handler%s", argv[1]);
-	
+    src = EVcreate_submit_handle(cm, DFG_SOURCE, simple_format_list);
+    source_capabilities = EVclient_register_source("master_source", src);
     chandle = strdup("thandler");
 	
-    EVdfg_register_sink_handler(cm,chandle, simple_format_list,
+    sink_capabilities = EVclient_register_sink_handler(cm,chandle, simple_format_list,
                                 (EVSimpleHandlerFunc) simple_handler);
     EVdfg_join_dfg(dfg, argv[1], argv[2]);
 	
@@ -254,16 +251,16 @@ be_test_child(int argc, char **argv)
 		test_fork_children(&reconfig_list[0], argv[2]);
     }
 	
-    EVdfg_ready_wait(dfg);
-    if (EVdfg_active_sink_count(dfg) == 0) {
-        EVdfg_ready_for_shutdown(dfg);
+    EVclient_ready_wait(dfg);
+    if (EVclient_active_sink_count(dfg) == 0) {
+        EVclient_ready_for_shutdown(dfg);
     }
 	
-    if (EVdfg_source_active(src)) {
+    if (EVclient_source_active(src)) {
         simple_rec rec;
         generate_simple_record(&rec);
         /* submit will be quietly ignored if source is not active */
         EVsubmit(src, &rec, NULL);
     }
-    return EVdfg_wait_for_shutdown(dfg);
+    return EVclient_wait_for_shutdown(dfg);
 }

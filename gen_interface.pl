@@ -394,10 +394,10 @@ EOF
 	    if (/EVdfg\W/) {
 		$evdfg = $name;
 	    }
-	    if (/EVdfg_client\W/) {
+	    if (/EVclient\W/) {
 		$cmanager = $name. "->cm";
 	    }
-	    if (/EVdfg_master\W/) {
+	    if (/EVmaster\W/) {
 		$cmanager = $name. "->cm";
 	    }
 	    if (/EVdfg_stone\W/) {

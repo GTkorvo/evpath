@@ -215,14 +215,14 @@ typedef struct _lookup_table_elem {
     int local_id;
 } lookup_table_elem;
 
-typedef struct _sink_table_elem {
+typedef struct _EVclient_sinks {
     char *name;
     FMStructDescList format_list;
     EVSimpleHandlerFunc handler;
     void *client_data;
 } sink_table_elem;
 
-typedef struct _source_table_elem {
+typedef struct _EVclient_sources {
     char *name;
     EVsource src;
 } source_table_elem;

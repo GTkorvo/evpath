@@ -17,19 +17,21 @@ extern "C" {
 **  Actual deployment:
 **  - first version:
 **    * Centralized
-**    * Server or distinguished participant is informed of all participants,  he gives them DFG segments and gets 
-**      reports back of stone IDs, necessary stone IDs are then distributed to neighbors and the cohort is released.
+**    * Server or distinguished participant is informed of all participants, he gives them DFG 
+**      segments and gets reports back of stone IDs, necessary stone IDs are then distributed to 
+**      neighbors and the cohort is released.
 **    * require all participants to be present before continuing
 **    * manage "ready messages" so that DFG is realized without race conditions
-**    * Do "validation" of DFG pre-realization.  Check for disconnected vertices, look at data types to see if they
-**      will be handled, etc.
+**    * Do "validation" of DFG pre-realization.  Check for disconnected vertices, look at data 
+**      types to see if they will be handled, etc.
 **    * deployment master may be distinguished participant or separate server.
 **  - optimization
-**    * eliminate actual stone IDs.  As long as the number of stones per CM is relatively small, we can use DFG-assigned 
-**      stone IDs in the event-message and do a table lookup to determine the right local stone when the message arrives.
+**    * eliminate actual stone IDs.  As long as the number of stones per CM is relatively small,
+**      we can use DFG-assigned stone IDs in the event-message and do a table lookup to determine
+**      the right local stone when the message arrives.
 **  - next version
-**    * add nodes to (fixed) DFG as they come up.  Provide early-arrivers with the contact lists of late-arriving 
-**      neighbors as they join.
+**    * add nodes to (fixed) DFG as they come up.  Provide early-arrivers with the contact lists of 
+**      late-arriving neighbors as they join.
 */
 
 /*!
@@ -40,18 +42,18 @@ extern "C" {
 typedef struct _EVdfg *EVdfg;
 
 /*!
- * EVdfg_master is a handle to a DFG master.
+ * EVmaster is a handle to a DFG master, the distinguished process who creates the DFGs and manages clients.
  *
- * EVdfg_master is an opaque handle
+ * EVmaster is an opaque handle
  */
-typedef struct _EVdfg_master *EVdfg_master;
+typedef struct _EVmaster *EVmaster;
 
 /*!
- * EVdfg_client is a handle to a DFG_client.
+ * EVclient is a handle to a client process which can host DFG components.
  *
- * EVdfg_client is an opaque handle
+ * EVclient is an opaque handle
  */
-typedef struct _EVdfg_client *EVdfg_client;
+typedef struct _EVclient *EVclient;
 
 /*!
  * EVdfg_stone is a handle to virtual EVpath stone.
@@ -61,6 +63,33 @@ typedef struct _EVdfg_client *EVdfg_client;
 typedef struct _EVdfg_stone *EVdfg_stone;
 
 /*!
+ * EVclient_sources is a handle to the set of client event source capabilities.
+ *
+ * This opaque handle is returned by EVclient_register_source() and is then
+ * specified to EVclient_assoc() or EVclient_assoc_local().  It represents
+ * the capabilities of this client to host event source stones for any DFG
+ * that might be created.
+ */
+typedef struct _EVclient_sources *EVclient_sources;
+
+/*!
+ * EVclient_sources is a handle to the set of client event handler capabilities.
+ *
+ * This opaque handle is returned by EVclient_register_sink_handler() or
+ * EVclient_register_raw_sink_handler() and is then specified to
+ * EVclient_assoc() or EVclient_assoc_local().  It represents the handlers
+ * available on this client for use by event sink stones for any DFG that
+ * might be created.
+ */
+typedef struct _EVclient_sinks *EVclient_sinks;
+
+/*
+ * DFG_SOURCE is a special StoneID used in calls to EVcreate_submit_handle() to create 
+ * EVsource handles that can be later assigned to DFG source nodes.
+ */
+#define DFG_SOURCE -1
+
+/*!
  * Create a DFG master
  *
  * This call is used in master process of a set of communicating EVdfg
@@ -68,121 +97,132 @@ typedef struct _EVdfg_stone *EVdfg_stone;
  * adminstration for client processes and DFGs.
  *
  * \param cm The CManager with which to associate the DFG
- * \return An EVdfg_master handle, to be used in later calls.
+ * \return An EVmaster handle, to be used in later calls.
  */
-extern EVdfg_master EVdfg_create_master(CManager cm);
+extern EVmaster EVmaster_create(CManager cm);
 
 /*!
- * Create a DFG
- *
- * This call is used in the master process to create a DFG that will be
- * deployed on the client processes.
- * \param cm The CManager with which to associate the DFG
- * \return An EVdfg handle, to be used in later calls.
- */
-extern EVdfg EVdfg_create(EVdfg_master master);
-
-
-/*!
- * Get the contact list from an EVdfg_master handle
+ * Get the contact list from an EVmaster handle
  *
  * This call is used to extract contact information from an
- * EVdfg_master handle.  This call is made on the Master side of EVdfg
+ * EVmaster handle.  This call is made on the Master side of EVdfg
  * and the contact information is then provided to the remote Clients
- * for use in EVdfg_assoc_client() calls.  The result of this call is a
+ * for use in EVclient_assoc() calls.  The result of this call is a
  * null-terminated string to be owned by the caller.  (I.E. you should
  * free the string memory when you're done with it.)
  *
- * \param master The EVdfg_master handle for which to create contact information.
+ * \param master The EVmaster handle for which to create contact information.
  * \return A null-terminated string representing contact information for this EVdfg
  */
-extern char *EVdfg_get_contact_list(EVdfg_master master);
+extern char *EVmaster_get_contact_list(EVmaster master);
 
 /*!
- *  Associate this process as a client to an EVdfg master
+ *  Associate this process as a client to an EVmaster
  *
- *  This call is used to join a DFG as a client by processes that are
- *  not the master.  The master_contact string should be the same one
- *  that came from EVdfg_get_contact_list() on the master.  This call
- *  cannot be used by the master process to participate in the DFG
- *  itself.  In that circumstance, EVdfg_assoc_client_local() should be
- *  used.
+ *  This call is used to join the set of communicating processes as a
+ * client.  The master_contact string should be the same one that came from
+ * EVmaster_get_contact_list() on the master.  This call cannot be used by
+ * the master process to participate in the DFG itself.  In that
+ * circumstance, EVclient_assoc_local() should be used.
+ *
+ * The source_capabilities and sink_capabilities parameters identify the set
+ * of sinks and sources that this client is capable of hosting.  Those
+ * capabilities may or may not be utilized in the DFGs created by the
+ * master.  All calls to register sinks and sources should be done *before*
+ * the EVclient_assoc() call.
  *
  * \param cm The CManager with which to associate the DFG client
  * \param node_name The name with which the client can be identified.  This
  *  should be unique among the joining nodes in static joining mode
- *  (I.E. using EVdfg_register_node_list().  In dynamic mode (I.E. where
- *  EVdfg_node_join_handler() is used), then this name is presented to the
+ *  (I.E. using EVmaster_register_node_list().  In dynamic mode (I.E. where
+ *  EVmaster_node_join_handler() is used), then this name is presented to the
  *  registered join handler, but it need not be unique.  EVdfg copies this
  *  string, so it can be free'd after use.
  * \param master_contact The string contact information for the master
  *  process.  This is not stored by EVdfg.
- *
+ * \param source_capabilities The last value returned by
+ *  EVclient_register_source() or NULL
+ * \param sink_capabilities The last value returned by
+ *  EVclient_register_sink_handle() or EVclient_register_raw_sink_handle, or NULL
  */
-extern EVdfg_client EVdfg_assoc_client(CManager cm, char *node_name, char *master_contact);
+extern EVclient EVclient_assoc(CManager cm, char *node_name, char *master_contact, 
+			       EVclient_sources source_capabilities, EVclient_sinks sink_capabilities);
 
 /*!
- *  Associate this process as a client to an EVdfg master
+ *  Associate a client to an EVmaster in the same process
  *
  *  This call is for the process which hosts the EVdfg master to also
- *  participate as an EVdfg client.
+ *  participate as an EVclient.
+ *
+ * The source_capabilities and sink_capabilities parameters identify the set
+ * of sinks and sources that this client is capable of hosting.  Those
+ * capabilities may or may not be utilized in the DFGs created by the
+ * master.  All calls to register sinks and sources should be done *before*
+ * the EVclient_assoc() call.
  *
  * \param cm The CManager with which to associate the DFG client
  * \param node_name The name with which the client can be identified.  This
  *  should be unique among the joining nodes in static joining mode
- *  (I.E. using EVdfg_register_node_list().  In dynamic mode (I.E. where
- *  EVdfg_node_join_handler() is used), then this name is presented to the
+ *  (I.E. using EVmaster_register_node_list().  In dynamic mode (I.E. where
+ *  EVmaster_node_join_handler() is used), then this name is presented to the
  *  registered join handler, but it need not be unique.  EVdfg copies this
  *  string, so it can be free'd after use.
- * \param master The handle for the EVdfg_master.
- *
+ * \param master The handle for the EVmaster.
+ * \param master_contact The string contact information for the master
+ *  process.  This is not stored by EVdfg.
+ * \param source_capabilities The last value returned by
+ *  EVclient_register_source() or NULL
+ * \param sink_capabilities The last value returned by
+ *  EVclient_register_sink_handle() or EVclient_register_raw_sink_handle, or NULL
  */
-extern EVdfg_client EVdfg_assoc_client_local(CManager cm, char *node_name, EVdfg_master master);
+extern EVclient EVclient_assoc_local(CManager cm, char *node_name, EVmaster master,
+					     EVclient_sources source_capabilities, EVclient_sinks sink_capabilities);
 
 
 /*!
- *  Supply a static list of client names to the EVdfg master.
+ *  Supply a static list of client names to the EVdmaster.
  *
- *   This call is used in static joining mode, that is when the set of nodes
+ * This call is used in static joining mode, that is when the set of nodes
  * that will join the DFG client set is known upfront and each has a predefined unique 
  * name. 
- * \param master The EVdfg_master handle for which the set of clients is to be
+ * \param master The EVmaster handle for which the set of clients is to be
  * specified. 
  * \param list A NULL-terminated list of NULL-terminated strings.  These
- * names must be unique, and each must be used in an EVdfg_join_dfg() call
- * before the ensemble will be complete.  EVdfg copies this list, so it
- * should be free'd by the calling application if dynamic.
+ * names must be unique, and each must be used in an EVclient_assoc() or
+ * EVclient_assoc_local() call before the ensemble will be complete.  EVdfg
+ * copies this list, so it should be free'd by the calling application if
+ * dynamic.
  *
  */
-extern void EVdfg_register_node_list(EVdfg_master master, char** list);
+extern void EVmaster_register_node_list(EVmaster master, char** list);
 
 /*!
- * The prototype for an EVdfg client-join handling function.
+ * The prototype for an EVmaster client-join handling function.
  *
  * In "dynamic join" mode, as opposed to static-client-list mode (See
- * EVdfg_register_node_list()), EVdfg calls a registered join handler each
- * time a new client node joins the DFG.  This handler should 1) potentially
- * assign a canonical name to the client node (using
- * EVdfg_assign_canonical_name()), and 2) when the expected nodes have all
- * joined the handler should create the virtual DFG and then call
+ * EVmaster_register_node_list()), the EVdfg master calls a registered join
+ * handler each time a new client node joins the DFG.  This handler should
+ * 1) potentially assign a canonical name to the client node (using
+ * EVmaster_assign_canonical_name()), and 2) when the expected nodes have
+ * all joined the handler should create the virtual DFG and then call
  * EVdfg_realize() in order to instantiate it.
  * 
  * This call happens in the Master process only.
  * 
  * \param dfg The EVdfg handle with which this handler is associated
  * \param identifier This null-terminated string is the value specified in
- * the corresponding EVdfg_join_dfg() call by a client.
+ * the corresponding EVclient_assoc() call by a client.
  * \param available_sources This parameter is currently a placeholder for
  * information about what sources the client is capable of hosting.
  * \param available_sinks This parameter is currently a placeholder for
  * information about what sinks the client is capable of hosting.
  */
-typedef void (*EVdfgJoinHandlerFunc) (EVdfg_master master, char *identifier, void* available_sources, void *available_sinks);
+typedef void (*EVmasterJoinHandlerFunc) (EVmaster master, char *identifier, void* available_sources, void *available_sinks);
 
 /*!
  * The prototype for an EVdfg client-fail handling function.
  *
- * If the an EVdfgFailHandlerFunc has been registered to the DFG, this
+ * If the an EVmasterFailHandlerFunc has been registered to the DFG, this
  * function will be called in the event that some node has failed.
  * Generally EVdfg becomes aware that a node has failed when some other
  * client tries to do a write to a bridge stone connected to that node and
@@ -194,16 +234,16 @@ typedef void (*EVdfgJoinHandlerFunc) (EVdfg_master master, char *identifier, voi
  * 
  * \param dfg The EVdfg handle with which this handler is associated
  * \param identifier This null-terminated string is the value that was
- * specified in EVdfg_join_dfg() in the failed client.
+ * specified in EVclient_assoc() in the failed client.
  * \param reporting_stone This is local ID of the failed stone (perhaps not
  * useful to anyone - should change or eliminate this).
  */
-typedef void (*EVdfgFailHandlerFunc) (EVdfg dfg, char *identifier, int reporting_stone);
+typedef void (*EVmasterFailHandlerFunc) (EVdfg dfg, char *identifier, int reporting_stone);
 
 /*!
  * The prototype for an EVdfg voluntary-reconfiguration handling function.
  *
- * If the an EVdfgReconfigHandlerFunc has been registered to the DFG, this
+ * If the an EVmasterReconfigHandlerFunc has been registered to the DFG, this
  * function will be called in the event that some stone has executed a call
  * to EVdfg_trigger_reconfiguration() inside a CoD-based event handler.
  * This allows a client application to monitor local conditions and to
@@ -215,7 +255,7 @@ typedef void (*EVdfgFailHandlerFunc) (EVdfg dfg, char *identifier, int reporting
  * 
  * \param dfg The EVdfg handle with which this handler is associated
  */
-typedef void (*EVdfgReconfigHandlerFunc) (EVdfg dfg);
+typedef void (*EVmasterReconfigHandlerFunc) (EVdfg dfg);
 
 /*!
  * Register a node join handler function to an EVdfg.
@@ -223,7 +263,7 @@ typedef void (*EVdfgReconfigHandlerFunc) (EVdfg dfg);
  * \param dfg The EVdfg handle with which to associate this handler
  * \param func The handler function to associate
  */
-extern void EVdfg_node_join_handler (EVdfg_master master, EVdfgJoinHandlerFunc func);
+extern void EVmaster_node_join_handler (EVmaster master, EVmasterJoinHandlerFunc func);
 
 /*!
  * Register a node fail handler function to an EVdfg.
@@ -231,7 +271,7 @@ extern void EVdfg_node_join_handler (EVdfg_master master, EVdfgJoinHandlerFunc f
  * \param dfg The EVdfg handle with which to associate this handler
  * \param func The handler function to associate
  */
-extern void EVdfg_node_fail_handler (EVdfg_master master, EVdfgFailHandlerFunc func);
+extern void EVmaster_node_fail_handler (EVmaster master, EVmasterFailHandlerFunc func);
 
 /*!
  * Register a voluntary reconfiguration handler function to an EVdfg.
@@ -239,7 +279,7 @@ extern void EVdfg_node_fail_handler (EVdfg_master master, EVdfgFailHandlerFunc f
  * \param dfg The EVdfg handle with which to associate this handler
  * \param func The handler function to associate
  */
-extern void EVdfg_node_reconfig_handler (EVdfg_master master, EVdfgReconfigHandlerFunc func);
+extern void EVmaster_node_reconfig_handler (EVmaster master, EVmasterReconfigHandlerFunc func);
 
 /*!
  * Cause the instantiation of a virtual DFG.
@@ -269,7 +309,7 @@ extern int EVdfg_realize(EVdfg dfg);
  *
  * \param dfg The EVdfg handle upon which to wait.
  */
-extern int EVdfg_ready_wait(EVdfg_client client);
+extern int EVclient_ready_wait(EVclient client);
 
 /*!
  * Associate a name with a source handle
@@ -286,8 +326,8 @@ extern int EVdfg_ready_wait(EVdfg_client client);
  *  association is actually an EVPath-level operation, so there is no EVdfg
  *  parameter in this call.
  */
-extern void
-EVdfg_register_source(char *name, EVsource src);
+extern EVclient_sources
+EVclient_register_source(char *name, EVsource src);
 
 /*!
  * Associate a name with a sink handle
@@ -310,8 +350,8 @@ EVdfg_register_source(char *name, EVsource src);
  * \param client_data An uninterpreted value that is passed to the handler
  * function when it is called.
  */
-extern void
-EVdfg_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler, void* client_data);
+extern EVclient_sinks
+EVclient_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler, void* client_data);
 
 /*!
  * Associate a name with a raw sink handle
@@ -328,8 +368,8 @@ EVdfg_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSi
  *  EVPath-level operation, so there is a CM parameter in this call, but no
  *  EVdfg param.
  */
-extern void
-EVdfg_register_raw_sink_handler(CManager cm, char *name, EVRawHandlerFunc handler);
+extern EVclient_sinks
+EVclient_register_raw_sink_handler(CManager cm, char *name, EVRawHandlerFunc handler, void *client_data);
 
 /*!
  *  return a boolean describing whether the source has been assigned in EVdfg
@@ -340,7 +380,7 @@ EVdfg_register_raw_sink_handler(CManager cm, char *name, EVRawHandlerFunc handle
  *
  * \param src The source to test
  */
-extern int EVdfg_source_active(EVsource src);
+extern int EVclient_source_active(EVsource src);
 
 /*!
  *  return a count of EVdfg sink stones assigned to the current client
@@ -350,13 +390,13 @@ extern int EVdfg_source_active(EVsource src);
  *
  * \param dfg The DFG under consideration.
  */
-extern int EVdfg_active_sink_count(EVdfg_client client);
+extern int EVclient_active_sink_count(EVclient client);
 
 /*!
  *  Assign a unique, canonical name to a client of a particular given_name.
  *
  *  This call is performed by the master, typically in the
- *  EVdfgJoinHandlerFunc, in order to assign a unique name to clients who may
+ *  EVmasterJoinHandlerFunc, in order to assign a unique name to clients who may
  *  not have one previously.  The canonical name is the name to be used in
  *  EVdfg_assign_node(). 
  *
@@ -364,7 +404,18 @@ extern int EVdfg_active_sink_count(EVdfg_client client);
  * \param given_name The original name of the client.
  * \param canonical_name The canonical name to be assigned to the client.
  */
-extern void EVdfg_assign_canonical_name(EVdfg_master master, char *given_name, char *canonical_name);
+extern void EVmaster_assign_canonical_name(EVmaster master, char *given_name, char *canonical_name);
+
+/*!
+ * Create a DFG
+ *
+ * This call is used in the master process to create a DFG that will be
+ * deployed on the client processes.
+ * \param cm The CManager with which to associate the DFG
+ * \return An EVdfg handle, to be used in later calls.
+ */
+extern EVdfg EVdfg_create(EVmaster master);
+
 
 /*!
  *  Create an EVdfg stone with a specific action associated with it.
@@ -405,7 +456,7 @@ extern void EVdfg_add_action (EVdfg_stone stone, char *action_spec);
  *
  * \param dfg The DFG under consideration.
  * \param source_name This value must match some value which has been
- *  specified in EVdfg_register_source() on the node to which this stone is
+ *  specified in EVclient_register_source() on the node to which this stone is
  *  eventually mapped.  (EVdfg can't detect a mismatch until EVdfg_realize()
  *  is called.)  The source_name string is *not* owned by EVdfg and should
  *  be free'd by the application if dynamic.
@@ -422,7 +473,7 @@ extern EVdfg_stone EVdfg_create_source_stone(EVdfg dfg, char *source_name);
  *
  * \param dfg The DFG under consideration.
  * \param handler_name This value must match some value which has been
- *  specified in EVdfg_register_sink_handler() on the node to which this
+ *  specified in EVclient_register_sink_handler() on the node to which this
  *  stone is eventually mapped.  (EVdfg can't detect a mismatch until
  *  EVdfg_realize() is called.)  The handler_name string is *not* owned by
  *  EVdfg and should be free'd by the application if dynamic.
@@ -440,7 +491,7 @@ extern EVdfg_stone EVdfg_create_sink_stone(EVdfg dfg, char *handler_name);
  *
  * \param stone The EVdfg_stone to which to add the sink action.
  * \param handler_name This value must match some value which has been
- *  specified in EVdfg_register_sink_handler() on the node to which this
+ *  specified in EVclient_register_sink_handler() on the node to which this
  *  stone is eventually mapped.  (EVdfg can't detect a mismatch until
  *  EVdfg_realize() is called.)  The handler_name string is *not* owned by
  *  EVdfg and should be free'd by the application if dynamic.
@@ -505,7 +556,7 @@ extern int EVdfg_unlink_dest(EVdfg_stone source, EVdfg_stone destination);
  * 
  * This function assigns a particular EVdfg_stone to be instantiated upon a
  *  particular client node.  The node parameter must match either 1) a
- *  string specified in EVdfg_register_node_list() (in static joining mode),
+ *  string specified in EVmaster_register_node_list() (in static joining mode),
  *  or 2) a canonical name that has been assigned to a node (in dynamic
  *  joining mode).
  *
@@ -527,7 +578,7 @@ extern void EVdfg_assign_node(EVdfg_stone stone, char *node);
  * portion.
  *  
  * Autosubmits are intiated on each node just as it is about to return from
- * EVdfg_ready_wait().
+ * EVclient_ready_wait().
  */
 extern void EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec, 
 				    int period_usec);
@@ -566,71 +617,71 @@ extern attr_list EVdfg_get_attr_list(EVdfg_stone stone);
  *  Vote that this node is ready for shutdown, provide it's contribution
  *  to the return value and wait for the actual shutdown to occur.
  *
- *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
+ *  One of EVclient_shutdown() or EVclient_ready_for_shutdown() should be called
  *  by every participating node for normal shutdown.  The return value from
- *  all calls (on all nodes) to EVdfg_shutdown() and
- *  EVdfg_wait_for_shutdown() will all be the same.
+ *  all calls (on all nodes) to EVclient_shutdown() and
+ *  EVclient_wait_for_shutdown() will all be the same.
  *
  * \param dfg The EVdfg handle to which a return value is contributed
  * \param result this node's contribution to the DFG-wide shutdown value
  * \return the DFG-wide shutdown value
  */
-extern int EVdfg_shutdown(EVdfg_client client, int result);
+extern int EVclient_shutdown(EVclient client, int result);
 
 /*!
  *  Override voting and force shutdown with specific return value.
  *
- *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
+ *  One of EVclient_shutdown() or EVclient_ready_for_shutdown() should be called
  *  by every participating node for normal shutdown.  However, this call
  *  forces an abnormal shutdown. The return value from all calls (on all
- *  nodes) to EVdfg_shutdown() and EVdfg_wait_for_shutdown() will all the
+ *  nodes) to EVclient_shutdown() and EVclient_wait_for_shutdown() will all the
  *  value of this result parameter.
  *
- * \param client The EVdfg_client handle for which shutdown should be forced
+ * \param client The EVclient handle for which shutdown should be forced
  * \param result this node's contribution to the DFG-wide shutdown value
  * \return the DFG-wide shutdown value (actually equal to result here)
  *
  */
-extern int EVdfg_force_shutdown(EVdfg_client client, int result);
+extern int EVclient_force_shutdown(EVclient client, int result);
 
 /*!
  *  Vote that this node is ready for shutdown and is providing no specific contribution
  *  to the return value.
  *
- *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
+ *  One of EVclient_shutdown() or EVclient_ready_for_shutdown() should be called
  *  by every participating node for normal shutdown.  The return value from
- *  EVdfg_wait_for_shutdown() will be the same on each node and will depend
+ *  EVclient_wait_for_shutdown() will be the same on each node and will depend
  *  upon every node's contribution to the shutdown status.
  *
- * \param client The EVdfg_client handle for which shutdown is indicated.
+ * \param client The EVclient handle for which shutdown is indicated.
  *
  */
-extern void EVdfg_ready_for_shutdown(EVdfg_client client);
+extern void EVclient_ready_for_shutdown(EVclient client);
 
 /*!
  *  Wait for EVdfg to determine that the coordinated shutdown time has arrived.
  *
- *  One of EVdfg_shutdown() or EVdfg_ready_for_shutdown() should be called
+ *  One of EVclient_shutdown() or EVclient_ready_for_shutdown() should be called
  *  by every participating node for normal shutdown.  The return value from
- *  EVdfg_wait_for_shutdown() will be the same on each node and will depend
+ *  EVclient_wait_for_shutdown() will be the same on each node and will depend
  *  upon every node's contribution to the shutdown status.
  *
- * \param client The EVdfg_client handle for which shutdown is indicated.
+ * \param client The EVclient handle for which shutdown is indicated.
  *
  */
-extern int EVdfg_wait_for_shutdown(EVdfg_client client);
+extern int EVclient_wait_for_shutdown(EVclient client);
 
 /*!
  *  Force EVdfg shutdown without necessarilying having contributions from all nodes.
  *
- *  Generally this will cause every call to EVdfg_wait_for_shutdown() to
+ *  Generally this will cause every call to EVclient_wait_for_shutdown() to
  *  return the result value here, terminating execution of the EVdfg.
  *
- * \param client The EVdfg_client handle for which shutdown is indicated.
+ * \param client The EVclient handle for which shutdown is indicated.
  * \param result this node's contribution to the DFG-wide shutdown value
  *
  */
-extern int EVdfg_force_shutdown(EVdfg_client client, int result);
+extern int EVclient_force_shutdown(EVclient client, int result);
 
 #ifdef	__cplusplus
 }

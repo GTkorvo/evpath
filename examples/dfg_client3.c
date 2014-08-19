@@ -19,14 +19,14 @@ static FMStructDescRec simple_format_list[] =
     {NULL, NULL}
 };
 
-EVdfg_client test_client;
+EVclient test_client;
 
 static int
 simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     simple_rec_ptr event = vevent;
     printf("I got %d\n", event->integer_field);
-    EVdfg_shutdown(test_client, event->integer_field == 318);
+    EVclient_shutdown(test_client, event->integer_field == 318);
     return 1;
 }
 
@@ -37,6 +37,8 @@ int main(int argc, char **argv)
     char *str_contact;
     EVdfg_stone src, sink;
     EVsource source_handle;
+    EVclient_sinks sink_capabilities;
+    EVclient_sources source_capabilities;
 
     (void)argc; (void)argv;
     cm = CManager_create();
@@ -47,20 +49,20 @@ int main(int argc, char **argv)
 */
 
     source_handle = EVcreate_submit_handle(cm, -1, simple_format_list);
-    EVdfg_register_source("event source", source_handle);
-    EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
+    source_capabilities = EVclient_register_source("event source", source_handle);
+    sink_capabilities = EVclient_register_sink_handler(cm, "simple_handler", simple_format_list,
 				(EVSimpleHandlerFunc) simple_handler, NULL);
 
     /* We're node argv[1] in the process set, contact list is argv[2] */
-    test_client = EVdfg_assoc_client(cm, argv[1], argv[2]);
+    test_client = EVclient_assoc(cm, argv[1], argv[2], source_capabilities, sink_capabilities);
 
-    if (EVdfg_ready_wait(test_client) != 1) {
+    if (EVclient_ready_wait(test_client) != 1) {
 	/* dfg initialization failed! */
 	exit(1);
     }
 
     
-    if (EVdfg_source_active(source_handle)) {
+    if (EVclient_source_active(source_handle)) {
 	simple_rec rec;
 	rec.integer_field = 318;
 	/* submit would be quietly ignored if source is not active */
@@ -68,18 +70,18 @@ int main(int argc, char **argv)
     }
 
 /*! [Shutdown code] */
-    if (EVdfg_active_sink_count(test_client) > 0) {
-	/* if there are active sinks, the handler will call EVdfg_shutdown() */
+    if (EVclient_active_sink_count(test_client) > 0) {
+	/* if there are active sinks, the handler will call EVclient_shutdown() */
     } else {
-	if (EVdfg_source_active(source_handle)) {
+	if (EVclient_source_active(source_handle)) {
 	    /* we had a source and have already submitted, indicate success */
-	    EVdfg_shutdown(test_client, 0 /* success */);
+	    EVclient_shutdown(test_client, 0 /* success */);
 	} else {
 	    /* we had neither a source or sink, ready to shutdown, no opinion */
-	    EVdfg_ready_for_shutdown(test_client);
+	    EVclient_ready_for_shutdown(test_client);
 	}
     }
 
-    return(EVdfg_wait_for_shutdown(test_client));
+    return(EVclient_wait_for_shutdown(test_client));
 /*! [Shutdown code] */
 }
