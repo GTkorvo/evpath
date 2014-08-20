@@ -7,7 +7,7 @@
 #include "test_support.h"
 
 static int status;
-static EVdfg test_dfg;
+static EVclient test_client;
 
 
 typedef struct _rec_a {
@@ -103,7 +103,7 @@ output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     }
     message_count++;
     if (message_count == repeat_count/2) {
-	EVdfg_shutdown(test_dfg, 0);
+	EVclient_shutdown(test_client, 0);
     }
     return 0;
 }
@@ -150,6 +150,10 @@ be_test_master(int argc, char **argv)
     EVsource a_handle, b_handle;
     char * q_action_spec;
     int count, i;
+    EVmaster test_master;
+    EVdfg test_dfg;
+    EVclient_sinks sink_capabilities;
+    EVclient_sources source_capabilities;
 
     (void)argc; (void)argv;
     cm = CManager_create();
@@ -159,21 +163,22 @@ be_test_master(int argc, char **argv)
 **  LOCAL DFG SUPPORT   Sources and sinks that might or might not be utilized.
 */
 
-    a_handle = EVcreate_submit_handle_free(cm, -1, a_format_list,
+    a_handle = EVcreate_submit_handle_free(cm, DFG_SOURCE, a_format_list,
 					   data_free, NULL);
-    b_handle = EVcreate_submit_handle_free(cm, -1, b_format_list,
+    b_handle = EVcreate_submit_handle_free(cm, DFG_SOURCE, b_format_list,
 					   data_free, NULL);
-    EVdfg_register_source("a_source", a_handle);
-    EVdfg_register_source("b_source", b_handle);
-    EVdfg_register_sink_handler(cm, "c_output_handler", c_format_list,
-				(EVSimpleHandlerFunc) output_handler);
+    (void) EVclient_register_source("a_source", a_handle);
+    source_capabilities = EVclient_register_source("b_source", b_handle);
+    sink_capabilities = EVclient_register_sink_handler(cm, "c_output_handler", c_format_list,
+				(EVSimpleHandlerFunc) output_handler, NULL);
 
 /*
 **  DFG CREATION
 */
-    test_dfg = EVdfg_create(cm);
-    str_contact = EVdfg_get_contact_list(test_dfg);
-    EVdfg_register_node_list(test_dfg, &nodes[0]);
+    test_master = EVmaster_create(cm);
+    str_contact = EVmaster_get_contact_list(test_master);
+    EVmaster_register_node_list(test_master, &nodes[0]);
+    test_dfg = EVdfg_create(test_master);
 
     srca = EVdfg_create_source_stone(test_dfg, "a_source");
     srcb = EVdfg_create_source_stone(test_dfg, "b_source");
@@ -192,12 +197,12 @@ be_test_master(int argc, char **argv)
     EVdfg_realize(test_dfg);
 
 /* We're node 0 in the DFG */
-    EVdfg_join_dfg(test_dfg, nodes[0], str_contact);
+    test_client = EVclient_assoc_local(cm, nodes[0], test_master, source_capabilities, sink_capabilities);
 
 /* Fork the others */
     test_fork_children(&nodes[0], str_contact);
 
-    if (EVdfg_ready_wait(test_dfg) != 1) {
+    if (EVclient_ready_wait(test_client) != 1) {
 	/* dfg initialization failed! */
 	exit(1);
     }
@@ -205,13 +210,13 @@ be_test_master(int argc, char **argv)
     
     count = repeat_count;
     for (i=0; i < count/2 ; i++) {
-	if (EVdfg_source_active(a_handle)) {
+	if (EVclient_source_active(a_handle)) {
 	    rec_a_ptr a = malloc(sizeof(*a));
 	    generate_a_record(a);
 	    if (quiet <=0) {printf("submitting a -> %d\n", a->a_field);}
 	    EVsubmit(a_handle, a, NULL);
 	}
-	if (EVdfg_source_active(b_handle)) {
+	if (EVclient_source_active(b_handle)) {
 	    rec_b_ptr b = malloc(sizeof(*b));
 	    generate_b_record(b);
 	    if (quiet <=0) {printf("submitting b -> %d\n", b->b_field);}
@@ -220,11 +225,11 @@ be_test_master(int argc, char **argv)
     }
     CMsleep(cm, 1);
 
-    if (EVdfg_active_sink_count(test_dfg) == 0) {
-	EVdfg_ready_for_shutdown(test_dfg);
+    if (EVclient_active_sink_count(test_client) == 0) {
+	EVclient_ready_for_shutdown(test_client);
     }
 
-    status = EVdfg_wait_for_shutdown(test_dfg);
+    status = EVclient_wait_for_shutdown(test_client);
 
     wait_for_children(nodes);
 
@@ -242,47 +247,48 @@ be_test_child(int argc, char **argv)
     CManager cm;
     EVsource a_handle, b_handle;
     int count, i;
+    EVclient_sinks sink_capabilities;
+    EVclient_sources source_capabilities;
 
     cm = CManager_create();
     if (argc != 3) {
 	printf("Child usage:  evtest  <nodename> <mastercontact>\n");
 	exit(1);
     }
-    test_dfg = EVdfg_create(cm);
 
-    EVdfg_register_sink_handler(cm, "c_output_handler", c_format_list,
-				(EVSimpleHandlerFunc) output_handler);
-    a_handle = EVcreate_submit_handle_free(cm, -1, a_format_list,
+    sink_capabilities = EVclient_register_sink_handler(cm, "c_output_handler", c_format_list,
+				(EVSimpleHandlerFunc) output_handler, NULL);
+    a_handle = EVcreate_submit_handle_free(cm, DFG_SOURCE, a_format_list,
 					   data_free, NULL);
-    b_handle = EVcreate_submit_handle_free(cm, -1, b_format_list,
+    b_handle = EVcreate_submit_handle_free(cm, DFG_SOURCE, b_format_list,
 					   data_free, NULL);
-    EVdfg_register_source("a_source", a_handle);
-    EVdfg_register_source("b_source", b_handle);
+    (void) EVclient_register_source("a_source", a_handle);
+    source_capabilities = EVclient_register_source("b_source", b_handle);
 
-    EVdfg_join_dfg(test_dfg, argv[1], argv[2]);
-    EVdfg_ready_wait(test_dfg);
+    test_client = EVclient_assoc(cm, argv[1], argv[2], source_capabilities, sink_capabilities);
+    EVclient_ready_wait(test_client);
 
-    if (EVdfg_active_sink_count(test_dfg) == 0) {
-	EVdfg_ready_for_shutdown(test_dfg);
+    if (EVclient_active_sink_count(test_client) == 0) {
+	EVclient_ready_for_shutdown(test_client);
     }
 
     count = repeat_count;
 
     for (i=0; i < count/2 ; i++) {
-	if (EVdfg_source_active(a_handle)) {
+	if (EVclient_source_active(a_handle)) {
 	    rec_a_ptr a = malloc(sizeof(*a));
 	    generate_a_record(a);
 	    if (quiet <=0) {printf("submitting a -> %d\n", a->a_field);}
 	    EVsubmit(a_handle, a, NULL);
 	}
-	if (EVdfg_source_active(b_handle)) {
+	if (EVclient_source_active(b_handle)) {
 	    rec_b_ptr b = malloc(sizeof(*b));
 	    generate_b_record(b);
 	    if (quiet <=0) {printf("submitting b -> %d\n", b->b_field);}
 	    EVsubmit(b_handle, b, NULL);
 	}
     }
-    status = EVdfg_wait_for_shutdown(test_dfg);
+    status = EVclient_wait_for_shutdown(test_client);
     EVfree_source(b_handle);
     EVfree_source(a_handle);
     return status;
