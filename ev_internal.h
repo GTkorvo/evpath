@@ -215,13 +215,14 @@ typedef struct _lookup_table_elem {
     int local_id;
 } lookup_table_elem;
 
-typedef struct _sink_table_elem {
+typedef struct _EVclient_sinks {
     char *name;
     FMStructDescList format_list;
     EVSimpleHandlerFunc handler;
+    void *client_data;
 } sink_table_elem;
 
-typedef struct _source_table_elem {
+typedef struct _EVclient_sources {
     char *name;
     EVsource src;
 } source_table_elem;
@@ -401,4 +402,5 @@ extern void fix_response_cache(stone_type stone);
 stone_type stone_struct(event_path_data evp, int stone_num);
 extern int lookup_global_stone(event_path_data evp, int stone_num);
 extern CManager get_cm_from_ev_state(void *evstate);
-
+extern void
+add_stone_to_lookup(event_path_data evp, int stone_num, int global_stone_num);

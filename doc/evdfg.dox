@@ -19,21 +19,23 @@ virtual representation of the actual data flow graph that is to be realized
 in EVPath, with EVdfg controlling the mapping (and potentially remapping) of
 EVPath stones to the participating processes (nodes).
 
-In particular, in EVdfg a single, differentiated 'Master' process is
-responsible for defining the entire DFG.  Code in the master creates the virtual
-stones, assigns actions to those stones, links them together to create the
-topology, and assigns stones to nodes.  It also determines when sufficient
-client processes have joined the DFG, either by specifying a static list, or
-by making a decision in a handler as each new client process joins.  Once
-all required nodes have joined and the virtual DFG has been created, it is
-<i>realized</i> by the master (I.E. actual EVPath stones are created at the
-appropriate places) and starts running.  The master may also register
-handlers that can be called in the event of new nodes joining, an existing
-node becoming unreachable, or a stone calling for reconfiguration.  In the
-case of each of these, the master may rearrange the set of virtual stones,
-moving some, adding others, changing links, etc. and then can realize the
-changed DFG.  The master can also arbitrate an orderly shutdown of all
-participating processes with an agreed-upon exit value.
+Unlike EVpath, EVdfg has knowledge of the entire set of processes that make
+up the 'cohort'.  In particular, in EVdfg a single, differentiated 'Master'
+process is responsible for defining the entire DFG.  Code in the master
+creates the virtual stones, assigns actions to those stones, links them
+together to create the topology, and assigns stones to nodes.  It also
+determines when sufficient 'client' processes have joined the DFG, either by
+specifying a static list, or by making a decision in a handler as each new
+client process joins.  Once all required nodes have joined and the virtual
+DFG has been created, it is <i>realized</i> by the master (I.E. actual
+EVPath stones are created at the appropriate places) and starts running.
+The master may also register handlers that can be called in the event of new
+nodes joining, an existing node becoming unreachable, or a stone calling for
+reconfiguration.  In the case of each of these, the master may rearrange the
+set of virtual stones, moving some, adding others, changing links, etc. and
+then can realize the changed DFG.  The master can also (optionally)
+arbitrate an orderly shutdown of all client processes with an agreed-upon
+exit value. 
 
 Generally, but not necessarily, the master process is also a client and a
 participant in the DFG.  The other participating processes are relatively
@@ -60,15 +62,17 @@ the DFG.
 
 In this static mode, the pseudocode for the master looks like this:
 \code{.c}
-    EVdfg test_dfg;
+    EVmaster test_master;
     char *str_contact;
     char *nodes[] = {"a", "b", NULL};
 
-    /* CM initialization and EVdfg capability registration occurs here */
+    /* CM initialization occurs here */
 
-    test_dfg = EVdfg_create(cm);
-    str_contact = EVdfg_get_contact_list(test_dfg);
-    EVdfg_register_node_list(test_dfg, &nodes[0]);
+    test_master = EVmaster_create(cm);
+    str_contact = EVmaster_get_contact_list(test_master);
+    EVmaster_register_node_list(test_master, &nodes[0]);
+
+    /* EVclient capability registration occurs here */
 
     /* EVdfg stone creation and assignment occurs here */
 
@@ -85,12 +89,12 @@ In this static mode, the pseudocode for the master looks like this:
 
 While the client is somewhat simpler:
 \code{.c}
-    EVdfg test_dfg;
+    EVclient test_client;
     char *str_contact;
 
-    /* CM initialization and EVdfg capability registration occurs here */
+    /* CM initialization and EVclient capability registration occurs here */
 
-    test_dfg = EVdfg_create(cm);
+    test_dfg = EVclient_create(cm);
 
     /* We're node "b" in the DFG */
     EVdfg_join_dfg(test_dfg, "b", str_contact);

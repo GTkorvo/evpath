@@ -290,6 +290,10 @@ int timeout_usec;
         svc->trace_out(sd->cm, "CMSelect with timeout %d sec, %d usec", 
 		       timeout.tv_sec, timeout.tv_usec);
 
+	if (timeout.tv_sec == -1) {
+	    timeout.tv_usec = 1;
+	    timeout.tv_sec = 0;
+	}
 	DROP_CM_LOCK(svc, sd->cm);
 	res = select(sd->sel_item_max+1, &rd_set, &wr_set,
                      (fd_set *) NULL, &timeout);
@@ -360,6 +364,7 @@ int timeout_usec;
 		    (long) ((fd_set *) sd->fdset)->fds_bits[1],
 		    (long) ((fd_set *) sd->fdset)->fds_bits[2],
 		    (long) ((fd_set *) sd->fdset)->fds_bits[3]);
+	    fprintf(stderr, "timeout was %d and %d\n", timeout_sec, timeout_usec);
 #else
 	    fprintf(stderr, "select failed, errno %d\n", errno);
 #endif

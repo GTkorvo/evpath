@@ -22,7 +22,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     printf("I got %d\n", event->integer_field);
 }
 
-/* this file is evpath/examples/derived_recv.c */
+/* this file is evpath/examples/derived_recv2.c */
 int main(int argc, char **argv)
 {
     CManager cm;

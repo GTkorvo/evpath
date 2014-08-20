@@ -27,40 +27,40 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     return 1;
 }
 
-/* this file is evpath/examples/net_recv.c */
+/* this file is evpath/examples/dfg_client.c */
 int main(int argc, char **argv)
 {
     CManager cm;
     char *str_contact;
     EVdfg_stone src, sink;
     EVsource source_handle;
-    EVdfg test_dfg;
+    EVclient test_client;
+    EVclient_sinks sink_capabilities;
+    EVclient_sources source_capabilities;
 
     (void)argc; (void)argv;
     cm = CManager_create();
     CMlisten(cm);
-
-    test_dfg = EVdfg_create(cm);
 
 /*
 **  LOCAL DFG SUPPORT   Sources and sinks that might or might not be utilized.
 */
 
     source_handle = EVcreate_submit_handle(cm, -1, simple_format_list);
-    EVdfg_register_source("event source", source_handle);
-    EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
-				(EVSimpleHandlerFunc) simple_handler);
+    source_capabilities = EVclient_register_source("event source", source_handle);
+    sink_capabilities = EVclient_register_sink_handler(cm, "simple_handler", simple_format_list,
+				(EVSimpleHandlerFunc) simple_handler, NULL);
 
-    /* We're node argv[1] in the DFG, contact list is argv[2] */
-    EVdfg_join_dfg(test_dfg, argv[1], argv[2]);
+    /* We're node argv[1] in the set of process clients, contact list is argv[2] */
+    test_client = EVclient_assoc(cm, argv[1], argv[2], source_capabilities, sink_capabilities);
 
-    if (EVdfg_ready_wait(test_dfg) != 1) {
-	/* dfg initialization failed! */
+    if (EVclient_ready_wait(test_client) != 1) {
+	/* initialization failed! */
 	exit(1);
     }
 
     
-    if (EVdfg_source_active(source_handle)) {
+    if (EVclient_source_active(source_handle)) {
 	simple_rec rec;
 	rec.integer_field = 318;
 	/* submit would be quietly ignored if source is not active */

@@ -27,7 +27,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     return 1;
 }
 
-/* this file is evpath/examples/net_recv.c */
+/* this file is evpath/examples/dfg_master2.c */
 int main(int argc, char **argv)
 {
 /*! [Changed nodes array] */
@@ -35,29 +35,35 @@ int main(int argc, char **argv)
 /*! [Changed nodes array] */
     CManager cm;
     char *str_contact;
+    EVmaster test_master;
     EVdfg test_dfg;
+    EVclient test_client;
     EVdfg_stone src, mid, sink;
     EVsource source_handle;
+    EVclient_sinks sink_capabilities;
+    EVclient_sources source_capabilities;
 
     (void)argc; (void)argv;
     cm = CManager_create();
     CMlisten(cm);
-    test_dfg = EVdfg_create(cm);
+
+    test_master = EVmaster_create(cm);
+    str_contact = EVmaster_get_contact_list(test_master);
+    EVmaster_register_node_list(test_master, &nodes[0]);
 
 /*
 **  LOCAL DFG SUPPORT   Sources and sinks that might or might not be utilized.
 */
 
     source_handle = EVcreate_submit_handle(cm, -1, simple_format_list);
-    EVdfg_register_source("event source", source_handle);
-    EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
-				(EVSimpleHandlerFunc) simple_handler);
+    source_capabilities = EVclient_register_source("event source", source_handle);
+    sink_capabilities = EVclient_register_sink_handler(cm, "simple_handler", simple_format_list,
+				(EVSimpleHandlerFunc) simple_handler, NULL);
 
 /*
 **  DFG CREATION
 */
-    str_contact = EVdfg_get_contact_list(test_dfg);
-    EVdfg_register_node_list(test_dfg, &nodes[0]);
+    test_dfg = EVdfg_create(test_master);
 
 /*! [Changed DFG Creation] */
     src = EVdfg_create_source_stone(test_dfg, "event source");
@@ -75,16 +81,16 @@ int main(int argc, char **argv)
 /*! [Changed DFG Creation] */
 
     /* We're node "a" in the DFG */
-    EVdfg_join_dfg(test_dfg, "a", str_contact);
+    test_client = EVclient_assoc_local(cm, "a", test_master, source_capabilities, sink_capabilities);
 
     printf("Contact list is \"%s\"\n", str_contact);
-    if (EVdfg_ready_wait(test_dfg) != 1) {
+    if (EVclient_ready_wait(test_client) != 1) {
 	/* dfg initialization failed! */
 	exit(1);
     }
 
     
-    if (EVdfg_source_active(source_handle)) {
+    if (EVclient_source_active(source_handle)) {
 	simple_rec rec;
 	rec.integer_field = 318;
 	/* submit would be quietly ignored if source is not active */

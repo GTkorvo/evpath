@@ -777,6 +777,7 @@ shutdown_enet_thread
     (void)cm;
     if (sd->server != NULL) {
 	ENetHost * server = sd->server;
+	enet_host_flush(sd->server);
 	svc->fd_remove_select(cm, enet_host_get_sock_fd (server));
 	sd->server = NULL;
 	enet_host_destroy(server);
