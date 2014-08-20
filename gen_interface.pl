@@ -85,10 +85,13 @@ sub gen_stub {
     my(@args);
     @args = split( ", ",  $arg_str,2);
     print REVP "\nextern $return_type{$subr}\n";
+    print REVPHI "\nextern $return_type{$subr}\n";
     if ($#args > 0) {
-	print REVP "R$subr(CMConnection conn, $args[1])\n";
+	print REVP "INT_R$subr(CMConnection conn, $args[1])\n";
+	print REVPHI "INT_R$subr(CMConnection conn, $args[1]);\n";
     } else {
-	print REVP "R$subr(CMConnection conn)\n";
+	print REVP "INT_R$subr(CMConnection conn)\n";
+	print REVPHI "INT_R$subr(CMConnection conn);\n";
     }
     print REVP "{\n";
     
@@ -103,11 +106,13 @@ sub gen_stub {
       /EVstone/ && do {$retsubtype = "int"; $ret_type="EVstone"; last;};
       /EVaction/ && do {$retsubtype = "int"; $ret_type="EVaction"; last;};
     }
-    print REVP "    int cond = CMCondition_get(conn->cm, conn);\n";
-    print REVP "    CMFormat f = CMlookup_format(conn->cm, ${subr}_req_formats);\n";
+    print REVP "    int cond;\n";
+    print REVP "    CMFormat f;\n";
     print REVP "    EV_${retsubtype}_response response;\n" unless ($return_type{$subr} eq "void");
     print REVP "    ${subr}_request request;\n";
     print REVP "    memset(&request, 0, sizeof(request));\n";
+    print REVP "    cond = INT_CMCondition_get(conn->cm, conn);\n";
+    print REVP "    f = INT_CMlookup_format(conn->cm, ${subr}_req_formats);\n";
     $free_list = "";
     foreach $arg (split (", ", $args[1])) {
 	$_ = $arg;
@@ -130,15 +135,15 @@ sub gen_stub {
     print REVP "        f = INT_CMregister_format(conn->cm, ${subr}_req_formats);\n";
     print REVP "    }\n";
     if ($return_type{$subr} eq "void") {
-	print REVP "    CMCondition_set_client_data(conn->cm, cond, NULL);\n";
+	print REVP "    INT_CMCondition_set_client_data(conn->cm, cond, NULL);\n";
     } else {
-	print REVP "    CMCondition_set_client_data(conn->cm, cond, &response);\n";
+	print REVP "    INT_CMCondition_set_client_data(conn->cm, cond, &response);\n";
     }
-    print REVP "    CMwrite(conn, f, &request);\n";
+    print REVP "    INT_CMwrite(conn, f, &request);\n";
     if ("$free_list" ne "") {
 	print REVP "$free_list";
     }
-    print REVP "    CMCondition_wait(conn->cm, cond);\n";
+    print REVP "    INT_CMCondition_wait(conn->cm, cond);\n";
   switch:for ($return_type{$subr}) {
       /attr_list/ && do {print REVP "    return attr_list_from_string(response.ret);\n"; last;};
       /void/ && do {last;};
@@ -147,6 +152,67 @@ sub gen_stub {
       /int/ && do {print REVP "    return response.ret;\n"; last;};
       /EVevent_list/ && do {print REVP "    return response.ret;\n"; last;};
   }
+    print REVP "}\n";
+}
+
+sub gen_wrapper {
+    my($subr, $arg_str, $has_client_data) = @_;
+    my(@args);
+    @args = split( ", ",  $arg_str,2);
+    print REVP "\nextern $return_type{$subr}\n";
+    if ($#args > 0) {
+      print REVP "R$subr(CMConnection conn, $args[1])\n";
+    } else {
+      print REVP "R$subr(CMConnection conn)\n";
+    }
+    #  This break stuff.  GSE
+    # $handler_register_string = "$handler_register_string\
+    # tmp_format = INT_CMregister_format(cm, ${subr}_req_formats);\
+    # INT_CMregister_handler(tmp_format, R${subr}_handler, cm->evp);\n";
+
+    print REVP "{\n";
+    $_ = $return_type{$subr};
+    if (/^\s*void\s*$/) {
+	$return_type{$subr} = "void";
+    }
+    $retsubtype = $return_type{$subr};
+    switch:  for ($ret_type) {
+      /attr_list/ && do {$retsubtype = "string"; $ret_type="char*"; last;};
+      /char*/ && do {$retsubtype = "string"; $ret_type="char*"; last;};
+      /EVstone/ && do {$retsubtype = "int"; $ret_type="EVstone"; last;};
+      /EVaction/ && do {$retsubtype = "int"; $ret_type="EVaction"; last;};
+    }
+    print REVP "    $return_type{$subr} ret;\n" unless ($return_type{$subr} eq "void");
+    print REVP "    CManager_lock(conn->cm);\n";
+    if ($return_type{$subr} eq "void") {
+        print REVP "    INT_R${subr}(conn";
+    } else {
+        print REVP "    ret = INT_R${subr}(conn";
+    }
+    foreach $arg (split (", ", $args[1])) {
+	$_ = $arg;
+	if (/^\s*(.*\W+)(\w+)$\s*/) {
+	    $argtype = $1;
+	    $argname = $2;
+	    $argtype =~ s/\s+$//;
+	    $argtype =~ s/(?!\w)\s+(?=\W)//;  #remove unnecessary white space
+	    $argtype =~ s/(?!\W)\s+(?=\w)//;  #remove unnecessary white space
+	    $argright = "$argname";
+	  switch:for ($argtype) {
+	      /attr_list/ && do {$argright = "$argname"; last;};
+	      /EVSimpleHandlerFunc/ && do {$argright = "$argname"; last;};
+	      /FMStructDescList/ && do {$argright = "$argname"; last;};
+	  }
+	}
+	print REVP ", $argright";
+    }
+    print REVP ");\n";
+    print REVP "    CManager_unlock(conn->cm);\n";
+    if ($return_type{$subr} eq "void") {
+        print REVP "    return;\n";
+    } else {
+        print REVP "    return ret;\n";
+    }
     print REVP "}\n";
 }
 
@@ -487,6 +553,17 @@ extern "C" {
 #endif
 EOF
 
+unless (open (REVPHI, ">revp_internal.h")) { die "Failed to open revpath.h";}
+print REVPHI<<EOF;
+/*
+ *  This file is automatically generated by gen_interface.pl from evpath.h.
+ *
+ *  DO NOT EDIT
+ *
+ */
+
+EOF
+
 unless (open (REVP, ">revp.c")) { die "Failed to open revp.c";}
 print REVP<<EOF;
 /*
@@ -716,6 +793,7 @@ EOF
 	gen_type(${subr}, $no_handler);
 	gen_field_list(${subr}, $no_handler);
 	gen_stub(${subr}, $no_handler);
+	gen_wrapper(${subr},  $no_handler, $has_client_data);
 	gen_handler(${subr}, $no_client_data, $has_client_data);
     }
 

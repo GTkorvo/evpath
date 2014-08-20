@@ -13,6 +13,7 @@
 #include "ev_deploy.h"
 #include "revpath.h"
 #include "ev_dfg_internal.h"
+#include "revp_internal.h"
 #include <assert.h>
 
 /*
@@ -330,7 +331,7 @@ perform_actions_on_nodes(EVdfg_configuration config, EVmaster master)
 	    if (local) {
 		INT_EVstone_set_output(cm, act.stone_id, act.u.link.port, act.u.link.dest_id);
 	    } else {
-//		INT_REVstone_set_output(conn, act.stone_id, act.unlink.port, act.u.link.dest_id);
+		INT_REVstone_set_output(conn, act.stone_id, act.u.link.port, act.u.link.dest_id);
 	    }
 	    break;
 	}
@@ -338,7 +339,7 @@ perform_actions_on_nodes(EVdfg_configuration config, EVmaster master)
 	    if (local) {
 		INT_EVstone_set_output(cm, act.stone_id, act.u.link.port, -1);
 	    } else {
-//		INT_REVstone_set_output(conn, act.stone_id, act.unlink.port, -1);
+		INT_REVstone_set_output(conn, act.stone_id, act.u.link.port, -1);
 	    }
 	    break;
 	}
@@ -346,7 +347,7 @@ perform_actions_on_nodes(EVdfg_configuration config, EVmaster master)
 	    if (local) {
 		INT_EVset_attr_list(cm, act.stone_id, act.u.attrs.attrs);
 	    } else {
-//		INT_REVset_attr_list(conn, act.stone_id, act.u.attrs.attrs);
+		INT_REVset_attr_list(conn, act.stone_id, act.u.attrs.attrs);
 	    }
 	    break;
 	}
@@ -357,7 +358,7 @@ perform_actions_on_nodes(EVdfg_configuration config, EVmaster master)
 	    if (local) {
 		INT_EVdestroy_stone(cm, act.stone_id);
 	    } else {
-//		INT_REVdestroy_stone(conn, act.stone_id);
+		INT_REVdestroy_stone(conn, act.stone_id);
 	    }
 	    break;
 	}
