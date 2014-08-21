@@ -460,25 +460,42 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
     double start =0, end = 0;
     ib_conn_data_ptr scd;
     tbuffer *tb;
-
+    int left = 0;
+    int lerrno;
+    char *buffer;
+    int requested_len = 0;
+    
     da_t = getlocaltime();
     
     scd = (ib_conn_data_ptr) svc->get_transport_data(conn);
 
     start = getlocaltime();    
 //    iget = read(scd->fd, (char *) &req, sizeof(struct request));
-    iget = read(scd->fd, (char *) &msg, sizeof(struct control_message));
-    
+    left =  sizeof(struct control_message);
+    buffer = (char*)&msg;
+    requested_len = left;
+    while (left > 0) {
+	    iget = read(scd->fd, (char *) buffer + requested_len - left,
+	                left);
+	    lerrno = errno;
+	    if (iget == -1) {
+		if ((lerrno != EWOULDBLOCK) &&
+		    (lerrno != EAGAIN) &&
+		    (lerrno != EINTR)) {
+		    /* serious error */
+		    svc->trace_out(scd->sd->cm, "CMSocket iget was -1, errno is %d, returning %d for read", 
+				   lerrno, requested_len - left);
+		    svc->connection_close(conn);
+		    return;
+		}
+	    }
+	    if (iget == 0) {
+		svc->connection_close(conn);
+		return;
+	    }
+	    left -= iget;
+	}
 
-    if (iget == 0) {
-	svc->connection_close(conn);
-	return;
-    }
-    if (iget != sizeof(struct control_message)) {
-	int lerrno = errno;
-	svc->trace_out(scd->sd->cm, "CMIB iget was %d, errno is %d, returning 0 for read",
-		       iget, lerrno);
-    }
 
     switch(msg.type) {
     case msg_piggyback: {
@@ -487,11 +504,10 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 	CMbuffer cb = svc->get_data_buffer(trans->cm, msg.u.pb.total_length - msg_offset);
 
 	memcpy(cb->buffer, &msg.u.pb.body[0], sizeof(struct control_message)-msg_offset);
-	int left = msg.u.pb.total_length - sizeof(struct control_message);
-	char *buffer = (char*)cb->buffer + sizeof(struct control_message)-msg_offset;
-	int requested_len = left;
+	left = msg.u.pb.total_length - sizeof(struct control_message);
+	buffer = (char*)cb->buffer + sizeof(struct control_message)-msg_offset;
+	requested_len = left;
 	while (left > 0) {
-	    int lerrno;
 	    iget = read(scd->fd, (char *) buffer + requested_len - left,
 		    left);
 	    lerrno = errno;
