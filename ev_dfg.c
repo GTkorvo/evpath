@@ -14,6 +14,7 @@
 #include "revpath.h"
 #include "ev_dfg_internal.h"
 #include "revp_internal.h"
+#undef NDEBUG
 #include <assert.h>
 
 /*
@@ -116,6 +117,7 @@ handle_queued_messages(CManager cm, void* vmaster)
     EVmaster_msg_ptr *last_ptr;
 
     if (master->queued_messages == NULL) return;
+    assert(CManager_locked(cm));
     next = master->queued_messages;
     last_ptr = &master->queued_messages;
     while(next != NULL) {
@@ -2063,6 +2065,7 @@ queue_master_msg(EVmaster master, void*vmsg, EVmaster_msg_type msg_type, CMConne
 	break;
     }
     default:
+	printf("MEssage type bad, value is %d  %d\n", msg_type, msg->msg_type);
 	assert(FALSE);
     }
     msg->next = NULL;
@@ -2084,8 +2087,8 @@ static void
 dfg_master_msg_handler(CManager cm, CMConnection conn, void *vmsg, 
 		       void *client_data, attr_list attrs)
 {
-    EVmaster master = (EVmaster)((uintptr_t)client_data & (~0xf));
-    EVmaster_msg_type msg_type = ((uintptr_t)client_data & 0xf);
+    EVmaster master = (EVmaster)((uintptr_t)client_data & (~0x7));
+    EVmaster_msg_type msg_type = ((uintptr_t)client_data & 0x7);
     queue_master_msg(master, vmsg, msg_type, conn, /*copy*/1);
     /* we'll handle this in the poll handler */
 }
