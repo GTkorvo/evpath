@@ -35,6 +35,7 @@ inet_ntoa(struct in_addr ina)
     return buf;
 }
 #endif
+#undef NDEBUG
 #include "assert.h"
 #include "ffs.h"
 #include "atl.h"

@@ -1,6 +1,7 @@
 #include "config.h"
 #include <stdio.h>
 #include <string.h>
+#undef NDEBUG
 #include <assert.h>
 #include <math.h>
 #ifdef HAVE_NETDB_H

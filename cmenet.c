@@ -4,6 +4,7 @@
 #  pragma warning (disable: 1418)
 #endif
 
+#undef NDEBUG
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>

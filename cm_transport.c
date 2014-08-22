@@ -17,6 +17,7 @@
 #include <cm_internal.h>
 #include <cm_transport.h>
 #include "dlloader.h"
+#undef NDEBUG
 #include "assert.h"
 
 extern struct CMtrans_services_s CMstatic_trans_svcs;

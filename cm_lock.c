@@ -14,6 +14,7 @@
 #include "evpath.h"
 #include "cm_internal.h"
 #include "config.h"
+#undef NDEBUG
 #include "assert.h"
 
 extern void

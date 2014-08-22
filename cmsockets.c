@@ -49,6 +49,7 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#undef NDEBUG
 #include <assert.h>
 #include <signal.h>
 #include <stdlib.h>

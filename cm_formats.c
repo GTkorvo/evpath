@@ -3,6 +3,7 @@
 #ifndef MODULE
 #include <stdio.h>
 #include <string.h>
+#undef NDEBUG
 #include <assert.h>
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
@@ -14,6 +15,7 @@
 #include "kernel/kcm.h"
 #include "kernel/cm_kernel.h"
 #include "kernel/library.h"
+#undef NDEBUG
 #include "assert.h"
 
 #endif

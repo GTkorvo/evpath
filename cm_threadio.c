@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <atl.h>
 #include <evpath.h>
+#undef NDEBUG
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>

@@ -1,6 +1,7 @@
 
 #include "config.h"
 #include <memory.h>
+#undef NDEBUG
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
