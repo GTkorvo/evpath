@@ -92,8 +92,8 @@ typedef struct _EVclient_sinks *EVclient_sinks;
 /*!
  * Create a DFG master
  *
- * This call is used in master process of a set of communicating EVdfg
- * processes.  The master is the unique point of control and
+ * This call is used in master process to create a set of communicating
+ * EVdfg processes.  The master is the unique point of control and
  * adminstration for client processes and DFGs.
  *
  * \param cm The CManager with which to associate the DFG
@@ -174,13 +174,14 @@ extern EVclient EVclient_assoc(CManager cm, char *node_name, char *master_contac
  *  EVclient_register_source() or NULL
  * \param sink_capabilities The last value returned by
  *  EVclient_register_sink_handle() or EVclient_register_raw_sink_handle, or NULL
+ * \return a handle to EVclient upon success
  */
 extern EVclient EVclient_assoc_local(CManager cm, char *node_name, EVmaster master,
-					     EVclient_sources source_capabilities, EVclient_sinks sink_capabilities);
+				     EVclient_sources source_capabilities, EVclient_sinks sink_capabilities);
 
 
 /*!
- *  Supply a static list of client names to the EVdmaster.
+ *  Supply a static list of client names to the EVmaster.
  *
  * This call is used in static joining mode, that is when the set of nodes
  * that will join the DFG client set is known upfront and each has a predefined unique 
@@ -286,28 +287,32 @@ extern void EVmaster_node_reconfig_handler (EVmaster master, EVmasterReconfigHan
  *
  *  This call is performed by the master to signal the end of the creation
  *  or reorganization of a DFG.  In static-client-list mode, it is generally
- *  called by master after the virtual DFG has been created and just before
- *  the master calls EVdfg_join_dfg().  In dynamic-join mode, creating the
- *  virtual DFG and calling EVdfg_realize() is how the join handler signals
- *  EVdfg that all expected nodes have joined.  In a node fail handler, a
- *  node reconfig handler, or when the join handler is called after the
- *  first realization of the DFG, a further call of EVdfg_realize()
- *  represents the finalization of a reconfiguration of the DFG.
+ *  called by master after the virtual DFG has been created.  In
+ *  dynamic-join mode, creating the virtual DFG and calling EVdfg_realize()
+ *  is how the join handler signals EVdfg that all expected nodes have
+ *  joined.  In a node fail handler, a node reconfig handler, or when the
+ *  join handler is called after the first realization of the DFG, a further
+ *  call of EVdfg_realize() represents the finalization of a reconfiguration
+ *  of the DFG.
  *
  * \param dfg The handle of the EVdfg to be realized.
  */
-extern int EVdfg_realize(EVdfg dfg);
+extern void EVdfg_realize(EVdfg dfg);
 
 /*!
  * Wait for a DFG to be ready to run
  *
- *  This call is performed by nodes which are participating in the DFG
- *  (clients and master) in order to wait for all nodes to join and the DFG
- *  to be realized.  This call will only return after the DFG has been
- *  completely instantiated and is running.  All participating clients will
- *  exit this call at roughly the same time.
+ *  This call is performed by participating clients (including the master
+ *  process operating as a client), in order to wait for the deployment of a
+ *  DFG.  This call will only return after a DFG has been completely
+ *  instantiated and is running.  In initial deployment, all participating
+ *  clients will exit this call at roughly the same time.  In the case of
+ *  client nodes that join after a DFG is already running, this call will
+ *  return after the master has been notified of the join and the client has
+ *  been incorporated into the DFG (I.E. stones potentially deployed.)
  *
- * \param dfg The EVdfg handle upon which to wait.
+ * \param client The EVclient handle upon which to wait.
+ * \return 1 on success, 0 on failure
  */
 extern int EVclient_ready_wait(EVclient client);
 
@@ -379,6 +384,7 @@ EVclient_register_raw_sink_handler(CManager cm, char *name, EVRawHandlerFunc han
  *  active by having a virtual source stone associated with it.
  *
  * \param src The source to test
+ * \return true if the source has been assigned, false otherwise
  */
 extern int EVclient_source_active(EVsource src);
 
@@ -389,8 +395,9 @@ extern int EVclient_source_active(EVsource src);
  *  sink stones have been assigned to them.
  *
  * \param dfg The DFG under consideration.
+ * \return the number of active sink stones assigned to the current client
  */
-extern int EVclient_active_sink_count(EVclient client);
+extern unsigned int EVclient_active_sink_count(EVclient client);
 
 /*!
  *  Assign a unique, canonical name to a client of a particular given_name.
@@ -398,13 +405,15 @@ extern int EVclient_active_sink_count(EVclient client);
  *  This call is performed by the master, typically in the
  *  EVmasterJoinHandlerFunc, in order to assign a unique name to clients who may
  *  not have one previously.  The canonical name is the name to be used in
- *  EVdfg_assign_node(). 
+ *  EVdfg_assign_node().  The only constraint on the name is that not have been 
+ *  assigned to any already-participating node.
  *
  * \param dfg The DFG under consideration.
  * \param given_name The original name of the client.
  * \param canonical_name The canonical name to be assigned to the client.
+ * \return true on success, false if the name was not unique
  */
-extern void EVmaster_assign_canonical_name(EVmaster master, char *given_name, char *canonical_name);
+extern int EVmaster_assign_canonical_name(EVmaster master, char *given_name, char *canonical_name);
 
 /*!
  * Create a DFG
@@ -499,28 +508,21 @@ extern EVdfg_stone EVdfg_create_sink_stone(EVdfg dfg, char *handler_name);
 extern void EVdfg_add_sink_action(EVdfg_stone stone, char *handler_name);
 
 /*!
- * Link an output port of one stone (the source) to a destination
- * (target) stone.
- * 
- * This function is roughly the analog of the EVstone_set_output function, but at
- * the EVdfg level.  All non-terminal stones have one or more output ports
- * from which data will emerge.  EVdfg_link_port() is used to assign each of
- * these outputs to another EVdfg_stone stone.
- *
- * \param source The EVdfg_stone whose ports are to be assigned.
- * \param output_index The zero-based index of the output which should be assigned.
- * \param destination The EVdfg_stone which is to receive those events.
- */
-extern void EVdfg_link_dest(EVdfg_stone source, EVdfg_stone destination);
-
-/*!
  * Link a particular output port of one stone (the source) to a destination
  * (target) stone.
  * 
- * This function is roughly the analog of the EVstone_set_output function, but at
- * the EVdfg level.  All non-terminal stones have one or more output ports
- * from which data will emerge.  EVdfg_link_port() is used to assign each of
- * these outputs to another EVdfg_stone stone.
+ * This function is roughly the analog of the EVstone_set_output function,
+ * but at the EVdfg level.  All non-terminal stones have one or more output
+ * ports from which data will emerge.  EVdfg_link_port() is used to assign
+ * each of these outputs to another EVdfg_stone stone.  For EVPath actions
+ * which have a single output, such as 'filter' and 'transform', those
+ * outputs appear on 'port_index' 0.  Other actions, such as router and
+ * multityped actions allow submission to any port, so care must be taken
+ * that the code in those actions uses appropriate port numbers as assigned
+ * here.  The complement of EVdfg_link_port() is EVdfg_unlink_port().  EVdfg
+ * source stones, and stones with no assigned actions, act as EVPath 'split'
+ * stones and their outputs are best managed with EVdfg_link_dest() and
+ * EVdfg_unlink_dest().
  *
  * \param source The EVdfg_stone whose ports are to be assigned.
  * \param output_index The zero-based index of the output which should be assigned.
@@ -528,6 +530,25 @@ extern void EVdfg_link_dest(EVdfg_stone source, EVdfg_stone destination);
  */
 extern void EVdfg_link_port(EVdfg_stone source, int output_index, 
 			    EVdfg_stone destination);
+
+/*!
+ * Link an anonymous output port of one stone (the source) to a destination
+ * (target) stone.
+ * 
+ * This function is roughly the analog of the EVstone_add_split_target, but
+ * at the EVdfg level.  EVdfg stones with no additional actions associated
+ * with them are implicitly EVPath split stones and events presented to
+ * their inputs are replicated to all outputs.  Those outputs can be
+ * maintained by their explicit numbers (with EVdfg_link_port()), or, since
+ * the specific output port to which a target stone is assigned is
+ * unimportant, the EVdfg_link_dest() call will simply assign the target
+ * stone to the next available port.  The complement to this call is
+ * EVdfg_unlink_dest().
+ *
+ * \param source The EVdfg_stone whose ports are to be assigned.
+ * \param destination The EVdfg_stone which is to receive those events.
+ */
+extern void EVdfg_link_dest(EVdfg_stone source, EVdfg_stone destination);
 
 /*!
  * Unlink a particular output port of one stone (the source).
@@ -538,7 +559,7 @@ extern void EVdfg_link_port(EVdfg_stone source, int output_index,
  * \param output_index The zero-based index of the output which should be assigned.
  * \return returns true on success, false if the particular port was not previously set
  */
-extern void EVdfg_unlink_port(EVdfg_stone source, int output_index);
+extern int EVdfg_unlink_port(EVdfg_stone source, int output_index);
 
 /*!
  * Unlink the output port of one stone (the source) so that it no longer
@@ -563,11 +584,14 @@ extern int EVdfg_unlink_dest(EVdfg_stone source, EVdfg_stone destination);
  * \param stone The EVdfg_stone to be assigned to a particular node.
  * \param node The node to which it is to be assigned.  EVdfg does not take
  *  ownership of this string and it should be free'd by the application if dynamic.
+ * \return returns true on success, false if the node name given was not found in the set of nodes.
  */
-extern void EVdfg_assign_node(EVdfg_stone stone, char *node);
+extern int EVdfg_assign_node(EVdfg_stone stone, char *node);
 
 /*!
- * Enable periodic auto-submits of NULL events on an EVdfg_stone. 
+ * Set virtual stone properties to enable periodic auto-submits of NULL
+ * events on an EVdfg_stone.  This becomes active upon DFG realization and
+ * activation.
  * 
  * This function is the analog of the EVenable_auto_stone() function, but at
  * the EVdfg level.
@@ -577,8 +601,8 @@ extern void EVdfg_assign_node(EVdfg_stone stone, char *node);
  * \param period_usec The period at which submits should occur, microseconds
  * portion.
  *  
- * Autosubmits are intiated on each node just as it is about to return from
- * EVclient_ready_wait().
+ * Autosubmits are initiated on each node just as it is about to return from
+ * EVclient_ready_wait(), I.E. with DFG activation.  
  */
 extern void EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec, 
 				    int period_usec);
@@ -612,6 +636,15 @@ extern void EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs);
  */
 extern attr_list EVdfg_get_attr_list(EVdfg_stone stone);
 
+/*
+ * DFG_STATUS_SUCCESS is a value used in EVclient_shutdown* calls
+ */
+#define DFG_STATUS_SUCCESS 0
+
+/*
+ * DFG_STATUS_FAILURE is a value used in EVclient_shutdown* calls
+ */
+#define DFG_STATUS_FAILURE 1
 
 /*!
  *  Vote that this node is ready for shutdown, provide it's contribution
@@ -623,7 +656,12 @@ extern attr_list EVdfg_get_attr_list(EVdfg_stone stone);
  *  EVclient_wait_for_shutdown() will all be the same.
  *
  * \param dfg The EVdfg handle to which a return value is contributed
- * \param result this node's contribution to the DFG-wide shutdown value
+ * \param result this node's contribution to the DFG-wide shutdown value.
+ *  In order to facilitate this value being passed directly to exit(), the
+ *  convention for DFG exit values follows the Unix process exit semantics
+ *  where 0 indicates success and non-zero indicates failure.  In
+ *  particular, the value provided should be either DFG_STATUS_SUCCESS (0)
+ *  or DFG_STATUS_FAILURE (1)
  * \return the DFG-wide shutdown value
  */
 extern int EVclient_shutdown(EVclient client, int result);
@@ -638,7 +676,12 @@ extern int EVclient_shutdown(EVclient client, int result);
  *  value of this result parameter.
  *
  * \param client The EVclient handle for which shutdown should be forced
- * \param result this node's contribution to the DFG-wide shutdown value
+ * \param result this node's contribution to the DFG-wide shutdown value.
+ *  In order to facilitate this value being passed directly to exit(), the
+ *  convention for DFG exit values follows the Unix process exit semantics
+ *  where 0 indicates success and non-zero indicates failure.  In
+ *  particular, the value provided should be either DFG_STATUS_SUCCESS (0)
+ *  or DFG_STATUS_FAILURE (1)
  * \return the DFG-wide shutdown value (actually equal to result here)
  *
  */
@@ -667,21 +710,13 @@ extern void EVclient_ready_for_shutdown(EVclient client);
  *  upon every node's contribution to the shutdown status.
  *
  * \param client The EVclient handle for which shutdown is indicated.
- *
+ * \return the DFG-wide shutdown value.  In order to facilitate this value
+ * being passed directly to exit(), the convention for DFG exit values
+ * follows the Unix process exit semantics where 0 indicates success and
+ * non-zero indicates failure.  In particular, the value returned here should be
+ * either DFG_STATUS_SUCCESS (0) or DFG_STATUS_FAILURE (1)
  */
 extern int EVclient_wait_for_shutdown(EVclient client);
-
-/*!
- *  Force EVdfg shutdown without necessarilying having contributions from all nodes.
- *
- *  Generally this will cause every call to EVclient_wait_for_shutdown() to
- *  return the result value here, terminating execution of the EVdfg.
- *
- * \param client The EVclient handle for which shutdown is indicated.
- * \param result this node's contribution to the DFG-wide shutdown value
- *
- */
-extern int EVclient_force_shutdown(EVclient client, int result);
 
 #ifdef	__cplusplus
 }

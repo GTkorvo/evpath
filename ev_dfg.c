@@ -904,7 +904,7 @@ dfg_stone_close_handler(CManager cm, CMConnection conn, int stone,
     CManager_unlock(client->cm);
 }
 
-extern void
+extern int
 INT_EVmaster_assign_canonical_name(EVmaster master, char *given_name, char *canonical_name)
 {
     int node;
@@ -918,6 +918,7 @@ INT_EVmaster_assign_canonical_name(EVmaster master, char *given_name, char *cano
 	    master->nodes[node].canonical_name = strdup(canonical_name);
 	}
     }
+    return 1;
 }
 
 static void
@@ -1392,7 +1393,7 @@ INT_EVmaster_register_node_list(EVmaster master, char **nodes)
     }
 }
 
-extern void
+extern int
 INT_EVdfg_assign_node(EVdfg_stone stone, char *node_name)
 {
     EVdfg dfg = stone->dfg;
@@ -1409,6 +1410,7 @@ INT_EVdfg_assign_node(EVdfg_stone stone, char *node_name)
     }
     if (node == -1) {
 	printf("Node \"%s\" not found in node list\n", node_name);
+	return 0;
     }
 	
     if (dfg->realized == 1) {
@@ -1419,6 +1421,7 @@ INT_EVdfg_assign_node(EVdfg_stone stone, char *node_name)
     act.stone_id = stone->stone_id;
     act.u.assign.dest_node = node;
     (void) EVdfg_perform_act_on_state(stone->dfg->working_state, act, 1 /* add to queue */);
+    return 1;
 }
 
 extern int 

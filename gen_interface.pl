@@ -379,7 +379,7 @@ for (@DECLS) {
 	s/REMOTE//g;
 	$remote = 1;
     }
-    if (/extern\W+(\w+\W+)(\w+).*\((.*)\)/) {
+    if (/extern\W+(\w+\W+)(\w+)\W*\((.*)\)/) {
 	$return = $1;
 	$name = $2;
 	$_ = $3;
@@ -392,6 +392,23 @@ for (@DECLS) {
 	$return_type{$name} = $return;
 	$args = $_;
 	$arguments{$name} = "$args";
+    } else {
+      if (/extern\W+(\w+\W+\w+\W+)(\w+).*\((.*)\)/) {
+	$return = $1;
+	$name = $2;
+	$_ = $3;
+	s/\)//g;
+	s/\s+/ /g;
+	$return =~ s/(?!\w)\s+(?=\W)//;  #remove unnecessary white space
+	$return =~ s/(?!\W)\s+(?=\w)//;  #remove unnecessary white space
+	$return =~ s/\s*$//;  #remove unnecessary white space
+	$return =~ s/^\s*//;  #remove unnecessary white space
+	$return_type{$name} = $return;
+	$args = $_;
+	$arguments{$name} = "$args";
+      } else {
+	print "Failed to match function2 on $_\n"
+      }
     }
     if ($nolock == 1) {
 	$nolocking{$name} = 1;

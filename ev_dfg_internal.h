@@ -264,8 +264,8 @@ struct _EVdfg {
 extern int INT_EVclient_active_sink_count ( EVclient client );
 extern void INT_EVdfg_add_action ( EVdfg_stone stone, char *action_spec );
 extern void INT_EVdfg_add_sink_action(EVdfg_stone stone, char *sink_name);
-extern void INT_EVmaster_assign_canonical_name ( EVmaster master, char *given_name, char *canonical_name );
-extern void INT_EVdfg_assign_node ( EVdfg_stone stone, char *node );
+extern int INT_EVmaster_assign_canonical_name ( EVmaster master, char *given_name, char *canonical_name );
+extern int INT_EVdfg_assign_node ( EVdfg_stone stone, char *node );
 extern EVmaster INT_EVmaster_create ( CManager cm );
 extern EVclient INT_EVclient_assoc ( CManager cm, char *node_name, char *master_contact,
 					     EVclient_sources source_capabilities, EVclient_sinks sink_capabilities);

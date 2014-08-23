@@ -3,16 +3,6 @@
 #define __EVPATH__H__
 /*! \file */
 
-#if defined(FUNCPROTO) || defined(__STDC__) || defined(__cplusplus) || defined(c_plusplus)
-#ifndef ARGS
-#define ARGS(args) args
-#endif
-#else
-#ifndef ARGS
-#define ARGS(args) (/*args*/)
-#endif
-#endif
-
 #include "ffs.h"
 #include "atl.h"
 #ifdef	__cplusplus
@@ -88,10 +78,10 @@ typedef struct buf_entry {
  * was delivered with.  These are determined by the transport and may
  * include those specified in CMwrite_attr() when the data was written.
  */
-typedef void (*CMHandlerFunc) ARGS((CManager cm, 
-				    CMConnection conn,
-				    void *message, void *client_data,
-				    attr_list attrs));
+typedef void (*CMHandlerFunc) (CManager cm, 
+			       CMConnection conn,
+			       void *message, void *client_data,
+			       attr_list attrs);
 
 /*!
  * The prototype for a CM polling handler (and others).
@@ -103,7 +93,7 @@ typedef void (*CMHandlerFunc) ARGS((CManager cm,
  * supplied in the CMadd_poll() call.  It is not interpreted by CM,
  * but instead can be used to maintain some application context.
  */
-typedef void (*CMPollFunc) ARGS((CManager cm, void *client_data));
+typedef void (*CMPollFunc) (CManager cm, void *client_data);
 
 /*!
  * The prototype for a CM connection close handler.
@@ -116,8 +106,8 @@ typedef void (*CMPollFunc) ARGS((CManager cm, void *client_data));
  * supplied in the CMregister_close_handler() call.  It is not interpreted 
  * by CM, but instead can be used to maintain some application context.
  */
-typedef void (*CMCloseHandlerFunc) ARGS((CManager cm, CMConnection conn,
-					 void *client_data));
+typedef void (*CMCloseHandlerFunc) (CManager cm, CMConnection conn,
+				    void *client_data);
 
 /*!
  * The prototype for a CM write possible callback.
@@ -130,8 +120,8 @@ typedef void (*CMCloseHandlerFunc) ARGS((CManager cm, CMConnection conn,
  * supplied in the CMregister_write_callback() call.  It is not interpreted 
  * by CM, but instead can be used to maintain some application context.
  */
-typedef void (*CMWriteCallbackFunc) ARGS((CManager cm, CMConnection conn,
-					  void *client_data));
+typedef void (*CMWriteCallbackFunc) (CManager cm, CMConnection conn,
+				     void *client_data);
 
 
 
@@ -150,7 +140,7 @@ extern CManager CManager_create();
  * termination of any network handling thread.
  * \param cm The CManager to be shut down.
  */
-extern void CManager_close ARGS((CManager cm));
+extern void CManager_close (CManager cm);
 
 /*!
  * specify a numerical identifier to be used as part of a trace output filename
@@ -160,7 +150,7 @@ extern void CManager_close ARGS((CManager cm));
  *
  */
 /*NOLOCK*/
-extern void CMTrace_file_id ARGS((int ID));
+extern void CMTrace_file_id (int ID);
 
 /*!
  * fork a thread to handle the network input operations of a CM.
@@ -176,7 +166,7 @@ extern void CMTrace_file_id ARGS((int ID));
  * used), one of the gen_thread init routines should be called <b>before</b>
  * the call to CManager_create().  Otherwise bad things will happen.
  */
-extern int CMfork_comm_thread ARGS((CManager cm));
+extern int CMfork_comm_thread (CManager cm);
 
 /*!
  * Tell CM to listen for incoming network connections.
@@ -189,7 +179,7 @@ extern int CMfork_comm_thread ARGS((CManager cm));
  * \note The listening transports will add their contact information to the
  * list returned by CMget_contact_list().
  */
-extern int CMlisten ARGS((CManager cm));
+extern int CMlisten (CManager cm);
 
 /*!
  * Tell CM to listen for incoming network connections with 
@@ -216,7 +206,7 @@ extern int CMlisten ARGS((CManager cm));
  * - the <b>nnti</b> transport  - a multi-network RDMA transport.
  * - the <b>ib</b> transport - kind-of-functional InfiniBand transport.
  */
-extern int CMlisten_specific ARGS((CManager cm, attr_list listen_info));
+extern int CMlisten_specific (CManager cm, attr_list listen_info);
 
 /*!
  * get the contact information for this CM.
@@ -228,7 +218,7 @@ extern int CMlisten_specific ARGS((CManager cm, attr_list listen_info));
  * \return the contact list.
  */
 extern attr_list
-CMget_contact_list ARGS((CManager cm));
+CMget_contact_list (CManager cm);
 
 /*!
  * insert contact information into this CM.
@@ -240,7 +230,7 @@ CMget_contact_list ARGS((CManager cm));
  * \param attrs the information to add.
  */
 extern void
-CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
+CM_insert_contact_info (CManager cm, attr_list attrs);
 
 /*!
  * get a specific subset of the contact information for this CM.
@@ -254,7 +244,7 @@ CM_insert_contact_info ARGS((CManager cm, attr_list attrs));
  * \return the contact list.
  */
 extern attr_list
-CMget_specific_contact_list ARGS((CManager cm, attr_list attrs));
+CMget_specific_contact_list (CManager cm, attr_list attrs);
 
 /*!
  * check to see if this is contact information for <b>this</b> CM.
@@ -269,7 +259,7 @@ CMget_specific_contact_list ARGS((CManager cm, attr_list attrs));
  * information in the cm. 0 otherwise.
  */
 extern int
-CMcontact_self_check ARGS((CManager cm, attr_list attrs));
+CMcontact_self_check (CManager cm, attr_list attrs);
 
 /*!
  * acquire a (possibly existing) connection to another CM process.
@@ -286,7 +276,7 @@ CMcontact_self_check ARGS((CManager cm, attr_list attrs));
  * performed using the contact list and its result value is returned.
  */
 extern CMConnection
-CMget_conn ARGS((CManager cm, attr_list contact_list));
+CMget_conn (CManager cm, attr_list contact_list);
 
 /*!
  * initiate connection to another CM process.
@@ -304,7 +294,7 @@ CMget_conn ARGS((CManager cm, attr_list contact_list));
  * succeeds will attempt to initiate a connection using only that transport.
  */
 extern CMConnection
-CMinitiate_conn ARGS((CManager cm, attr_list contact_list));
+CMinitiate_conn (CManager cm, attr_list contact_list);
 
 /*!
  * kill and potentially deallocate a connection.
@@ -321,7 +311,7 @@ CMinitiate_conn ARGS((CManager cm, attr_list contact_list));
  * with connections that are passively created (accepted through CMlisten()).
 */
 extern void
-CMConnection_close ARGS((CMConnection conn));
+CMConnection_close (CMConnection conn);
 
 /*!
  * manually increment the reference count of a connection.
@@ -332,7 +322,7 @@ CMConnection_close ARGS((CMConnection conn));
  * have closed it.
 */
 extern void
-CMConnection_add_reference ARGS((CMConnection conn));
+CMConnection_add_reference (CMConnection conn);
 
 /*!
  * register a function to be called when a connection is closed.
@@ -345,9 +335,9 @@ CMConnection_add_reference ARGS((CMConnection conn));
  * registrations overwrite each other.
  */
 extern void
-CMconn_register_close_handler ARGS((CMConnection conn, 
-				    CMCloseHandlerFunc func, 
-				    void *client_data));
+CMconn_register_close_handler (CMConnection conn, 
+			       CMCloseHandlerFunc func, 
+			       void *client_data);
 /*!
  * return the list of attributes associated with a connection.
  *
@@ -355,7 +345,7 @@ CMconn_register_close_handler ARGS((CMConnection conn,
  * \return an attr_list value containing connection attributes.
  */
 extern attr_list 
-CMConnection_get_attrs ARGS((CMConnection conn));
+CMConnection_get_attrs (CMConnection conn);
 
 /*!
  * modify the characteristics of a connection.
@@ -365,7 +355,7 @@ CMConnection_get_attrs ARGS((CMConnection conn));
  * \return a true/false failure value.
  */
 extern int
-CMConnection_set_character ARGS((CMConnection conn, attr_list attrs));
+CMConnection_set_character (CMConnection conn, attr_list attrs);
 
 /*!
  * return connection 'i' associated with a CM value.
@@ -375,7 +365,7 @@ CMConnection_set_character ARGS((CMConnection conn, attr_list attrs));
  * \return a CMConnection value associated with connection 'i'
  */
 extern CMConnection
-CMget_indexed_conn ARGS((CManager cm, int i));
+CMget_indexed_conn (CManager cm, int i);
 
 /*!
  * register a format with CM.
@@ -390,7 +380,7 @@ CMget_indexed_conn ARGS((CManager cm, int i));
  * handler for incoming messages.
  */
 extern CMFormat
-CMregister_format ARGS((CManager cm, FMStructDescList format_list));
+CMregister_format (CManager cm, FMStructDescList format_list);
 
 /*!
  * register a simple (no internal structures) format with CM.
@@ -408,7 +398,7 @@ CMregister_format ARGS((CManager cm, FMStructDescList format_list));
  * struct_size and the opt_info specified as NULL.
  */
 extern CMFormat
-CMregister_simple_format ARGS((CManager cm, char *format_name, FMFieldList field_list, int struct_size));
+CMregister_simple_format (CManager cm, char *format_name, FMFieldList field_list, int struct_size);
 
 /*!
  * lookup the CMFormat associated with a particular FMStructDescList
@@ -432,7 +422,7 @@ CMregister_simple_format ARGS((CManager cm, char *format_name, FMFieldList field
  * guarantee that all field lists used to register formats have a unique
  * address. 
  */
-extern CMFormat CMlookup_format ARGS((CManager cm, FMStructDescList format_list));
+extern CMFormat CMlookup_format (CManager cm, FMStructDescList format_list);
 
 /*!
  * return the FMContext value used by a CM.
@@ -457,7 +447,7 @@ extern FMContext CMget_FMcontext(CManager cm);
  * passed for the attrs parameter.
  */
 extern int
-CMwrite ARGS((CMConnection conn, CMFormat format, void *data));
+CMwrite (CMConnection conn, CMFormat format, void *data);
 
 /*!
  * send a message on a connection with particular attributes.
@@ -479,8 +469,8 @@ CMwrite ARGS((CMConnection conn, CMFormat format, void *data));
  * equivalent to CMwrite().
  */
 extern int
-CMwrite_attr ARGS((CMConnection conn, CMFormat format, void *data, 
-		   attr_list attrs));
+CMwrite_attr (CMConnection conn, CMFormat format, void *data, 
+	      attr_list attrs);
 
 /*!
  * register a function to be called when message matching a particular 
@@ -492,8 +482,8 @@ CMwrite_attr ARGS((CMConnection conn, CMFormat format, void *data,
  * when it is called.
  */
 extern void
-CMregister_handler ARGS((CMFormat format, CMHandlerFunc handler, 
-			void *client_data));
+CMregister_handler (CMFormat format, CMHandlerFunc handler, 
+		    void *client_data);
 
 /*!
  * register a function to be called when a write is again possible on a particular CMconnection.
@@ -506,9 +496,9 @@ CMregister_handler ARGS((CMFormat format, CMHandlerFunc handler,
  * 
  */
 extern void
-CMregister_write_callback ARGS((CMConnection conn, 
-				CMWriteCallbackFunc handler,
-				void *client_data));
+CMregister_write_callback (CMConnection conn, 
+			   CMWriteCallbackFunc handler,
+			   void *client_data);
 
 /*!
  * test whether a write to a particular connection would block
@@ -526,7 +516,7 @@ CMregister_write_callback ARGS((CMConnection conn,
  * again FALSE).)
  */
 extern int
-CMConnection_write_would_block ARGS((CMConnection conn));
+CMConnection_write_would_block (CMConnection conn);
 
 /*!
  * assume control over a incoming buffer of data.
@@ -545,7 +535,7 @@ CMConnection_write_would_block ARGS((CMConnection conn));
  * the CMHandlerFunc).
  * \return NULL on error, otherwise returns the data parameter. 
 */
-extern void *CMtake_buffer ARGS((CManager cm, void *data));
+extern void *CMtake_buffer (CManager cm, void *data);
 
 /*!
  * return a buffer of incoming data.
@@ -556,7 +546,7 @@ extern void *CMtake_buffer ARGS((CManager cm, void *data));
  * \param data The base address of the data (I.E. same value that was passed
  * to CMtake_buffer().
 */
-extern void CMreturn_buffer ARGS((CManager cm, void *data));
+extern void CMreturn_buffer (CManager cm, void *data);
 
 #include "cm_transport.h"
 /*!
@@ -569,10 +559,8 @@ extern void CMreturn_buffer ARGS((CManager cm, void *data));
  * \return 0 if the message was completely handled.  
  *   Otherwise return the number of additional bytes necessary.
  */
-typedef int (*CMNonCMHandler) ARGS((CMConnection conn,
-                                     CMTransport transport,
-				     char *buffer,
-				     long length));
+typedef int (*CMNonCMHandler) (CMConnection conn, CMTransport transport,
+			       char *buffer, long length);
 
 /*!
  * register a handler for raw (non-CM) messages.
@@ -594,7 +582,7 @@ typedef int (*CMNonCMHandler) ARGS((CMConnection conn,
  */
 /*NOLOCK*/
 extern void
-CMregister_non_CM_message_handler ARGS((int header, CMNonCMHandler handler));
+CMregister_non_CM_message_handler (int header, CMNonCMHandler handler);
 
 /*!
  * return the pointer to the static transport services structure.
@@ -606,7 +594,7 @@ CMregister_non_CM_message_handler ARGS((int header, CMNonCMHandler handler));
  */
 /*NOLOCK*/
 extern CMtrans_services
-CMget_static_trans_services ARGS(());
+CMget_static_trans_services ();
 
   /*!
    * return the pointer to a CMConnection's transport data.
@@ -617,7 +605,7 @@ CMget_static_trans_services ARGS(());
    * \return returns the pointer to the transport data structure.
    */
 extern void*
-CMget_transport_data ARGS((CMConnection conn));
+CMget_transport_data (CMConnection conn);
 
 /*!
  * add a task (function) to be executed occasionally.
@@ -630,7 +618,7 @@ CMget_transport_data ARGS((CMConnection conn));
  * once per call to CMpoll_network() if that function is used.
  */
 extern void
-CMadd_poll ARGS((CManager cm, CMPollFunc func, void *client_data));
+CMadd_poll (CManager cm, CMPollFunc func, void *client_data);
 
 /*!
  * add a task (function) to be executed with a specified periodicity.
@@ -652,8 +640,8 @@ CMadd_poll ARGS((CManager cm, CMPollFunc func, void *client_data));
  * executed). 
  */
 extern CMTaskHandle
-CMadd_periodic_task ARGS((CManager cm, int period_sec, int period_usec, 
-			  CMPollFunc func, void *client_data));
+CMadd_periodic_task (CManager cm, int period_sec, int period_usec, 
+		     CMPollFunc func, void *client_data);
 
 /*!
  * add a task (function) to be executed at a later time.
@@ -673,8 +661,8 @@ CMadd_periodic_task ARGS((CManager cm, int period_sec, int period_usec,
  * when the first opportunity arises after it is scheduled.  
  */
 extern CMTaskHandle
-CMadd_delayed_task ARGS((CManager cm, int secs, int usecs, CMPollFunc func,
-			 void *client_data));
+CMadd_delayed_task (CManager cm, int secs, int usecs, CMPollFunc func,
+		    void *client_data);
 
 /*!
  * remove a registered periodic or delayed task.
@@ -682,7 +670,7 @@ CMadd_delayed_task ARGS((CManager cm, int secs, int usecs, CMPollFunc func,
  * \param handle The handle to the task to remove.
  */
 extern void
-CMremove_task ARGS((CMTaskHandle handle));
+CMremove_task (CMTaskHandle handle);
 
 /*!
  * add a task (function) to be called when the CM is shut down.
@@ -697,7 +685,7 @@ CMremove_task ARGS((CMTaskHandle handle));
  * in the order registered.  There is currently no API for removing them.
  */
 extern void
-CMadd_shutdown_task ARGS((CManager cm, CMPollFunc func, void *client_data, int task_type));
+CMadd_shutdown_task (CManager cm, CMPollFunc func, void *client_data, int task_type);
 
 /*!
  * task type for CMadd_shutdown_task.  NO_TASK is used internally 
@@ -724,8 +712,8 @@ CMadd_shutdown_task ARGS((CManager cm, CMPollFunc func, void *client_data, int t
  * \deprecated Use CMadd_periodic_task().
  */
 extern CMTaskHandle
-CMadd_periodic ARGS((CManager cm, long period, CMPollFunc func,
-		     void *client_data));
+CMadd_periodic (CManager cm, long period, CMPollFunc func,
+		void *client_data);
 
 /*!
  * remove a registered periodic task.
@@ -734,7 +722,7 @@ CMadd_periodic ARGS((CManager cm, long period, CMPollFunc func,
  * \deprecated Use CMremove_task()
  */
 extern void
-CMremove_periodic ARGS((CMTaskHandle handle));
+CMremove_periodic (CMTaskHandle handle);
 
 /*!
  * sleep for a given number of seconds.
@@ -749,7 +737,7 @@ CMremove_periodic ARGS((CMTaskHandle handle));
  * \param secs The number of seconds for which to sleep.
  */
 extern void
-CMsleep ARGS((CManager cm, int secs));
+CMsleep (CManager cm, int secs);
 
 /*!
  * sleep for a given number of microseconds.
@@ -764,7 +752,7 @@ CMsleep ARGS((CManager cm, int secs));
  * \param usecs The number of microseconds for which to sleep.
  */
 extern void
-CMusleep ARGS((CManager cm, int usecs));
+CMusleep (CManager cm, int usecs);
 
 /*!
  * handle one round of network events
@@ -779,7 +767,7 @@ CMusleep ARGS((CManager cm, int usecs));
  * will be handled for each connection upon which input is pending.
  */
 extern 
-void CMpoll_network ARGS((CManager cm));
+void CMpoll_network (CManager cm);
 
 /*!
  * handle network events until shutdown.
@@ -791,7 +779,7 @@ void CMpoll_network ARGS((CManager cm));
  * essentially handles network events until the CManager is shutdown.
  */
 extern 
-void CMrun_network ARGS((CManager cm));
+void CMrun_network (CManager cm);
 
 /*!
  * The prototype for a CM select handling function.
@@ -814,8 +802,8 @@ typedef void (*select_func) (void *param1, void*param2);
  * \param param2 The value to be passed as param2 to the handler_func.
  */
 extern void
-CM_fd_add_select ARGS((CManager cm, int fd, select_func handler_func,
-		       void *param1, void *param2));
+CM_fd_add_select (CManager cm, int fd, select_func handler_func,
+		  void *param1, void *param2);
 
 /*!
  * allocate a new CM condition value.
@@ -837,7 +825,7 @@ CM_fd_add_select ARGS((CManager cm, int fd, select_func handler_func,
  * then that connection should be specified as the dep parameter in this
  * call.  If there is no such reliance, dep can be NULL.
  */
-extern int CMCondition_get ARGS((CManager cm, CMConnection dep));
+extern int CMCondition_get (CManager cm, CMConnection dep);
 
 /*!
  * wait for a CM condition value.
@@ -862,7 +850,7 @@ extern int CMCondition_get ARGS((CManager cm, CMConnection dep));
  * CMCondition_wait() and should not be used in any subsequent call
  * (including calls to CMCondition_get_client_data(), etc.).
  */
-extern int CMCondition_wait ARGS((CManager cm, int condition));
+extern int CMCondition_wait (CManager cm, int condition);
 
 /*!
  * signal a CM condition value.
@@ -875,7 +863,7 @@ extern int CMCondition_wait ARGS((CManager cm, int condition));
  * satisfy a particular condition variable has occurred and any waiting
  * thread should awaken.
  */
-extern void CMCondition_signal ARGS((CManager cm, int condition));
+extern void CMCondition_signal (CManager cm, int condition);
 
 /*!
  * set the client_data associated with a condition value.
@@ -899,8 +887,8 @@ extern void CMCondition_signal ARGS((CManager cm, int condition));
  * the request to ensure that the response doesn't arrive before the client
  * data is set.
  */
-extern void CMCondition_set_client_data ARGS((CManager cm, int condition,
-				       void *client_data));
+extern void CMCondition_set_client_data (CManager cm, int condition,
+				       void *client_data);
 /*!
  * get the client_data associated with a condition value.
  *
@@ -919,7 +907,7 @@ extern void CMCondition_set_client_data ARGS((CManager cm, int condition,
  * condition value is considered 'free'd upon return from CMCondition_wait()
  * and should not be used in any subsequent call.
  */
-extern void *CMCondition_get_client_data ARGS((CManager cm, int condition));
+extern void *CMCondition_get_client_data (CManager cm, int condition);
 
 /*!
  * test whether or not a particular condition has been signaled.
@@ -933,7 +921,7 @@ extern void *CMCondition_get_client_data ARGS((CManager cm, int condition));
  * \warning This call should not be used on a condition after
  * a CMCondition_wait() has been performed.
  */
-extern int CMCondition_has_signaled ARGS((CManager cm, int condition));
+extern int CMCondition_has_signaled (CManager cm, int condition);
 /*!
  * test whether or not a particular condition has failed.
  *
@@ -946,7 +934,7 @@ extern int CMCondition_has_signaled ARGS((CManager cm, int condition));
  * \warning This call should not be used on a condition after
  * a CMCondition_wait() has been performed.
  */
-extern int CMCondition_has_failed ARGS((CManager cm, int condition));
+extern int CMCondition_has_failed (CManager cm, int condition);
 
 /** @defgroup malloc CM memory allocation functions
  *
@@ -964,7 +952,7 @@ extern int CMCondition_has_failed ARGS((CManager cm, int condition));
  * \return a pointer to the new block
  */
 /*NOLOCK*/
-extern void* CMrealloc ARGS((void *ptr, long size));
+extern void* CMrealloc (void *ptr, long size);
 /*!
  * allocate a chunk of memory
  *
@@ -972,14 +960,14 @@ extern void* CMrealloc ARGS((void *ptr, long size));
  * \return a pointer to the new block
  */
 /*NOLOCK*/
-extern void* CMmalloc ARGS((long size));
+extern void* CMmalloc (long size);
 /*!
  * free a chunk of memory
  *
  * \param ptr the memory to free
  */
 /*NOLOCK*/
-extern void CMfree ARGS((void *ptr));
+extern void CMfree (void *ptr);
 
 /** @defgroup perf Performance-query functions
  * These functions intrusively test the characteristics of a connection,
@@ -1004,8 +992,8 @@ extern void CMfree ARGS((void *ptr));
  * time required for each.  The return value is the average of these final
  * operations. 
 */
-extern long CMprobe_latency ARGS((CMConnection conn, long msg_size,
-				  attr_list attrs));
+extern long CMprobe_latency (CMConnection conn, long msg_size,
+				  attr_list attrs);
 
 /*!
  * Probe the available bandwidth on a particular connection by sending a
@@ -1023,7 +1011,7 @@ extern long CMprobe_latency ARGS((CMConnection conn, long msg_size,
  * That is, CMprobe_bandwidth sends about 100Kbytes of data.
 */
 extern double
-CMprobe_bandwidth ARGS((CMConnection conn, long size, attr_list attrs));
+CMprobe_bandwidth (CMConnection conn, long size, attr_list attrs);
 
 /*!
  * Probe the available bandwidth on a particular connection by sending several streams
@@ -1041,7 +1029,7 @@ CMprobe_bandwidth ARGS((CMConnection conn, long size, attr_list attrs));
  * That is, CMprobe_bandwidth sends about 100Kbytes of data.
 */
 extern double
-CMregressive_probe_bandwidth ARGS((CMConnection conn, long size, attr_list attrs));
+CMregressive_probe_bandwidth (CMConnection conn, long size, attr_list attrs);
 
 /*@}*/
 /*!
@@ -1092,8 +1080,8 @@ typedef struct _EVSource *EVsource;
  * \param client_data This value is the same client_data value that was
  * supplied in the call.
  */
-typedef void (*EVSubmitCallbackFunc) ARGS((CManager cm, EVstone target, 
-					  void *client_data));
+typedef void (*EVSubmitCallbackFunc) (CManager cm, EVstone target, 
+					  void *client_data);
 
 /*!
  * The prototype for an EVPath terminal handler function.
@@ -1111,9 +1099,8 @@ typedef void (*EVSubmitCallbackFunc) ARGS((CManager cm, EVstone target,
  * was delivered with.  These are determined by the transport and may
  * include those specified in CMwrite_attr() when the data was written.
  */
-typedef int (*EVSimpleHandlerFunc) ARGS((CManager cm, 
-					  void *message, void *client_data,
-					  attr_list attrs));
+typedef int (*EVSimpleHandlerFunc) (CManager cm, void *message, void *client_data,
+				    attr_list attrs);
 
 /*!
  * The prototype for an EVPath raw terminal handler function.
@@ -1132,9 +1119,8 @@ typedef int (*EVSimpleHandlerFunc) ARGS((CManager cm,
  * was delivered with.  These are determined by the transport and may
  * include those specified in CMwrite_attr() when the data was written.
  */
-typedef int (*EVRawHandlerFunc) ARGS((CManager cm, void *message, 
-				      int msg_len, void *client_data,
-				      attr_list attrs));
+typedef int (*EVRawHandlerFunc) (CManager cm, void *message, int msg_len, void *client_data,
+				 attr_list attrs);
 
 /*!
  * The prototype for a EVPath bridge stone close handler.
@@ -1148,8 +1134,7 @@ typedef int (*EVRawHandlerFunc) ARGS((CManager cm, void *message,
  * supplied in the EVregister_close_handler() call.  It is not interpreted 
  * by CM, but instead can be used to maintain some application context.
  */
-typedef void (*EVStoneCloseHandlerFunc) ARGS((CManager cm, CMConnection conn, 
-					      int stone, void *client_data));
+typedef void (*EVStoneCloseHandlerFunc) (CManager cm, CMConnection conn, int stone, void *client_data);
 
 struct _event_item;
 
@@ -1790,7 +1775,7 @@ EVfree_source(EVsource source);
  * the same client_data value that was specified in the
  * EVcreate_submit_handle_free() call.
  */
-typedef void (*EVFreeFunction) ARGS((void *event_data, void *client_data));
+typedef void (*EVFreeFunction) (void *event_data, void *client_data);
 
 /*!
  * Create a submission handle (EVsource), specifying a free function for the
@@ -1916,7 +1901,7 @@ EVtransfer_events(CManager cm, EVstone src_stone, EVstone dest_stone);
  * \return 0 on error, 1 on success;
 */
 extern int
-EVtake_event_buffer ARGS((CManager cm, void *event));
+EVtake_event_buffer (CManager cm, void *event);
 
 /*!
  * Return a buffer of incoming data.
@@ -1928,7 +1913,7 @@ EVtake_event_buffer ARGS((CManager cm, void *event));
  * to EVtake_event_buffer().
 */
 extern void
-EVreturn_event_buffer ARGS((CManager cm, void *event));
+EVreturn_event_buffer (CManager cm, void *event);
 
 /*!
  * return the FFSDataHandle associated with an EVsource handle.
@@ -2245,12 +2230,9 @@ EVdump_stone(CManager cm,  EVstone stone_num);
  * external so that EVPath's response to unknown data can be customized.
  * However, at the moment this is an internal interface.
  */
-typedef int (*EVImmediateHandlerFunc) ARGS((CManager cm, 
-					    struct _event_item *event, 
-					    void *client_data,
-					    attr_list attrs, 
-					    int out_count,
-					    int *out_stones));
+typedef int (*EVImmediateHandlerFunc) (CManager cm, struct _event_item *event, 
+				       void *client_data, attr_list attrs, 
+				       int out_count, int *out_stones);
 /*!
  * Associate a conversion action.
  *
