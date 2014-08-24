@@ -349,10 +349,10 @@ be_test_master(int argc, char **argv)
     EVdfg_add_sink_action(sink, "c_output_handler");
     q_action_spec = create_multityped_action_spec(queue_list, trans);
     multiq = EVdfg_create_stone(test_dfg, q_action_spec);
-    EVdfg_link_port(srca, 0, multiq);
-    EVdfg_link_port(srcb, 0, multiq);
-    EVdfg_link_port(srcc, 0, multiq);
-    EVdfg_link_port(srccommand, 0, multiq);
+    EVdfg_link_dest(srca, multiq);
+    EVdfg_link_dest(srcb, multiq);
+    EVdfg_link_dest(srcc, multiq);
+    EVdfg_link_dest(srccommand, multiq);
     EVdfg_link_port(multiq, 0, sink);
 
     EVdfg_assign_node(srca, "a");

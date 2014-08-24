@@ -61,13 +61,13 @@ join_handler(EVmaster master, char *identifier, void* available_sources, void *a
     for (i=1; i < node_count -1; i++) {
 	char str[10];
 	tmp = EVdfg_create_stone(dfg, NULL);
-	EVdfg_link_port(last, 0, tmp);
+	EVdfg_link_dest(last, tmp);
 	sprintf(str, "client%d", i);
 	EVdfg_assign_node(tmp, str);
 	last = tmp;
     }
     sink = EVdfg_create_sink_stone(dfg, "simple_handler");
-    EVdfg_link_port(last, 0, sink);
+    EVdfg_link_dest(last, sink);
     EVdfg_assign_node(sink, "terminal");
 
     EVdfg_realize(dfg);

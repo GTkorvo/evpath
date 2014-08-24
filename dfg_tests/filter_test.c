@@ -77,9 +77,9 @@ be_test_master(int argc, char **argv)
 
     filter_action_spec = create_filter_action_spec(filter_format_list, "{int ret = input.long_field % 2;return ret;}\0\0");
     filter = EVdfg_create_stone(test_dfg, filter_action_spec);
-    EVdfg_link_port(src, 0, filter);
+    EVdfg_link_dest(src, filter);
     sink = EVdfg_create_sink_stone(test_dfg, "simple_handler");
-    EVdfg_link_port(filter, 0, sink);
+    EVdfg_link_dest(filter, sink);
 
     if ((argc != 1) || ((argc == 1) && (strcmp(argv[0], "3") == 0))) {
 	EVmaster_register_node_list(test_master, &nodes[0]);

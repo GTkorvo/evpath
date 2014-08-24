@@ -81,7 +81,7 @@ be_test_master(int argc, char **argv)
     EVdfg_assign_node(src, "b");
     sink = EVdfg_create_sink_stone(test_dfg, "raw_handler");
     EVdfg_assign_node(sink, "a");
-    EVdfg_link_port(src, 0, sink);
+    EVdfg_link_dest(src, sink);
 
     EVdfg_realize(test_dfg);
 

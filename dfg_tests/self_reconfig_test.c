@@ -132,9 +132,9 @@ reconfig_handler(EVdfg dfg)
     if (!quiet)
 	printf("new stone deployed to node %s\n", nodes[node_count/2]);
 		
-    EVdfg_unlink_port(reconfig_prev, 0);
-    EVdfg_link_port(reconfig_prev, 0, middle_stone);
-    EVdfg_link_port(middle_stone, 0, reconfig_next);
+    EVdfg_unlink_dest(reconfig_prev, reconfig_next);
+    EVdfg_link_dest(reconfig_prev, middle_stone);
+    EVdfg_link_dest(middle_stone, reconfig_next);
     EVdfg_realize(dfg);
     if (!quiet) 
 	printf("realized\n");
@@ -197,7 +197,7 @@ be_test_master(int argc, char **argv)
 
     for (i=1; i < node_count -1; i++) {
 	stones[i] = tmp = EVdfg_create_stone(test_dfg, filter);
-	EVdfg_link_port(last, 0, tmp);
+	EVdfg_link_dest(last, tmp);
 	EVdfg_assign_node(tmp, nodes[i]);
 	if (!quiet)
 	    printf("stone %d deployed to node %s\n", i, nodes[i]);
@@ -213,7 +213,7 @@ be_test_master(int argc, char **argv)
     }
     sink = EVdfg_create_sink_stone(test_dfg, "simple_handler");
     stones[node_count-1] = sink;
-    EVdfg_link_port(last, 0, sink);
+    EVdfg_link_dest(last, sink);
     EVdfg_assign_node(sink, nodes[node_count-1]);
     if (!quiet)
 	printf("stone %d deployed to node %s\n", node_count-1, nodes[node_count-1]);

@@ -104,7 +104,7 @@ be_test_master(int argc, char **argv)
 		// nbase = pow(2,(i-1))
 		n = nbase + j;
 		tmp[j] = EVdfg_create_stone(test_dfg,NULL);
-		EVdfg_link_port(last[j/base], j%2 , tmp[j]);
+		EVdfg_link_dest(last[j/base], tmp[j]);
 		EVdfg_assign_node(tmp[j], nodes[n-1]);
 	    }
 	    for (j=0; j<nbase; j++) {
@@ -120,7 +120,7 @@ be_test_master(int argc, char **argv)
 	    sink_capabilities = EVclient_register_sink_handler(cm,chandle,simple_format_list, 
 							       (EVSimpleHandlerFunc) simple_handler, NULL);
 	    tmp[j] = EVdfg_create_sink_stone(test_dfg,chandle);
-	    EVdfg_link_port(last[j/base],j%2 ,tmp[j]);
+	    EVdfg_link_dest(last[j/base], tmp[j]);
 	    EVdfg_assign_node(tmp[j], nodes[n-1]);
 	}
     } else {
@@ -137,7 +137,7 @@ be_test_master(int argc, char **argv)
 	    autos = EVdfg_create_stone(test_dfg, strdup(action_spec));
 	    EVdfg_assign_node(autos, nodes[i]);
 	    EVdfg_enable_auto_stone(autos, 1, 0);
-	    EVdfg_link_port(autos, 0, sink); 
+	    EVdfg_link_dest(autos, sink); 
 	}
 	free(action_spec);
     }

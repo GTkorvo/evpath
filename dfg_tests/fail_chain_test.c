@@ -109,7 +109,7 @@ fail_handler(EVdfg dfg, char *failed_node_name, int failed_stone)
     dest_node = failed_node+1;
     while ((dest_stone = stones[dest_node]) == NULL) dest_node++;
     
-    EVdfg_link_port(stones[failed_node-1], 0, dest_stone);
+    EVdfg_link_dest(stones[failed_node-1], dest_stone);
     if (!quiet) printf("Linking stone %p on node %d to stone on node %d\n", stones[failed_node+1], failed_node-1, dest_node);
     EVdfg_realize(dfg);
 }
@@ -172,13 +172,13 @@ be_test_master(int argc, char **argv)
 
     for (i=1; i < node_count -1; i++) {
 	stones[i] = tmp = EVdfg_create_stone(test_dfg, filter);
-	EVdfg_link_port(last, 0, tmp);
+	EVdfg_link_dest(last, tmp);
 	EVdfg_assign_node(tmp, nodes[i]);
 	last = tmp;
     }
     sink = EVdfg_create_sink_stone(test_dfg, "simple_handler");
     stones[node_count-1] = sink;
-    EVdfg_link_port(last, 0, sink);
+    EVdfg_link_dest(last, sink);
     EVdfg_assign_node(sink, nodes[node_count-1]);
 
     EVdfg_realize(test_dfg);

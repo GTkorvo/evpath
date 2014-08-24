@@ -95,12 +95,12 @@ be_test_master(int argc, char **argv)
 
     for (i=1; i < node_count -1; i++) {
 	tmp = EVdfg_create_stone(test_dfg, filter);
-	EVdfg_link_port(last, 0, tmp);
+	EVdfg_link_dest(last, tmp);
 	EVdfg_assign_node(tmp, nodes[i]);
 	last = tmp;
     }
     sink = EVdfg_create_sink_stone(test_dfg, "simple_handler");
-    EVdfg_link_port(last, 0, sink);
+    EVdfg_link_dest(last, sink);
     EVdfg_assign_node(sink, nodes[node_count-1]);
 
     EVdfg_realize(test_dfg);
