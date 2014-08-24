@@ -575,6 +575,9 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 		    memmove(&src->out_links[i], &src->out_links[i+1], 
 			    sizeof(src->out_links[0]) * (src->out_count - i - 1));
 		    found++;
+		    /* rewrite action to refer to link by position */
+		    act.type = ACT_unlink_port;
+		    act.u.link.port = i;
 		}
 	    }
 	}
@@ -1801,7 +1804,7 @@ static int
 create_bridge_stone(EVdfg dfg, EVdfg_stone_state target, int node)
 {
     EVdfg_stone_state bstone;
-    EVdfg_config_action act;
+    EVdfg_config_action act, link_act;
 
     char *contact = dfg->master->nodes[target->node].str_contact_list;
     char *action;
@@ -1817,6 +1820,11 @@ create_bridge_stone(EVdfg dfg, EVdfg_stone_state target, int node)
     dfg->stones[dfg->stone_count-1] = NULL;  /* not a user-visible stone */
     act.node_for_action = node;
     EVdfg_perform_act_on_state(dfg->working_state, act, 1 /* add to queue */);
+    link_act.type = ACT_link_dest;
+    link_act.stone_id = act.stone_id;
+    link_act.node_for_action = node;
+    link_act.u.link.dest_id = target->stone_id;
+    EVdfg_perform_act_on_state(dfg->working_state, link_act, 0 /* don't add to queue */);
     return act.stone_id;
 }
 
@@ -1883,13 +1891,19 @@ add_stone_to_deploy_msg(EVdfg_configuration config, EVdfg_deploy_msg *msg, EVdfg
     }
     mstone->period_secs = dstone->period_secs;
     mstone->period_usecs = dstone->period_usecs;
-    mstone->out_count = dstone->out_count;
-    mstone->out_links = malloc(sizeof(mstone->out_links[0])*mstone->out_count);
-    for (k=0; k< dstone->out_count; k++) {
-	if (dstone->out_links[k] != -1) {
-	    mstone->out_links[k] = dstone->out_links[k];
-	} else {
-	    mstone->out_links[k] = -1;
+    if (dstone->bridge_stone) {
+	/* bridge stone virtual links should not be deployed, just for bookkeeping */
+	mstone->out_count = 0;
+	mstone->out_links = NULL;
+    } else {
+	mstone->out_count = dstone->out_count;
+	mstone->out_links = malloc(sizeof(mstone->out_links[0])*mstone->out_count);
+	for (k=0; k< dstone->out_count; k++) {
+	    if (dstone->out_links[k] != -1) {
+		mstone->out_links[k] = dstone->out_links[k];
+	    } else {
+		mstone->out_links[k] = -1;
+	    }
 	}
     }
     mstone->action = dstone->action;
