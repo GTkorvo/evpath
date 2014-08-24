@@ -24,7 +24,7 @@ up the 'cohort'.  In particular, in EVdfg a single, differentiated 'Master'
 process is responsible for defining the entire DFG.  Code in the master
 creates the virtual stones, assigns actions to those stones, links them
 together to create the topology, and assigns stones to nodes.  It also
-determines when sufficient 'client' processes have joined the DFG, either by
+determines when sufficient 'client' processes have joined the 'cohort', either by
 specifying a static list, or by making a decision in a handler as each new
 client process joins.  Once all required nodes have joined and the virtual
 DFG has been created, it is <i>realized</i> by the master (I.E. actual
@@ -38,15 +38,16 @@ arbitrate an orderly shutdown of all client processes with an agreed-upon
 exit value. 
 
 Generally, but not necessarily, the master process is also a client and a
-participant in the DFG.  The other participating processes are relatively
+participant in the cohort.  The other participating processes are relatively
 passive.  They identify their capabilities to the master, but do not
 directly contribute stones to the DFG instead accepting the stones that are
 assigned to them.
 
 \subsection joining The Joining Process
 
-The subroutine EVdfg_join_dfg() is used to join a client to a master and by
-the master process to initiate participation in the DFG it controls.  The
+The subroutine EVclient_assoc() is used to associate a client with a
+master.  A similar routine, EVclient_assoc_local() is used by the the master
+process to initiate client-like participation in the cohort it controls.  The 
 goal of the joining process is for EVdfg to know when all participating
 processes have joined and to have a unique name for each process (string
 node names are used for stone assignment).  
@@ -56,7 +57,7 @@ node names are used for stone assignment).
 In the simplest form of the
 join, called `static joining' mode, the following things occur:
 - Each joining node provides a unique name under which it participates in
-the DFG.
+the cohort.
 - The master provides a fixed list of the names of nodes that must join.
 - The joining process is complete when all named nodes have joined.
 
@@ -79,12 +80,12 @@ In this static mode, the pseudocode for the master looks like this:
     EVdfg_realize(test_dfg);
 
     /* We're node "a" in the DFG */
-    EVdfg_join_dfg(test_dfg, "a", str_contact);
+    test_client = EVclient_assoc_local(cm, "a", master, source_capabilities, sink_capabilities););
 
     /* Somehow provide str_contact to the other participant(s) */
 
     /* Wait until everyone has joined */
-    EVdfg_ready_wait(test_dfg);
+    EVclient_ready_wait(test_client);
 \endcode
 
 While the client is somewhat simpler:
@@ -94,62 +95,62 @@ While the client is somewhat simpler:
 
     /* CM initialization and EVclient capability registration occurs here */
 
-    test_dfg = EVclient_create(cm);
-
-    /* We're node "b" in the DFG */
-    EVdfg_join_dfg(test_dfg, "b", str_contact);
+    /* We're node "b" in the cohort */
+    test_client = EVclient_assoc(test_client, "b", str_contact, source_capabilities, sink_capabilities);
 
     /* Wait until everyone has joined */
-    EVdfg_ready_wait(test_dfg);
+    EVclient_ready_wait(test_client);
 \endcode
-
+For the moment, please ignore the 'source_capabilities' and
+'sink_capabilities' parameters to EVclient_assoc() and
+EVclient_assoc_local().  Those will be explained below.
 
 \subsubsection dynamic_joining Dynamic Joining mode
 
 There are situations in which the "static joining" scenario described above
 is too rigid.  'Dynamic Joining' mode relaxes several requirements above.
 First, rather than using a static node list (via
-EVdfg_register_node_list()) and creating the entire virtual DFG before all
-the nodes join, the master registers a EVdfgJoinHandlerFunc which is called
+EVmaster_register_node_list()) and creating the entire virtual DFG before all
+the nodes join, the master registers a EVmasterJoinHandlerFunc which is called
 each time a client joins.  This join function may use its own criterion in
 deciding when sufficient clients have joined.  When it decides that enough
 have joined, then it should create the virtual DFG and call
 EVdfg_realize().  In this situation, the requirement that each client
-process specify a unique name to EVdfg_join_dfg() is also relaxed.  Instead,
+process specify a unique name to EVclient_assoc() is also relaxed.  Instead,
 each client can specify a generic name (like "client") and the join handler
 can associate a unique canonical name with that client using
-EVdfg_assign_canonical_name().  In this case, the canonical names assigned
+EVmaster_assign_canonical_name().  In this case, the canonical names assigned
 must be unique and are the names used in EVdfg_assign_node().
 
 In dynamic mode, the pseudocode for the client is unchanged (except that the
 specified name need not be unique).  But the code structure for the master
 is changes:
 \code{.c}
-    EVdfg test_dfg;
+    EVmaster test_master;
     char *str_contact;
 
-    /* CM initialization and EVdfg capability registration occurs here */
+    /* CM initialization and EVclient capability registration occurs here */
 
-    test_dfg = EVdfg_create(cm);
-    str_contact = EVdfg_get_contact_list(test_dfg);
-    EVdfg_node_join_handler (test_dfg, join_handler_func);
+    test_master = EVmaster_create(cm);
+    str_contact = EVmaster_get_contact_list(test_master);
+    EVmaster_node_join_handler (test_master, join_handler_func);
 
-    /* We're node "a" in the DFG */
-    EVdfg_join_dfg(test_dfg, "client", str_contact);
+    /* We're node "a" in the set of participating nodes */
+    test_client = EVclient_assoc_local(cm, "client", test_master, source_capabilities, sink_capabilities););
 
     /* Somehow provide str_contact to the other participant(s) */
 
-    /* Wait until everyone has joined */
-    EVdfg_ready_wait(test_dfg);
+    /* Wait until everyone has joined and a DFG has been deployed */
+    EVclient_ready_wait(test_client);
 \endcode
 The join handler function in dynamic mode will generally follow this form:
 \code{.c}
 void
-join_handler_func(EVdfg dfg, char *identifier, void*cur_unused1, void*cur_unused2)
+join_handler_func(EVmaster master, char *identifier, void*cur_unused1, void*cur_unused2)
 {
     char *canon_name;
     /* Generate a canonical name for this client in canon_name, then assign */
-    EVdfg_assign_canonical_name(dfg, identifier, canon_name);
+    EVmaster_assign_canonical_name(master, identifier, canon_name);
 
     if ( /* not ready to start running */) return;
 
@@ -158,16 +159,16 @@ join_handler_func(EVdfg dfg, char *identifier, void*cur_unused1, void*cur_unused
     EVdfg_realize(dfg);
     /* 
      * upon return, the DFG will be instantiated and all clients fall out
-     * of EVdfg_ready_wait();
+     * of EVclient_ready_wait();
      */
 }
 \endcode
 The join handler function is also used for dynamic reconfiguration of the
 DFG, described later.
 
-\subsection capability EVdfg Capability Registration
+\subsection capability EVclient Capability Registration
 
-The phrase "EVdfg capability registration" occurs in the pseudocode comments
+The phrase "EVclient capability registration" occurs in the pseudocode comments
 above.  Due to the dynamic code generation and FFS-based data representation
 in EVPath, many stones can be placed on any process, without regard to
 architecture, OS or other considerations.  However data sources and data
@@ -188,40 +189,56 @@ those handler names may or may not be assigned individual clients.
 \subsubsection source_capability EVdfg Source Capabilities
 
 EVdfg clients register source capabilities by first creating an EVPath
-source handle as in normal EVPath, but specifying -1 as the target stone
-ID.  Then the EVdfg routine EVdfg_register_source() is used to associate a
-name with the source handle.  Unlike EVPath, where EVsource handles are
-associated with particular local stones, but are not considered stones
-themselves, EVdfg sources are full virtual stones, assignable to different
-clients like other virtual stones.  The master creates them with
-EVdfg_create_source_stone(), specifying a source name.  This source name
-must match a registered source on the client to which the source stone is
-assigned.  Source names should be unique within each client, no client
-EVsource handle can have more than one EVdfg_stone associated with it.
+source handle as in normal EVPath, but specifying the value 'DFG_SOURCE' as
+the target stone ID.  Then the EVdfg routine EVclient_register_source() is
+used to associate a name with the source handle.  Unlike EVPath, where
+EVsource handles are associated with particular local stones, but are not
+considered stones themselves, EVdfg sources are full virtual stones,
+assignable to different clients like other virtual stones.  The master
+creates them with EVdfg_create_source_stone(), specifying a source name.
+This source name must match a registered source on the client to which the
+source stone is assigned.  Source names should be unique within each client,
+no client EVsource handle can have more than one EVdfg_stone associated with
+it.  The return value from EVclient_register_source() is of type
+EVclient_sources and represents a handle to the source capabilities of this
+client.  The value is adjusted each time EVclient_register_source() is
+called.  All calls to EVclient_register_source() should happen before the
+call to EVclient_assoc() or EVclient_assoc_local() and the return value of
+the last call to EVclient_register_source() should be passed to
+EVclient_assoc() or EVclient_assoc_local() as the source_capabilities
+parameter.  (The return values of prior calls can be ignored.)
 
 \subsubsection sink_capability EVdfg Sink Capabilities
 
 EVdfg clients register sink (terminal handler) capabilities by using the
-routine EVdfg_register_sink_handler().  Essentially, this establishes an
+routine EVclient_register_sink_handler().  Essentially, this establishes an
 association between an particular handler subroutine, the FMStructDescList
 describing the data it expects, and a handler name.  The master creates sink
 stones with EVdfg_create_sink_stone(), or associates a new sink action with
 an existing stone with EVdfg_add_sink_action().  In each case, the
 handler_name specified in the call must match one that has appeared in a
-EVdfg_register_sink_handler() call on the client to which that sink stone
-is assigned.  Unlike sources, there is no restriction on how many different
-sink stones may be associated with the same sink handler.
+EVclient_register_sink_handler() call on the client to which that sink stone is
+assigned.  Unlike sources, there is no restriction on how many different
+sink stones may be associated with the same sink handler.  The return value
+from EVclient_register_sink_handler() is of type EVclient_sinks and
+represents a handle to the sink capabilities of this client.  The value is
+adjusted each time EVclient_register_sink_handler() is called.  All calls to
+EVclient_register_sink_handler() should happen before the call to
+EVclient_assoc() or EVclient_assoc_local() and the return value of the last
+call to EVclient_register_sink_handler() should be passed to
+EVclient_assoc() or EVclient_assoc_local() as the sink_capabilities
+parameter.  (The return values of prior calls can be ignored.)
 
 \subsubsection run_time Run-time Semantics
 
 It is sometimes useful to clients to know, after a DFG has been realized, if
 a particular local source has had an EVdfg source stone associated with it.
-The routine EVdfg_source_active(EVsource src) returns a boolean value on
+The routine EVclient_source_active(EVsource src) returns a boolean value on
 this condition (True if associated, False if not).  During DFG run-time,
 clients usually test if a source is active so that they know if data is to
 be submitted to it, as in the code below:
 \code{.c}
-    if (EVdfg_source_active(source_handle)) {
+    if (EVclient_source_active(source_handle)) {
 	simple_rec rec;
 	generate_simple_record(&rec);
 	/* submit would be quietly ignored if source is not active */
@@ -234,7 +251,7 @@ quietly ignored by EVPath, but it's better form to test first.
 For local sinks, that the actual handler gets called when data arrives is
 the only real indication that a source handle has been utilized.  However, a
 count of the total sink stones assigned to a particular node is available
-via the routine EVdfg_active_sink_count(EVdfg dfg).  This is sometimes
+via the routine EVclient_active_sink_count(EVclient client).  This is sometimes
 useful for clients who need to know if they should be waiting for particular
 data before signalling for shutdown, or if they are just waiting patiently
 for the other nodes to complete operation.
@@ -244,11 +261,17 @@ The code below is a sample for a client that is capable of being a source
 for "simple" data, or for hosting terminal stones that handle "simple" data.
 \code{.c}
     source_handle = EVcreate_submit_handle(cm, -1, simple_format_list);
-    EVdfg_register_source("data_source", source_handle);
-    EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
+    source_capabilities = EVclient_register_source("data_source", source_handle);
+    sink_capabilities = EVdfg_register_sink_handler(cm, "simple_handler", simple_format_list,
 				(EVSimpleHandlerFunc) simple_handler, NULL);
 \endcode
 
+As noted previously, the source_capabilies and sink_capabilities are of
+types EVclient_sources and EVclient_sinks, respectively, and the last return
+value of each should be passed to EVassoc_client() or
+EVassoc_client_local().  These capabilities represent what the client is
+*capable* of doing.  What it will actually do depends upon what resources
+are assigned to it by the master.
 
 \subsection stone_creation EVdfg Stone Creation and Assignment
 
@@ -266,7 +289,7 @@ specific nodes like any other EVdfg_stone.
 split stones.
 - While many EVpath action assignment functions have a "target_stone"
 parameter, in EVdfg the links between stones are established with the
-EVdfg_link_port() function.
+EVdfg_link_dest() and EVdfg_link_port() functions.
 
 These are the basic DFG creation functions:
 <table border> 
@@ -294,6 +317,10 @@ These are the basic DFG creation functions:
 <tr> 
     <td> EVdfg_add_sink_action() </td> 
     <td> Add a sink action to an existing stone  </td> 
+</tr> 
+<tr> 
+    <td> EVdfg_link_dest() </td> 
+    <td> Connect the next available output port on one stone to deliver events to another  </td> 
 </tr> 
 <tr> 
     <td> EVdfg_link_port() </td> 
@@ -398,11 +425,11 @@ test.
 In order to support all of these circumstances, EVdfg has some informational
 functions that let the application write shutdown code that doesn't
 explicitly depend upon how the stones are mapped to nodes.  One of these
-functions is the EVdfg_source_active() function that was introduced above.
-Another is EVdfg_active_sink_count(), which returns the number of sinks that
+functions is the EVclient_source_active() function that was introduced above.
+Another is EVclient_active_sink_count(), which returns the number of sinks that
 have been mapped to the current node.  We'll use these, along with the EVdfg
-shutdown functions, EVdfg_shutdown(), EVdfg_ready_for_shutdown() and
-EVdfg_wait_for_shutdown(), in order to cleanly handle shutdown in our
+shutdown functions, EVclient_shutdown(), EVclient_ready_for_shutdown() and
+EVclient_wait_for_shutdown(), in order to cleanly handle shutdown in our
 example programs. 
 
 In particular, in the place of the call to CMrun_network() we'll use the
@@ -410,19 +437,19 @@ following code segment in both master and client:
   \snippet dfg_client3.c Shutdown code
 Additionally, we add the line:
 <pre>
-    EVdfg_shutdown((EVdfg)client_data, event->integer_field == 318);
+    EVclient_shutdown((EVclient)client_data, event->integer_field == 318);
 </pre>
 to the simpler_handler function.  With these changes, all processes end up
-in EVdfg_wait_for_shutdown() instead of CMrun_network().  Additionally:
-- node "a", which hosts only the source calls EVdfg_shutdown(dfg, 0)
+in EVclient_wait_for_shutdown() instead of CMrun_network().  Additionally:
+- node "a", which hosts only the source calls EVclient_shutdown(dfg, 0)
 <em>after</em> it has done EVsubmit().
 - node "b", which hosts only the intermediate node calls
-EVdfg_ready_for_shutdown() as soon as it starts running.
+EVclient_ready_for_shutdown() as soon as it starts running.
 - node "c", which hosts the terminal stone, calls none of these calls prior
-to EVdfg_wait_for_shutdown().  But it calls EVdfg_shutdown() in the handler,
+to EVclient_wait_for_shutdown().  But it calls EVclient_shutdown() in the handler,
 passing in <tt>event->integer_field == 318</tt> as the success value.
 
-That EVdfg_wait_for_shutdown() is in the return statement means that each
+That EVclient_wait_for_shutdown() is in the return statement means that each
 node will exit() with the same result code, which will be a success code if
 the event is delivered properly.
 
@@ -443,7 +470,45 @@ write file in the DFG), the joining of a new node, or through voluntary
 reconfiguration (via a CoD handler in the DFG calling
 EVdfg_trigger_reconfiguration()).
 
-The mechanism through which this reconfiguration is accomplish is currently
-being rewritten, so documentation will follow.
+Specifying modifications to the deployed DFG are done with the same DFG
+creation functions detailed above, with some additions detailed below:
+<table border> 
+<tr> 
+   <td><b> Function </b></td> 
+   <td><b> Purpose </b></td> 
+</tr> 
+
+<tr> 
+    <td> EVdfg_unlink_port() </td> 
+    <td> Remove the link on a specific output index </td> 
+</tr> 
+<tr> 
+    <td> EVdfg_unlink_dest() </td> 
+    <td> Remove the link to a specific destination/target stone </td> 
+</tr> 
+<tr> 
+    <td> EVdfg_destroy_stone() </td> 
+    <td> Remove a specific stone from the DFG </td> 
+</tr> 
+</table>
+
+In addition, the functions EVdfg_set_attr_list() and EVdfg_get_attr_list()
+may be particularly useful in the reconfiguration process.  In particular,
+when EVdfg_set_attr_list() is done prior to DFG realization, the attribute
+list that is supplied becomes the 'stone_attrs' value that is available for
+manipulation by actions running on the stone (See EVPath docs).  Certain
+EVdfg-provided functions that are also available in actions cause these
+client-level stone attributes on individual clients to be flushed back to
+the master.  Once flushed, those changed attributes are available for query
+via EVdfg_get_attr_list().  This basic communication mechanism allows for
+self-initiated DFG reconfiguration.
+
+\subsubsection Handling node failure
+To be written.
+\subsubsection Handling after-deployment node joins
+To be written.
+\subsubsection Handling self-initated DFG reconfiguration
+To be written.
+
 */
 

@@ -83,7 +83,9 @@ typedef struct _EVclient_sources *EVclient_sources;
  */
 typedef struct _EVclient_sinks *EVclient_sinks;
 
-/*
+/*!
+ * Special StoneID used in EVcreate_submit_handle()
+ *
  * DFG_SOURCE is a special StoneID used in calls to EVcreate_submit_handle() to create 
  * EVsource handles that can be later assigned to DFG source nodes.
  */
@@ -168,8 +170,6 @@ extern EVclient EVclient_assoc(CManager cm, char *node_name, char *master_contac
  *  registered join handler, but it need not be unique.  EVdfg copies this
  *  string, so it can be free'd after use.
  * \param master The handle for the EVmaster.
- * \param master_contact The string contact information for the master
- *  process.  This is not stored by EVdfg.
  * \param source_capabilities The last value returned by
  *  EVclient_register_source() or NULL
  * \param sink_capabilities The last value returned by
@@ -259,25 +259,25 @@ typedef void (*EVmasterFailHandlerFunc) (EVdfg dfg, char *identifier, int report
 typedef void (*EVmasterReconfigHandlerFunc) (EVdfg dfg);
 
 /*!
- * Register a node join handler function to an EVdfg.
+ * Register a node join handler function to an EVmaster.
  *
- * \param dfg The EVdfg handle with which to associate this handler
+ * \param master The EVmaster handle with which to associate this handler
  * \param func The handler function to associate
  */
 extern void EVmaster_node_join_handler (EVmaster master, EVmasterJoinHandlerFunc func);
 
 /*!
- * Register a node fail handler function to an EVdfg.
+ * Register a node fail handler function to an EVmaster
  *
- * \param dfg The EVdfg handle with which to associate this handler
+ * \param master The EVmaster handle with which to associate this handler
  * \param func The handler function to associate
  */
 extern void EVmaster_node_fail_handler (EVmaster master, EVmasterFailHandlerFunc func);
 
 /*!
- * Register a voluntary reconfiguration handler function to an EVdfg.
+ * Register a voluntary reconfiguration handler function to an EVmaster
  *
- * \param dfg The EVdfg handle with which to associate this handler
+ * \param master The EVmaster handle with which to associate this handler
  * \param func The handler function to associate
  */
 extern void EVmaster_node_reconfig_handler (EVmaster master, EVmasterReconfigHandlerFunc func);
@@ -330,6 +330,8 @@ extern int EVclient_ready_wait(EVclient client);
  * \param src The EVsource to be associated with the name.  Source/name
  *  association is actually an EVPath-level operation, so there is no EVdfg
  *  parameter in this call.
+ * \return The last value returned by EVclient_register_source() should be passed 
+ *  to EVclient_assoc() or EVclient_assoc_local().  Prior return values can be ignored.
  */
 extern EVclient_sources
 EVclient_register_source(char *name, EVsource src);
@@ -354,6 +356,9 @@ EVclient_register_source(char *name, EVsource src);
  *  EVdfg param.
  * \param client_data An uninterpreted value that is passed to the handler
  * function when it is called.
+ * \return The last value returned by EVclient_register_sink_handle() or 
+ *  EVclient_register_raw_sink_handle, should be passed to EVclient_assoc() or 
+ *  EVclient_assoc_local().  Prior return values can be ignored.
  */
 extern EVclient_sinks
 EVclient_register_sink_handler(CManager cm, char *name, FMStructDescList list, EVSimpleHandlerFunc handler, void* client_data);
@@ -372,6 +377,11 @@ EVclient_register_sink_handler(CManager cm, char *name, FMStructDescList list, E
  *  name/data type.  Sink-handle/name association is actually an
  *  EVPath-level operation, so there is a CM parameter in this call, but no
  *  EVdfg param.
+ * \param client_data An uninterpreted value that is passed to the handler
+ * function when it is called.
+ * \return The last value returned by EVclient_register_sink_handle() or 
+ *  EVclient_register_raw_sink_handle, should be passed to EVclient_assoc() or 
+ *  EVclient_assoc_local().  Prior return values can be ignored.
  */
 extern EVclient_sinks
 EVclient_register_raw_sink_handler(CManager cm, char *name, EVRawHandlerFunc handler, void *client_data);
@@ -394,7 +404,7 @@ extern int EVclient_source_active(EVsource src);
  *  This call is performed by client nodes in order to determine how many
  *  sink stones have been assigned to them.
  *
- * \param dfg The DFG under consideration.
+ * \param client The EVclient under consideration.
  * \return the number of active sink stones assigned to the current client
  */
 extern unsigned int EVclient_active_sink_count(EVclient client);
@@ -408,7 +418,7 @@ extern unsigned int EVclient_active_sink_count(EVclient client);
  *  EVdfg_assign_node().  The only constraint on the name is that not have been 
  *  assigned to any already-participating node.
  *
- * \param dfg The DFG under consideration.
+ * \param master The master the client is joining.
  * \param given_name The original name of the client.
  * \param canonical_name The canonical name to be assigned to the client.
  * \return true on success, false if the name was not unique
@@ -420,7 +430,7 @@ extern int EVmaster_assign_canonical_name(EVmaster master, char *given_name, cha
  *
  * This call is used in the master process to create a DFG that will be
  * deployed on the client processes.
- * \param cm The CManager with which to associate the DFG
+ * \param master The EVmaster with which to associate the DFG
  * \return An EVdfg handle, to be used in later calls.
  */
 extern EVdfg EVdfg_create(EVmaster master);
@@ -636,12 +646,16 @@ extern void EVdfg_set_attr_list(EVdfg_stone stone, attr_list attrs);
  */
 extern attr_list EVdfg_get_attr_list(EVdfg_stone stone);
 
-/*
+/*!
+ *  a value used in EVclient shutdown calls
+ *
  * DFG_STATUS_SUCCESS is a value used in EVclient_shutdown* calls
  */
 #define DFG_STATUS_SUCCESS 0
 
-/*
+/*!
+ *  a value used in EVclient shutdown calls
+ *
  * DFG_STATUS_FAILURE is a value used in EVclient_shutdown* calls
  */
 #define DFG_STATUS_FAILURE 1
@@ -655,7 +669,7 @@ extern attr_list EVdfg_get_attr_list(EVdfg_stone stone);
  *  all calls (on all nodes) to EVclient_shutdown() and
  *  EVclient_wait_for_shutdown() will all be the same.
  *
- * \param dfg The EVdfg handle to which a return value is contributed
+ * \param client The EVclient handle to which a return value is contributed
  * \param result this node's contribution to the DFG-wide shutdown value.
  *  In order to facilitate this value being passed directly to exit(), the
  *  convention for DFG exit values follows the Unix process exit semantics
