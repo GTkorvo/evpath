@@ -406,7 +406,6 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	stone->out_links = NULL;
 	stone->action_count = 1;
 	stone->extra_actions = NULL;
-	stone->new_out_count = 0;
 	stone->invalid = 0;
 	stone->frozen = 0;
 	stone->bridge_target = -1;
@@ -702,57 +701,6 @@ INT_EVdfg_enable_auto_stone(EVdfg_stone stone, int period_sec,
 
 
 static void fdump_dfg_stone(FILE* out, EVdfg_stone_state s);
-
-
-/* static void  */
-/* reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events) */
-/* { */
-/*     if (src->new_out_count == 0) { */
-/*         src->new_out_links = malloc(sizeof(src->new_out_links[0])); */
-/*         memset(src->new_out_links, 0, sizeof(src->new_out_links[0])); */
-/*         src->new_out_count = 1; */
-/* 	src->new_out_ports = malloc(sizeof(src->new_out_ports[0])); */
-/*     } else { */
-/*         src->new_out_links = realloc(src->new_out_links, */
-/* 				     sizeof(src->new_out_links[0]) * (src->new_out_count+1)); */
-/*         memset(&src->new_out_links[src->new_out_count], 0, sizeof(src->new_out_links[0])); */
-/*         ++(src->new_out_count); */
-/* 	src->new_out_ports = realloc(src->new_out_ports, sizeof(src->new_out_ports[0]) * (src->new_out_count)); */
-/*     } */
-/*     src->new_out_links[src->new_out_count - 1] = dest; */
-/*     src->processed_pending_events = q_events; */
-/*     src->new_out_ports[src->new_out_count - 1] = port; */
-/* } */
-
-
-/* extern void INT_EVdfg_reconfig_link_port_to_stone(EVdfg dfg, int src_stone_index, int port, EVdfg_stone target_stone, EVevent_list q_events) { */
-/* 	reconfig_link_port(dfg->stones[src_stone_index], port, target_stone, q_events); */
-/* } */
-
-/* extern void INT_EVdfg_reconfig_link_port_from_stone(EVdfg dfg, EVdfg_stone src_stone, int port, int target_index, EVevent_list q_events) { */
-/* 	reconfig_link_port(src_stone, port, dfg->stones[target_index], q_events); */
-/* } */
-
-/* extern void INT_EVdfg_reconfig_link_port(EVdfg_stone src, int port, EVdfg_stone dest, EVevent_list q_events) { */
-/* 	reconfig_link_port(src, port, dest, q_events); */
-/* } */
-
-/* extern void INT_EVdfg_reconfig_insert(EVdfg dfg, int src_stone_index, EVdfg_stone new_stone, int dest_stone_index, EVevent_list q_events) { */
-/*     reconfig_link_port(dfg->stones[src_stone_index], 0, new_stone, q_events); */
-/*     reconfig_link_port(new_stone, 0, dfg->stones[dest_stone_index], NULL); */
-/*     CMtrace_out(dfg->cm, EVdfgVerbose, "Inside reconfig_insert, sin = %d, min = %d, din = %d : \n", dfg->stones[src_stone_index]->node, new_stone->node, dfg->stones[dest_stone_index]->node); */
-/* } */
-
-/* extern void INT_EVdfg_reconfig_insert_on_port(EVdfg dfg, EVdfg_stone src_stone, int port, EVdfg_stone new_stone, EVevent_list q_events) */
-/* { */
-/*     EVdfg_stone dest_stone = src_stone->out_links[port]; */
-/*     (void)dfg; */
-/*     reconfig_link_port(src_stone, port, new_stone, q_events); */
-/*     /\* link port on the new stone to the old destination *\/ */
-/*     reconfig_link_port(new_stone, port, dest_stone, NULL); */
-/*     CMtrace_out(dfg->cm, EVdfgVerbose, "Inside reconfig_insert_on_port, sin = %d, min = %d, din = %d : \n", src_stone->node, new_stone->node, dest_stone->node); */
-/*     printf("Inside reconfig_insert_on_port, sin = %x, min = %x, din = %x : \n", src_stone->stone_id, new_stone->stone_id, dest_stone->stone_id); */
-/* } */
 
 extern int
 INT_EVdfg_link_port(EVdfg_stone src, int port, EVdfg_stone dest)
@@ -1414,11 +1362,40 @@ extern char *INT_EVmaster_get_contact_list(EVmaster master)
     return tmp;
 }
 
+static int
+max_output_for_action(char *action, int cur_max)
+{
+    if (cur_max == -1) return -1;
+    switch (action_type(action)) {
+    case Action_NoAction:
+    case Action_Terminal:
+    case Action_Bridge:
+	return cur_max;
+	break;
+    case Action_Filter:
+    case Action_Immediate:
+	if (cur_max < 1) {
+	    return 1;
+	} else {
+	    return cur_max;
+	}
+    case Action_Multi:
+    case Action_Split:
+    case Action_Source:
+	return -1; /* no max */
+    default:
+	printf("Didn't expect case in max_output_for_action\n");
+	exit(1);
+    }
+}
+
 static void
 check_connectivity(EVdfg_configuration state, EVmaster master)
 {
     int i;
+    int max_output = 0;
     for (i=0; i< state->stone_count; i++) {
+	int j;
 	CMtrace_out(master->cm, EVdfgVerbose, "Stone %d - assigned to node %s, action %s\n", i, 
 		    master->nodes[state->stones[i]->node].canonical_name, (state->stones[i]->action ? state->stones[i]->action : "NULL"));
 	if (state->stones[i]->node == -1) {
@@ -1426,22 +1403,34 @@ check_connectivity(EVdfg_configuration state, EVmaster master)
 	    printf("    This stones particulars are:\n");
 	    fdump_dfg_stone(stdout, state->stones[i]);
 	}
+	if (state->stones[i]->bridge_stone) {
+	    /* we created the bridge stones, assume they're OK */
+	    continue;
+	}
 	if (state->stones[i]->action_count == 0) {
 	    printf("Warning, stone %d (assigned to node %s) has no actions registered", i, master->nodes[state->stones[i]->node].canonical_name);
 	    continue;
 	}
-	if ((state->stones[i]->out_count == 0) && (state->stones[i]->new_out_count == 0)) {
-	    char *action_spec = state->stones[i]->action;
-	    switch(action_type(action_spec)) {
-	    case Action_Terminal:
-	    case Action_Bridge:
-		break;
-	    default:
-		printf("Warning, stone %d (assigned to node %s) has no outputs connected to other stones\n", i, master->nodes[state->stones[i]->node].canonical_name);
-		printf("    This stones particulars are:\n");
-		fdump_dfg_stone(stdout, state->stones[i]);
-		break;
-	    }
+	max_output = max_output_for_action(state->stones[i]->action, max_output);
+	for (j=0; j< state->stones[i]->action_count - 1; j++) {
+	    max_output = max_output_for_action(state->stones[i]->extra_actions[j], max_output);
+	}
+	if ((state->stones[i]->out_count == 0) && (max_output != 0)) {
+	    printf("Warning, stone %d (assigned to node %s) has no outputs connected to other stones\n", i, master->nodes[state->stones[i]->node].canonical_name);
+	    printf("    This stones particulars are:\n");
+	    fdump_dfg_stone(stdout, state->stones[i]);
+	    continue;
+	}
+	if ((max_output == 1) && (state->stones[i]->out_count > 1)) {
+	    printf("Warning, stone %d (assigned to node %s) has more than one output port linked, but can only support one output\n", i, master->nodes[state->stones[i]->node].canonical_name);
+	    printf("    This stones particulars are:\n");
+	    fdump_dfg_stone(stdout, state->stones[i]);
+	    continue;
+	}
+	if ((max_output == 1) && (state->stones[i]->out_links[0] == -1)) {
+	    printf("Warning, stone %d (assigned to node %s) produces at least one output, but output port 0 is unlinked\n", i, master->nodes[state->stones[i]->node].canonical_name);
+	    printf("    This stones particulars are:\n");
+	    fdump_dfg_stone(stdout, state->stones[i]);
 	}
     }
 }
@@ -2053,10 +2042,6 @@ fdump_dfg_stone(FILE* out, EVdfg_stone_state s)
 	fprintf(out, "%x, ", s->out_links[i]);
     }
     fprintf(out, "\n action_count %d, action = \"%s\"\n", s->action_count, (s->action ? s->action : "NULL"));
-    fprintf(out, "new_out_count %d : ", s->new_out_count);
-    for (i=0; i < s->new_out_count; i++) {
-	fprintf(out, "(port %d) -> %p, ", s->new_out_ports[i], s->new_out_links[i]);
-    }
     fprintf(out, "\nbridge_target %x\n", s->bridge_target);
 }
 

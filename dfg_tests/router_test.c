@@ -102,7 +102,7 @@ be_test_master(int argc, char **argv)
     router = EVdfg_create_stone(test_dfg, router_action);
     EVdfg_assign_node(router, nodes[0]);
 
-    EVdfg_link_port(source, 0, router);
+    EVdfg_link_dest(source, router);
 
     for (i=1; i < node_count; i++) {
 	EVdfg_stone terminal = EVdfg_create_sink_stone(test_dfg,"simple_handler");

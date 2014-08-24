@@ -164,11 +164,8 @@ typedef struct _EVdfg_stone_state {
     int bridge_target;
 	
     /* dynamic reconfiguration structures below */
-    EVdfg_stone *new_out_links;
     EVevent_list pending_events;
     EVevent_list processed_pending_events;
-    int new_out_count;
-    int *new_out_ports;
     int invalid;
     int frozen;
 } *EVdfg_stone_state;
