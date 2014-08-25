@@ -234,12 +234,12 @@ typedef void (*EVmasterJoinHandlerFunc) (EVmaster master, char *identifier, void
  * calls to this function resulting from a single failure.
  * 
  * \param dfg The EVdfg handle with which this handler is associated
- * \param identifier This null-terminated string is the value that was
+ * \param failed_client This null-terminated string is the value that was
  * specified in EVclient_assoc() in the failed client.
- * \param reporting_stone This is local ID of the failed stone (perhaps not
+ * \param failed_stone This is local ID of the failed stone (perhaps not
  * useful to anyone - should change or eliminate this).
  */
-typedef void (*EVmasterFailHandlerFunc) (EVdfg dfg, char *identifier, int reporting_stone);
+typedef void (*EVmasterFailHandlerFunc) (EVdfg dfg, char *failed_client, int failed_stone);
 
 /*!
  * The prototype for an EVdfg voluntary-reconfiguration handling function.

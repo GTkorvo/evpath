@@ -503,12 +503,71 @@ the master.  Once flushed, those changed attributes are available for query
 via EVdfg_get_attr_list().  This basic communication mechanism allows for
 self-initiated DFG reconfiguration.
 
-\subsubsection Handling node failure
-To be written.
-\subsubsection Handling after-deployment node joins
-To be written.
-\subsubsection Handling self-initated DFG reconfiguration
-To be written.
+Future enhancements of EVdfg may allow the master to manage multiple
+independent DFGs simultaneously.  In that circumstance, this API may
+change.  Additional future enhancements to EVdfg may allow the application
+to query the state and connectivity of the DFG (I.E. to ask which nodes to
+link to a particular node, etc.).  Without that enhancement in place, the
+master program must maintain it's own knowledge about what stones exist and
+how they are connected in order to change that connectivity in a
+reconfiguration handler.  
 
+\subsubsection Handling node failure
+In order to handle node/process failure, the master must register a fail
+handler function with EVmaster_node_fail_handler():
+\code{.c}
+typedef void (*EVmasterFailHandlerFunc) (EVdfg dfg, char *failed_client, int failed_stone);
+
+extern void EVmaster_node_fail_handler (EVmaster master, EVmasterFailHandlerFunc func);
+\endcode
+Note that the master process is a single point of failure for the entire
+system.  If the master process fails, the DFG is not recoverable and client
+behaviour is unpredictable.  However, if a non-master client fails it can be
+handled cleanly and the DFG reconfigured, albeit with potential loss of
+events and data at the failed node.  EVdfg detects node failure when event
+flow is distrupted by a failed network write.  When this happens, the
+occurrence is reported to the master, the master determines which node and
+stone were the intended target of the network transmission and calls any
+failure handler with the DFG.  The details of the fail handler vary widely
+by application, but the regression test evpath/dfg_tests/fail_chain_test.c
+may be used as an example.  The important concepts are that the fail handler
+modify the prior DFG to a consistent state using the EVdfg_* APIs and then
+once again call EVdfg_realize().
+
+\subsubsection Handling after-deployment node joins
+In order to handle nodes joining after the initial deployment, the master
+must use "dynamic joining" as described above.  I.E. it must register a node
+join handler function with EVmaster_node_join_handler().  In this case, the
+join handler will simply be called when new nodes join as it was prior to
+the initial realization.  As with the fail handler, when called
+post-realization, the join handler should reconfigure the DFG as desired to
+accomodate the newly joined node and then should call EVdfg_realize().  
+
+Note that the join handler gets called with the EVmaster as a parameter
+while the other reconfiguration handlers are called with EVdfg as a first
+parameter.  This arranement will change as EVdfg is modified to introduce
+multiple simultaneous DFGs, but exists at the moment because the join
+handler must also assign a canonical name for the new node.  An example of
+handling late-joining nodes can be found in evpath/dfg_tests/fail_chain_test.c.
+
+\subsubsection Handling self-initated DFG reconfiguration
+The last type of reconfiguration that EVdfg is capable of is self-initiated
+reconfiguration.  I.E. reconfiguration that is not initiated by a change in
+the set of underly nodes in the cohort, but rather is initiated by action
+code in the DFG itself, including possibly by actions running on client nodes.
+\code{.c}
+typedef void (*EVmasterReconfigHandlerFunc) (EVdfg dfg);
+extern void EVmaster_node_reconfig_handler (EVmaster master, EVmasterReconfigHandlerFunc func);
+\end{code}
+Here, the reconfiguration handler is called if some action on stone calls
+'EVdfg_trigger_reconfiguration()'.  Because EVdfg has no actual knowledge of
+the circumstances which might have prompted this call, the handler on the
+master is invoked with only the EVdfg as a parameter.  However, the call to
+EVdfg_trigger_reconfiguration() also causes all the stone attributes on that
+client to be flushed back to the master so that they are available for
+query and this communication mechanism can be used as a way for action code
+to convey those circumstances to the master.  Again, details vary with the
+application but the regression test evpath/dfg_tests/self_reconfig_test.c
+provides an example.
 */
 
