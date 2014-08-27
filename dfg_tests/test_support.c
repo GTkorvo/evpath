@@ -165,6 +165,7 @@ run_subprocess(char **args)
 }
 
 static char *argv0;
+static pid_t *pid_list = NULL;
 
 extern void
 test_fork_children(char **list, char *master_contact)
@@ -178,12 +179,14 @@ test_fork_children(char **list, char *master_contact)
 	args[node_index++] = "-v";
     }	
     args[node_index+1] = master_contact;
-    
+    pid_list = malloc(sizeof(pid_list[0]));
     while(list[list_index] != NULL) {
 	args[node_index] = list[list_index];
-	subproc_proc = run_subprocess(args);
+	pid_list[list_index -1 ] = run_subprocess(args);
 	list_index++;
+	pid_list = realloc(pid_list, sizeof(pid_list[0]) * list_index);
     }
+    pid_list[list_index - 1] = 0;
 }
 
 static void
@@ -207,8 +210,15 @@ delayed_fork_children(CManager cm, char **list, char *master_contact, int delay_
 
 int wait_for_children(char **list)
 {
+    int i=0, stat;
     (void)list;
-    /* should wait for kids */
+    while(pid_list && pid_list[i] != 0) {
+	printf("Waiting for pid %x\n", pid_list[i]);
+	waitpid(pid_list[i], &stat, 0);
+	i++;
+    }
+    free(pid_list);
+    pid_list = NULL;
     return 0;
 }
 

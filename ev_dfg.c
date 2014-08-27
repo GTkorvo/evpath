@@ -2259,7 +2259,11 @@ perform_deployment(EVdfg dfg)
 	master->state = DFG_Starting;
 	CMtrace_out(master->cm, EVdfgVerbose, "EVDFG check all nodes registered -  master DFG state is %s\n", str_state[master->state]);
 	add_bridge_stones(dfg, dfg->working_state);
-	dfg->deploy_ack_count = 1;  /* we are number 1 */
+	if (dfg->master->client) {
+	    dfg->deploy_ack_count = 1;  /* we are number 1 */
+	} else {
+	    dfg->deploy_ack_count = 0;
+	}
 	if (dfg->deploy_ack_condition == -1) {
 	    dfg->deploy_ack_condition = INT_CMCondition_get(master->cm, NULL);
 	}
@@ -2439,14 +2443,18 @@ possibly_signal_shutdown(EVmaster master, int value, CMConnection conn)
 	    }
 	}
     }
-    master->client->shutdown_value = status;
-    i = 0;
-    master->client->already_shutdown = 1;
-    while(master->client->shutdown_conditions && (master->client->shutdown_conditions[i] != -1)) {
-	CMtrace_out(master->cm, EVdfgVerbose, "Client %d shutdown signalling %d\n", master->client->my_node_id, master->client->shutdown_conditions[i]);
-	INT_CMCondition_signal(master->cm, master->client->shutdown_conditions[i++]);
+    /* sleep briefly to let the shutdown messages go out */
+    INT_CMusleep(master->cm, 100000);
+    if (master->client) {
+	master->client->shutdown_value = status;
+	i = 0;
+	master->client->already_shutdown = 1;
+	while(master->client->shutdown_conditions && (master->client->shutdown_conditions[i] != -1)) {
+	    CMtrace_out(master->cm, EVdfgVerbose, "Client %d shutdown signalling %d\n", master->client->my_node_id, master->client->shutdown_conditions[i]);
+	    INT_CMCondition_signal(master->cm, master->client->shutdown_conditions[i++]);
+	}
+	CMtrace_out(master->cm, EVdfgVerbose, "Master DFG shutdown\n");
     }
-    CMtrace_out(master->cm, EVdfgVerbose, "Master DFG shutdown\n");
 }
 
 extern void INT_EVmaster_node_join_handler(EVmaster master, EVmasterJoinHandlerFunc func)
