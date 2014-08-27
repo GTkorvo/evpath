@@ -1,4 +1,5 @@
-/*! 
+/*!
+
 \example dfg_master.c
 \example dfg_client.c
 \example dfg_master2.c
@@ -512,7 +513,7 @@ master program must maintain it's own knowledge about what stones exist and
 how they are connected in order to change that connectivity in a
 reconfiguration handler.  
 
-\subsubsection Handling node failure
+\subsubsection node_failure Handling node failure
 In order to handle node/process failure, the master must register a fail
 handler function with EVmaster_node_fail_handler():
 \code{.c}
@@ -534,7 +535,7 @@ may be used as an example.  The important concepts are that the fail handler
 modify the prior DFG to a consistent state using the EVdfg_* APIs and then
 once again call EVdfg_realize().
 
-\subsubsection Handling after-deployment node joins
+\subsubsection join_reconfig Handling after-deployment node joins
 In order to handle nodes joining after the initial deployment, the master
 must use "dynamic joining" as described above.  I.E. it must register a node
 join handler function with EVmaster_node_join_handler().  In this case, the
@@ -550,7 +551,7 @@ multiple simultaneous DFGs, but exists at the moment because the join
 handler must also assign a canonical name for the new node.  An example of
 handling late-joining nodes can be found in evpath/dfg_tests/fail_chain_test.c.
 
-\subsubsection Handling self-initated DFG reconfiguration
+\subsubsection self_reconfig Handling self-initated DFG reconfiguration
 The last type of reconfiguration that EVdfg is capable of is self-initiated
 reconfiguration.  I.E. reconfiguration that is not initiated by a change in
 the set of underly nodes in the cohort, but rather is initiated by action
@@ -558,7 +559,7 @@ code in the DFG itself, including possibly by actions running on client nodes.
 \code{.c}
 typedef void (*EVmasterReconfigHandlerFunc) (EVdfg dfg);
 extern void EVmaster_node_reconfig_handler (EVmaster master, EVmasterReconfigHandlerFunc func);
-\end{code}
+\endcode
 Here, the reconfiguration handler is called if some action on stone calls
 'EVdfg_trigger_reconfiguration()'.  Because EVdfg has no actual knowledge of
 the circumstances which might have prompted this call, the handler on the
