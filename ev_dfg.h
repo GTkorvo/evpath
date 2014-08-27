@@ -356,8 +356,8 @@ EVclient_register_source(char *name, EVsource src);
  *  EVdfg param.
  * \param client_data An uninterpreted value that is passed to the handler
  * function when it is called.
- * \return The last value returned by EVclient_register_sink_handle() or 
- *  EVclient_register_raw_sink_handle, should be passed to EVclient_assoc() or 
+ * \return The last value returned by EVclient_register_sink_handler() or 
+ *  EVclient_register_raw_sink_handler(), should be passed to EVclient_assoc() or 
  *  EVclient_assoc_local().  Prior return values can be ignored.
  */
 extern EVclient_sinks
@@ -379,8 +379,8 @@ EVclient_register_sink_handler(CManager cm, char *name, FMStructDescList list, E
  *  EVdfg param.
  * \param client_data An uninterpreted value that is passed to the handler
  * function when it is called.
- * \return The last value returned by EVclient_register_sink_handle() or 
- *  EVclient_register_raw_sink_handle, should be passed to EVclient_assoc() or 
+ * \return The last value returned by EVclient_register_sink_handler() or 
+ *  EVclient_register_raw_sink_handler(), should be passed to EVclient_assoc() or 
  *  EVclient_assoc_local().  Prior return values can be ignored.
  */
 extern EVclient_sinks

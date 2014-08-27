@@ -10,7 +10,7 @@
 #include "cod.h"
 #include "evpath.h"
 #include "cm_internal.h"
-#include "ev_deploy.h"
+#include "ev_dfg.h"
 #include "revpath.h"
 #include "ev_dfg_internal.h"
 #include "revp_internal.h"
@@ -55,6 +55,7 @@
 char *str_state[] = {"DFG_Joining", "DFG_Starting", "DFG_Running", "DFG_Reconfiguring", "DFG_Shutting_Down"};
 static char *master_msg_str[] = {"DFGnode_join", "DFGdeploy_ack", "DFGshutdown_contrib", "DFGconn_shutdown", 
 			  "DFGflush_reconfig", NULL};
+char *stone_condition_str[EVstone_condition_last] = {"Undeployed", "Deployed", "Frozen", "Lost"};
 
 
 static void handle_conn_shutdown(EVmaster master, EVmaster_msg_ptr msg);
@@ -406,11 +407,9 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	stone->out_links = NULL;
 	stone->action_count = 1;
 	stone->extra_actions = NULL;
-	stone->invalid = 0;
-	stone->frozen = 0;
+	stone->condition = EVstone_Undeployed;
 	stone->bridge_target = -1;
-	stone->pending_events = NULL;
-	stone->processed_pending_events = NULL;
+	stone->fetched_events = NULL;
 	if (bridge) {
 	    stone->bridge_stone = 1;
 	    stone->stone_id = act.stone_id;
@@ -486,6 +485,7 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	    if (src->out_links[act.u.link.port] != 0) {
 		EVdfg_config_action dact;
 		dact.type = ACT_unlink_port;
+		dact.node_for_action = src->node;
 		dact.stone_id = src->stone_id;
 		dact.u.link.port = act.u.link.port;
 		EVdfg_perform_act_on_state(config, dact, build_queue);
@@ -493,6 +493,14 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	}
 	src->out_links[act.u.link.port] = act.u.link.dest_id;
 	if (build_queue) {
+	    if (src->condition == EVstone_Deployed) {
+		EVdfg_config_action fact;
+		fact.type = ACT_freeze;
+		fact.stone_id = src->stone_id;
+		fact.node_for_action = src->node;
+		EVdfg_add_act_to_queue(config, fact);
+		src->condition = EVstone_Frozen;
+	    }
 	    EVdfg_add_act_to_queue(config, act);
 	}
 	break;
@@ -684,6 +692,14 @@ fdump_dfg_config_action(FILE *out, EVdfg_config_action act)
 	fprintf(out, "Action is DESTROY, stone_id = %x\n",
 		act.stone_id);
 	break;
+    case ACT_freeze:
+	fprintf(out, "Action is FREEZE, stone_id = %x\n",
+		act.stone_id);
+	break;
+    case ACT_unfreeze:
+	fprintf(out, "Action is UNFREEZE, stone_id = %x\n",
+		act.stone_id);
+	break;
     }
 }
 
@@ -821,8 +837,11 @@ static void
 handle_conn_shutdown(EVmaster master, EVmaster_msg_ptr msg)
 {
     int stone = msg->u.conn_shutdown.stone;
+    EVdfg_stone_state reporting_stone = find_stone_state(stone, master->dfg->deployed_state);
     EVdfg dfg = master->dfg;
 
+    /* this stone is automatically frozen by EVPath */
+    reporting_stone->condition = EVstone_Frozen;
     master->state = DFG_Reconfiguring;
     
     CMtrace_out(master->cm, EVdfgVerbose, "EVDFG conn_shutdown_handler -  master DFG state is now %s\n", str_state[master->state]);
@@ -849,10 +868,18 @@ handle_conn_shutdown(EVmaster master, EVmaster_msg_ptr msg)
 	for (i=0; i< dfg->stone_count; i++) {
 	    if (dfg->deployed_state->stones[i]->stone_id == target_stone) {
 		int node = dfg->deployed_state->stones[i]->node;
+		int j;
 		CMtrace_out(master->cm, EVdfgVerbose, "Dead node is %d, name %s\n", node,
 			    master->nodes[node].canonical_name);
 		failed_node = master->nodes[node].canonical_name;
 		master->nodes[node].shutdown_status_contribution = STATUS_FAILED;
+		for (j=0; j< dfg->stone_count; j++) {
+		    if (dfg->deployed_state->stones[j]->node == node) {;
+			CMtrace_out(master->cm, EVdfgVerbose, "Dead node is %d, name %s\n", node,
+				    master->nodes[node].canonical_name);
+			dfg->deployed_state->stones[j]->condition = EVstone_Lost;
+		    }
+		}
 	    }
 	}
 	CManager_unlock(master->cm);
@@ -1415,7 +1442,7 @@ check_connectivity(EVdfg_configuration state, EVmaster master)
 	for (j=0; j< state->stones[i]->action_count - 1; j++) {
 	    max_output = max_output_for_action(state->stones[i]->extra_actions[j], max_output);
 	}
-	if ((state->stones[i]->out_count == 0) && (max_output != 0)) {
+	if ((state->stones[i]->out_count == 0) && (max_output >= 0)) {
 	    printf("Warning, stone %d (assigned to node %s) has no outputs connected to other stones\n", i, master->nodes[state->stones[i]->node].canonical_name);
 	    printf("    This stones particulars are:\n");
 	    fdump_dfg_stone(stdout, state->stones[i]);
@@ -2004,6 +2031,7 @@ deploy_to_node(EVdfg dfg, int node, EVdfg_configuration config)
 	if (config->stones[i]->node == node) {
 	    EVdfg_stone_state dstone = config->stones[i];
 	    add_stone_to_deploy_msg(config, &msg, dstone);
+	    dstone->condition = EVstone_Deployed;
 	}
     }
     dfg->master->nodes[node].needs_ready = 1;
@@ -2035,7 +2063,8 @@ fdump_dfg_stone(FILE* out, EVdfg_stone_state s)
 
     (void)dump_dfg_stone;   /* stop warning aboud dump_dfg_stone, handy to keep around for debugging */
 
-    fprintf(out, "stone %p, node %d, stone_id %x\n", s, s->node, s->stone_id);
+    fprintf(out, "stone %p, node %d, stone_id %x  (current condition %s)\n", s, s->node, s->stone_id,
+	    stone_condition_str[s->condition]);
     if (s->bridge_stone) fprintf(out, "      bridge_stone\n");
     fprintf(out, " out_count %d : ", s->out_count);
     for (i=0; i < s->out_count; i++) {
@@ -2219,89 +2248,6 @@ extern void INT_EVdfg_reconfig_transfer_events(EVdfg dfg, int src_stone_index, i
     ++dfg->transfer_events_count;
 }
 
-/* static void reconfig_add_bridge_stones(EVdfg dfg)  */
-/* {	 */
-/*     int i; */
-/*     int j; */
-/*     int k; */
-/*     EVdfg_stone cur = NULL; */
-	
-/*     for (i = dfg->deployed_stone_count; i < dfg->stone_count; ++i) { */
-/* 	if (dfg->stones[i]->bridge_stone == 0) { */
-/* 	    cur = dfg->stones[i]; */
-/* 	    for (k = 0; k < dfg->master->node_count; ++k) { */
-/* 		if (k == cur->node && cur->new_out_count !=0 ) { */
-/* 		    for (j = 0; j < cur->new_out_count; ++j) { */
-/* 			INT_EVdfg_link_port(cur, cur->new_out_ports[j], cur->new_out_links[j]); */
-/* 		    } */
-		    
-/* 		    free(cur->new_out_links); */
-/* 		    free(cur->new_out_ports); */
-		    
-/* 		    cur->new_out_links = NULL; */
-/* 		    cur->new_out_ports = NULL; */
-		    
-/* 		    cur->new_out_count = 0; */
-/* 		    for (j = 0; j < cur->out_count; ++j) { */
-/* 			EVdfg_stone temp_stone, target = cur->out_links[j]; */
-/* 			if (target->bridge_stone) { */
-/* 			    temp_stone = target; */
-/* 			    target = target->bridge_target; */
-/* 			} */
-/* 			if (target && (!cur->bridge_stone) && (cur->node != target->node)) { */
-/* 			    cur->out_links[j] = create_bridge_stone(dfg, target); */
-/* 			    /\* put the bridge stone where the source stone is *\/ */
-/* 			    cur->out_links[j]->node = cur->node; */
-/* 			    printf("Built bridge stone %x\n", cur->out_links[j]->stone_id); */
-/* 			} */
-/* 		    } */
-/* 		    break; */
-/* 		} */
-/* 	    } */
-/* 	} */
-/*     } */
-/* } */
-
-
-/* extern void INT_EVdfg_reconfig_delete_link(EVdfg dfg, int src_index, int dest_index) */
-/* { */
-/*     if (dfg->delete_count == 0) { */
-/* 	dfg->delete_list = malloc(sizeof(int *)); */
-/*     } else { */
-/* 	dfg->delete_list = realloc(dfg->delete_list, (dfg->delete_count + 1) * sizeof(int *)); */
-/*     } */
-	
-/*     dfg->delete_list[dfg->delete_count] = malloc(2 * sizeof(int)); */
-	
-/*     dfg->delete_list[dfg->delete_count][0] = src_index; */
-/*     dfg->delete_list[dfg->delete_count][1] = dest_index; */
-	
-/*     ++dfg->delete_count; */
-/* } */
-
-
-/* extern */
-/* void INT_REVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index) */
-/* { */
-/*     REVfreeze_stone(dfg->master->nodes[dfg->stones[stone_index]->node].conn, dfg->stones[stone_index]->out_links[0]->stone_id); */
-
-/*     if (dfg->realized == 1) { */
-/* 	dfg->master->reconfig = 0; */
-/*     } */
-/*     dfg->master->no_deployment = 1; */
-/* } */
-
-/* extern */
-/* void INT_EVdfg_freeze_next_bridge_stone(EVdfg dfg, int stone_index)  */
-/* { */
-/*     EVfreeze_stone(dfg->client->cm, dfg->stones[stone_index]->out_links[0]->stone_id); */
-	
-/*     if (dfg->realized == 1) { */
-/* 	dfg->master->reconfig = 0; */
-/*     } */
-/*     dfg->master->no_deployment = 1; */
-/* } */
-
 static void
 perform_deployment(EVdfg dfg)
 {
@@ -2315,7 +2261,7 @@ perform_deployment(EVdfg dfg)
 	add_bridge_stones(dfg, dfg->working_state);
 	dfg->deploy_ack_count = 1;  /* we are number 1 */
 	if (dfg->deploy_ack_condition == -1) {
-	    dfg->deploy_ack_condition = INT_CMCondition_get(dfg->client->cm, NULL);
+	    dfg->deploy_ack_condition = INT_CMCondition_get(master->cm, NULL);
 	}
 	for (i=0; i < dfg->master->node_count; i++) {
 	    deploy_to_node(dfg, i, dfg->working_state);
@@ -2399,11 +2345,11 @@ signal_ready(EVdfg dfg)
 		printf("Failure, no connection, not self, node %d\n", i);
 		exit(1);
 	    }
-	    CManager_unlock(dfg->client->cm);
+	    CManager_unlock(dfg->master->cm);
 	    msg.node_id = i;
 	    CMtrace_out(dfg->master->cm, EVdfgVerbose, "Master DFG %p is ready, local signalling %d\n", dfg, dfg->client->ready_condition);
-	    dfg_ready_handler(dfg->client->cm, NULL, &msg, dfg->client, NULL);
-	    CManager_lock(dfg->client->cm);
+	    dfg_ready_handler(dfg->master->cm, NULL, &msg, dfg->client, NULL);
+	    CManager_lock(dfg->master->cm);
 	}
 	dfg->master->nodes[i].needs_ready = 0;
     }
