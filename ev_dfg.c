@@ -1420,9 +1420,9 @@ static void
 check_connectivity(EVdfg_configuration state, EVmaster master)
 {
     int i;
-    int max_output = 0;
     for (i=0; i< state->stone_count; i++) {
 	int j;
+	int max_output = 0;
 	CMtrace_out(master->cm, EVdfgVerbose, "Stone %d - assigned to node %s, action %s\n", i, 
 		    master->nodes[state->stones[i]->node].canonical_name, (state->stones[i]->action ? state->stones[i]->action : "NULL"));
 	if (state->stones[i]->node == -1) {
@@ -1442,7 +1442,7 @@ check_connectivity(EVdfg_configuration state, EVmaster master)
 	for (j=0; j< state->stones[i]->action_count - 1; j++) {
 	    max_output = max_output_for_action(state->stones[i]->extra_actions[j], max_output);
 	}
-	if ((state->stones[i]->out_count == 0) && (max_output >= 0)) {
+	if ((state->stones[i]->out_count == 0) && (max_output > 0)) {
 	    printf("Warning, stone %d (assigned to node %s) has no outputs connected to other stones\n", i, master->nodes[state->stones[i]->node].canonical_name);
 	    printf("    This stones particulars are:\n");
 	    fdump_dfg_stone(stdout, state->stones[i]);
