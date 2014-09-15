@@ -1,5 +1,7 @@
 #include "config.h"
+#if !NO_DYNAMIC_LINKING
 #include "dlloader.h"
+#endif
 #include <stdio.h>
 #include <string.h>
 #undef NDEBUG
@@ -50,7 +52,7 @@ extern void libcmselect_LTX_select_stop(CMtrans_services svc,void *client_data);
 #endif
 
 
-static void CMinitialize ARGS((CManager cm));
+static void CMinitialize (CManager cm);
 
 static atom_t CM_TRANSPORT = -1;
 static atom_t CM_NETWORK_POSTFIX = -1;
@@ -100,20 +102,19 @@ struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, IN
 					       cond_wait_CM_lock,
 					       add_buffer_to_pending_queue
 };
-static void INT_CMControlList_close ARGS((CMControlList cl, CManager cm));
-static int CMcontrol_list_poll ARGS((CMControlList cl));
-int CMdo_non_CM_handler ARGS((CMConnection conn, int header,
-			      char *buffer, int length));
-void CMdo_performance_response ARGS((CMConnection conn, long length,
+static void INT_CMControlList_close(CMControlList cl, CManager cm);
+static int CMcontrol_list_poll(CMControlList cl);
+int CMdo_non_CM_handler(CMConnection conn, int header,
+			      char *buffer, int length);
+void CMdo_performance_response(CMConnection conn, long length,
 					    int func, int byte_swap,
-					    char *buffer));
+					    char *buffer);
 
-void CMhttp_handler ARGS((CMConnection conn, char* buffer, int length));
-static void CM_init_select ARGS((CMControlList cl, CManager cm));
+void CMhttp_handler(CMConnection conn, char* buffer, int length);
+static void CM_init_select(CMControlList cl, CManager cm);
 
 static void cond_wait_CM_lock(CManager cm, void *vcond, char *file, int line)
 {
-    int ret = cm->locked;
     pthread_cond_t *cond = vcond;
     CMtrace_out(cm, CMLowLevelVerbose, "CManager Condition wait at \"%s\" line %d\n",
 		file, line);
@@ -560,8 +561,8 @@ INT_CMlisten_specific(CManager cm, attr_list listen_info)
     return (success != 0);
 }
 
-#ifndef DONT_USE_SOCKETS
-static char *CMglobal_default_transport = "sockets";
+#ifdef CM_DEFAULT_TRANSPORT
+static char *CMglobal_default_transport = CM_DEFAULT_TRANSPORT;
 #else 
 static char *CMglobal_default_transport = NULL;
 #endif
@@ -1220,12 +1221,14 @@ CMConnection_failed(CMConnection conn, int do_dereference)
 	conn->close_list = NULL;
 	while (list != NULL) {
 	    CMCloseHandlerList next = list->next;
-	    CMtrace_out(conn->cm, CMConnectionVerbose, 
-			"CM - Calling close handler %p for connection %p\n",
-			(void*) list->close_handler, (void*)conn);
-	    CManager_unlock(conn->cm);
-	    list->close_handler(conn->cm, conn, list->close_client_data);
-	    CManager_lock(conn->cm);
+	    if (! conn->closed ) {
+		CMtrace_out(conn->cm, CMConnectionVerbose, 
+			    "CM - Calling close handler %p for connection %p\n",
+			    (void*) list->close_handler, (void*)conn);
+		CManager_unlock(conn->cm);
+		list->close_handler(conn->cm, conn, list->close_client_data);
+		CManager_lock(conn->cm);
+	    }
 	    INT_CMfree(list);
 	    list = next;
 	}
@@ -1350,6 +1353,7 @@ send_and_maybe_wait_for_handshake(CManager cm, CMConnection conn)
     struct FFSEncodeVec tmp_vec[1];
     int reliable = transport_is_reliable(conn);
     int msg[5], actual;
+    if (!cm->FFSserver_identifier) cm->FFSserver_identifier = -1;
     msg[0] = 0x434d4800;  /* CMH\0 */
     msg[1] = (CURRENT_HANDSHAKE_VERSION << 24) + sizeof(msg);
     msg[2] = cm->FFSserver_identifier;
@@ -2029,6 +2033,9 @@ CMdo_handshake(CMConnection conn, int handshake_version, int byte_swap, char *ba
 	if (conn->remote_format_server_ID != remote_format_server_ID) {
 	    printf("Gaak.  Got a second handshake on connection 0x%p, with a different format server ID %x vs. %x\n",
 		   conn, conn->remote_format_server_ID, remote_format_server_ID);
+	} else {
+	    printf("Less Gaak.  Got a second handhake on connection 0x%p, remote id %x\n",
+		   conn, conn->remote_format_server_ID);
 	}
     } else {
 	conn->remote_format_server_ID = remote_format_server_ID;
@@ -3318,9 +3325,9 @@ CM_init_select(CMControlList cl, CManager cm)
     SelectInitFunc init_function;
     SelectInitFunc shutdown_function;
     SelectInitFunc select_free_function;
-    lt_dlhandle handle;	
-    char *libname;
 #if !NO_DYNAMIC_LINKING
+    char *libname;
+    lt_dlhandle handle;	
     lt_dladdsearchdir(EVPATH_LIBRARY_BUILD_DIR);
     lt_dladdsearchdir(EVPATH_LIBRARY_INSTALL_DIR);
     libname = malloc(strlen("libcmselect") + strlen(MODULE_EXT) + 1);
@@ -3453,7 +3460,7 @@ CMdo_non_CM_handler(CMConnection conn, int header, char *buffer, int length)
 }
 
 extern CMtrans_services
-INT_CMget_static_trans_services ARGS(())
+INT_CMget_static_trans_services()
 {
   return &CMstatic_trans_svcs;
 }

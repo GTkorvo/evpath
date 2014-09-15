@@ -154,8 +154,6 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	/* result of bandwidth measure arriving, wake waiting guy */
 	{
 	    int cond = *(int*)buffer;  /* first entry should be condition */
-	    int time;
-	    char *chr_time, tmp;
 	    double *result_p = INT_CMCondition_get_client_data(conn->cm, cond);
 	    union {
 		double d;
@@ -178,7 +176,6 @@ CMdo_performance_response(CMConnection conn, long length, int func,
     case CMPerfTestInit: 
         {
 	    /* initiate bandwidth measure */
-	    int cond = ((int*)buffer)[0];  /* first entry should be condition */
 	    int header_size = ((int*)buffer)[1];  /* first entry should be condition */
 	    char *attr_string = buffer + header_size - 12;
 	    attr_list list = attr_list_from_string(attr_string);
@@ -250,8 +247,6 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	/* result of bandwidth measure arriving, wake waiting guy */
 	{
 	    int cond = *(int*)buffer;  /* first entry should be condition */
-	    int time;
-	    char *chr_time, tmp;
 	    attr_list *result_p = INT_CMCondition_get_client_data(conn->cm, cond);
 
 	    if (ntohl(((int*)buffer)[1]) != 0) {

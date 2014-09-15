@@ -20,6 +20,19 @@ include(TestBigEndian)
 include(FindCERCSProject)
 include(CTest)
 
+if(MSVC)
+  # Force to always compile with W4
+  if(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
+    string(REGEX REPLACE "/W[0-4]" "/W4" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+  else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
+  endif()
+elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
+  # Update if necessary
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall ")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall ")
+endif()
+
 IF(NOT DEFINED BUILD_SHARED_STATIC)
   SET( BUILD_SHARED_STATIC "BOTH")
 ENDIF(NOT DEFINED BUILD_SHARED_STATIC)
@@ -75,6 +88,8 @@ list (APPEND BASE_LIBS m ${CERCS_ENV_LIBRARIES} ${ATL_LIBRARIES} ${FFS_LIBRARIES
 INCLUDE_DIRECTORIES(${INC_DIRS} ${DL_INCLUDE_DIR})
 LINK_DIRECTORIES(${LIB_DIRS})
 
+SET (CM_DEFAULT_TRANSPORT "sockets")
+
 if (NOT NO_TRANSPORT_MODULES)
   add_library(cmsockets MODULE cmsockets.c)
   add_library(cmselect MODULE cmselect.c)
@@ -88,7 +103,8 @@ if (NOT NO_TRANSPORT_MODULES)
   list (APPEND TARGETS evpath cmselect cmsockets cmudp cmmulticast)
 endif (NOT NO_TRANSPORT_MODULES)
 
-FIND_CERCS_PROJECT (df_shm LIBRARY df_shm INCLUDES df_shm.h df_shm_queue.h ${CERCS_FIND_OPTIONS})
+FIND_CERCS_PROJECT (df_shm LIBRARY df_shm INCLUDES df_shm.h df_shm_queue.h
+df_config.h ${CERCS_FIND_OPTIONS})
 IF (NOT DF_SHM_FOUND)
    MESSAGE (STATUS " - Df_shm library was not found.  This is not a fatal error, just that the NNTI/SHM transport will not be built.")
 ENDIF (NOT DF_SHM_FOUND)
@@ -161,7 +177,7 @@ ENDIF (HAVE_IBVERBS OR HAVE_UGNI)
 add_custom_command(
   OUTPUT "cm_interface.c" "revp.c" "revpath.h"
   SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/evpath.h ${CMAKE_CURRENT_SOURCE_DIR}/ev_dfg.h
-  COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl
+  COMMAND perl ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl ${CMAKE_CURRENT_SOURCE_DIR}/evpath.h ${CMAKE_CURRENT_SOURCE_DIR}/ev_dfg.h
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl ${CMAKE_CURRENT_SOURCE_DIR}/evpath.h ${CMAKE_CURRENT_SOURCE_DIR}/ev_dfg.h
 )
 
@@ -255,7 +271,6 @@ if (MPI_FOUND)
 endif (MPI_FOUND)
 find_program(SSH ssh)
 if (SSH) 
-   message (STATUS "located ssh at ${SSH}")
    set (SSH_PATH "${SSH}")
 endif (SSH) 
 ADD_SUBDIRECTORY( examples )

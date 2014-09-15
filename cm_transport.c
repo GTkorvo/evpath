@@ -16,7 +16,9 @@
 #include <evpath.h>
 #include <cm_internal.h>
 #include <cm_transport.h>
+#if !NO_DYNAMIC_LINKING
 #include "dlloader.h"
+#endif
 #undef NDEBUG
 #include "assert.h"
 
@@ -64,9 +66,9 @@ load_transport(CManager cm, const char *trans_name, int quiet)
     transport_entry *trans_list = global_transports;
     transport_entry transport = NULL;
     int i = 0;
+#if !NO_DYNAMIC_LINKING
     int ret = 0;
     char *libname;
-#if !NO_DYNAMIC_LINKING
     lt_dlhandle handle;	
 #endif
 
@@ -85,6 +87,7 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 	trans_list++;
 	i++;
     }
+#if !NO_DYNAMIC_LINKING 
     libname = INT_CMmalloc(strlen(trans_name) + strlen("libcm") + strlen(MODULE_EXT) 
 		       + 1);
     
@@ -92,7 +95,6 @@ load_transport(CManager cm, const char *trans_name, int quiet)
     strcat(libname, trans_name);
     strcat(libname, MODULE_EXT);
 
-#if !NO_DYNAMIC_LINKING 
     lt_dladdsearchdir(EVPATH_LIBRARY_BUILD_DIR);
     lt_dladdsearchdir(EVPATH_LIBRARY_INSTALL_DIR);
     handle = CMdlopen(cm->CMTrace_file, libname, 0);

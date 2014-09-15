@@ -98,11 +98,11 @@ typedef struct select_data {
     int 	wake_write_fd;
 } *select_data_ptr;
 
-static void wake_server_thread ARGS((select_data_ptr socket_data));
-static void setup_wake_mechanism ARGS((CMtrans_services svcs,
-				       select_data_ptr *sdp));
-static int remove_periodic_task ARGS((select_data_ptr sd,
-				      periodic_task_handle handle));
+static void wake_server_thread(select_data_ptr socket_data);
+static void setup_wake_mechanism(CMtrans_services svcs,
+				       select_data_ptr *sdp);
+static int remove_periodic_task(select_data_ptr sd,
+				      periodic_task_handle handle);
 
 #ifdef HAVE_WINDOWS_H
 /* Winsock init stuff  */
@@ -110,7 +110,7 @@ static int remove_periodic_task ARGS((select_data_ptr sd,
 static WORD wVersionRequested = MAKEWORD(1, 1);
 static WSADATA wsaData;
 int nErrorStatus;
-static char*WSAerror_str ARGS((int err));
+static char*WSAerror_str(int err);
 #define FD_SETSIZE 1024
 #endif
 
@@ -1089,7 +1089,6 @@ void *client_data;
 
     svc->trace_out(sd->cm, "CMSelect Shutdown task called");
     if (sd->server_thread != thr_thread_self()) {
-	int count = 5;
 	sd->closed = 1;
 	wake_server_thread(sd);
     }

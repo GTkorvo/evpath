@@ -36,12 +36,9 @@ typedef enum {Immediate, Immediate_and_Multi, Bridge, Congestion} action_class;
  */
 struct queue_item;  /* forward decl */
 struct _queue;
-typedef int (*EVMultiHandlerFunc) ARGS((CManager cm, 
-                                         struct _queue *queue,
-                                         struct queue_item *item,
-					 void *client_data,
-					 int out_count,
-					 int *out_stones));
+typedef int (*EVMultiHandlerFunc) (CManager cm, struct _queue *queue,
+				   struct queue_item *item, void *client_data,
+				   int out_count, int *out_stones);
 
 typedef struct bridge_action_struct {
     CMConnection conn;
@@ -162,7 +159,7 @@ typedef enum {
     Stall_Overload  = 1 << 0, /* too many queued messages */
     Stall_Squelch   = 1 << 1, /* squelched by remote stone */
     Stall_Requested = 1 << 2, /* requested explicitly (EVstall/unstall_stone) */
-    Stall_Upstream  = 1 << 3, /* upstream stalled while we were stalled; thus we need to make
+    Stall_Upstream  = 1 << 3 /* upstream stalled while we were stalled; thus we need to make
                                  special considerations when unstalling */
 } stall_source;
 

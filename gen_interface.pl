@@ -331,8 +331,21 @@ sub mod_EVhandler {
 {
     local ($/, *INPUT);
 	
-    unless (open(INPUT, "cat $dirname/evpath.h $dirname/ev_dfg.h |")) {
-	die "sudden flaming death, no evpath.h\n";
+    $cat_args = "";
+    $has_ev_dfg = 0;
+    $cm_only = 0;
+    foreach my $a(@ARGV) {
+	if ($a =~ "-CM_ONLY") {
+	    $cm_only = 1;
+	    next;
+	}
+	$cat_args .= "$a ";
+	if ($a =~ /ev_dfg/) {
+	    $has_evdfg = 1;
+	}
+    }
+    unless (open(INPUT, "cat $cat_args |")) {
+	die "sudden flaming death, no file: $cat_args\n";
     }
 
     $_ = <INPUT>;
@@ -436,14 +449,21 @@ print INT<<EOF;
 #include "cod.h"
 #include "atl.h"
 #include "evpath.h"
-#include "ev_dfg.h"
 #include "cm_internal.h"
-#include "ev_dfg_internal.h"
+EOF
+if ($has_evdfg) {
+    print INT "#include \"ev_dfg.h\"\n";
+    print INT "#include \"ev_dfg_internal.h\"\n";
+}
+print INT<<EOF;
 #ifdef	__cplusplus
 extern "C" \{
 #endif
 EOF
     foreach $subr (sort (keys %return_type)) {
+	if ($cm_only && (($subr =~ /^EV/) || ($subr =~ /^create/))) {
+	    next;
+	}
 	print INT "\nextern $return_type{$subr}\n";
 	print INT "$subr ( $arguments{$subr} )\n";
 	print INT "{\n";

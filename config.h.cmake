@@ -171,3 +171,4 @@
 /* Define if byteorder is bigendian */
 #cmakedefine WORDS_BIGENDIAN
 
+#define CM_DEFAULT_TRANSPORT "@CM_DEFAULT_TRANSPORT@"
