@@ -431,8 +431,6 @@ for (@DECLS) {
     }
 }
 
-open FIXUP, ">fixup.pl";
-print FIXUP "#!/usr/bin/env perl -pi.bak\n";
 unless (open (INT, ">cm_interface.c")) { die "Failed to open cm_interface.c";}
 print INT<<EOF;
 /*
@@ -566,7 +564,6 @@ EOF
 	}
 	print INT "\treturn ret;\n" unless ($return_type{$subr} eq "void");
 	print INT "}\n";
-	print FIXUP "s/$subr/INT_$subr/g unless /INT_$subr/;\n";
     }
 print "done\n";
 
@@ -576,6 +573,7 @@ print INT<<EOF;
 #endif
 EOF
 close INT;
+if ($cm_only) { exit(0); }
 unless (open (REVPH, ">revpath.h")) { die "Failed to open revpath.h";}
 print REVPH<<EOF;
 /*
