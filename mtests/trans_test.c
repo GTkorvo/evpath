@@ -233,7 +233,6 @@ main(argc, argv)
 {
     CManager cm;
     CMConnection conn = NULL;
-    CMFormat format;
     static int atom_init = 0;
     int start_subprocess = 1;
     int use_mpi = 0;
