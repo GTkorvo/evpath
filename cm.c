@@ -690,6 +690,7 @@ INT_CManager_create()
     }
     if (cm == NULL)
 	return NULL;
+    memset(cm, 0, sizeof(CManager_s));
 
     if (atom_init == 0) {
 	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
