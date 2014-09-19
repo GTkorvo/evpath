@@ -224,6 +224,13 @@ typedef struct _EVclient_sources {
     EVsource src;
 } source_table_elem;
 
+typedef struct _ev_handler_activation_rec {
+    struct _ev_handler_activation_rec *prev;
+    pthread_t thread_id;
+    EVstone stone_id;
+    struct _ev_handler_activation_rec *next;
+} ev_handler_activation_rec, *ev_handler_activation_ptr;
+
 typedef struct _event_path_data {
     int stone_count;
     int stone_base_num;
@@ -246,6 +253,7 @@ typedef struct _event_path_data {
     FMStructDescList *extern_structs;
     EVStoneCloseHandlerFunc app_stone_close_handler;
     void *app_stone_close_data;
+    ev_handler_activation_ptr activation_stack;
 } *event_path_data;
 
 struct _EVSource {

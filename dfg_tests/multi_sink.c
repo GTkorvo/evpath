@@ -1,3 +1,7 @@
+/*
+ *  Test the ability of a stone to have sink handlers for multiple two different types of incoming data.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 

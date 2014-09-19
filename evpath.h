@@ -2067,6 +2067,24 @@ extern int
 EVdrain_stone(CManager cm, EVstone stone_id);
 
 /*!
+ * Return the EVstone id inside an executing terminal handler
+ *
+ * If called from within an executing terminal handler or a function called
+ * by a terminal handler, this function will return the EVstone ID of the
+ * stone with home that handler was registered.  Generally, the client_data
+ * parameter in EVcreate/assoc_terminal_action() is the best way to pass
+ * information to a handler, but in EVdfg a handler is registered once by
+ * name and may be assigned to multiple stones.  This function provides a
+ * way to differentiate between those stones during execution and to access
+ * items such as the attribute list associated with those stones.
+ *
+ * \param cm The CManager in which the function is currently executing
+ * \return The stone ID of the stone in whose handler we're executing (or -1 on error)
+ */
+extern EVstone
+EVexecuting_stone(CManager cm);
+
+/*!
  * Return the queued events associated with a stone and its actions.
  * 
  * This function will be called by EVdrain_stone. It will form an array of

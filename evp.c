@@ -1542,6 +1542,74 @@ static int do_bridge_action(CManager cm, int s);
 static void backpressure_set(CManager, EVstone, int stalledp);
 static int process_stone_pending_output(CManager, EVstone);
 
+static void
+push_activation_record_on_stack(CManager cm, ev_handler_activation_ptr rec)
+{
+    event_path_data evp = cm->evp;
+    rec->thread_id = pthread_self();
+    if (evp->activation_stack != NULL) {
+	evp->activation_stack->prev = rec;
+    }
+    rec->prev = NULL;
+    rec->next = evp->activation_stack;
+    evp->activation_stack = rec;
+}
+
+static void
+pop_activation_record_from_stack(CManager cm, ev_handler_activation_ptr rec)
+{
+    event_path_data evp = cm->evp;
+    ev_handler_activation_ptr tmp;
+    pthread_t self = pthread_self();
+    if (!evp->activation_stack) {
+	printf("Activation stack inconsistency!  No records!\n"); 
+	return;
+    }
+    if (evp->activation_stack->thread_id == self) {
+	evp->activation_stack = evp->activation_stack->next;
+	if (evp->activation_stack) {
+	    evp->activation_stack->prev = NULL;
+	}
+	return;
+    }
+    tmp = evp->activation_stack->next;
+    while(tmp) {
+	if (tmp->thread_id == self) {
+	    tmp->prev->next = tmp->next;
+	    if (tmp->next) {
+		tmp->next->prev = tmp->prev;
+	    }
+	    return;
+	}
+	tmp = tmp->next;
+    }
+    printf("Activation stack inconsistency!  Record with thread ID now found!\n"); 
+}
+
+static ev_handler_activation_ptr
+find_activation_record_from_stack(CManager cm)
+{
+    event_path_data evp = cm->evp;
+    ev_handler_activation_ptr tmp;
+    pthread_t self = pthread_self();
+    tmp = evp->activation_stack;
+    while(tmp) {
+	if (tmp->thread_id == self) {
+	    return tmp;
+	}
+	tmp = tmp->next;
+    }
+    return NULL;
+}
+
+extern EVstone
+INT_EVexecuting_stone(CManager cm)
+{
+    ev_handler_activation_ptr rec = find_activation_record_from_stack(cm);
+    if (!rec) return -1;
+    return rec->stone_id;
+}
+
 static int
 process_events_stone(CManager cm, int s, action_class c)
 {
@@ -1647,6 +1715,7 @@ process_events_stone(CManager cm, int s, action_class c)
             /* do nothing */
         } else if (is_immediate_action(act)) {
 	    event_item *event = dequeue_item(cm, stone, item);
+	    ev_handler_activation_rec act_rec;
 	    switch(act->action_type) {
 	    case Action_Terminal:
 	    case Action_Filter: {
@@ -1671,6 +1740,8 @@ process_events_stone(CManager cm, int s, action_class c)
 		    (event->event_encoded == 0)) {
 		    encode_event(cm, event);
 		}
+		act_rec.stone_id = stone->local_id;
+		push_activation_record_on_stack(cm, &act_rec);
 		CManager_unlock(cm);
 		if (event->event_encoded == 0) {
 		    out = (handler)(cm, event->decoded_event, client_data,
@@ -1682,6 +1753,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		}
 		CManager_lock(cm);
 		stone = stone_struct(cm->evp, s);
+		pop_activation_record_from_stack(cm, &act_rec);
 		stone->is_processing = 0;
 		{
 		    if (cm->evp->current_event_list->item == event) {
