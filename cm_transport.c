@@ -67,7 +67,6 @@ load_transport(CManager cm, const char *trans_name, int quiet)
     transport_entry transport = NULL;
     int i = 0;
 #if !NO_DYNAMIC_LINKING
-    int ret = 0;
     char *libname;
     lt_dlhandle handle;	
 #endif

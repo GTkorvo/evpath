@@ -2591,7 +2591,7 @@ static void
 transport_wake_any_pending_write(CMConnection conn)
 {
     conn->write_pending = 0;
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "UNSet Pending write for conn %p\n", conn);
+    CMtrace_out(conn->cm, CMTransportVerbose, "UNSet Pending write for conn %p\n", conn);
     cm_wake_any_pending_write(conn);
 }
 
@@ -2609,9 +2609,9 @@ cm_wake_any_pending_write(CMConnection conn)
                 (callbacks[i].func)(conn->cm, conn, callbacks[i].client_data);
             }
         }
-	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, did %d notifications\n", i);
+	CMtrace_out(conn->cm, CMTransportVerbose, "Completed pending write, did %d notifications\n", i);
     } else {
-	CMtrace_out(conn->cm, CMLowLevelVerbose, "Completed pending write, No notifications\n");
+	CMtrace_out(conn->cm, CMTransportVerbose, "Completed pending write, No notifications\n");
     }
     CMwake_server_thread(conn->cm);
 }
@@ -2620,7 +2620,7 @@ static void
 cm_set_pending_write(CMConnection conn)
 {
     assert(CManager_locked(conn->cm));
-    CMtrace_out(conn->cm, CMLowLevelVerbose, "Set Pending write for conn %p\n", conn);
+    CMtrace_out(conn->cm, CMTransportVerbose, "Set Pending write for conn %p\n", conn);
     conn->write_pending = 1;
 }
 

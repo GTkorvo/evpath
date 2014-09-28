@@ -152,7 +152,6 @@ add_format_to_cm(CManager cm, CMFormat format)
 	    if (format->registration_pending) {
 		CMcomplete_format_registration(format, 0);
 		if (format->registration_pending) {
-		    CMFormat dup;
 		    int i = 0;
 		    /* if still pending, it's a duplicate format */
 		    for(i=0; i < cm->in_format_count; i++) {
