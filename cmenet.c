@@ -683,6 +683,7 @@ libcmenet_LTX_read_block_func(CMtrans_services svc,
     return cb;
 }
 
+#ifdef CURRENT_UTC_TIME_NEEDED
 static
 void current_utc_time(struct timespec *ts)
 {
@@ -697,9 +698,10 @@ void current_utc_time(struct timespec *ts)
 #else
     clock_gettime(CLOCK_REALTIME, ts);
 #endif
- 
 }
+#endif
 
+#ifdef TIME_DIFF_USED
 static struct timespec time_diff(struct timespec start, struct timespec end)
 {
     struct timespec temp;
@@ -712,6 +714,7 @@ static struct timespec time_diff(struct timespec start, struct timespec end)
     }
     return temp;
 }
+#endif
 
 extern int
 libcmenet_LTX_writev_func(CMtrans_services svc, enet_conn_data_ptr ecd,
