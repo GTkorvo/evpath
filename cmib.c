@@ -91,6 +91,7 @@
 
 
 //all the message types have a queue associated with them
+static char *msg_string[] = {"Request", "Response", "Piggyback"};
 enum {msg_request = 0, msg_response = 1, msg_piggyback = 2} msg_type;
 
 struct request
@@ -474,13 +475,11 @@ static int internal_read_stream(CMtrans_services svc,
 				/* serious error */
 				svc->trace_out(scd->sd->cm, "CMIB iget was -1, errno is %d, returning %d for read", 
 				               lerrno, requested_len - left);
-				svc->connection_close(scd->conn);
 				return iget;
 			}
 		}
 		if (iget == 0) {
-			svc->connection_close(scd->conn);
-			return -1;
+		  return -1;
 		}
 		left -= iget;
 	}
@@ -506,9 +505,13 @@ static int internal_write_piggyback(CMtrans_services svc,
 	}
 
 	msg = malloc(offset + length);
+	memset(msg, 0, offset+length);
 	msg->type = msg_piggyback;
 	msg->u.pb.total_length = length + offset;
 	point = &msg->u.pb.body[0];
+	svc->trace_out(scd->sd->cm, "CMIB sending piggyback msg of length %d,", 
+		       length);
+
 	
 	for (i = 0; i < iovcnt; i++)
 	{
@@ -572,6 +575,7 @@ static int internal_write_request(CMtrans_services svc,
 	msg.u.req.magic = 0xdeadbeef;
 	msg.u.req.length = length;
 
+	svc->trace_out(scd->sd->cm, "Doing internal write request, writing %d bytes\n", sizeof(struct control_message));
 	iget = write(scd->fd, &msg, sizeof(struct control_message));
 	if(iget != sizeof(struct control_message))
 	{
@@ -582,8 +586,18 @@ static int internal_write_request(CMtrans_services svc,
 	return 0;
 }
 	
-static double read_t = 0, write_t = 0, find_t = 0, wait_t = 0, call_t = 0;
+static double write_t = 0;
 static double da_t = 0;
+
+static void
+free_sg_list(struct ibv_sge *sg_list, int len)
+{
+    int i;
+    for(i=0; i<len; i++) {
+	free((void*)sg_list[i].addr);
+    }
+    free(sg_list);     
+}
 
 static int handle_response(CMtrans_services svc,
                            ib_conn_data_ptr scd,
@@ -592,15 +606,10 @@ static int handle_response(CMtrans_services svc,
 
 	//read back response
 	int iget = 0;
-	int lerrno;
 	struct ibv_send_wr *bad_wr;    
-	int lerror;
-	char *buffer = NULL;
-	int requested_len = 0;
 	int retval = 0;
 	int i = 0;
 	struct ibv_wc wc;
-	int left;
 	struct response *rep;
 
 	rep = &msg->u.resp;
@@ -643,7 +652,7 @@ static int handle_response(CMtrans_services svc,
 
 		if(scd->wr)
 		{       
-			free(scd->wr->sg_list);     
+		    free_sg_list(scd->wr->sg_list, scd->mrlen);
 			free(scd->wr);
 		}
     
@@ -707,7 +716,7 @@ static int handle_response(CMtrans_services svc,
         
 			}
 
-			free(scd->wr->sg_list);     
+			free_sg_list(scd->wr->sg_list, scd->mrlen);
 			free(scd->wr);
 
 			//no we wait for the send even to get anoutput
@@ -724,8 +733,8 @@ static int handle_response(CMtrans_services svc,
 		{
 			//cool beans - send completed we can go on with our life
         
-			// svc->trace_out(scd->sd->cm, "notification for send done %p\n", 
-			//                ptr_from_int64(wc.wr_id));
+		    svc->trace_out(scd->sd->cm, "notification for send done %p\n", 
+				   ptr_from_int64(wc.wr_id));
 			break;      
 		}
 		else if(iget == 0)
@@ -742,7 +751,7 @@ static int handle_response(CMtrans_services svc,
 		}
     
 	}while(1);
-
+	svc->wake_any_pending_write(scd->conn);
 	return 0;   
     
 }
@@ -753,17 +762,11 @@ static void handle_request(CMtrans_services svc,
 	//handling the request message
 
 	//first read the request message from the socket
-	int iget;
 	struct ibv_mr *mr;
 	struct ibv_wc wc;
 	tbuffer *tb;
-	int left = 0;
-	int lerrno;
-	char *buffer;
-	int requested_len = 0;
 	int retval = 0;
 	struct request *req;
-	struct response resp;
 
 	req = &msg->u.req;
 	
@@ -775,11 +778,10 @@ static void handle_request(CMtrans_services svc,
 		goto wait_on_q; 
 	}
 
-	scd->read_buffer = tb->buf->buffer;
-	scd->read_buffer_len = req->length;
 	scd->tb = tb;
 	mr = tb->mr;
 
+	svc->set_pending_write(scd->conn);
 	internal_write_response(svc, scd, tb, req->length);
 
 wait_on_q:
@@ -823,7 +825,11 @@ wait_on_q:
     
 	}while(1);
 
+	scd->read_buffer = tb->buf;
+	svc->trace_out(scd->sd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", req->length, ((unsigned char*)tb->buf->buffer)[0], ((unsigned char*)tb->buf->buffer)[1], ((unsigned char*)tb->buf->buffer)[2], ((unsigned char*)tb->buf->buffer)[3], ((unsigned char*)tb->buf->buffer)[4], ((unsigned char*)tb->buf->buffer)[5], ((unsigned char*)tb->buf->buffer)[6], ((unsigned char*)tb->buf->buffer)[7], ((unsigned char*)tb->buf->buffer)[8], ((unsigned char*)tb->buf->buffer)[9], ((unsigned char*)tb->buf->buffer)[10], ((unsigned char*)tb->buf->buffer)[11], ((unsigned char*)tb->buf->buffer)[12], ((unsigned char*)tb->buf->buffer)[13], ((unsigned char*)tb->buf->buffer)[14], ((unsigned char*)tb->buf->buffer)[15]);
+	scd->read_buffer_len = req->length;
 	svc->trace_out(scd->sd->cm, "CMIB handle_request completed");    
+	svc->wake_any_pending_write(scd->conn);
 }
 
 int handle_piggyback(CMtrans_services svc,
@@ -839,12 +845,16 @@ int handle_piggyback(CMtrans_services svc,
 	memcpy(cb->buffer, &(msg->u.pb.body[0]), sizeof(struct control_message)-offset);
 	int left = msg->u.pb.total_length - sizeof(struct control_message);
 	char *buffer = (char*)cb->buffer + sizeof(struct control_message)- offset;
-	iget = internal_read_stream(svc, scd, left, buffer);
+	iget = internal_read_stream(svc, scd, left, (unsigned char *)buffer);
 	if(iget < 0)
 	{
 		svc->return_data_buffer(scd->sd->cm, cb);
+		svc->connection_close(scd->conn);
 		return -1;
 	}
+	svc->trace_out(scd->sd->cm, "CMIB received piggyback msg of length %d, added to read_buffer", 
+		       scd->read_buffer_len);
+
 	scd->read_buffer_len = msg->u.pb.total_length - offset;
 	scd->read_buffer = cb;
 	return 0;
@@ -859,17 +869,8 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 	ib_client_data_ptr sd = (ib_client_data_ptr) trans->trans_data;
 	CMtrans_services svc = sd->svc;
 	struct control_message msg;
-	struct control_message rep;
-	struct ibv_mr *mr;
-	int retval = 0;
-	struct ibv_wc wc;
-	double start =0, end = 0;
+	double start =0;
 	ib_conn_data_ptr scd;
-	tbuffer *tb;
-	int left = 0;
-	int lerrno;
-	char *buffer;
-	int requested_len = 0;
     
 	da_t = getlocaltime();
     
@@ -881,11 +882,15 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 	                            (unsigned char*)&msg);
 	if(iget <= 0)
 	{
-		svc->connection_close(conn);
-		return;
+	    svc->trace_out(scd->sd->cm, "CMIB iget is %d, dying\n", 
+			   iget);
+
+	    svc->connection_close(conn);
+	    return;
 	}
 
-	svc->trace_out(scd->sd->cm, "CMIB data available type = %d", msg.type);
+	svc->trace_out(scd->sd->cm, "CMIB data available type = %s(%d)", 
+		       msg_string[msg.type], msg.type);
 
 	switch(msg.type) {
 	case msg_piggyback:
@@ -1078,7 +1083,7 @@ void *void_conn_sock;
 	                   (void (*)(void *, void *)) CMIB_data_available,
 	                   (void *) trans, (void *) conn);
 
-
+	svc->trace_out(sd->cm, "Falling out of accept conn\n");
 }
 
 extern void
@@ -1086,6 +1091,8 @@ libcmib_LTX_shutdown_conn(svc, scd)
 	CMtrans_services svc;
 ib_conn_data_ptr scd;
 {
+	svc->trace_out(scd->sd->cm, "CMIB shutdown_conn, removing select %d\n",
+	               scd->fd);
 	svc->fd_remove_select(scd->sd->cm, scd->fd);
 	close(scd->fd);
 	//free(scd->remote_host);
@@ -1306,6 +1313,7 @@ int no_more_redirect;
 	param.port = sd->port;
 	param.psn  = sd->psn;
     
+	svc->trace_out(sd->cm, "Writing param, size %d\n", sizeof(param));
 	retval = write(sock, &param, sizeof(param));
 	if(retval <= 0)
 	{
@@ -1314,6 +1322,7 @@ int no_more_redirect;
     
 	}
     
+	svc->trace_out(sd->cm, "reading remote param, size %d\n", sizeof(param));
 	retval = read(sock, &remote_param, sizeof(param));
 	if(retval <= 0)
 	{
@@ -1371,6 +1380,7 @@ int no_more_redirect;
 		}
 	}
 
+	svc->trace_out(sd->cm, "Falling out of init conn\n");
 	return sock;
 }
 
@@ -1705,10 +1715,14 @@ ib_conn_data_ptr scd;
 int *len_ptr;
 {
 	*len_ptr = scd->read_buffer_len;
-	// if (scd->read_buffer) 
-	// 	return scd->read_buffer;
-	if(scd->tb)
-		return scd->tb->buf;
+	if (scd->read_buffer) {
+	    CMbuffer tmp = scd->read_buffer;
+//	    scd->read_buffer = NULL;
+//	    scd->read_buffer_len = 0;
+	    return tmp;
+	}
+//	if(scd->tb)
+//	    return scd->tb->buf;
 	return NULL;  
 }
 
@@ -1718,7 +1732,7 @@ int *len_ptr;
 #define IOV_MAX 16
 #endif
 
-static double reg_t = 0, createwr_t = 0, post_t = 0, notify_t = 0;
+static double reg_t = 0;
 
 static double writev_t = 0;
 
@@ -1736,23 +1750,18 @@ attr_list attrs;
 	int iget = 0;
 	int i;
 	struct iovec * iov = (struct iovec*) iovs;
-	int mrlen = 0, wrlen = 0;
-	int retval  = 0;
+	struct iovec * tmp_iov;
+	int wrlen = 0;
 	double start = 0, end = 0;
-	int lerror;
-	char *buffer = NULL;
-	int requested_len = 0;
 	struct control_message msg; 
-	struct request req;
-	char *point;
-    
 
 	writev_t = getlocaltime();
     
 	start = getlocaltime();
     
-	for (i = 0; i < iovcnt; i++)
-		left += iov[i].iov_len;
+	for (i = 0; i < iovcnt; i++) {
+	    left += iov[i].iov_len;
+	}
 
 	svc->trace_out(scd->sd->cm, "CMIB writev of %d bytes on fd %d",
 	               left, fd);
@@ -1773,11 +1782,20 @@ attr_list attrs;
 		return -1;
 	}
 
+	svc->set_pending_write(scd->conn);
 	iget = internal_write_request(svc, scd, left);
 	if(iget < 0)
 	{
 		svc->trace_out(scd->sd->cm, "CMIB error in writing request");
 		return -1;
+	}
+
+	/* for now, copy all data */
+	tmp_iov = malloc(sizeof(tmp_iov[0]) * iovcnt);
+	for (i = 0; i < iovcnt; i++) {
+	    tmp_iov[i].iov_len = iov[i].iov_len;
+	    tmp_iov[i].iov_base = malloc(iov[i].iov_len);
+	    memcpy(tmp_iov[i].iov_base, iov[i].iov_base, iov[i].iov_len);
 	}
 
 	memset(&msg, 0, sizeof(msg));
@@ -1787,7 +1805,7 @@ attr_list attrs;
 	write_t = end - start;
     
 	start = getlocaltime();
-	scd->infolist[scd->infocount].mrlist = regblocks(scd->sd, iov, iovcnt,
+	scd->infolist[scd->infocount].mrlist = regblocks(scd->sd, tmp_iov, iovcnt,
 	                                                 IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE
 	                                                 |IBV_ACCESS_REMOTE_READ,
 	                                                 &scd->infolist[scd->infocount].mrlen);
@@ -1803,12 +1821,13 @@ attr_list attrs;
 	}
 	scd->mrlist = scd->infolist[scd->infocount].mrlist;
 	scd->infolist[scd->infocount].wr = createwrlist(scd,
-	                                                scd->infolist[scd->infocount].mrlist, iov,
+	                                                scd->infolist[scd->infocount].mrlist, tmp_iov,
 	                                                scd->infolist[scd->infocount].mrlen, &wrlen);
 	
+	svc->trace_out(scd->sd->cm, "FIrst 16 bytes of send buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", left, ((unsigned char*)iov[0].iov_base)[0], ((unsigned char*)iov[0].iov_base)[1], ((unsigned char*)iov[0].iov_base)[2], ((unsigned char*)iov[0].iov_base)[3], ((unsigned char*)iov[0].iov_base)[4], ((unsigned char*)iov[0].iov_base)[5], ((unsigned char*)iov[0].iov_base)[6], ((unsigned char*)iov[0].iov_base)[7], ((unsigned char*)iov[0].iov_base)[8], ((unsigned char*)iov[0].iov_base)[9], ((unsigned char*)iov[0].iov_base)[10], ((unsigned char*)iov[0].iov_base)[11], ((unsigned char*)iov[0].iov_base)[12], ((unsigned char*)iov[0].iov_base)[13], ((unsigned char*)iov[0].iov_base)[14], ((unsigned char*)iov[0].iov_base)[15]);
 	scd->wr = scd->infolist[scd->infocount].wr;
 	scd->infocount ++;
-
+	free(tmp_iov);
 
 	return iovcnt;
 }
@@ -2270,11 +2289,15 @@ static struct ibv_send_wr * createwrlist(ib_conn_data_ptr conn,
 
 	int i = 0;
     
+	int len = 0;
 	for(i = 0; i <mrlen; i++)
 	{
-		sge[i].addr = int64_from_ptr(iovlist[i].iov_base);
-		sge[i].length = iovlist[i].iov_len;
-		sge[i].lkey = mrlist[i]->lkey;  
+		len += iovlist[i].iov_len;
+	}
+	for(i = 0; i <mrlen; i++) {
+	    sge[i].addr = int64_from_ptr(iovlist[i].iov_base);
+	    sge[i].length = iovlist[i].iov_len;
+	    sge[i].lkey = mrlist[i]->lkey;  
 	}
 	// sge[mrlen].addr = int64_from_ptr(sd->pad.pad);
 	// sge[mrlen].length = sizeof(sd->pad.pad);
