@@ -94,7 +94,6 @@ remove_stone_from_lookup(event_path_data evp, int stone_num)
 extern void
 add_stone_to_lookup(event_path_data evp, int stone_num, int global_stone_num)
 {
-    int i, stone = -1;
     int base = evp->stone_lookup_table_size;
     if (evp->stone_lookup_table_size == 0) {
 	evp->stone_lookup_table = 
@@ -1814,7 +1813,6 @@ process_events_stone(CManager cm, int s, action_class c)
 		int *out_stones;
 		int out_count;
 		int in_play = as->events_in_play;
-		proto_action *p = &stone->proto_actions[act->proto_action_id];
 		/* data is already in the right format */
 		func = act->o.imm.handler;
 		client_data = act->o.imm.client_data;
@@ -1859,7 +1857,6 @@ process_events_stone(CManager cm, int s, action_class c)
 		assert(FALSE);
 	    }
 	} else if (is_multi_action(act) || is_congestion_action(act)) {
-            proto_action *p = &stone->proto_actions[act->proto_action_id];
 	    /* event_item *event = dequeue_item(cm, stone->queue, item); XXX */
 	    if (stone->new_enqueue_flag) {
 		stone->new_enqueue_flag = 0;
@@ -2029,8 +2026,7 @@ do_bridge_action(CManager cm, int s)
 	int action_id, ret = 1;
 	if (act->o.bri.conn && 
 	    INT_CMConnection_write_would_block(act->o.bri.conn)) {
-            queue_item *q = stone->queue->queue_head;
-	    int i = 0;
+/*            queue_item *q = stone->queue->queue_head;*/
 	    {
 		/* this is temporary, a disabling of congestion handlers */
 		INT_CMConnection_wait_for_pending_write(act->o.bri.conn);
@@ -2444,7 +2440,6 @@ INT_EVstone_add_split_target(CManager cm, EVstone stone_num, EVstone new_stone_t
 {
     event_path_data evp = cm->evp;
     stone_type stone;
-    int action_num = 0;
     EVstone *target_stone_list;
 
     stone = stone_struct(evp, stone_num);

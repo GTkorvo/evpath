@@ -17,7 +17,6 @@ main(argc, argv)
 {
     CManager cm;
     CMConnection conn = NULL;
-    CMFormat format;
     static int atom_init = 0;
 
     cm = CManager_create();
@@ -52,12 +51,11 @@ main(argc, argv)
 	CMsleep(cm, 1200);
     } else {
 	int size = 100;
-	int i,j;
+	int i;
 	int N, repeat_time, size_inc;
-	int bw_long, bw_cof; /*measured values*/
 
 	attr_list contact_list = NULL;
-	attr_list bw_list, result_list;
+	attr_list bw_list;
 
 	for (i = 1; i < argc; i++) {
 	    char *final;

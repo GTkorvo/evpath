@@ -528,7 +528,6 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
     case ACT_unlink_port: {
 	EVdfg_stone_state src = find_stone_state(act.stone_id, config);
 	EVdfg_stone_state dest;
-	int i=0;
 	if (!src) {
 	    return 0;
 	}
@@ -1194,7 +1193,6 @@ static void
 free_client(CManager cm, void *vclient)
 {
     EVclient client = (EVclient)vclient;
-    int i;
     if (client->master_contact_str) free(client->master_contact_str);
     if (client->shutdown_conditions) free(client->shutdown_conditions);
     free(client);
@@ -1340,7 +1338,6 @@ extern EVdfg
 INT_EVdfg_create(EVmaster master)
 {
     EVdfg dfg = malloc(sizeof(struct _EVdfg));
-    attr_list contact_list;
 
     memset(dfg, 0, sizeof(struct _EVdfg));
     dfg->master = master;
@@ -1819,7 +1816,6 @@ INT_EVclient_assoc(CManager cm, char* node_name, char *master_contact_str,
 static int
 create_bridge_stone(EVdfg dfg, EVdfg_stone_state target, int node)
 {
-    EVdfg_stone_state bstone;
     EVdfg_config_action act, link_act;
 
     char *contact = dfg->master->nodes[target->node].str_contact_list;
@@ -1880,15 +1876,6 @@ add_bridge_stones(EVdfg dfg, EVdfg_configuration config)
 		CMtrace_out(dfg->master->cm, EVdfgVerbose, "Created bridge stone %x, target node is %d, assigned to node %d\n", cur->out_links[j], target->node, cur->node);
 	    }
 	}
-    }
-}
-
-static void
-assign_stone_ids(EVdfg dfg)
-{
-    int i;
-    for (i=0; i< dfg->stone_count; i++) {
-	dfg->stones[i]->stone_id = 0x80000000 | i;
     }
 }
 
@@ -2303,24 +2290,6 @@ wait_for_deploy_acks(EVdfg dfg)
 	    CManager_unlock(dfg->master->cm);
 	    CMCondition_wait(dfg->master->cm, dfg->deploy_ack_condition);
 	    CManager_lock(dfg->master->cm);
-	}
-    }
-}
-
-static void
-reconfig_signal_ready(EVdfg dfg)
-{
-    int i;
-    CMFormat ready_msg = INT_CMlookup_format(dfg->master->cm, EVdfg_ready_format_list);
-    EVready_msg msg;
-    CMtrace_out(dfg->master->cm, EVdfgVerbose, "Master signaling DFG %p ready for operation\n",
-				dfg);
-    for (i=dfg->master->old_node_count; i < dfg->master->node_count; i++) {
-	if (dfg->master->nodes[i].conn != NULL) {
-	    msg.node_id = i;
-	    INT_CMwrite(dfg->master->nodes[i].conn, ready_msg, &msg);
-	    CMtrace_out(dfg->master->cm, EVdfgVerbose, "Master - ready sent to node \"%s\"\n",
-			dfg->master->nodes[i].name);
 	}
     }
 }

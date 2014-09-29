@@ -40,7 +40,6 @@ CMdlopen(void *CMTrace_filev, char *in_lib, int mode)
 #if NO_DYNAMIC_LINKING
     return NULL;
 #else
-    int i;
     dlhandle dlh;
     void *handle;
     char *tmp;

@@ -1458,8 +1458,6 @@ int
 cod_max_output(cod_exec_context ec)
 {
     struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
-    CManager cm = ev_state->cm;
-    event_path_data evp = ev_state->cm->evp;
     return ev_state->out_count;
 }
 
@@ -1467,9 +1465,6 @@ static int
 cod_target_stone_on_port(cod_exec_context ec, int port, void *data, void *type_info, attr_list attrs)
 {
     struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
-    CManager cm = ev_state->cm;
-    event_path_data evp = ev_state->cm->evp;
-    event_item *event;
     EVstone target_stone = port_to_stone(ev_state, port);
 
     if (target_stone == -1) {
