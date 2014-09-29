@@ -279,7 +279,6 @@ void *void_conn_sock;
 	add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
 		 (attr_value) (long)socket_conn_data->remote_IP);
 	if (sock_addr.sa_family == AF_INET) {
-#ifdef HAS_STRUCT_HOSTENT
 	    struct hostent *host;
 	    struct sockaddr_in *in_sock = (struct sockaddr_in *) &sock_addr;
 	    host = gethostbyaddr((char *) &in_sock->sin_addr,
@@ -289,7 +288,6 @@ void *void_conn_sock;
 		add_attr(conn_attr_list, CM_PEER_HOSTNAME, Attr_String,
 			 (attr_value) strdup(host->h_name));
 	    }
-#endif
 	}
     }
     if (socket_conn_data->remote_host != NULL) {
@@ -372,7 +370,6 @@ attr_list conn_attr_list;
     socket_client_data_ptr sd = (socket_client_data_ptr) trans->trans_data;
     char *host_name;
     int remote_IP = -1;
-    int IP = get_self_ip_addr(cm, svc);
     static int host_ip = 0;
     unsigned int sock_len;
     struct sockaddr sock_addr;
@@ -545,7 +542,6 @@ attr_list conn_attr_list;
 	add_attr(conn_attr_list, CM_PEER_CONN_PORT, Attr_Int4,
 		 (attr_value) (long)int_port_num);
 	if (sock_addr.sa_family == AF_INET) {
-#ifdef HAS_STRUCT_HOSTENT
 	    struct hostent *host;
 	    struct sockaddr_in *in_sock = (struct sockaddr_in *) &sock_addr;
 	    host = gethostbyaddr((char *) &in_sock->sin_addr,
@@ -555,7 +551,6 @@ attr_list conn_attr_list;
 		add_attr(conn_attr_list, CM_PEER_HOSTNAME, Attr_String,
 			 (attr_value) strdup(host->h_name));
 	    }
-#endif
 	}
     }
     return sock;
