@@ -89,7 +89,7 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	    tmp_vec[1].iov_base = buffer;
 
 	    CMtrace_out(conn->cm, CMTransportVerbose, "CM - responding to latency probe of %ld bytes\n", length);
-	    actual = INT_CMwrite_raw(conn, tmp_vec, tmp_vec + 1, 2, length, NULL, 0, 0);
+	    actual = INT_CMwrite_raw(conn, tmp_vec, tmp_vec + 1, 2, length, NULL, 0);
 	    if (actual != 2) {
 		printf("perf write failed\n");
 	    }
@@ -143,7 +143,7 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	    }
 	    tmp_vec[0].iov_base = &header;
 	    tmp_vec[0].iov_len = sizeof(header);
-	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, sizeof(header), NULL, 0, 0);
+	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, sizeof(header), NULL, 0);
 
 	    if (actual != 1) {
 		printf("perf write failed\n");
@@ -236,7 +236,7 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 	    }
 	    free_attr_list(upcall_feed);
 	    CMtrace_out(conn->cm, CMTransportVerbose, "CM - transport test response sent:");
-	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 2, sizeof(header) + tmp_vec[1].iov_len, NULL, 0, 0);
+	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 2, sizeof(header) + tmp_vec[1].iov_len, NULL, 0);
 	    if (str_list) free(str_list);
 	    if (actual != 1) {
 		printf("perf write failed\n");
@@ -285,7 +285,7 @@ CMdo_performance_response(CMConnection conn, long length, int func,
 
 	    tmp_vec[0].iov_base = &header;
 	    tmp_vec[0].iov_len = sizeof(header);
-	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, sizeof(header), NULL, 0, 0);
+	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, sizeof(header), NULL, 0);
 	    if (actual != 1) {
 		printf("perf write failed\n");
 	    }
@@ -366,7 +366,7 @@ do_single_probe(CMConnection conn, long size, attr_list attrs)
 
     tmp_vec[0].iov_base = &block[0];
     tmp_vec[0].iov_len = size;
-    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0, 0);
+    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0);
 
     if (actual != 1) return -1;
 
@@ -442,21 +442,21 @@ INT_CMprobe_bandwidth(CMConnection conn, long size, attr_list attrs)
     CMtrace_out(conn->cm, CMTransportVerbose, "CM - Initiating bandwidth probe of %ld bytes, %d messages\n", size, repeat_count);
     tmp_vec[0].iov_base = &block[0];
     tmp_vec[0].iov_len = size;
-    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0, 0);
+    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0);
     if (actual != 1) { 
 	return -1;
     }
 
     ((int*)block)[1] = (((int*)block)[1]&0xffffff) | (CMPerfBandwidthBody<<24);
     for (i=0; i <(repeat_count-1); i++) {
-	actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0, 0);
+	actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0);
 	if (actual != 1) {
 	    return -1;
 	}
     }
 
     ((int*)block)[1] = (((int*)block)[1]&0xffffff) | (CMPerfBandwidthEnd<<24);
-    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0, 0);
+    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0);
     if (actual != 1) {
 	return -1;
     }
@@ -538,21 +538,6 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 
     CMtrace_out(conn->cm, CMTransportVerbose, "CM - Initiating transport test of %ld bytes, %d messages\n", size, repeat_count);
 
-    tmp_vec = malloc(sizeof(tmp_vec[0]) * (vecs + 1));  /* at least 2 */
-    tmp_vec[0].iov_base = NULL;
-    tmp_vec[1].iov_base = NULL;
-    int each = (size + vecs - 1) / vecs;
-    for (count = 0; count < vecs; count++) {
-	tmp_vec[count].iov_base = calloc(each + repeat_count, 1);
-	tmp_vec[count].iov_len = each;
-    }
-    for (count = 0; count < vecs; count++) {
-	/* for each vector, give it unique data */
-	int j;
-	for (j=0; j < ((each + repeat_count) /sizeof(int)); j++) {
-	    ((int*)tmp_vec[count].iov_base)[j] = lrand48();
-	}
-    }
     CMtrace_out(conn->cm, CMTransportVerbose, "CM - transport test, sending first message\n");
 
     header_vec = malloc(sizeof(header_vec[0]) * (vecs + 1));  /* at least 2 */
@@ -560,25 +545,45 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     header_vec[0].iov_len = sizeof(header);
     header_vec[1].iov_base = attr_str;
     header_vec[1].iov_len = strlen(attr_str) + 1; /* send NULL */
-    actual = INT_CMwrite_raw(conn, header_vec, NULL, 2, header_vec[0].iov_len + header_vec[1].iov_len, NULL, 0, 1);
+    actual = INT_CMwrite_raw(conn, header_vec, NULL, 2, header_vec[0].iov_len + header_vec[1].iov_len, NULL, 1);
     free(attr_str);
     if (actual != 1) { 
 	free(header_vec);
 	return NULL;
     }
+
+    tmp_vec = malloc(sizeof(tmp_vec[0]) * (vecs + 2));  /* at least 2 */
+    int each = (size + vecs - 1) / vecs;
+    tmp_vec[0].iov_base = malloc(4 * sizeof(int)); /* body header */
+    tmp_vec[0].iov_len = 4 * sizeof(int); /* body header */
+    for (count = 0; count < vecs; count++) {
+	tmp_vec[count+1].iov_base = calloc(each + repeat_count, 1);
+	tmp_vec[count+1].iov_len = each;
+    }
+    for (count = 0; count < vecs; count++) {
+	/* for each vector, give it unique data */
+	int j;
+	for (j=0; j < ((each + repeat_count) /sizeof(int)); j++) {
+	    ((int*)tmp_vec[count+1].iov_base)[j] = lrand48();
+	}
+    }
+    tmp_vec[1].iov_len -= tmp_vec[0].iov_len;
     for (i=0; i <repeat_count; i++) {
-	if (tmp_vec[0].iov_base == NULL) {
+	if (tmp_vec[1].iov_base == NULL) {
+	    tmp_vec[0].iov_base = malloc(4 * sizeof(int)); /* body header */
+	    tmp_vec[0].iov_len = 4 * sizeof(int); /* body header */
 	    for (count = 0; count < vecs; count++) {
-		tmp_vec[count].iov_base = calloc(each + repeat_count, 1);
-		tmp_vec[count].iov_len = each;
+		tmp_vec[count+1].iov_base = calloc(each + repeat_count, 1);
+		tmp_vec[count+1].iov_len = each;
 	    }
 	    for (count = 0; count < vecs; count++) {
 		/* for each vector, give it unique data */
 		int j;
 		for (j=0; j < ((each + repeat_count) /sizeof(int)); j++) {
-		    ((int*)tmp_vec[count].iov_base)[j] = lrand48();
+		    ((int*)tmp_vec[count+1].iov_base)[j] = lrand48();
 		}
 	    }
+	    tmp_vec[1].iov_len -= tmp_vec[0].iov_len;
 	}
 	((int*)tmp_vec[0].iov_base)[0] = 0x434d5000;
     /* size in second entry, high byte gives CMPerf operation */
@@ -589,14 +594,17 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 #endif
 	((int*)tmp_vec[0].iov_base)[2] = (size & 0xffffffff);
 	((int*)tmp_vec[0].iov_base)[3] = i;   /* sequence number */
-	tmp_vec[vecs-1].iov_len = size - (each * (vecs-1));
-	write_vec = malloc(sizeof(write_vec[0]) * (vecs + 1));  /* at least 2 */
-	memcpy(write_vec, tmp_vec, sizeof(write_vec[0]) * (vecs + 1));
+	tmp_vec[vecs].iov_len = size - (each * (vecs-1));
+	write_vec = malloc(sizeof(write_vec[0]) * (vecs + 2));  /* at least 3 */
+	memcpy(write_vec, tmp_vec, sizeof(write_vec[0]) * (vecs + 2));
 	for (count = 0; count < vecs; count++) {
 	    /* On each iteration, increment the write base for each buffer by 1 */
 	    write_vec[count+1].iov_base += i;
 	}
-	actual = INT_CMwrite_raw(conn, write_vec, NULL, vecs, size, NULL, 0, 0);
+	printf("Doing a write, vecs is %d\n", vecs);
+	int k;
+	for (k=0; k<vecs+1; k++) printf("iov [%d] base %p, len %ld\n", k, write_vec[k].iov_base, write_vec[k].iov_len);
+	actual = INT_CMwrite_raw(conn, write_vec, NULL, vecs+1, size, NULL, 0);
 	free(write_vec);
 	if (actual != 1) {
 	    free(tmp_vec);
@@ -618,7 +626,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     }
     tmp_vec[0].iov_base = &header[0];
     tmp_vec[0].iov_len = sizeof(header);
-    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, sizeof(header), NULL, 0, 0);
+    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, sizeof(header), NULL, 0);
     free(tmp_vec);
     free(header_vec);
     if (actual != 1) {
@@ -894,7 +902,7 @@ INT_CMregressive_probe_bandwidth(CMConnection conn, long size, attr_list attrs)
 	CMtrace_out(conn->cm, CMTransportVerbose, "CM - Initiating bandwidth probe of %ld bytes, %d messages\n", size, repeat_count);
 	tmp_vec[0].iov_base = &block[0];
 	tmp_vec[0].iov_len = size;
-	actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0, 0);
+	actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0);
 
 	if (actual != 1) {
 	    return -1;
@@ -902,13 +910,13 @@ INT_CMregressive_probe_bandwidth(CMConnection conn, long size, attr_list attrs)
 
 	((int*)block)[1] = size | (CMRegressivePerfBandwidthBody<<24);
 	for (j=0; j <(repeat_count-1); j++) {
-	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0, 0);
+	    actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0);
 	    if (actual != 1) {
 		return -1;
 	    }
 	}
 	((int*)block)[1] = size | (CMRegressivePerfBandwidthEnd <<24);
-	actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0, 0);
+	actual = INT_CMwrite_raw(conn, tmp_vec, NULL, 1, size, NULL, 0);
 	if (actual != 1) {
 	    return -1;
 	}

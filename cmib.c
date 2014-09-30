@@ -98,6 +98,7 @@ struct request
 {
     int magic;    
     uint32_t length;    
+    uint64_t request_ID;
 };
 
 
@@ -106,6 +107,7 @@ struct response
     uint64_t remote_addr;
     uint32_t rkey;
     uint32_t max_length;    
+    uint64_t request_ID;
 };
 
 struct piggyback
@@ -163,8 +165,6 @@ typedef struct ib_client_data {
 } *ib_client_data_ptr;
 
 
-typedef enum {Block, Non_Block} socket_block_state;
-
 typedef struct notification
 {
 	int done;
@@ -177,10 +177,12 @@ typedef struct notification
 
 typedef struct remote_info
 {
-	int mrlen;
-	notify isDone;
-	struct ibv_mr **mrlist;
-	struct ibv_send_wr *wr; 
+    int mrlen;
+    notify isDone;
+    struct ibv_mr **mrlist;
+    struct ibv_send_wr *wr; 
+    CMcompletion_notify_func notify_func;
+    void *notify_client_data;
 }rinfo;
 
 
@@ -193,14 +195,9 @@ typedef struct ib_connection_data {
 	int read_buffer_len;
 	struct tbuffer_ *tb;    
 	ib_client_data_ptr sd;
-	socket_block_state block_state;
 	CMConnection conn;
 	struct ibv_qp *dataqp;    
-	struct ibv_mr *mr;
 	notify isDone;
-	struct ibv_mr **mrlist;
-	struct ibv_send_wr *wr;
-	int mrlen;
 	int infocount;
 	rinfo infolist[10];
 	int max_imm_data;   
@@ -402,7 +399,6 @@ create_ib_conn_data(svc)
 	ib_conn_data->fd = 0;
 	ib_conn_data->read_buffer = NULL;
 	ib_conn_data->read_buffer_len = 0;
-	ib_conn_data->block_state = Block;
 
 	return ib_conn_data;
 }
@@ -456,7 +452,7 @@ static int internal_read_stream(CMtrans_services svc,
 	//from the fd
 	
 	int left;
-	int iget;
+	int iget = 0;
 	int requested_len;
 	int lerrno;
 
@@ -535,7 +531,8 @@ static int internal_write_piggyback(CMtrans_services svc,
 static int internal_write_response(CMtrans_services svc,
                                    ib_conn_data_ptr scd,
                                    tbuffer *tb,
-                                   int length)
+                                   int length,
+				   int64_t request_ID)
 {
 	struct control_message msg;
 	int iget = 0;
@@ -546,12 +543,14 @@ static int internal_write_response(CMtrans_services svc,
 		msg.u.resp.remote_addr = int64_from_ptr(tb->buf->buffer);
 		msg.u.resp.rkey = tb->mr->rkey;
 		msg.u.resp.max_length = length;
+		msg.u.resp.request_ID = request_ID;
 	}
 	else
 	{
 		msg.u.resp.remote_addr = 0;
 		msg.u.resp.rkey = 0;
 		msg.u.resp.max_length = 0;
+		msg.u.resp.request_ID = request_ID;
 	}
 
 	iget = write(scd->fd, &msg, sizeof(struct control_message));
@@ -566,7 +565,8 @@ static int internal_write_response(CMtrans_services svc,
 
 static int internal_write_request(CMtrans_services svc,
                                   ib_conn_data_ptr scd,
-                                  int length)
+                                  int length,
+    				  void *request_ID)
 {
 	struct control_message msg;
 	int iget = 0;
@@ -574,8 +574,9 @@ static int internal_write_request(CMtrans_services svc,
 	msg.type = msg_request;
 	msg.u.req.magic = 0xdeadbeef;
 	msg.u.req.length = length;
+	msg.u.req.request_ID = int64_from_ptr(request_ID);
 
-	svc->trace_out(scd->sd->cm, "Doing internal write request, writing %d bytes\n", sizeof(struct control_message));
+	svc->trace_out(scd->sd->cm, "Doing internal write request, writing %d bytes", sizeof(struct control_message));
 	iget = write(scd->fd, &msg, sizeof(struct control_message));
 	if(iget != sizeof(struct control_message))
 	{
@@ -590,11 +591,13 @@ static double write_t = 0;
 static double da_t = 0;
 
 static void
-free_sg_list(struct ibv_sge *sg_list, int len)
+free_sg_list(struct ibv_sge *sg_list, int len, int free_data_elements)
 {
     int i;
-    for(i=0; i<len; i++) {
-	free((void*)sg_list[i].addr);
+    if (free_data_elements) {
+	for(i=0; i<len; i++) {
+	    free((void*)sg_list[i].addr);
+	}
     }
     free(sg_list);     
 }
@@ -604,157 +607,170 @@ static int handle_response(CMtrans_services svc,
                            struct control_message *msg)
 {
 
-	//read back response
-	int iget = 0;
-	struct ibv_send_wr *bad_wr;    
-	int retval = 0;
-	int i = 0;
-	struct ibv_wc wc;
-	struct response *rep;
+    //read back response
+    int iget = 0;
+    struct ibv_send_wr *bad_wr;    
+    int retval = 0;
+    int i = 0;
+    struct ibv_wc wc;
+    struct response *rep;
+    rinfo *write_request;
+    int free_data_elements;
+    
+    rep = &msg->u.resp;
+    write_request = ptr_from_int64(rep->request_ID);
+    
+    free_data_elements = (write_request->notify_func == NULL);
+    if (write_request == NULL) {
+	fprintf(stderr, "Failed to get work request - aborting write\n");
+	return -0x01000;
+    }
 
-	rep = &msg->u.resp;
-	scd->wr->wr.rdma.remote_addr = rep->remote_addr;    
-	scd->wr->wr.rdma.rkey = rep->rkey;
+    write_request->wr->wr.rdma.remote_addr = rep->remote_addr;    
+    write_request->wr->wr.rdma.rkey = rep->rkey;
 
     
-	if(scd->wr == NULL)
-	{
-		fprintf(stderr, "failed to get work request - aborting write\n");
-		return -0x01000;    
-	}
-
-	retval = ibv_req_notify_cq(scd->sd->send_cq, 0);
+    if(write_request->wr == NULL)
+    {
+	fprintf(stderr, "failed to get work request - aborting write\n");
+	return -0x01000;    
+    }
+    
+    retval = ibv_req_notify_cq(scd->sd->send_cq, 0);
+    if(retval)
+    {
+	scd->sd->svc->trace_out(scd->sd->cm, "CMib notification request failed");
+	return -1;  
+    }
+    
+    if(rep->remote_addr == 0)
+    {
+	//error on the recieving side just send a -1 as the isdone and return
+	scd->isDone.done = -1;
+	
+	retval = ibv_post_send(scd->dataqp, &scd->isDone.wr, 
+			       &bad_wr);
+        
 	if(retval)
 	{
-		scd->sd->svc->trace_out(scd->sd->cm, "CMib notification request failed\n");
-		return -1;  
+	    //we got an error - ideally we'll fall through and post an error on the connection socket
+	    svc->trace_out(scd->sd->cm, "CMib unable to notify over ib\n");
 	}
-
-	if(rep->remote_addr == 0)
+	
+	for(i = 0; i < write_request->mrlen && write_request->mrlist; i ++)
 	{
-		//error on the recieving side just send a -1 as the isdone and return
-		scd->isDone.done = -1;
+	    ibv_dereg_mr(write_request->mrlist[i]);	    
+	}
+	
+	if(write_request->wr)
+	{       
+	    free_sg_list(write_request->wr->sg_list, write_request->mrlen, free_data_elements);
+	    free(write_request->wr);
+	}
+	
+	//no we wait for the send even to get anoutput
+	retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
+	if(retval)
+	{
+	    svc->trace_out(scd->sd->cm, "Error while waiting\n");
+	    return -1;      
+	}
+        
+        
+	
+    }
+    else
+    {    
+	retval = ibv_post_send(scd->dataqp, write_request->wr, &bad_wr);
+	if(retval)
+	{
+	    svc->trace_out(scd->sd->cm, "CMIB unable to post send %d\n", retval);
+	    //we can get the error from the *bad_wr
+	    return retval;  
+	    
+	}
+	
+	retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
+	if(retval)
+	{
+	    svc->trace_out(scd->sd->cm, "Error while waiting\n");
+	    return -1;      
+	}
+	
+    }
     
-		retval = ibv_post_send(scd->dataqp, &scd->isDone.wr, 
-		                       &bad_wr);
-        
-		if(retval)
-		{
-			//we got an error - ideally we'll fall through and post an error on the connection socket
-			svc->trace_out(scd->sd->cm, "CMib unable to notify over ib\n");
-		}
-
-		for(i = 0; i < scd->mrlen && scd->mrlist; i ++)
-		{
-			ibv_dereg_mr(scd->mrlist[i]);       
-        
-		}
-
-		if(scd->wr)
-		{       
-		    free_sg_list(scd->wr->sg_list, scd->mrlen);
-			free(scd->wr);
-		}
     
-		//no we wait for the send even to get anoutput
-		retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
-		if(retval)
-		{
-			svc->trace_out(scd->sd->cm, "Error while waiting\n");
-			return -1;      
-		}
-        
-        
-    
+    do
+    {
+	//empty the poll cq 1 by 1
+	iget = ibv_poll_cq(scd->sd->send_cq, 1, &wc);
+	if(iget > 0 && wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_RDMA_WRITE)
+	{
+	    //send completeled for RDMA write
+	    //we can break out after derigstering the memory
+	    
+	    //now post a send
+	    scd->isDone.done = 0;
+	    
+	    retval = ibv_post_send(scd->dataqp, &scd->isDone.wr, 
+				   &bad_wr);
+	    
+	    if(retval)
+	    {
+		//we got an error - ideally we'll fall through and post an error on the connection socket
+		svc->trace_out(scd->sd->cm, "CMib unable to notify over ib\n");
+		break;      
+	    }
+	    
+	    for(i = 0; i < write_request->mrlen; i ++)
+	    {
+		ibv_dereg_mr(write_request->mrlist[i]);       
+		
+	    }
+	    
+	    free_sg_list(write_request->wr->sg_list, write_request->mrlen, free_data_elements);
+	    free(write_request->wr);
+	    
+	    //no we wait for the send even to get anoutput
+	    retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
+	    if(retval)
+	    {
+		svc->trace_out(scd->sd->cm, "Error while waiting\n");
+		return -1;      
+	    }
+	    
+	    
+	}
+	else if(iget > 0 && wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_SEND)
+	{
+	    //cool beans - send completed we can go on with our life
+	    
+	    svc->trace_out(scd->sd->cm, "notification for send done %p\n", 
+			   ptr_from_int64(wc.wr_id));
+	    break;      
+	}
+	else if(iget == 0)
+	{
+	    //cq is empty - we shouldn't even be here!
+	    continue;       
 	}
 	else
-	{    
-		retval = ibv_post_send(scd->dataqp, scd->wr, &bad_wr);
-		if(retval)
-		{
-			svc->trace_out(scd->sd->cm, "CMIB unable to post send %d\n", retval);
-			//we can get the error from the *bad_wr
-			return retval;  
-
-		}
-    
-		retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
-		if(retval)
-		{
-			svc->trace_out(scd->sd->cm, "Error while waiting\n");
-			return -1;      
-		}
-
-	}
-    
-    
-	do
 	{
-		//empty the poll cq 1 by 1
-		iget = ibv_poll_cq(scd->sd->send_cq, 1, &wc);
-		if(iget > 0 && wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_RDMA_WRITE)
-		{
-			//send completeled for RDMA write
-			//we can break out after derigstering the memory
-
-			//now post a send
-			scd->isDone.done = 0;
-        
-			retval = ibv_post_send(scd->dataqp, &scd->isDone.wr, 
-			                       &bad_wr);
-        
-			if(retval)
-			{
-				//we got an error - ideally we'll fall through and post an error on the connection socket
-				svc->trace_out(scd->sd->cm, "CMib unable to notify over ib\n");
-				break;      
-			}
-
-			for(i = 0; i < scd->mrlen; i ++)
-			{
-				ibv_dereg_mr(scd->mrlist[i]);       
-        
-			}
-
-			free_sg_list(scd->wr->sg_list, scd->mrlen);
-			free(scd->wr);
-
-			//no we wait for the send even to get anoutput
-			retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
-			if(retval)
-			{
-				svc->trace_out(scd->sd->cm, "Error while waiting\n");
-				return -1;      
-			}
-        
-        
-		}
-		else if(iget > 0 && wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_SEND)
-		{
-			//cool beans - send completed we can go on with our life
-        
-		    svc->trace_out(scd->sd->cm, "notification for send done %p\n", 
-				   ptr_from_int64(wc.wr_id));
-			break;      
-		}
-		else if(iget == 0)
-		{
-			//cq is empty - we shouldn't even be here!
-			continue;       
-		}
-		else
-		{
-			svc->trace_out(scd->sd->cm, "error in polling queue %X %d %d", 
-			               wc.wr_id, wc.status,  wc.opcode);
-        
-			return -1;      
-		}
-    
-	}while(1);
-	svc->wake_any_pending_write(scd->conn);
-	return 0;   
+	    svc->trace_out(scd->sd->cm, "error in polling queue %X %d %d", 
+			   wc.wr_id, wc.status,  wc.opcode);
+	    
+	    return -1;      
+	}
+	
+    }while(1);
+    if (write_request->notify_func) {
+	(write_request->notify_func)( write_request->notify_client_data);
+    }
+    svc->wake_any_pending_write(scd->conn);
+    return 0;   
     
 }
+
 static void handle_request(CMtrans_services svc,
                            ib_conn_data_ptr scd,
                            struct control_message *msg)
@@ -774,7 +790,7 @@ static void handle_request(CMtrans_services svc,
 	if(tb == NULL)
 	{
 		svc->trace_out(scd->sd->cm, "Failed to get memory\n");
-		internal_write_response(svc, scd, NULL, 0);
+		internal_write_response(svc, scd, NULL, 0, 0);
 		goto wait_on_q; 
 	}
 
@@ -782,7 +798,8 @@ static void handle_request(CMtrans_services svc,
 	mr = tb->mr;
 
 	svc->set_pending_write(scd->conn);
-	internal_write_response(svc, scd, tb, req->length);
+	printf("Request id is %ld\n", req->request_ID);
+	internal_write_response(svc, scd, tb, req->length, req->request_ID);
 
 wait_on_q:
 	//now the sender will start the data transfer. When it finishes he will 
@@ -905,7 +922,6 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 		handle_response(svc, scd, &msg);
 		break;
 	case msg_request:
-		//set pending write here
 		handle_request(svc, scd, &msg);
 		if(scd->isDone.done == 0)
 		{
@@ -1738,14 +1754,15 @@ static double writev_t = 0;
 
 
 extern int
-libcmib_LTX_writev_func(svc, scd, iovs, iovcnt, attrs)
-	CMtrans_services svc;
-ib_conn_data_ptr scd;
-void *iovs;
-int iovcnt;
-attr_list attrs;
+libcmib_LTX_writev_complete_notify_func(CMtrans_services svc, 
+					ib_conn_data_ptr scd,
+					void *iovs,
+					int iovcnt,
+					attr_list attrs,
+					CMcompletion_notify_func notify_func,
+					void *notify_client_data)
 {
-	int fd = scd->fd;
+    	int fd = scd->fd;
 	int left = 0;
 	int iget = 0;
 	int i;
@@ -1770,6 +1787,9 @@ attr_list attrs;
 	{
 		//total size is less than the piggyback size
 		iget = internal_write_piggyback(svc, scd, left, iov, iovcnt);
+		if (notify_func) {
+		    (notify_func)(notify_client_data);
+		}
 		if(iget < 0)
 		{
 			svc->trace_out(scd->sd->cm, "CMIB error in writing piggyback");
@@ -1783,21 +1803,26 @@ attr_list attrs;
 	}
 
 	svc->set_pending_write(scd->conn);
-	iget = internal_write_request(svc, scd, left);
-	if(iget < 0)
-	{
-		svc->trace_out(scd->sd->cm, "CMIB error in writing request");
-		return -1;
-	}
 
-	/* for now, copy all data */
-	tmp_iov = malloc(sizeof(tmp_iov[0]) * iovcnt);
-	for (i = 0; i < iovcnt; i++) {
-	    tmp_iov[i].iov_len = iov[i].iov_len;
-	    tmp_iov[i].iov_base = malloc(iov[i].iov_len);
-	    memcpy(tmp_iov[i].iov_base, iov[i].iov_base, iov[i].iov_len);
+	if (notify_func == NULL) {
+	    /* 
+	     * Semantics are that *MUST* be done with the data when we return,
+	     * so, for now, copy all data 
+	     */
+	    tmp_iov = malloc(sizeof(tmp_iov[0]) * iovcnt);
+	    for (i = 0; i < iovcnt; i++) {
+		tmp_iov[i].iov_len = iov[i].iov_len;
+		tmp_iov[i].iov_base = malloc(iov[i].iov_len);
+		memcpy(tmp_iov[i].iov_base, iov[i].iov_base, iov[i].iov_len);
+	    }
+	} else {
+	    /*
+	     *  Cool.  The app doesn't need the data back right away.  
+	     *  We can keep it and tell the upper levels when we're done.
+	     *  Don't copy.  The reply message will trigger the notification.
+	     */
+	    tmp_iov = iov;
 	}
-
 	memset(&msg, 0, sizeof(msg));
 
     
@@ -1809,7 +1834,8 @@ attr_list attrs;
 	                                                 IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE
 	                                                 |IBV_ACCESS_REMOTE_READ,
 	                                                 &scd->infolist[scd->infocount].mrlen);
-	scd->mrlen = scd->infolist[scd->infocount].mrlen;
+	scd->infolist[scd->infocount].notify_func = notify_func;
+	scd->infolist[scd->infocount].notify_client_data = notify_client_data;
 	end = getlocaltime();
     
 	reg_t = end - start;
@@ -1819,40 +1845,36 @@ attr_list attrs;
 		svc->trace_out(scd->sd->cm, "CMIB writev error in registereing memory");
 		return -1;
 	}
-	scd->mrlist = scd->infolist[scd->infocount].mrlist;
 	scd->infolist[scd->infocount].wr = createwrlist(scd,
 	                                                scd->infolist[scd->infocount].mrlist, tmp_iov,
 	                                                scd->infolist[scd->infocount].mrlen, &wrlen);
 	
 	svc->trace_out(scd->sd->cm, "FIrst 16 bytes of send buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", left, ((unsigned char*)iov[0].iov_base)[0], ((unsigned char*)iov[0].iov_base)[1], ((unsigned char*)iov[0].iov_base)[2], ((unsigned char*)iov[0].iov_base)[3], ((unsigned char*)iov[0].iov_base)[4], ((unsigned char*)iov[0].iov_base)[5], ((unsigned char*)iov[0].iov_base)[6], ((unsigned char*)iov[0].iov_base)[7], ((unsigned char*)iov[0].iov_base)[8], ((unsigned char*)iov[0].iov_base)[9], ((unsigned char*)iov[0].iov_base)[10], ((unsigned char*)iov[0].iov_base)[11], ((unsigned char*)iov[0].iov_base)[12], ((unsigned char*)iov[0].iov_base)[13], ((unsigned char*)iov[0].iov_base)[14], ((unsigned char*)iov[0].iov_base)[15]);
-	scd->wr = scd->infolist[scd->infocount].wr;
-	scd->infocount ++;
+	iget = internal_write_request(svc, scd, left, &scd->infolist[scd->infocount]);
+	if(iget < 0)
+	{
+		svc->trace_out(scd->sd->cm, "CMIB error in writing request");
+		return -1;
+	}
+
 	free(tmp_iov);
 
 	return iovcnt;
 }
 
-/* non blocking version */
 extern int
-libcmib_LTX_NBwritev_func(svc, scd, iovs, iovcnt, attrs)
-	CMtrans_services svc;
+libcmib_LTX_writev_func(svc, scd, iovs, iovcnt, attrs)
+CMtrans_services svc;
 ib_conn_data_ptr scd;
 void *iovs;
 int iovcnt;
 attr_list attrs;
 {
-
-	return -16;
-    
+    return libcmib_LTX_writev_complete_notify_func(svc, scd, iovs, iovcnt, 
+						   attrs, NULL, NULL);
 }
 
 int socket_global_init = 0;
-
-#ifdef HAVE_WINDOWS_H
-/* Winsock init stuff, ask for ver 1.1 */
-static WORD wVersionRequested = MAKEWORD(1, 1);
-static WSADATA wsaData;
-#endif
 
 static void
 free_ib_data(CManager cm, void *sdv)

@@ -128,6 +128,8 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 	lt_dlsym(handle, "read_block_func");  
     transport->writev_func = (CMTransport_writev_func)
 	lt_dlsym(handle, "writev_func");  
+    transport->writev_complete_notify_func = (CMTransport_writev_complete_notify_func)
+	lt_dlsym(handle, "writev_complete_notify_func");  
     transport->NBwritev_func = (CMTransport_writev_func)
 	lt_dlsym(handle, "NBwritev_func");  
     transport->set_write_notify = (CMTransport_set_write_notify_func)

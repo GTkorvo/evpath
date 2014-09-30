@@ -99,6 +99,13 @@ typedef int (*CMTransport_writev_func)(CMtrans_services svc,
 				       void *transport_data,
 				       void *buffer, int len,
 				       attr_list attrs);
+
+typedef void (*CMcompletion_notify_func)(void *client_data);
+typedef int (*CMTransport_writev_complete_notify_func)(CMtrans_services svc,
+						       void *transport_data,
+						       void *buffer, int len,
+						       attr_list attrs, CMcompletion_notify_func func,
+						       void *client_data);
 typedef void (*CMTransport_shutdown_conn_func)(CMtrans_services svc,
 					       void *conn_data);
 
@@ -143,6 +150,7 @@ struct _transport_item {
     CMTransport_read_block_func read_block_func;
     CMTransport_writev_func writev_func;
     CMTransport_writev_func NBwritev_func; /* non blocking */
+    CMTransport_writev_complete_notify_func writev_complete_notify_func;
     CMTransport_set_write_notify_func set_write_notify;
     void *trans_data;
     CMTransport_get_transport_characteristics get_transport_characteristics;
@@ -286,6 +294,17 @@ struct _transport_item {
  *      of less than the requested count is not a fatal error.
  *      Instead, the remaining bytes will be copied and queued for a
  *      later write.
+ *  -  int writev_complete_notify(CMtrans_services svc, void *conn_data, void *iov, 
+ *                int iovcnt, attr_list attrs, CMcompletion_notify_func func, void*client_data);
+ *      writev_complete_notify() differs from writev() in that it does *not*
+ *      enforce the semantic that the write is essentially complete
+ *      (I.E. data can be immeditately overwritten) when the function
+ *      returns.  Instead, the higher level is assuring the transport that
+ *      the data will remain valid until such time as the transport
+ *      indicates that the write is complete by calling the
+ *      CMcompletion_notify_func that was specified in the call).  Providing
+ *      this call is OPTIONAL for transports, but CM and EVPath will attempt
+ *      to use it where possible.
  * - int set_write_notify(transport_entry trans, CMtrans_services svc,
  *                        void *conn_data, int enable);
  *      This routine is used if a non-blocking write fails to write

@@ -245,7 +245,6 @@ main(argc, argv)
     char path[10240];
     int me;
 #ifdef MPI_C_FOUND
-    MPI_Status status;          /* Status object for receive */
     int np;
 #endif
 
@@ -426,6 +425,7 @@ main(argc, argv)
 	attr_list contact_list, listen_list = NULL;
 	if (transport == NULL) {
 	    transport = getenv("CMTransport");
+	    if (transport) transport=strdup(transport);
 	}
 	if (transport != NULL) {
 	    listen_list = create_attr_list();

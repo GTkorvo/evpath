@@ -2763,7 +2763,7 @@ INT_CMConnection_wait_for_pending_write(CMConnection conn)
 /* Returns 1 if successful, -1 if deferred, 0 on error */
 int
 INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector data_vec,
-                long vec_count, long byte_count, attr_list attrs, int nowp, int data_vec_stack)
+                long vec_count, long byte_count, attr_list attrs, int data_vec_stack)
 {
     int actual = 0;
     unsigned char checksum = 0;
@@ -2790,7 +2790,7 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
     }
     ((int*)full_vec[0].iov_base)[0] = 
 	(((int*)full_vec[0].iov_base)[0] & 0xffffff00) | (unsigned char) checksum;
-    if (conn->do_non_blocking_write == 1 && !nowp) {
+    if (conn->do_non_blocking_write == 1) {
         int actual_bytes;
         actual_bytes = 
             conn->trans->NBwritev_func(&CMstatic_trans_svcs, 
@@ -2834,7 +2834,7 @@ INT_CMwrite_evcontrol(CMConnection conn, unsigned char type, int argument) {
     vec[2].iov_base = NULL;
     vec[2].iov_len = 0;
     evcontrol_header[1] = type << 24 | (sizeof(evcontrol_header) + sizeof(int));
-    success = INT_CMwrite_raw(conn, vec, vec + 1, 2, evcontrol_header[1] & 0xffffff, NULL, 0, 1) != 0;
+    success = INT_CMwrite_raw(conn, vec, vec + 1, 2, evcontrol_header[1] & 0xffffff, NULL, 1) != 0;
     printf("done write\n");
     return success;
 }
@@ -2957,7 +2957,7 @@ INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data,
 			vec_count, byte_count);
 	}
 	
-        actual = INT_CMwrite_raw(conn, tmp_vec, vec, vec_count, byte_count, attrs, 0, 0);
+        actual = INT_CMwrite_raw(conn, tmp_vec, vec, vec_count, byte_count, attrs, 0);
 	if (tmp_vec != &static_vec[0]) {
 	    INT_CMfree(tmp_vec);
 	}
@@ -3118,7 +3118,7 @@ internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
 			"Writing %d vectors, total %d bytes (including attrs) in writev\n", 
 			vec_count, byte_count);
 	}
-        actual = INT_CMwrite_raw(conn, tmp_vec, vec, vec_count, byte_count, attrs, 0,   
+        actual = INT_CMwrite_raw(conn, tmp_vec, vec, vec_count, byte_count, attrs,
                                     vec == &preencoded_vec[0]);
 	if (tmp_vec != &static_vec[0]) {
 	    INT_CMfree(tmp_vec);
