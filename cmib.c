@@ -798,7 +798,6 @@ static void handle_request(CMtrans_services svc,
 	mr = tb->mr;
 
 	svc->set_pending_write(scd->conn);
-	printf("Request id is %ld\n", req->request_ID);
 	internal_write_response(svc, scd, tb, req->length, req->request_ID);
 
 wait_on_q:
@@ -1100,6 +1099,7 @@ void *void_conn_sock;
 	                   (void *) trans, (void *) conn);
 
 	svc->trace_out(sd->cm, "Falling out of accept conn\n");
+    free_attr_list(conn_attr_list);
 }
 
 extern void
@@ -1857,7 +1857,10 @@ libcmib_LTX_writev_complete_notify_func(CMtrans_services svc,
 		return -1;
 	}
 
-	free(tmp_iov);
+	if (notify_func == NULL) {
+	    /* it was our tmp_iov */
+	    free(tmp_iov);
+	}
 
 	return iovcnt;
 }
