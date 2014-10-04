@@ -2760,10 +2760,19 @@ INT_CMConnection_wait_for_pending_write(CMConnection conn)
     wait_for_pending_write(conn);
 }
 
-/* Returns 1 if successful, -1 if deferred, 0 on error */
 int
 INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector data_vec,
                 long vec_count, long byte_count, attr_list attrs, int data_vec_stack)
+{
+    return INT_CMwrite_raw_notify(conn, full_vec, data_vec, vec_count, byte_count, attrs, data_vec_stack,
+				  NULL, NULL);
+}
+
+/* Returns 1 if successful, -1 if deferred, 0 on error */
+int
+INT_CMwrite_raw_notify(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector data_vec,
+		       long vec_count, long byte_count, attr_list attrs, int data_vec_stack,
+		       CMcompletion_notify_func notify_func, void *notify_client_data)
 {
     int actual = 0;
     unsigned char checksum = 0;
@@ -2812,10 +2821,18 @@ INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector dat
             return -1; /* XXX */
         }
         actual = vec_count;  /* set actual for success */
+    } else if (conn->trans->writev_complete_notify_func && notify_func) {
+        actual = conn->trans->writev_complete_notify_func(&CMstatic_trans_svcs, 
+							  conn->transport_data, 
+							  full_vec, vec_count, 
+							  attrs, notify_func, notify_client_data);
     } else {
         actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
                                           conn->transport_data, 
                                           full_vec, vec_count, attrs);
+	if (notify_func) {
+	    (notify_func)(notify_client_data);
+	}
     }
     return actual == vec_count ? 1 : 0;
 }
@@ -3020,7 +3037,7 @@ internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	fprintf(cm->CMTrace_file, "CM - Writing record %lx of type %s\n", (long)event,
+	fprintf(cm->CMTrace_file, "CM - Writing EVENT record %lx of type %s\n", (long)event,
 	       name_of_FMformat(format->fmformat));
 	if (attrs != NULL) {
 	    fprintf(cm->CMTrace_file, "CM - write attributes are:");

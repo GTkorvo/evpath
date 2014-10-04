@@ -526,6 +526,10 @@ extern void CMdo_performance_response(CMConnection conn, long length, int func,
 extern int
 INT_CMwrite_raw(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector data_vec,
                 long vec_count, long byte_count, attr_list attrs, int data_vec_stack);
+int
+INT_CMwrite_raw_notify(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVector data_vec,
+		       long vec_count, long byte_count, attr_list attrs, int data_vec_stack,
+		       CMcompletion_notify_func notify_func, void *notify_client_data);
 extern void
 INT_CMConnection_dereference(CMConnection conn);
 extern FMContext INT_CMget_FMcontext(CManager cm);
