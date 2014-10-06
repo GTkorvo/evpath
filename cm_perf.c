@@ -497,14 +497,17 @@ write_is_done(void *vdata)
     int count;
 
     free(data->write_vec[0].iov_base);
-    free(data->write_vec);
     if (data->tmp_vec) {
 	for (count = 0; count < data->vecs; count++) {
+	    if (data->tmp_vec[count].iov_base == data->write_vec[0].iov_base) {
+		continue;
+	    }
 	    free(data->tmp_vec[count].iov_base);
 	    data->tmp_vec[count].iov_base = NULL;
 	}
 	free(data->tmp_vec);
     }
+    free(data->write_vec);
     free(data);
 }
 
@@ -607,7 +610,10 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 #endif
 	((int*)tmp_vec[0].iov_base)[2] = (size & 0xffffffff);
 	((int*)tmp_vec[0].iov_base)[3] = i;   /* sequence number */
-	tmp_vec[vecs].iov_len = size - (each * (vecs-1));
+	if (vecs > 1) {
+	    /* if more than one vec, handle rounding */
+	    tmp_vec[vecs].iov_len = size - (each * (vecs-1));
+	}
 	write_vec = malloc(sizeof(write_vec[0]) * (vecs + 2));  /* at least 3 */
 	memcpy(write_vec, tmp_vec, sizeof(write_vec[0]) * (vecs + 2));
 	for (count = 0; count < vecs; count++) {
