@@ -42,8 +42,6 @@
 #  pragma warning (disable: 981)
 #endif
 
-static void enet_free_func(void *packet);
-
 typedef enum {MAP_EACH_MESSAGE_PULL, MAP_EACH_MESSAGE_PUSH,
 	      PERSISTENT_MAPPED_BUFFER_PULL, PERSISTENT_MAPPED_BUFFER_PUSH,
 	      LAST_PROTOCOL} messaging_protocols;
@@ -141,6 +139,7 @@ typedef struct nnti_transport_data {
     char *self_hostname;
     char* incoming;
     NNTI_buffer_t  mr_recvs;
+    NNTI_work_request_t  wr_recvs;
     NNTI_transport_t trans_hdl;
     pthread_t listen_thread;
     pthread_t listen_thread2;
@@ -213,7 +212,7 @@ typedef struct nnti_connection_data {
     ENetPacket *packet;
 #endif
     NNTI_buffer_t mr_pull;
-
+    NNTI_work_request_t wr_pull;
 #ifdef DF_SHM_FOUND
     shm_conn_data_ptr shm_cd;
 #endif
@@ -235,6 +234,34 @@ typedef struct _send_handle {
 #endif
     nnti_conn_data_ptr ncd;
 } send_handle;
+
+static int buffer_pack(void *input, void **output, int32_t *output_size, xdrproc_t pack_func)
+{
+	XDR pack_xdrs;
+
+	*output_size = xdr_sizeof(pack_func, input);
+	*output=malloc(*output_size);
+    xdrmem_create(&pack_xdrs, (caddr_t)*output, *output_size, XDR_ENCODE);
+    pack_func(&pack_xdrs, input);
+
+    return(0);
+}
+
+static int buffer_pack_free(void *input, int32_t input_size, xdrproc_t free_func)
+{
+//	free(input);
+    return(0);
+}
+
+static int buffer_unpack(void *input, int32_t input_size, void *output, xdrproc_t unpack_func)
+{
+	XDR unpack_xdrs;
+
+    xdrmem_create(&unpack_xdrs, (caddr_t)input, input_size, XDR_DECODE);
+    unpack_func(&unpack_xdrs, output);
+
+    return(0);
+}
 
 send_handle
 get_control_message_buffer(nnti_conn_data_ptr ncd, struct client_message **mp,
@@ -280,7 +307,8 @@ send_control_message(send_handle h)
 		       h.size);
 	NNTI_status_t               status;
 	int timeout = 1000;
-	int err = NNTI_send(&h.ncd->peer_hdl, &h.ncd->mr_send, NULL);
+	NNTI_work_request_t send_wr;
+	int err = NNTI_send(&h.ncd->peer_hdl, &h.ncd->mr_send, NULL, &send_wr);
 	
 	if (err != NNTI_OK) {
 	    fprintf (stderr, "Error: NNTI_send() returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
@@ -291,7 +319,7 @@ send_control_message(send_handle h)
 	/* Wait for message to be sent */
 	timeout = 1000;
       again:
-	err = NNTI_wait(&h.ncd->mr_send, NNTI_SEND_SRC, timeout, &status);
+	err = NNTI_wait(&send_wr, timeout, &status);
 	if (err == NNTI_ETIMEDOUT) {
 	  timeout *=2;
 	  if (h.ncd->ntd->shutdown_listen_thread) return 0;
@@ -563,9 +591,9 @@ unlink_connection(nnti_transport_data_ptr ntd, nnti_conn_data_ptr ncd)
 
 #include "qual_hostname.c"
 
-enum {CMNNTI_CONNECT=1, CMNNTI_PIGGYBACK=2, CMNNTI_PULL_REQUEST=3, CMNNTI_PULL_COMPLETE=4, CMNNTI_PULL_SHM_REQUEST=5, CMNNTI_PIGGYBACK_RECVD=6, CMNNTI_LAST_MSG_TYPE=7};
+enum {CMNNTI_CONNECT=1, CMNNTI_PIGGYBACK=2, CMNNTI_PULL_REQUEST=3, CMNNTI_PULL_COMPLETE=4, CMNNTI_PULL_SHM_REQUEST=5, CMNNTI_LAST_MSG_TYPE=7};
 char *msg_type_name[] = 
-{"NO MESSAGE", "CMNNTI_CONNECT", "CMNNTI_PIGGYBACK", "CMNNTI_PULL_REQUEST", "CMNNTI_PULL_COMPLETE", "CMNNTI_PULL_SHM_REQUEST", "CMNNTI_PIGGYBACK_RECVD"};
+{"NO MESSAGE", "CMNNTI_CONNECT", "CMNNTI_PIGGYBACK", "CMNNTI_PULL_REQUEST", "CMNNTI_PULL_COMPLETE", "CMNNTI_PULL_SHM_REQUEST"};
 
 struct connect_message {
     short message_type;
@@ -593,12 +621,7 @@ attr_list conn_attr_list;
     char *host_name, *nnti_transport, *params;
     char server_url[256];
     struct connect_message *cmsg;
-
-    /* 
-     *TODO: config this in a better way. e.g., first make sure the receiving
-     * side indeed can support share memory transport
-     */
-    int use_shm = 0;
+    NNTI_work_request_t send_wr;
 
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
@@ -647,6 +670,11 @@ attr_list conn_attr_list;
 #endif
 
 #ifdef DF_SHM_FOUND
+    /* 
+     *TODO: config this in a better way. e.g., first make sure the receiving
+     * side indeed can support share memory transport
+     */
+    int use_shm = 0;
     int is_shm_connection = 0;
     /* make shm connection if the peer process and this process are on the same node */
     if ((use_shm) && (strcmp(host_name, ntd->self_hostname) == 0)) {
@@ -681,7 +709,7 @@ attr_list conn_attr_list;
     /* register memory regions */
     char *req_buf = malloc (NNTI_REQUEST_BUFFER_SIZE);
     err = NNTI_register_memory(&ntd->trans_hdl, req_buf, NNTI_REQUEST_BUFFER_SIZE, 1,
-                                NNTI_SEND_SRC, &nnti_conn_data->peer_hdl, &nnti_conn_data->mr_send);
+                                NNTI_SEND_SRC, &nnti_conn_data->mr_send);
     if (err != NNTI_OK) {
         fprintf (stderr, "Error: NNTI_register_memory(SEND_SRC) for client message returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
         return 1;
@@ -720,7 +748,8 @@ attr_list conn_attr_list;
 #endif
 
     svc->trace_out(cm, "CMNNTI initiate sending connect message to remote host");
-    err = NNTI_send(&nnti_conn_data->peer_hdl, &nnti_conn_data->mr_send, NULL);
+    err = NNTI_send(&nnti_conn_data->peer_hdl, &nnti_conn_data->mr_send, 
+		    NULL, &send_wr);
     if (err != NNTI_OK) {
         fprintf (stderr, "Error: NNTI_send() returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
         return 1;
@@ -735,7 +764,7 @@ attr_list conn_attr_list;
     NNTI_status_t               status;
     timeout = 500;
  again:
-    err = NNTI_wait(&nnti_conn_data->mr_send, NNTI_SEND_SRC, timeout, &status);
+    err = NNTI_wait(&send_wr, timeout, &status);
     if ((err == NNTI_ETIMEDOUT) || (err == NNTI_EAGAIN)) {
 	if (nnti_conn_data->ntd->shutdown_listen_thread) return 0;
 	timeout *=2;
@@ -775,9 +804,6 @@ enet_non_blocking_listen(CManager cm, CMtrans_services svc,
     nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) trans->trans_data;
     ENetAddress address;
     ENetHost * server;
-
-
-    u_short port_num = 0;
 
     svc->trace_out(cm, "CMnnti begin enet listen\n");
 
@@ -889,10 +915,8 @@ initiate_enet_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 	      attr_list conn_attr_list)
 {
     int int_port_num;
-    nnti_transport_data_ptr ntd = (nnti_transport_data_ptr) trans->trans_data;
     char *host_name;
     static int host_ip = 0;
-    struct in_addr sin_addr;
     (void)conn_attr_list;
 
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
@@ -938,13 +962,13 @@ attr_list attrs;
     nnti_conn_data_ptr nnti_conn_data = create_nnti_conn_data(svc);
     attr_list conn_attr_list = create_attr_list();
     CMConnection conn;
-    int enet_conn_status;
 
     if (initiate_nnti_conn(cm, svc, trans, attrs, nnti_conn_data, conn_attr_list) != 1) {
 	return NULL;
     }
 
 #ifdef ENET_FOUND
+    int enet_conn_status;
     sleep(1);
 
     enet_conn_status = initiate_enet_conn(cm, svc, trans, attrs, nnti_conn_data, conn_attr_list);
@@ -1064,11 +1088,9 @@ struct piggyback {
 };
 
 struct pull_request {
-  unsigned long size;          // size of message to pull
-  void *addr;
-  NNTI_buffer_t buf_addr;
-  NNTI_buffer_t res_addr;
-  void *msg_info;
+    unsigned long size;          /* size of message to pull */
+    void *msg_info;	       /* returned unchanged */
+    char packed_src_buf[1];
 };
 
 struct pull_complete_notify {
@@ -1100,24 +1122,18 @@ struct pull_sched_context {
 
 /* queue structure for delayed pull requests */
 struct pull_request_queue {
-  struct pull_request request;
   enum pull_request_state state;
   int num_errors;
   struct pull_sched_context context;
   struct pull_request_queue *next;
+  struct pull_request request;
 };
-
-/* max number of errors for scheduling a request */
-static int max_num_errors_scheduling = 10;
 
 static void
 handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
 			    struct client_message *m);
 static void
 handle_pull_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
-			     struct client_message *m);
-static void
-handle_piggyback_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
 			     struct client_message *m);
 
 static void
@@ -1194,7 +1210,7 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	err = NNTI_register_memory (&ntd->trans_hdl,
 				    ncd->send_buffer,
 				    NNTI_REQUEST_BUFFER_SIZE, 1, NNTI_SEND_SRC,
-				    &ncd->peer_hdl, &ncd->mr_send);
+				    &ncd->mr_send);
 	if (err != NNTI_OK) {
 	    fprintf (stderr, "Error: NNTI_register_memory(NNTI_SEND_SRC) for server message returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
 	    return;
@@ -1229,17 +1245,6 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	memcpy(&((char*)read_buffer->buffer)[0], &(m->pig.payload[0]), m->pig.size);
 	
 	ntd->svc->add_buffer_to_pending_queue(trans->cm, ncd->conn, read_buffer, m->pig.size);
-	if (!ncd->use_enet) {
-	    /* if NNTI, send piggyback recvd message to unblock writes */
-	    send_handle h;
-	    struct client_message *r;
-	    h = get_control_message_buffer(ncd, &r, sizeof(*r));
-	    r->message_type = CMNNTI_PIGGYBACK_RECVD;
-	    svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET piggyback processed, sending PIGGYBACK RECVD control message, type %d", r->message_type);
-	    if (send_control_message(h) == 0) {
-		svc->trace_out(ncd->ntd->cm, "--- control message send failed!");
-	    }
-	}
     }
     break;
     default:
@@ -1266,32 +1271,32 @@ listen_thread_func(void *vlsp)
 
     ACQUIRE_CM_LOCK(svc, trans->cm);
     int buf_size = 10;  // initial size
-    NNTI_buffer_t **buf_list = malloc(sizeof(buf_list[0]) * buf_size);
+    NNTI_work_request_t **wr_list = malloc(sizeof(wr_list[0]) * buf_size);
 
     while (1) {
 	unsigned int which;
-	int buf_count = 1;
+	int wr_count = 1;
 	if (lsp->wait_mode != WAIT_MODE_RDMA) {
-	    buf_list[0] = &ntd->mr_recvs;
+	    wr_list[0] = &ntd->wr_recvs;
 	} else {
-	    buf_count = 0;
+	    wr_count = 0;
 	}
 	if (lsp->wait_mode != WAIT_MODE_REQUEST) {
 	    if (buf_size < ntd->request_size) {
-		buf_list = realloc(buf_list, sizeof(buf_list[0]) * ntd->request_size);
+		wr_list = realloc(wr_list, sizeof(wr_list[0]) * ntd->request_size);
 		buf_size = ntd->request_size;
 	    }
 	    for(which=1; which <= ntd->request_size; which++) {
 		if (ntd->request_list[which-1] != NULL) {
-		    buf_list[buf_count] = &ntd->request_list[which-1]->mr_pull;
-		    buf_count++;
+		    wr_list[wr_count] = &ntd->request_list[which-1]->wr_pull;
+		    wr_count++;
 		}
 	    }
 	}
 	//err = NNTI_wait(&ntd->mr_recvs, NNTI_RECV_QUEUE, timeout, &wait_status);
-	if (buf_count > 0) {
+	if (wr_count > 0) {
 	    DROP_CM_LOCK(svc, trans->cm);
-	    err = NNTI_waitany((const struct NNTI_buffer_t **)buf_list, buf_count, NNTI_RECV_QUEUE, timeout, &which, &wait_status);
+	    err = NNTI_waitany(wr_list, wr_count, timeout, &which, &wait_status);
 	    ACQUIRE_CM_LOCK(svc, trans->cm);
 	} else {
 	    svc->cond_wait_CM_lock((trans->cm),&(ntd->cond),  __FILE__, __LINE__);
@@ -1320,6 +1325,9 @@ listen_thread_func(void *vlsp)
         if (wait_status.result == NNTI_OK) {
 	    if ((which == 0) && (lsp->wait_mode != WAIT_MODE_RDMA)) {
 		handle_request_buffer_event(lsp, &wait_status);
+		ntd->svc->trace_out(trans->cm, "Clearing request buffer work request\n");
+		NNTI_destroy_work_request(&ntd->wr_recvs);
+		NNTI_create_work_request(&ntd->mr_recvs, &ntd->wr_recvs);
 	    } else {
 		/* handle a completed pull request */
 		send_handle h;
@@ -1328,7 +1336,7 @@ listen_thread_func(void *vlsp)
 		int i;
 		for (i=0; i < ntd->request_size; i++) {
 		    if ((ntd->request_list[i] != NULL) &&
-			(&ntd->request_list[i]->mr_pull == buf_list[which])) {
+			(&ntd->request_list[i]->wr_pull == wr_list[which])) {
 			ncd = ntd->request_list[i];
 			ntd->request_list[i] = NULL;
 		    }
@@ -1350,6 +1358,8 @@ listen_thread_func(void *vlsp)
 		    ncd->read_buffer = NULL;
 		    NNTI_unregister_memory(&ncd->mr_pull);
 		}
+		ntd->svc->trace_out(trans->cm, "Clearing recvs work request\n");
+		NNTI_clear_work_request(wr_list[which]);
 	    }
 	}
         // TODO: check if it's time to schedule Puts and check progress of outstanding requests
@@ -1585,10 +1595,6 @@ handle_control_request(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_e
       handle_pull_complete_message(ncd, svc, trans, m);
       break;
   }
-  case CMNNTI_PIGGYBACK_RECVD:{
-      handle_piggyback_complete_message(ncd, svc, trans, m);
-      break;
-  }
   default:
       printf("Bad control request! type %d\n", m->message_type);
   }
@@ -1606,7 +1612,6 @@ enet_accept_conn(nnti_transport_data_ptr ntd, transport_entry trans,
     CMtrans_services svc = ntd->svc;
     nnti_conn_data_ptr ncd = ntd->connections;
     int verbose = -1;
-    CMConnection conn;
     attr_list conn_attr_list = NULL;;
 
  restart:
@@ -1718,7 +1723,6 @@ setup_nnti_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
     char *last_colon, *first_colon, *last_slash;
     char *hostname;
     int incoming_size = 100;
-    char *nnti_transport;
     int int_port_num = 0;
     int err;
 
@@ -1780,7 +1784,9 @@ setup_nnti_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
     
     err = NNTI_register_memory(&trans_hdl, (char*)ntd->incoming, 
 			       NNTI_REQUEST_BUFFER_SIZE, incoming_size,
-			       NNTI_RECV_QUEUE, &trans_hdl.me, &ntd->mr_recvs);
+			       NNTI_RECV_QUEUE, &ntd->mr_recvs);
+    NNTI_create_work_request(&ntd->mr_recvs, &ntd->wr_recvs);
+
     if (err != NNTI_OK) {
       fprintf (stderr, "Error: NNTI_register_memory(NNTI_RECV_DST) for client messages returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
       return;
@@ -1874,14 +1880,6 @@ struct iovec {
 
 #endif
 
-static void enet_free_func(void *packet)
-{
-#ifdef ENET_FOUND
-    /* Clean up the packet now that we're done using it. */
-    enet_packet_destroy ((ENetPacket*)packet);
-#endif
-}
-
 /* 
  *  This function will not be used unless there is no read_to_buffer function
  *  in the transport.  It is an example, meant to be copied in transports 
@@ -1916,15 +1914,15 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     CMbuffer write_buffer;
     NNTI_buffer_t mr;
     char *data;
+    char *ptr;
     int i, size = 0;
     int err;
     long register_size;
     nnti_message_info local_message_info = malloc(sizeof(*local_message_info));
-    NNTI_status_t               status;
+    void *packed = NULL;
+    int32_t packed_size;
 
     for(i=0; i<iovcnt; i++) size+= iov[i].iov_len;
-
-    h = get_control_message_buffer(ncd, &m, sizeof(*m));
 
 #ifdef DF_SHM_FOUND
     if (ncd->shm_cd) {
@@ -1935,9 +1933,10 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
             return -1;
         }
 
+	h = get_control_message_buffer(ncd, &m, sizeof(*m));
+
         m->message_type = CMNNTI_PULL_SHM_REQUEST;
         m->pull.size = size;
-        m->pull.addr = NULL;
         //m->pull.buf_addr;
         m->pull.msg_info = NULL;
 
@@ -1970,7 +1969,7 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
 	}
         svc->trace_out(ncd->ntd->cm, "CMNNTI registering region at %p, size %d",
 		       data, register_size);
-	err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, register_size, 1, NNTI_GET_SRC, &ncd->peer_hdl, &mr);
+	err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, register_size, 1, NNTI_GET_SRC, &mr);
 	if (err != NNTI_OK) {
 	    printf ("  CMNNTI: NNTI_register_memory() for message returned non-zero: %d %s\n",
 		    err, NNTI_ERROR_STRING(err));
@@ -1980,10 +1979,23 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
 	ncd->outgoing_mapped_mr = mr;
     }
 
+    buffer_pack(&mr, &packed, &packed_size, (xdrproc_t)&xdr_NNTI_buffer_t);
+
+    if (packed_size > NNTI_REQUEST_BUFFER_SIZE) {
+	svc->trace_out(ncd->ntd->cm, "buffer_pack() says encoded NNTI_buffer_t is larger than NNTI_REQUEST_BUFFER_SIZE");        
+	exit(1);
+    }
+
+    int offset_of_packed_src_buf = ((int) (((char *) (&(((struct client_message *)NULL)->pull.packed_src_buf))) - ((char *) NULL)));
+    h = get_control_message_buffer(ncd, &m, offset_of_packed_src_buf + packed_size + sizeof(packed_size));
+    ptr = &m->pull.packed_src_buf[0];
+    memcpy(ptr, &packed_size, sizeof(packed_size));
+    ptr += sizeof(packed_size);
+    memcpy(ptr, packed, packed_size);
+    ptr += packed_size;
+
     m->message_type = CMNNTI_PULL_REQUEST;
     m->pull.size = size;
-    m->pull.addr = data;
-    m->pull.buf_addr = mr;
     m->pull.msg_info = local_message_info;
     local_message_info->send_id = send_request++;
     local_message_info->size = size;
@@ -1998,6 +2010,8 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET registered buffer %p, copied %d bytes and sending pull request", data, size);
     svc->set_pending_write(ncd->conn);
     if (send_control_message(h) == 0) return 0;
+
+    buffer_pack_free(packed, packed_size, (xdrproc_t)&xdr_NNTI_buffer_t);
 
     return 1;
 }
@@ -2071,14 +2085,27 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
     CMbuffer read_buffer;
     char *data;
     NNTI_status_t               status;
+    NNTI_buffer_t get_src_mr;
+    void *packed = NULL;
+    void *ptr = NULL;
+    int32_t packed_size;
 
     svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET Received pull request, pulling %d bytes", request->size);
+
+    memset(&get_src_mr, 0, sizeof(get_src_mr));
+    ptr = &request->packed_src_buf[0];
+    memcpy(&packed_size, ptr, sizeof(packed_size));
+    ptr += sizeof(packed_size);
+    packed = malloc(packed_size);
+    memcpy(packed, ptr, packed_size);
+
+    buffer_unpack(ptr, packed_size, &get_src_mr, (xdrproc_t)&xdr_NNTI_buffer_t);
 
     if (ncd->read_buffer) {
 	svc->trace_out(ncd->ntd->cm, "Considering reuse of buffer %p, ref_count %d\n", ncd->read_buffer, ncd->read_buffer->ref_count);
     }
     if (ncd->ntd->cache_maps &&
-        (memcmp(&request->buf_addr, &ncd->incoming_mapped_region, sizeof(NNTI_buffer_t)) == 0)) {
+        (memcmp(&get_src_mr, &ncd->incoming_mapped_region, sizeof(NNTI_buffer_t)) == 0)) {
 	/* no need to reregister!  We'll reuse!*/
         svc->trace_out(ncd->ntd->cm, "CMNNTI reusing already mapped region at %p, size %d",
 		       ncd->incoming_mapped_region, ncd->incoming_mapped_size);
@@ -2087,36 +2114,42 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
     } else {
 	if (ncd->read_buffer != NULL) {
 	    svc->return_data_buffer(trans->cm, ncd->read_buffer);
-	    svc->trace_out(ncd->ntd->cm, "CMNNTI unregistering previously mapped region at %p, size %d",
+	    svc->trace_out(ncd->ntd->cm, "CMNNTI freeing previously mapped region at %p, size %d",
 			   ncd->incoming_mapped_region, ncd->incoming_mapped_size);
-	    err = NNTI_unregister_memory(&ncd->mr_pull);
+	    err = NNTI_free(&ncd->mr_pull);
 	    if (err != NNTI_OK) {
-		printf ("  CMNNTI: NNTI_unregister_memory() for client returned non-zero: %d %s\n",
+		printf ("  CMNNTI: NNTI_free() for client returned non-zero: %d %s\n",
 			err, NNTI_ERROR_STRING(err));
 	    }
 	    ncd->read_buffer = NULL;
 	}
 
-        read_buffer = svc->get_data_buffer(ncd->ntd->cm, request->size);
+/*        read_buffer = svc->get_data_buffer(ncd->ntd->cm, request->size);
 	data = read_buffer->buffer;
-        svc->trace_out(ncd->ntd->cm, "CMNNTI registering region at %p, size %d",
-		       data, read_buffer->size);
         err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, request->size, 1,
-			       NNTI_GET_DST, &ncd->peer_hdl, &ncd->mr_pull);
+	NNTI_GET_DST, &ncd->mr_pull);*/
+
+	err = NNTI_alloc(&ncd->ntd->trans_hdl, request->size, 1, NNTI_GET_DST, &ncd->mr_pull);
+
+	data = NNTI_BUFFER_C_POINTER(&ncd->mr_pull);
+	read_buffer = svc->create_data_buffer(ncd->ntd->cm, data, request->size);
+        svc->trace_out(ncd->ntd->cm, "CMNNTI alloced region at %p, size %d",
+		       data, read_buffer->size);
+
 	if (err != NNTI_OK) {
 	    printf ("  CMNNTI: NNTI_register_memory() for client returned non-zero: %d %s\n",
 		    err, NNTI_ERROR_STRING(err));
             return -1;
 	}
 	ncd->incoming_mapped_size = read_buffer->size;
-        memcpy(&ncd->incoming_mapped_region, &request->buf_addr, sizeof(NNTI_buffer_t));
+        memcpy(&ncd->incoming_mapped_region, &get_src_mr, sizeof(NNTI_buffer_t));
     }
 
-    err = NNTI_get (&request->buf_addr,
+    err = NNTI_get (&get_src_mr,
 		    offset,  // get from this remote buffer+offset
 		    pullsize,      // this amount of data
 		    &ncd->mr_pull,
-		    offset); // into this buffer+offset
+		    offset, &ncd->wr_pull); // into this buffer+offset
     
     if (err != NNTI_OK) {
 	printf ("  THREAD: Error: NNTI_get() for client returned non-zero: %d %s\n",
@@ -2130,7 +2163,7 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
 	err = NNTI_ETIMEDOUT;
 	DROP_CM_LOCK(svc, trans->cm);
 	while ( (err == NNTI_ETIMEDOUT ) && (timeout < 520)) {
-	    err = NNTI_wait(&ncd->mr_pull, NNTI_GET_DST, timeout, &status);
+	    err = NNTI_wait(&ncd->wr_pull, timeout, &status);
 	    timeout ++;
 	}
 	ACQUIRE_CM_LOCK(svc, trans->cm);
@@ -2175,21 +2208,27 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
 		       struct client_message *m)
 {
     // put the current message into pull request queue
+    int pull_rqst_size = sizeof(struct pull_request_queue) + *((int*)(char*)&m->pull.packed_src_buf) + 4;
+    int copy_size = sizeof(struct pull_request) + *((int*)(char*)&m->pull.packed_src_buf) + 4;
     struct pull_request_queue *request = (struct pull_request_queue *)
-        svc->malloc_func (sizeof(struct pull_request_queue));
+        svc->malloc_func (pull_rqst_size);
+    
     if (!request) {
         svc->trace_out(ncd->ntd->cm, "CMNNTI: Error: cannot allocate memory %s:%d", __FUNCTION__, __LINE__);
         return;
     }
-    request->request = m->pull;
+    memcpy (&request->request, &m->pull, copy_size);
     request->state = GET_SCHED_QUEUED;
     request->num_errors = 0;
 
 #define NO_SCHEDULER
 #ifdef NO_SCHEDULER
-    int rc = perform_pull_request_message(ncd, svc, trans, &request->request);
+    perform_pull_request_message(ncd, svc, trans, &request->request);
     free(request);
 #else
+    /* max number of errors for scheduling a request */
+    static int max_num_errors_scheduling = 10;
+
 
     request->next = ncd->ntd->pull_req_queue;
     ncd->ntd->pull_req_queue = request;
@@ -2269,14 +2308,6 @@ handle_pull_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, trans
     free(local_message_info);
 }
 
-static void
-handle_piggyback_complete_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transport_entry trans,
-		       struct client_message *m)
-{
-    svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET received piggyback complete message, unblocking any pending writes");
-    svc->wake_any_pending_write(ncd->conn);
-}
-
 extern int
 libcmnnti_LTX_writev_func(svc, ncd, iov, iovcnt, attrs)
 CMtrans_services svc;
@@ -2329,10 +2360,6 @@ attr_list attrs;
 	  size += iov[i].iov_len;
 	}
         svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET outbound piggybacking %d bytes of data in control message", size);
-	if (!ncd->use_enet) {
-	    /* if NNTI, block writes until we get a piggyback recvd message */
-	    svc->set_pending_write(ncd->conn);
-	}
 	if (send_control_message(h) == 0) return 0;
     } else {
         if (copy_full_buffer_and_send_pull_request(svc, ncd, iov, iovcnt, attrs) == 0)
@@ -2392,6 +2419,7 @@ CMtrans_services svc;
 	CM_NNTI_ADDR = attr_atom_from_string("NNTI_ADDR");
 	CM_NNTI_PARAMS = attr_atom_from_string("NNTI_PARAMS");
 	CM_NNTI_ENET_CONTROL = attr_atom_from_string("NNTI_ENET_CONTROL");
+	CM_PEER_LISTEN_PORT = attr_atom_from_string("PEER_LISTEN_PORT");
 	CM_NNTI_IMMEDIATE_PULL_WAIT = attr_atom_from_string("NNTI_IMMEDIATE_PULL_WAIT");
 	CM_IP_HOSTNAME = attr_atom_from_string("IP_HOST");
 	CM_ENET_ADDR = attr_atom_from_string("CM_ENET_ADDR");
