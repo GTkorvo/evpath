@@ -2483,5 +2483,30 @@ static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd,
 }
 
 
+extern transport_entry
+cmenet_add_static_transport(CManager cm, CMtrans_services svc)
+{
+    transport_entry transport;
+    transport = svc->malloc_func(sizeof(struct _transport_item));
+    memset(transport, 0, sizeof(*transport));
+    transport->trans_name = strdup("enet");
+    transport->cm = cm;
+    transport->transport_init = (CMTransport_func)libcmib_LTX_initialize;
+    transport->listen = (CMTransport_listen_func)libcmib_LTX_non_blocking_listen;
+    transport->initiate_conn = (CMConnection(*)())libcmib_LTX_initiate_conn;
+    transport->self_check = (int(*)())libcmib_LTX_self_check;
+    transport->connection_eq = (int(*)())libcmib_LTX_connection_eq;
+    transport->shutdown_conn = (CMTransport_shutdown_conn_func)libcmib_LTX_shutdown_conn;
+    transport->read_block_func = (CMTransport_read_block_func)libcmib_LTX_read_block_func;
+    transport->read_to_buffer_func = (CMTransport_read_to_buffer_func)NULL;
+    transport->writev_func = (CMTransport_writev_func)libcmib_LTX_writev_func;
+    transport->writev_complete_notify_func = (CMTransport_writev_func)libcmib_LTX_writev_complete_notify_func;
+    transport->get_transport_characteristics = NULL;
+    if (transport->transport_init) {
+	transport->trans_data = transport->transport_init(cm, svc, transport);
+    }
+    return transport;
+}
+
 #endif
 
