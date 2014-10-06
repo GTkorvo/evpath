@@ -2535,6 +2535,7 @@ cmnnti_add_static_transport(CManager cm, CMtrans_services svc)
 {
     transport_entry transport;
     transport = svc->malloc_func(sizeof(struct _transport_item));
+    memset(transport, 0, sizeof(*transport));
     transport->trans_name = strdup("nnti");
     transport->cm = cm;
     transport->transport_init = (CMTransport_func)libcmnnti_LTX_initialize;
