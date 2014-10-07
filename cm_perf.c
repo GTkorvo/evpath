@@ -35,6 +35,7 @@ extern atom_t CM_BW_MEASURE_SIZEINC;
 static void init_atoms();
 
 static atom_t CM_TRANS_TEST_SIZE = -1;
+static atom_t CM_TRANS_TEST_NODE = -1;
 static atom_t CM_TRANS_TEST_VECS = -1;
 static atom_t CM_TRANS_TEST_VERBOSE = -1;
 static atom_t CM_TRANS_TEST_REPEAT = -1;
@@ -409,7 +410,7 @@ INT_CMprobe_bandwidth(CMConnection conn, long size, attr_list attrs)
 
     cond = INT_CMCondition_get(conn->cm, conn);
 
-    if (size < 16) size = 16;
+    if (size < 20) size = 20;
     if (repeat_count < 10) repeat_count = 10;
     if (max_block_size == 0) {
 	char *new_block = malloc(size);
@@ -474,6 +475,7 @@ init_atoms()
 {
     if (CM_TRANS_TEST_SIZE==-1) {
 	CM_TRANS_TEST_SIZE = attr_atom_from_string("CM_TRANS_TEST_SIZE");
+	CM_TRANS_TEST_NODE = attr_atom_from_string("CM_TRANS_TEST_NODE");
 	CM_TRANS_TEST_VECS = attr_atom_from_string("CM_TRANS_TEST_VECS");
 	CM_TRANS_TEST_VERBOSE = attr_atom_from_string("CM_TRANS_TEST_VERBOSE");
 	CM_TRANS_TEST_REPEAT = attr_atom_from_string("CM_TRANS_TEST_REPEAT");
@@ -516,7 +518,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 {
     int i;
     int cond;
-    attr_list result;
+    attr_list result = NULL;
     long actual;
     struct FFSEncodeVec *write_vec;
     struct FFSEncodeVec *tmp_vec, *header_vec;
@@ -531,6 +533,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     cond = INT_CMCondition_get(conn->cm, conn);
     CManager cm = conn->cm;
     struct _free_struct *write_data;
+    int node_id;
 
     if (!get_long_attr(how, CM_TRANS_TEST_SIZE, &size)) {
 	printf("CM_TRANS_TEST_SIZE attr not found by CMtest_transport, required\n");
@@ -547,6 +550,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     get_int_attr(how, CM_TRANS_TEST_VERBOSE, &verbose);
     get_int_attr(how, CM_TRANS_TEST_REPEAT, &repeat_count);
     get_int_attr(how, CM_TRANS_TEST_REUSE_WRITE_BUFFER, &reuse_write_buffer);
+    get_int_attr(how, CM_TRANS_TEST_NODE, &node_id);
     char *attr_str = attr_list_to_string(how);
 
     
@@ -586,7 +590,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
     for (i=0; i <repeat_count; i++) {
 	if (tmp_vec == NULL) {
 	    tmp_vec = malloc(sizeof(tmp_vec[0]) * (vecs + 2));  /* at least 2 */
-	    tmp_vec[0].iov_len = 4 * sizeof(int); /* body header */
+	    tmp_vec[0].iov_len = 5 * sizeof(int); /* body header */
 	    for (count = 0; count < vecs; count++) {
 		tmp_vec[count+1].iov_base = calloc(each + repeat_count, 1);
 		tmp_vec[count+1].iov_len = each;
@@ -600,7 +604,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	    }
 	    tmp_vec[1].iov_len -= tmp_vec[0].iov_len;
 	}
-	tmp_vec[0].iov_base = malloc(4 * sizeof(int)); /* body header */
+	tmp_vec[0].iov_base = malloc(5 * sizeof(int)); /* body header */
 	((int*)tmp_vec[0].iov_base)[0] = 0x434d5000;
     /* size in second entry, high byte gives CMPerf operation */
 #if SIZEOF_LONG == 4
@@ -610,6 +614,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 #endif
 	((int*)tmp_vec[0].iov_base)[2] = (size & 0xffffffff);
 	((int*)tmp_vec[0].iov_base)[3] = i;   /* sequence number */
+	((int*)tmp_vec[0].iov_base)[4] = node_id;   /* node_id */
 	if (vecs > 1) {
 	    /* if more than one vec, handle rounding */
 	    tmp_vec[vecs].iov_len = size - (each * (vecs-1));
@@ -863,7 +868,7 @@ INT_CMregressive_probe_bandwidth(CMConnection conn, long size, attr_list attrs)
     double covXY=0.0, cofXY=0.0;
     struct FFSEncodeVec tmp_vec[1];
 
-    if (size < 16) size = 16;
+    if (size < 20) size = 20;
 
     if (attrs != NULL) {
 	get_int_attr(attrs, CM_REBWM_RLEN, &N);

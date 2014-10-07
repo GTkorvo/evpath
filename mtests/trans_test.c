@@ -10,6 +10,7 @@
 #include <signal.h>
 #include "evpath.h"
 #include <errno.h>
+#include "cercs_env.h"
 #ifdef MPI_C_FOUND
 #include "mpi.h"
 #define CONTACTLEN 1024
@@ -23,6 +24,7 @@ static atom_t CM_TRANS_TEST_VERBOSE = -1;
 static atom_t CM_TRANS_TEST_REPEAT = 10;
 static atom_t CM_TRANS_TEST_REUSE_WRITE_BUFFER = -1;
 static atom_t CM_TRANS_TEST_DURATION = -1;
+static atom_t CM_TRANS_TEST_NODE = -1;
 static atom_t CM_TRANS_MEGABITS_SEC = -1;
 static atom_t CM_TRANS_TEST_TAKE_RECEIVE_BUFFER = -1;
 static atom_t CM_TRANSPORT = -1;
@@ -35,6 +37,7 @@ static int msg_count = 10;
 static int reuse_write = 1;
 
 static int received_count = 0;
+static int *received_counts = NULL;
 static int taken_corrupt = 0;
 static int expected_count = -1;
 static long write_size = -1;
@@ -43,13 +46,16 @@ static int take = 0;
 static int size_error = 0;
 static int global_exit_condition = -1;
 static attr_list global_test_result = NULL;
-
+static int use_mpi = 0;
+static int np = 2;
+static int me = 0;
 typedef struct _buf_list {
     int checksum;
     long length;
     void *buffer;
 } *buf_list;
 
+chr_time bandwidth_start_time;
 attr_list
 trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list list)
 {
@@ -64,6 +70,14 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
 	    printf("\n");
 	}
 	received_count = 0;
+	if (use_mpi && (received_counts == NULL)) {
+	    received_counts = malloc(sizeof(int) * np);
+	    memset(received_counts, 0, sizeof(int) * np);
+	    chr_timer_start(&bandwidth_start_time);
+	} else {
+	    /* only once */
+	    chr_timer_start(&bandwidth_start_time);
+	}
 	if (list) {
 	    get_int_attr(list, CM_TRANS_TEST_REPEAT, &expected_count);
 	    get_long_attr(list, CM_TRANS_TEST_SIZE, &write_size);
@@ -74,15 +88,19 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
 	break;
     case 1:
 	/* body message */
-	if (verbose) printf("Body message %d received, length %ld\n", *(int*)buffer, length);
+	if (verbose) printf("Body message %d received from node %d, length %ld\n", *(int*)buffer, 
+			    ((int*)buffer)[1], length);
 	if (length != (write_size - 12 /* test protocol swallows a little as header */)) {
 	    printf("Error in body delivery size, expected %ld, got %ld\n", write_size - 12, length);
 	    size_error++;
 	}
+	if (use_mpi) {
+	    received_count = received_counts[((int*)buffer)[1]];
+	}
 	if (*(int*)buffer != received_count) {
 	    static int warned = 0;
 	    if (verbose && !warned) {
-		printf("Data missing or out of order, expected msg %d and got %d\n", received_count, *(int*)buffer);
+		printf("Data missing or out of order, expected msg %d and got %d, from node %d\n", received_count, *(int*)buffer, ((int*)buffer)[1]);
 		warned++;
 	    }
 	}
@@ -104,6 +122,9 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
 	    buffer_count++;
 	}
 	received_count++;
+	if (use_mpi) {
+	    received_counts[((int*)buffer)[1]]++;
+	}
 	return NULL;
 	break;
     case 2: {
@@ -111,6 +132,15 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
 	attr_list ret = create_attr_list();
 	double secs;
 	int buf;
+	if (use_mpi) {
+	    int i;
+	    for (i=1; i < np; i++) {
+		if (received_counts[i] < expected_count) {
+		    return NULL;
+		}
+	    }
+	}
+	chr_timer_stop(&bandwidth_start_time);
 	for (buf = 0; buf < buffer_count; buf++) {
 	    int sum = 0;
 	    int i;
@@ -129,8 +159,10 @@ trans_test_upcall(CManager cm, void *buffer, long length, int type, attr_list li
 	}
 	set_int_attr(ret, CM_TRANS_TEST_RECEIVED_COUNT, received_count);
 	//dump_attr_list(list);
+	set_double_attr(list, CM_TRANS_TEST_DURATION,
+			chr_time_to_secs(&bandwidth_start_time));
 	if (get_double_attr(list, CM_TRANS_TEST_DURATION, &secs)) {
-	    long size = received_count * write_size;
+	    long size = received_count * write_size * (np-1);
 	    double megabits = (double)size*8 / ((double)1000*1000);
 	    double megabits_sec = megabits / secs;
 	    set_double_attr(ret, CM_TRANS_MEGABITS_SEC, megabits_sec);
@@ -235,7 +267,6 @@ main(argc, argv)
     CMConnection conn = NULL;
     static int atom_init = 0;
     int start_subprocess = 1;
-    int use_mpi = 0;
     int ret, actual_count;
     argv0 = argv[0];
     int start_subproc_arg_count = 4; /* leave a few open at the beginning */
@@ -243,10 +274,6 @@ main(argc, argv)
     int cur_subproc_arg = start_subproc_arg_count;
     char *transport = NULL;
     char path[10240];
-    int me;
-#ifdef MPI_C_FOUND
-    int np;
-#endif
 
     if (getcwd(&path[0], sizeof(path)) == NULL) {
         printf("Couldn't get pwd\n");
@@ -382,10 +409,6 @@ main(argc, argv)
 	MPI_Init(&argc, &argv);                /* Initialize MPI */
 	MPI_Comm_size(MPI_COMM_WORLD, &np);    /* Get nr of processes */
 	MPI_Comm_rank(MPI_COMM_WORLD, &me);    /* Get own identifier */
-	if (np != 2) {
-	    MPI_Finalize();
-	    exit(1);
-	}
     } else {
 	me = 0;
     }
@@ -415,6 +438,7 @@ main(argc, argv)
 	CM_TRANS_TEST_RECEIVED_COUNT = attr_atom_from_string("CM_TRANS_TEST_RECEIVED_COUNT");
 	CM_TRANS_TEST_TAKEN_CORRUPT = attr_atom_from_string("CM_TRANS_TEST_TAKEN_CORRUPT");
 	CM_TRANS_TEST_DURATION = attr_atom_from_string("CM_TRANS_TEST_DURATION_SECS");
+	CM_TRANS_TEST_NODE = attr_atom_from_string("CM_TRANS_TEST_NODE");
 	CM_TRANS_MEGABITS_SEC = attr_atom_from_string("CM_TRANS_MEGABITS_SEC");
 	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
 	atom_init++;
@@ -448,6 +472,7 @@ main(argc, argv)
 	    char master_contact[CONTACTLEN];             /* Local host name string */
 	    strcpy(master_contact, attr_list_to_string(contact_list));
 	    MPI_Bcast(master_contact,CONTACTLEN,MPI_CHAR,0,MPI_COMM_WORLD);
+	    MPI_Barrier(MPI_COMM_WORLD);
 #endif
 	} else {
 	    int i;
@@ -510,7 +535,13 @@ main(argc, argv)
 	add_int_attr(test_list, CM_TRANS_TEST_REUSE_WRITE_BUFFER, reuse_write); 
 	add_int_attr(test_list, CM_TRANS_TEST_TAKE_RECEIVE_BUFFER, take); 
 	add_int_attr(test_list, CM_TRANS_TEST_VERBOSE, verbose);
+	add_int_attr(test_list, CM_TRANS_TEST_NODE, me);
 		
+#ifdef MPI_C_FOUND
+	if (use_mpi) {
+	    MPI_Barrier(MPI_COMM_WORLD);
+	}
+#endif
 	result = CMtest_transport(conn, test_list);
 	global_test_result = result;
 	free_attr_list(test_list);
@@ -528,11 +559,15 @@ main(argc, argv)
     }
     free(subproc_args);
 
-    if (!global_test_result) return 1;
+    if (!global_test_result) {
+	if (use_mpi) MPI_Finalize();
+	return 0;
+    }
     ret = 0;
     if (!get_int_attr(global_test_result, CM_TRANS_TEST_RECEIVED_COUNT, &actual_count)) ret = 1;
     if (actual_count != msg_count) ret = 1;
     free_attr_list(global_test_result);
+    if (use_mpi) MPI_Finalize();
     return ret;
 }
 
