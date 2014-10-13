@@ -380,7 +380,8 @@ get_qual_hostname(void *cm, char *buf, int len, CMtrans_services svc, attr_list 
 	svc->free_func(new_name_str);
     }
 
-    if (((host = gethostbyname(buf)) == NULL) ||
+    if ((buf[0] == 0) ||
+	((host = gethostbyname(buf)) == NULL) ||
 	(memchr(buf, '.', strlen(buf)) == NULL)) {
 	/* just use the bloody IP address */
 	struct in_addr IP;
