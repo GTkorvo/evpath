@@ -213,7 +213,6 @@ int wait_for_children(char **list)
     int i=0, stat;
     (void)list;
     while(pid_list && pid_list[i] != 0) {
-	printf("Waiting for pid %x\n", pid_list[i]);
 	waitpid(pid_list[i], &stat, 0);
 	i++;
     }
@@ -272,6 +271,5 @@ main(int argc, char **argv)
     if (!regression_master) {
 	return be_test_child(argc, argv);
     }
-    alarm(70);
     return be_test_master(argc-1, &argv[1]);
 }
