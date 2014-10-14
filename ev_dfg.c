@@ -1535,6 +1535,7 @@ INT_EVclient_shutdown(EVclient client, int result)
     EVshutdown_contribution_msg msg;
     if (client->already_shutdown) printf("Node %d, already shut down BAD!\n", client->my_node_id);
     msg.value = result;
+    CMtrace_out(client->cm, EVdfgVerbose, "Client %d calling client_shutdown\n", client->my_node_id);
     if (client->master_connection == NULL) {
 	queue_master_msg(client->master, (void*)&msg, DFGshutdown_contrib, NULL, /*copy*/0);
     } else {
@@ -1543,7 +1544,9 @@ INT_EVclient_shutdown(EVclient client, int result)
     }
     if (!client->already_shutdown) {
 	CManager_unlock(client->cm);
+	CMtrace_out(client->cm, EVdfgVerbose, "Client %d shutdown condition wait\n", client->my_node_id);
 	CMCondition_wait(client->cm, new_shutdown_condition(client, client->master_connection));
+	CMtrace_out(client->cm, EVdfgVerbose, "Client %d shutdown condition wait DONE!\n", client->my_node_id);
 	CManager_lock(client->cm);
     }
     return client->shutdown_value;
@@ -1554,6 +1557,7 @@ INT_EVclient_force_shutdown(EVclient client, int result)
 {
     result |= STATUS_FORCE;
     if (client->already_shutdown) printf("Node %d, already contributed to shutdown.  Don't call shutdown twice!\n", client->my_node_id);
+    CMtrace_out(client->cm, EVdfgVerbose, "Client %d calling client_FORCE_shutdown\n", client->my_node_id);
     if (client->master_connection != NULL) {
 	/* we are a client, tell the master to shutdown */
 	CMFormat shutdown_msg = INT_CMlookup_format(client->cm, EVclient_shutdown_contribution_format_list);
@@ -1566,7 +1570,9 @@ INT_EVclient_force_shutdown(EVclient client, int result)
     }
     if (!client->already_shutdown) {
 	CManager_unlock(client->cm);
+	CMtrace_out(client->cm, EVdfgVerbose, "Client %d shutdonw condition wait\n", client->my_node_id);
 	CMCondition_wait(client->cm, new_shutdown_condition(client, client->master_connection));
+	CMtrace_out(client->cm, EVdfgVerbose, "Client %d shutdonw condition wait DONE!\n", client->my_node_id);
 	CManager_lock(client->cm);
     }
     return client->shutdown_value;
@@ -1582,6 +1588,7 @@ extern void
 INT_EVclient_ready_for_shutdown(EVclient client)
 {
     if (client->already_shutdown) return;
+    CMtrace_out(client->cm, EVdfgVerbose, "Client %d ready for shutdown \n", client->my_node_id);
     if (client->master_connection != NULL) {
 	/* we are a client, tell the master to shutdown */
 	CMFormat shutdown_msg = INT_CMlookup_format(client->cm, EVclient_shutdown_contribution_format_list);
@@ -1596,11 +1603,10 @@ INT_EVclient_ready_for_shutdown(EVclient client)
 extern int 
 INT_EVclient_wait_for_shutdown(EVclient client)
 {
-//    printf("Wait for shutdown called for node %d\n", dfg->my_node_id);
+    CMtrace_out(client->cm, EVdfgVerbose, "Client %d wait for shutdown \n", client->my_node_id);
     if (client->already_shutdown) return client->shutdown_value;
-//    printf("Wait for shutdown waiting for node %d\n", dfg->my_node_id);
     INT_CMCondition_wait(client->cm, new_shutdown_condition(client, client->master_connection));
-//    printf("Wait for shutdown returning for node %d\n", dfg->my_node_id);
+    CMtrace_out(client->cm, EVdfgVerbose, "Client %d wait for shutdown DONE! \n", client->my_node_id);
     return client->shutdown_value;
 }
 
@@ -2339,6 +2345,7 @@ possibly_signal_shutdown(EVmaster master, int value, CMConnection conn)
     int force_shutdown = 0;
     int signal_from_client = -1;
     assert(CManager_locked(master->cm));
+    CMtrace_out(master->cm, EVdfgVerbose, "possibly signal shutdown\n");
     for (i=0; i < master->node_count; i++) {
 	if ((conn == NULL) && master->nodes[i].self) {
 	    /* we're the master and node i */
@@ -2413,7 +2420,7 @@ possibly_signal_shutdown(EVmaster master, int value, CMConnection conn)
 	}
     }
     /* sleep briefly to let the shutdown messages go out */
-    INT_CMusleep(master->cm, 100000);
+    INT_CMsleep(master->cm, 1);
     if (master->client) {
 	master->client->shutdown_value = status;
 	i = 0;
