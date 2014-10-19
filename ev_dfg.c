@@ -1570,9 +1570,9 @@ INT_EVclient_force_shutdown(EVclient client, int result)
     }
     if (!client->already_shutdown) {
 	CManager_unlock(client->cm);
-	CMtrace_out(client->cm, EVdfgVerbose, "Client %d shutdonw condition wait\n", client->my_node_id);
+	CMtrace_out(client->cm, EVdfgVerbose, "Client %d shutdown condition wait\n", client->my_node_id);
 	CMCondition_wait(client->cm, new_shutdown_condition(client, client->master_connection));
-	CMtrace_out(client->cm, EVdfgVerbose, "Client %d shutdonw condition wait DONE!\n", client->my_node_id);
+	CMtrace_out(client->cm, EVdfgVerbose, "Client %d shutdown condition wait DONE!\n", client->my_node_id);
 	CManager_lock(client->cm);
     }
     return client->shutdown_value;
@@ -1608,6 +1608,14 @@ INT_EVclient_wait_for_shutdown(EVclient client)
     INT_CMCondition_wait(client->cm, new_shutdown_condition(client, client->master_connection));
     CMtrace_out(client->cm, EVdfgVerbose, "Client %d wait for shutdown DONE! \n", client->my_node_id);
     return client->shutdown_value;
+}
+
+extern int 
+INT_EVclient_test_for_shutdown(EVclient client)
+{
+    CMtrace_out(client->cm, EVdfgVerbose, "Client %d testing for shutdown return %d\n", client->my_node_id,
+	client->already_shutdown);
+    return client->already_shutdown;
 }
 
 extern int INT_EVclient_source_active(EVsource src)

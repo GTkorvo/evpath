@@ -304,4 +304,5 @@ extern int INT_EVclient_shutdown ( EVclient client, int result );
 extern int INT_EVclient_force_shutdown ( EVclient client, int result );
 extern int INT_EVclient_source_active ( EVsource src );
 extern int INT_EVclient_wait_for_shutdown ( EVclient client );
+extern int INT_EVclient_test_for_shutdown ( EVclient client );
 

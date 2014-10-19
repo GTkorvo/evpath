@@ -732,6 +732,19 @@ extern void EVclient_ready_for_shutdown(EVclient client);
  */
 extern int EVclient_wait_for_shutdown(EVclient client);
 
+/*!
+ *  test to see if the coordinated shutdown time has arrived.
+ *
+ *  This call essentially tests to see if EVclient_wait_for_shutdown() will
+ * return immediately.  If false, EVclient_wait_for_shutdown() would block
+ * as the coordinated shutdown time has not yet arrived.  Clients using this
+ * call must still use EVclient_wait_for_shutdown() to exit cleanly.
+ *
+ * \param client The EVclient handle for which shutdown may be imminent
+ * \return boolean True if the DFG-wide shutdown time has arrived
+ */
+extern int EVclient_test_for_shutdown(EVclient client);
+
 #ifdef	__cplusplus
 }
 #endif
