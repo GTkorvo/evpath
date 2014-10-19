@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
 set (TESTS evtest master_not_client multi_sink rawtest chain_test filter_test tree_test multi_test dchain_test fail_chain_test 
-  reconfig_chain_test anon_multi_test auto_tree_test router_test force_test self_reconfig_test)
+  reconfig_chain_test anon_multi_test auto_tree_test router_test force_test self_reconfig_test source_split named_stones)
 
 ENABLE_TESTING()
 

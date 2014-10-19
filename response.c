@@ -1014,6 +1014,31 @@ static attr_list cod_ev_get_attrs(cod_exec_context ec, int queue, int index) {
     return *pattr;
 }
 
+static attr_list cod_ev_get_stone_attrs(cod_exec_context ec, char *stone_name) {
+    struct ev_state_data *ev_state = (void*) cod_get_client_data(ec, 0x34567890);
+    CManager cm = ev_state->cm;
+    event_path_data evp = cm->evp;
+    attr_list ret_list = NULL;
+    int cur_stone;
+    static atom_t STONE_NAME_ATOM = -1;
+    if (STONE_NAME_ATOM == -1) {
+	STONE_NAME_ATOM = attr_atom_from_string("EVP_STONE_NAME");
+    }
+    for (cur_stone = evp->stone_base_num; cur_stone < evp->stone_count + evp->stone_base_num; ++cur_stone) {
+	stone_type stone = stone_struct(evp, cur_stone);
+	if (stone && (stone->stone_attrs != NULL)) {
+	    char *this_stone_name = NULL;
+	    if (get_string_attr(stone->stone_attrs, STONE_NAME_ATOM, &this_stone_name)) {
+		if (stone_name && (strcmp(this_stone_name, stone_name) == 0)) {
+		    if (ret_list) printf("Warning, duplicate stone name \"%s\" found during attr query\n", stone_name);
+		    ret_list = stone->stone_attrs;
+		}
+	    }
+	}
+    }
+    return ret_list;
+}
+
 static int
 queued_wrapper(CManager cm, struct _queue *queue, queue_item *item,
                 void *client_data, int out_count, int *out_stones)
@@ -1135,7 +1160,7 @@ free_multi_response(void *client_data)
 {
     response_instance resp = (response_instance) client_data;
     resp->u.queued.ref_count--;
-    if (resp->u.queued.ref_count > 0) return;
+    if (resp->u.queued.ref_count != 0) return;
     if (resp->u.queued.code) cod_code_free(resp->u.queued.code);
     if (resp->u.queued.ec) cod_exec_context_free(resp->u.queued.ec);
     free(resp);
@@ -1546,6 +1571,7 @@ add_standard_routines(stone_type stone, cod_parse_context context)
 		int EVtarget_stone_on_port(cod_exec_context ec, int port);\n\
 		void EVsubmit(cod_exec_context ec, int port, void* d, cod_type_spec dt);\n\
 		void EVsubmit_attr(cod_exec_context ec, int port, void* d, cod_type_spec dt, attr_list list);\n\
+        	attr_list EVget_stone_attrs(cod_exec_context ec, char *stone_name);\n \
 		attr_list stone_attrs;\n";
 		//time_t time(time_t *timer);\n";
 
@@ -1562,6 +1588,7 @@ add_standard_routines(stone_type stone, cod_parse_context context)
 	{"sleep", (void*) 0},
 	{"EVmax_output", (void*)0},
 	{"EVtarget_stone_on_port", (void*)0},
+        {"EVget_stone_attrs",  (void *)0},
 	{(void *) 0, (void *) 0}
     };
 
@@ -1583,6 +1610,7 @@ add_standard_routines(stone_type stone, cod_parse_context context)
     externs[9].extern_value = (void *) (long) &sleep;
     externs[10].extern_value = (void *) (long) &cod_max_output;
     externs[11].extern_value = (void *) (long) &cod_target_stone_on_port;
+    externs[12].extern_value = (void *) (long) &cod_ev_get_stone_attrs;
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
@@ -1706,8 +1734,9 @@ add_queued_routines(cod_parse_context context, FMFormat *formats)
         int EVpresent(cod_exec_context ec, int queue, int index);\n\
 	int EVget_port(cod_exec_context ec, int queue);\n\
     	int EVtarget_size(cod_exec_context ec, int outstone);\n\
-        void EVget_attrs(cod_exec_context ec, int queue, int index);\n\
-        void EVget_attrs_full(cod_exec_context ec, cod_closure_context queue, int index);\n";
+        attr_list EVget_attrs(cod_exec_context ec, int queue, int index);\n	\
+        attr_list EVget_attrs_full(cod_exec_context ec, cod_closure_context queue, int index);\n\
+";
 
     static cod_extern_entry externs[] = {
         {"EVconforms", (void *)0},  //0 
