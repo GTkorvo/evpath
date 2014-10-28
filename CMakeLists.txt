@@ -184,6 +184,8 @@ IF (HAVE_IBVERBS OR HAVE_UGNI)
 	IF (NOT NO_TRANSPORT_MODULES)
            add_library(cmnnti MODULE cmnnti.c)
 	   list (APPEND TARGETS cmnnti)
+	   STRING(REGEX REPLACE trios_nnti trios_support NNTI_SUP_LIB ${NNTI_LIBRARIES})
+	   list (APPEND NNTI_LIBRARIES ${NNTI_SUP_LIB})
 	   TARGET_LINK_LIBRARIES(cmnnti ${NNTI_LIBRARIES} ${ENET_LIBRARIES} ${DF_SHM_LIBRARIES} ${BASE_LIBS})
 	ELSE (NOT NO_TRANSPORT_MODULES)
 	   list (APPEND EVPATH_SRC_LIST cmnnti.c)  # link nnti in main lib
@@ -279,17 +281,10 @@ if (${CMAKE_C_COMPILER_ID} MATCHES "Intel")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -shared-intel")
 endif()
 
-CONFIGURE_FILE( ${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h )
-
-# display status message for important variables
-MESSAGE( STATUS )
-MESSAGE( STATUS "-------------------------------------------------------------------------------" )
-MESSAGE( STATUS "CMAKE_INSTALL_PREFIX = ${CMAKE_INSTALL_PREFIX}" )
-MESSAGE( STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}  (options are: Debug,Release,RelWithDebInfo,MinSizeRel)")
-MESSAGE( STATUS "BUILD_SHARED_STATIC = ${BUILD_SHARED_STATIC}" )
-MESSAGE( STATUS "Change a value with: cmake -D<Variable>=<Value>" )
-MESSAGE( STATUS "    to use installed CERCS libraries specify -DCERCS_USE_INSTALLED=1" )
-MESSAGE( STATUS "-------------------------------------------------------------------------------" )
+find_program(SSH ssh)
+if (SSH) 
+   set (SSH_PATH "${SSH}")
+endif (SSH) 
 
 ENABLE_TESTING()
 
@@ -300,10 +295,6 @@ ADD_SUBDIRECTORY( dfg_tests )
 if (MPI_FOUND)
     ADD_SUBDIRECTORY( mpi_tests )
 endif (MPI_FOUND)
-find_program(SSH ssh)
-if (SSH) 
-   set (SSH_PATH "${SSH}")
-endif (SSH) 
 ADD_SUBDIRECTORY( examples )
 
 get_target_property_with_default(EVPATH_VERSION_MAJOR evpath LT_VERSION_CURRENT "0")
@@ -349,3 +340,17 @@ configure_file(EVPathConfigVersion.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/EVPathCo
 # Install these two files into the same directory as the generated exports-file.
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/EVPathConfig.cmake ${CMAKE_CURRENT_BINARY_DIR}/EVPathConfigVersion.cmake
         DESTINATION ${CMAKECONFIG_INSTALL_DIR} )
+
+
+CONFIGURE_FILE( ${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h )
+
+# display status message for important variables
+MESSAGE( STATUS )
+MESSAGE( STATUS "-------------------------------------------------------------------------------" )
+MESSAGE( STATUS "CMAKE_INSTALL_PREFIX = ${CMAKE_INSTALL_PREFIX}" )
+MESSAGE( STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}  (options are: Debug,Release,RelWithDebInfo,MinSizeRel)")
+MESSAGE( STATUS "BUILD_SHARED_STATIC = ${BUILD_SHARED_STATIC}" )
+MESSAGE( STATUS "Change a value with: cmake -D<Variable>=<Value>" )
+MESSAGE( STATUS "    to use installed CERCS libraries specify -DCERCS_USE_INSTALLED=1" )
+MESSAGE( STATUS "-------------------------------------------------------------------------------" )
+
