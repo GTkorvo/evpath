@@ -462,6 +462,15 @@ main(argc, argv)
 	    dump_attr_list(listen_list);
 	}
 	free_attr_list(listen_list);
+	if (transport != NULL) {
+	    char *actual_transport = NULL;
+	    get_string_attr(contact_list, CM_TRANSPORT, &actual_transport);
+	    if (!actual_transport) actual_transport = "sockets";
+	    if (strncmp(actual_transport, transport, strlen(actual_transport)) != 0) {
+		printf("Failed to load transport \"%s\"\n", transport);
+		exit(1);
+	    }
+	}
 	subproc_args[cur_subproc_arg++] = attr_list_to_string(contact_list);
 	subproc_args[cur_subproc_arg] = NULL;
 	global_exit_condition = CMCondition_get(cm, NULL);
