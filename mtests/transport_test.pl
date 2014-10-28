@@ -25,6 +25,9 @@ for (@file_list)
     warn "couldn't parse $file: $@" if $@;
     warn "couldn't do $file: $!"    unless defined $return;
     warn "couldn't run $file"       unless $return;
+  } else {
+    print "Loaded file $file\n";
+    last;
   }
 }
 die "No test spec file found in list : @file_list\n" unless $return;
