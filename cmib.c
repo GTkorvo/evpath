@@ -76,7 +76,7 @@
 
 #define LISTSIZE 1024
 #define _WITH_IB_
-#define PIGGYBACK 1024*10
+#define PIGGYBACK 1025*100
 
 #ifdef _WITH_IB_
 
