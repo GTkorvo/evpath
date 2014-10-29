@@ -1507,7 +1507,7 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 	}           
         case ENET_EVENT_TYPE_DISCONNECT: {
 	    nnti_conn_data_ptr nnti_conn_data = event.peer -> data;
-	    svc->trace_out(NULL, "Got a disconnect on connection %p\n",
+	    svc->trace_out(nnti_conn_data->ntd->cm, "Got a disconnect on connection %p\n",
 		event.peer -> data);
 
             nnti_conn_data = event.peer -> data;
@@ -1640,14 +1640,14 @@ enet_accept_conn(nnti_transport_data_ptr ntd, transport_entry trans,
     ncd->remote_contact_port = address->port;
 
     if (ncd->remote_host != NULL) {
-	svc->trace_out(NULL, "Accepted NNTI/ENET RUDP connection from host \"%s\"",
+	svc->trace_out(ntd->cm, "Accepted NNTI/ENET RUDP connection from host \"%s\"",
 		       ncd->remote_host);
     } else {
-	svc->trace_out(NULL, "Accepted NNTI/ENET RUDP connection from UNKNOWN host");
+	svc->trace_out(ntd->cm, "Accepted NNTI/ENET RUDP connection from UNKNOWN host");
     }
     add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
 	     (attr_value) (long)ncd->remote_contact_port);
-    svc->trace_out(NULL, "Remote host (IP %x) is listening at port %d\n",
+    svc->trace_out(ntd->cm, "Remote host (IP %x) is listening at port %d\n",
 		   ncd->remote_IP,
 		   ncd->remote_contact_port);
     return ncd;
@@ -1970,6 +1970,12 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
         svc->trace_out(ncd->ntd->cm, "CMNNTI registering region at %p, size %d",
 		       data, register_size);
 	err = NNTI_register_memory(&ncd->ntd->trans_hdl, data, register_size, 1, NNTI_GET_SRC, &mr);
+//	{
+//	    char *segments[] = {data, data + 1024};
+//	    uint64_t lengths[] = {1024, register_size - 1024},
+//		err = NNTI_register_segments(&ncd->ntd->trans_hdl, segments,
+//					     lengths, 2, NNTI_GET_SRC, &mr);
+//	}
 	if (err != NNTI_OK) {
 	    printf ("  CMNNTI: NNTI_register_memory() for message returned non-zero: %d %s\n",
 		    err, NNTI_ERROR_STRING(err));
