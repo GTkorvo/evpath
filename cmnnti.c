@@ -224,6 +224,8 @@ typedef struct nnti_connection_data {
 #define IOV_MAX 16
 #endif
 
+#define ENET_PIGGYBACK_SIZE 102500
+
 typedef enum {enet, nnti} control_transport;
 
 typedef struct _send_handle {
@@ -967,6 +969,9 @@ attr_list attrs;
 	return NULL;
     }
 
+    /* this size might be overridden */
+    nnti_conn_data->piggyback_size_max = NNTI_REQUEST_BUFFER_SIZE;
+
 #ifdef ENET_FOUND
     int enet_conn_status;
     sleep(1);
@@ -982,6 +987,7 @@ attr_list attrs;
       return NULL;
     default:
       nnti_conn_data->use_enet = 1;
+      nnti_conn_data->piggyback_size_max = ENET_PIGGYBACK_SIZE;
     }
 #endif
 
@@ -992,7 +998,6 @@ attr_list attrs;
     add_attr(conn_attr_list, CM_NNTI_PARAMS, Attr_String,
 	     (attr_value) (long)nnti_conn_data->nnti_params);
 
-    nnti_conn_data->piggyback_size_max = NNTI_REQUEST_BUFFER_SIZE;
     conn = svc->connection_create(trans, nnti_conn_data, conn_attr_list);
     add_connection(nnti_conn_data->ntd, nnti_conn_data);
     nnti_conn_data->conn = conn;
@@ -1083,7 +1088,7 @@ nnti_conn_data_ptr ncd;
 
 
 struct piggyback {
-  unsigned short size;          // size of message payload
+  unsigned int size;          // size of message payload
   char payload[1];
 };
 
@@ -1216,8 +1221,6 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	    return;
 	}
 	
-	ncd->piggyback_size_max = NNTI_REQUEST_BUFFER_SIZE;
-
 #ifdef DF_SHM_FOUND
         if (cm->shm_contact_len != 0) {
             /* attach to the shared memory region to complete connection setup */
@@ -1467,6 +1470,7 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 	    nnti_connection_data = enet_accept_conn(ntd, trans, &event.peer->address);
 
 	    ((nnti_conn_data_ptr)nnti_connection_data)->use_enet = 1;
+	    ((nnti_conn_data_ptr)nnti_connection_data)->piggyback_size_max = ENET_PIGGYBACK_SIZE;
             /* Store any relevant client information here. */
             event.peer -> data = nnti_connection_data;
 	    ((nnti_conn_data_ptr)nnti_connection_data)->peer = event.peer;
@@ -1475,6 +1479,7 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 	}
         case ENET_EVENT_TYPE_RECEIVE: {
 	    nnti_conn_data_ptr ncd = event.peer->data;
+	    CMbuffer cb;
 	    struct client_message *m = (struct client_message *) event.packet->data;
 	    svc->trace_out(cm, "An ENET packet of length %u was received on channel %u, message type %s(%d)",
 			   (unsigned int) event.packet -> dataLength,
@@ -1498,7 +1503,11 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 		/* kick this upstairs */
 		svc->trace_out(cm, "We received piggybacked data of size %d %x.",
 			       piggyback_size, piggyback_size);
-		svc->add_buffer_to_pending_queue(trans->cm, ncd->conn, read_buffer, piggyback_size);
+		ncd->read_buffer = read_buffer;
+		ncd->read_buf_len = piggyback_size;
+		trans->data_available(trans, ncd->conn);
+		svc->return_data_buffer(trans->cm, read_buffer);
+//		svc->add_buffer_to_pending_queue(trans->cm, ncd->conn, read_buffer, piggyback_size);
 	    } else {
 		handle_control_request(ncd, svc, trans, m);
 		enet_packet_destroy (event.packet);
@@ -1891,10 +1900,16 @@ CMtrans_services svc;
 nnti_conn_data_ptr ncd;
 int *actual_len;
 {
-    printf("Don't call me!\n");
-    return (void*)0;
-}
+    CMbuffer cb;
 
+    if (ncd->read_buf_len == -1) return NULL;
+
+    *actual_len = ncd->read_buf_len;
+    cb = ncd->read_buffer;
+    ncd->read_buf_len = 0;
+    ncd->read_buffer = NULL;
+    return cb;
+}
 
 typedef struct {
     int send_id;
