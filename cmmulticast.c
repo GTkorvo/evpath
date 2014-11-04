@@ -205,6 +205,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_lis
     struct sockaddr_in addr;
     struct sockaddr_in output_addr;
     struct ip_mreq mreq;
+    char my_host_name[256];
 
     (void) no_more_redirect;
     if (!query_attr(attrs, CM_MCAST_ADDR, /* type pointer */ NULL,
@@ -230,6 +231,8 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_lis
 	exit(1);
     }
     port_num = int_port_num;
+
+    get_qual_hostname(cm, my_host_name, sizeof(my_host_name), svc, NULL, NULL);
 
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = (unsigned short) AF_INET;

@@ -1476,11 +1476,11 @@ fdump_CMConnection(FILE *out, CMConnection conn)
     fprintf(out, "\twrite_pending %d\n", conn->write_pending);
 }
 
-static void
+/*static void
 dump_CMConnection(CMConnection conn)
 {
     fdump_CMConnection(stdout, conn);
-}
+    }*/
 
 CMConnection
 INT_CMinitiate_conn(CManager cm, attr_list attrs)

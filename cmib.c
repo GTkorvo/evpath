@@ -1160,8 +1160,7 @@ int no_more_redirect;
 	int remote_IP = -1;
 	static int host_ip = 0;
 	unsigned int sock_len;
-union
-	{
+	union {
 	    struct sockaddr s;
 	    struct sockaddr_in s_I4;
 	    struct sockaddr_in6 s_l6;
