@@ -140,14 +140,9 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
 int
 main(int argc, char* argv[]) 
 {
-    int i, j, np, me;
-    const int nametag  = 42;    /* Tag value for sending name */
-    const int datatag  = 43;    /* Tag value for sending data */
-    const int root = 0;         /* Root process in scatter */
-    MPI_Status status;          /* Status object for receive */
+    int np, me;
 
     char master_contact[CONTACTLEN];             /* Local host name string */
-    char hostname[MAXPROC][NAMELEN];  /* Received host names */
     char *transport = NULL;
     attr_list listen_list = NULL, contact_list;
     char *string_list;

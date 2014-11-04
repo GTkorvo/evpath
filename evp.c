@@ -16,8 +16,8 @@
 extern 
 FMFormat EVregister_format_set(CManager cm, FMStructDescList list);
 static void reference_event(event_item *event);
-static void dump_action(stone_type stone, response_cache_element *resp, 
-			int a, const char *indent);
+//static void dump_action(stone_type stone, response_cache_element *resp, 
+//			int a, const char *indent);
 static void dump_stone(stone_type stone);
 static void fdump_stone(FILE* out, stone_type stone);
 static int is_bridge_stone(CManager cm, EVstone stone_num);
@@ -1446,12 +1446,12 @@ fdump_stone(FILE* out, stone_type stone)
     }
 }
 
-static void
+/*static void
 dump_action(stone_type stone, response_cache_element *resp, int a, const char *indent)
 {
     fdump_action(stdout, stone, resp, a, indent);
 }
-
+*/
 void
 EVdump_stone(CManager cm,  EVstone stone_num)
 {
@@ -1984,6 +1984,7 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
     if (handler) handler(cm, conn, s, evp->app_stone_close_data);
 }
 
+#ifdef NOT_DEF
 static void
 write_callback_handler(CManager cm, CMConnection conn, void *client_data)
 {
@@ -2003,6 +2004,7 @@ write_callback_handler(CManager cm, CMConnection conn, void *client_data)
     process_events_stone(cm, s, Congestion);
     do_bridge_action(cm, s);
 }
+#endif
 
 static
 int

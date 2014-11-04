@@ -786,9 +786,11 @@ static void cod_ev_discard_rel(cod_exec_context ec, int queue, int index) {
     cod_ev_discard(ec, 0, queue, index);
 }
 
+#ifdef NOT_DEF
 static void cod_ev_discard_abs(cod_exec_context ec, int queue, int index) {
     cod_ev_discard(ec, 1, queue, index);
 }
+#endif
 
 static EVstone
 port_to_stone(struct ev_state_data *evstate, int port)
@@ -865,10 +867,12 @@ static void cod_ev_submit_rel(cod_exec_context ec,int port, int queue, int index
     cod_ev_submit(ec, 0, port, queue, index);
 }
 
+#ifdef NOT_DEF
 static void cod_ev_submit_abs(cod_exec_context ec,int port, int queue, int index) 
 {
     cod_ev_submit(ec, 1, port, queue, index);
 }
+#endif
 
 static int cod_ev_get_port(cod_exec_context ec, int queue)
 {
@@ -902,6 +906,7 @@ static void cod_ev_discard_and_submit_rel(cod_exec_context ec, int port, int que
     cod_ev_discard_and_submit(ec, 0, port, queue, index);
 }
 
+#ifdef NOT_DEF
 static void cod_ev_discard_and_submit_abs(cod_exec_context ec, int port, int queue,
         int index) {
     struct ev_state_data *ev_state = (void*) cod_get_client_data(ec, 0x34567890);
@@ -913,6 +918,7 @@ static void cod_ev_discard_and_submit_abs(cod_exec_context ec, int port, int que
 
     cod_ev_discard_and_submit(ec, 1, port, queue, index);
 }
+#endif
 
 static void *cod_ev_get_data(cod_exec_context ec, int absp, int queue, int index)
 {
@@ -2094,6 +2100,7 @@ generate_filter_code(CManager cm, struct response_spec *mrd, stone_type stone,
     return instance;
 }
 
+#ifdef NOT_DEF
 static int
 verify_multityped_code(CManager cm, struct response_spec *mrd, stone_type stone,
 			 FMFormat *formats)
@@ -2135,6 +2142,7 @@ verify_multityped_code(CManager cm, struct response_spec *mrd, stone_type stone,
     ret = cod_code_verify(mrd->u.multityped.function, parse_context);
     return ret;
 }
+#endif
 
 static response_instance
 generate_multityped_code(CManager cm, struct response_spec *mrd, stone_type stone,

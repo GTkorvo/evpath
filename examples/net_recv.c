@@ -40,4 +40,5 @@ int main(int argc, char **argv)
     string_list = attr_list_to_string(CMget_contact_list(cm));
     printf("Contact list \"%d:%s\"\n", stone, string_list);
     CMrun_network(cm);
+    return 0;
 }

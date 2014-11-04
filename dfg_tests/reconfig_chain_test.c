@@ -66,7 +66,7 @@ join_handler(EVmaster master, char *identifier, void* available_sources, void *a
 {
     static int client_count = 0;
     int i;
-    char *canon_name;
+    char *canon_name = NULL;
     EVdfg_stone last, tmp, sink;
     static EVdfg_stone src;
     static EVdfg_stone first;
@@ -146,7 +146,6 @@ be_test_master(int argc, char **argv)
     atom_t Hop_count_atom;
     int i;
     EVmaster test_master;
-    EVdfg test_dfg;
     EVclient_sinks sink_capabilities;
     EVclient_sources source_capabilities;
 	

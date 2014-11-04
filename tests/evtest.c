@@ -136,7 +136,6 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 	if (attrs) dump_attr_list(attrs);
     }
     if (client_data != NULL) {
-	CMConnection conn;
 	int tmp = *((int *) client_data);
 	*((int *) client_data) = tmp + 1;
     }

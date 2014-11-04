@@ -40,4 +40,5 @@ int main(int argc, char **argv)
     source = EVcreate_submit_handle(cm, stone, simple_format_list);
     data.integer_field = 217;
     EVsubmit(source, &data, NULL);
+    return 0;
 }

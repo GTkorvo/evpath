@@ -20,23 +20,6 @@ static FMStructDescRec simple_format_list[] =
     {NULL, NULL}
 };
 
-typedef struct _second_rec {
-    double data_field;
-    char data_type;
-} second_rec, *second_rec_ptr;
-
-static FMField second_field_list[] =
-{
-    {"data_field", "float", sizeof(double), FMOffset(second_rec_ptr, data_field)},
-    {"data_type", "char", sizeof(char), FMOffset(second_rec_ptr, data_type)},
-    {NULL, NULL, 0, 0}
-};
-static FMStructDescRec second_format_list[] =
-{
-    {"second", second_field_list, sizeof(second_rec), NULL},
-    {NULL, NULL}
-};
-
 /* this file is evpath/examples/derived_send.c */
 int main(int argc, char **argv)
 {
@@ -95,4 +78,5 @@ int main(int argc, char **argv)
 	EVsubmit(source, &data, NULL);
 	data.integer_field++;
     }
+    return 0;
 }

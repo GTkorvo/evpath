@@ -244,7 +244,6 @@ char **argv;
 	    int first_row_stones[2];
 	    int list[3] = {0, 0, -1};
 	    int i;
-	    atom_t CMDEMO_TEST_ATOM;
 	    char *list_str;
 	    sscanf(argv[1], "%d:", &remote_stone);
 	    list_str = strchr(argv[1], ':') + 1;

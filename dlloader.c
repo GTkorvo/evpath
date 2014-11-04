@@ -41,7 +41,7 @@ CMdlopen(void *CMTrace_filev, char *in_lib, int mode)
     return NULL;
 #else
     dlhandle dlh;
-    void *handle;
+    void *handle = NULL;
     char *tmp;
     char *lib;
     FILE *CMTrace_file = (FILE*)CMTrace_filev;

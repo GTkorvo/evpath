@@ -42,10 +42,9 @@ be_test_master(int argc, char **argv)
     char **nodes;
     CManager cm;
     char *str_contact;
-    char *chandle;
     EVdfg_stone source, router;
     EVsource source_handle;
-    int out_count, node_count, last_row_size;
+    int out_count, node_count;
     int ndig = 5;
     int i;
     int repeat_count = 40;

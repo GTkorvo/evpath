@@ -34,8 +34,6 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 int main(int argc, char **argv)
 {
     CManager cm;
-    char *str_contact;
-    EVdfg_stone src, sink;
     EVsource source_handle;
     EVclient_sinks sink_capabilities;
     EVclient_sources source_capabilities;

@@ -19,7 +19,6 @@ static
 int
 simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
-    simple_rec_ptr event = vevent;
     (void)cm;
     (void)client_data;
     static int count = 0;

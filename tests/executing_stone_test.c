@@ -88,7 +88,6 @@ int
 simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     simple_rec_ptr event = vevent;
-    long sum = 0, scan_sum = 0;
     (void)cm;
     if (EVexecuting_stone(cm) != *(int*)client_data) {
 	printf("Inconsistency in EVexecuting_stone, expected %d, got %d!\n",
@@ -102,9 +101,6 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     }
     return 0;
 }
-
-static int do_regression_master_test();
-static int regression = 1;
 
 char *transport = NULL;
 
@@ -158,10 +154,3 @@ main(int argc, char **argv)
     return 0;
 }
 
-static void
-fail_and_die(int signal)
-{
-    (void) signal;
-    fprintf(stderr, "EVtest failed to complete in reasonable time\n");
-    exit(1);
-}

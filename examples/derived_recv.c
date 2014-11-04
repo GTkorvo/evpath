@@ -46,4 +46,5 @@ int main(int argc, char **argv)
     free(filter_spec);
     free(encoded_filter_spec);
     CMsleep(cm, 600);
+    return 0;
 }

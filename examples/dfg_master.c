@@ -89,4 +89,5 @@ int main(int argc, char **argv)
     }
 
     CMrun_network(cm);
+    return 0;
 }

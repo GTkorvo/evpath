@@ -107,4 +107,5 @@ int main(int argc, char **argv)
     free(encoded_trans_spec);
     free(encoded_trans_spec2);
     CMsleep(cm, 600);
+    return 0;
 }

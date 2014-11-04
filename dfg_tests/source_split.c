@@ -156,7 +156,7 @@ be_test_child(int argc, char **argv)
 
     src = EVcreate_submit_handle(cm, DFG_SOURCE, simple_format_list);
     source_capabilities = EVclient_register_source("a_source", src);
-    (void)EVclient_register_sink_handler(cm, "simple_handler", simple_format_list,
+    sink_capabilities = EVclient_register_sink_handler(cm, "simple_handler", simple_format_list,
 				(EVSimpleHandlerFunc) simple_handler, NULL);
     test_client = EVclient_assoc(cm, argv[1], argv[2], source_capabilities, sink_capabilities);
     EVclient_ready_wait(test_client);

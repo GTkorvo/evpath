@@ -193,10 +193,10 @@ INT_EVdfg_create_sink_stone(EVdfg dfg, char *sink_name)
 static int
 EVdfg_perform_act_on_state(EVdfg_configuration state, EVdfg_config_action act, int build_queue);
 static void fdump_dfg_config_action(FILE* out, EVdfg_config_action a);
-static void dump_dfg_config_action(EVdfg_config_action a)
+/*static void dump_dfg_config_action(EVdfg_config_action a)
 {
     fdump_dfg_config_action(stdout, a);
-}
+    }*/
 
 static void
 EVdfg_add_act_to_queue(EVdfg_configuration state, EVdfg_config_action act)

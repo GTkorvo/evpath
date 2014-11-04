@@ -35,9 +35,7 @@ join_handler_func(EVmaster master, char *identifier, void*cur_unused1, void*cur_
 {
     EVdfg_stone src, mid, sink;
     static int i = 1;
-    char *canon_name;
     EVdfg dfg;
-    /* Generate a canonical name for this client in canon_name, then assign */
 
     if (i == 1) {
 	/* first client joining becomes "b" */

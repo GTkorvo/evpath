@@ -105,7 +105,7 @@ be_test_master(int argc, char **argv)
       for (j=0; j<nbase; j++) {
 	n = nbase+j;
 	sprintf(chandle,"handlerN%d", n);
-	EVclient_register_sink_handler(cm,chandle,simple_format_list, 
+	sink_capabilities = EVclient_register_sink_handler(cm,chandle,simple_format_list, 
 				    (EVSimpleHandlerFunc) simple_handler, NULL);
 	tmp[j] = EVdfg_create_sink_stone(test_dfg,chandle);
 	EVdfg_link_dest(last[j/base], tmp[j]);
