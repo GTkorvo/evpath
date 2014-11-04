@@ -1160,8 +1160,12 @@ int no_more_redirect;
 	int remote_IP = -1;
 	static int host_ip = 0;
 	unsigned int sock_len;
-	struct sockaddr sock_addr;
-	struct sockaddr_in *sock_addri = (struct sockaddr_in *) &sock_addr;
+union
+	{
+	    struct sockaddr s;
+	    struct sockaddr_in s_I4;
+	    struct sockaddr_in6 s_l6;
+	} sock_addr;
 	struct ibparam param, remote_param;
 
 	//ib stuff
@@ -1223,7 +1227,7 @@ int no_more_redirect;
 			svc->trace_out(cm, " CMIB connect FAILURE --> Couldn't create socket");
 			return -1;
 		}
-		((struct sockaddr_in *) &sock_addr)->sin_family = AF_INET;
+		sock_addr.s.sa_family = AF_INET;
 		if (((network_string = cercs_getenv("CM_NETWORK")) != NULL) &&
 		    (host_name != NULL)) {
 			int name_len = strlen(host_name) + 2 + strlen(network_string);
@@ -1238,9 +1242,9 @@ int no_more_redirect;
 				strcat(new_host_name, network_string);
 				strcat(new_host_name, first_dot);
 			}
-			if (check_host(new_host_name, (void *) &sock_addri->sin_addr) == 0) {
+			if (check_host(new_host_name, (void *) &sock_addr.s_I4.sin_addr) == 0) {
 				/* host has no NETWORK interface */
-				if (check_host(host_name, (void *) &sock_addri->sin_addr) == 0) {
+				if (check_host(host_name, (void *) &sock_addr.s_I4.sin_addr) == 0) {
 					svc->trace_out(cm, "--> Host not found \"%s\"",
 					               host_name);
 				}
@@ -1251,22 +1255,22 @@ int no_more_redirect;
 			svc->free_func(new_host_name);
 		} else {
 			if (host_name != NULL) {
-				if (check_host(host_name, (void *) &sock_addri->sin_addr) == 0) {
+				if (check_host(host_name, (void *) &sock_addr.s_I4.sin_addr) == 0) {
 					if (host_ip == 0) {
 						svc->trace_out(cm, "CMIB connect FAILURE --> Host not found \"%s\", no IP addr supplied in contact list", host_name);
 					} else {
 						svc->trace_out(cm, "CMIB --> Host not found \"%s\", Using supplied IP addr %x",
 						               host_name == NULL ? "(unknown)" : host_name,
 						               host_ip);
-						sock_addri->sin_addr.s_addr = ntohl(host_ip);
+						((struct sockaddr_in *) &sock_addr)->sin_addr.s_addr = ntohl(host_ip);
 					}
 				}
 			} else {
-				sock_addri->sin_addr.s_addr = ntohl(host_ip);
+				sock_addr.s_I4.sin_addr.s_addr = ntohl(host_ip);
 			}
 		}
-		sock_addri->sin_port = htons(port_num);
-		remote_IP = ntohl(sock_addri->sin_addr.s_addr);
+		sock_addr.s_I4.sin_port = htons(port_num);
+		remote_IP = ntohl(sock_addr.s_I4.sin_addr.s_addr);
 		if (is_private_192(remote_IP)) {
 			svc->trace_out(cm, "Target IP is on a private 192.168.x.x network");
 		}
@@ -1278,7 +1282,7 @@ int no_more_redirect;
 		}
 		svc->trace_out(cm, "Attempting CMIB socket connection, host=\"%s\", IP = %s, port %d",
 		               host_name == 0 ? "(unknown)" : host_name, 
-		               inet_ntoa(sock_addri->sin_addr),
+		               inet_ntoa(sock_addr.s_I4.sin_addr),
 		               int_port_num);
 		if (connect(sock, (struct sockaddr *) &sock_addr,
 		            sizeof sock_addr) == SOCKET_ERROR) {
@@ -1286,7 +1290,7 @@ int no_more_redirect;
 			int err = WSAGetLastError();
 			if (err != WSAEWOULDBLOCK || err != WSAEINPROGRESS) {
 #endif
-				svc->trace_out(cm, "CMIB connect FAILURE --> Connect() to IP %s failed", inet_ntoa(sock_addri->sin_addr));
+				svc->trace_out(cm, "CMIB connect FAILURE --> Connect() to IP %s failed", inet_ntoa(sock_addr.s_I4.sin_addr));
 				close(sock);
 #ifdef WSAEWOULDBLOCK
 			}
@@ -1380,11 +1384,11 @@ int no_more_redirect;
 	         (attr_value) (long)int_port_num);
 	add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
 	         (attr_value) (long)ib_conn_data->remote_IP);
-	if (getpeername(sock, &sock_addr, &sock_len) == 0) {
+	if (getpeername(sock, &sock_addr.s, &sock_len) == 0) {
 		int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
 		add_attr(conn_attr_list, CM_PEER_CONN_PORT, Attr_Int4,
 		         (attr_value) (long)int_port_num);
-		if (sock_addr.sa_family == AF_INET) {
+		if (sock_addr.s.sa_family == AF_INET) {
 			struct hostent *host;
 			struct sockaddr_in *in_sock = (struct sockaddr_in *) &sock_addr;
 			host = gethostbyaddr((char *) &in_sock->sin_addr,
@@ -2501,7 +2505,7 @@ cmib_add_static_transport(CManager cm, CMtrans_services svc)
     transport->read_block_func = (CMTransport_read_block_func)libcmib_LTX_read_block_func;
     transport->read_to_buffer_func = (CMTransport_read_to_buffer_func)NULL;
     transport->writev_func = (CMTransport_writev_func)libcmib_LTX_writev_func;
-    transport->writev_complete_notify_func = (CMTransport_writev_func)libcmib_LTX_writev_complete_notify_func;
+    transport->writev_complete_notify_func = (CMTransport_writev_complete_notify_func)libcmib_LTX_writev_complete_notify_func;
     transport->get_transport_characteristics = NULL;
     if (transport->transport_init) {
 	transport->trans_data = transport->transport_init(cm, svc, transport);
