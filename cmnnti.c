@@ -270,6 +270,7 @@ get_control_message_buffer(nnti_conn_data_ptr ncd, struct client_message **mp,
 			   int size)
 {
     send_handle ret;
+    memset(&ret, 0, sizeof(ret));
     if (ncd->use_enet) {
 	ret.t = enet;
 #ifdef ENET_FOUND
@@ -1479,7 +1480,6 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 	}
         case ENET_EVENT_TYPE_RECEIVE: {
 	    nnti_conn_data_ptr ncd = event.peer->data;
-	    CMbuffer cb;
 	    struct client_message *m = (struct client_message *) event.packet->data;
 	    svc->trace_out(cm, "An ENET packet of length %u was received on channel %u, message type %s(%d)",
 			   (unsigned int) event.packet -> dataLength,
@@ -2229,8 +2229,10 @@ handle_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, transp
 		       struct client_message *m)
 {
     // put the current message into pull request queue
-    int pull_rqst_size = sizeof(struct pull_request_queue) + *((int*)(char*)&m->pull.packed_src_buf) + 4;
-    int copy_size = sizeof(struct pull_request) + *((int*)(char*)&m->pull.packed_src_buf) + 4;
+    int32_t size;
+    memcpy(&size, &m->pull.packed_src_buf[0], sizeof(size));
+    int pull_rqst_size = sizeof(struct pull_request_queue) + size + 4;
+    int copy_size = sizeof(struct pull_request) + size + 4;
     struct pull_request_queue *request = (struct pull_request_queue *)
         svc->malloc_func (pull_rqst_size);
     
