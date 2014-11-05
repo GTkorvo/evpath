@@ -102,8 +102,6 @@ static FMStructDescList queue_list[] = {a_format_list, command_format_list, anon
 #define EVENT_COUNT 20
 #define COMMAND_COUNT 2
 
-static int repeat_count = EVENT_COUNT;
-
 static int sequence_num = 0;
 
 static
@@ -276,7 +274,6 @@ be_test_master(int argc, char **argv)
     int node_count = 3;
     char *queue_node = "b";
     char *terminal_node = "c";
-    atom_t index_atom;
     EVmaster test_master;
     EVdfg test_dfg;
     EVclient_sinks sink_capabilities;
@@ -426,7 +423,6 @@ submit any remaining anon from bottom (oldest)
 18: b=5
 19: b=8
 */
-    index_atom = attr_atom_from_string("index_atom");
     /* we know the sources are here, just do submits */
     for (i=0; i < EVENT_COUNT + COMMAND_COUNT; i++) {
 	switch (i) {
@@ -517,8 +513,6 @@ be_test_child(int argc, char **argv)
     EVclient_sinks sink_capabilities;
     EVclient_sources source_capabilities;
 
-    int count;
-
     cm = CManager_create();
     if (argc != 3) {
 	printf("Child usage:  evtest  <nodename> <mastercontact>\n");
@@ -544,8 +538,6 @@ be_test_child(int argc, char **argv)
     if (EVclient_active_sink_count(test_client) == 0) {
 	EVclient_ready_for_shutdown(test_client);
     }
-
-    count = repeat_count;
 
     /* sources are with the master, don't do submits here */
 
