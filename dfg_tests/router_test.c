@@ -157,7 +157,6 @@ be_test_child(int argc, char **argv)
 {
     CManager cm;
     EVsource src;
-    char *chandle;
     EVclient_sinks sink_capabilities;
     EVclient_sources source_capabilities;
 
@@ -169,7 +168,6 @@ be_test_child(int argc, char **argv)
 
     src = EVcreate_submit_handle(cm, DFG_SOURCE, simple_format_list);
     source_capabilities = EVclient_register_source("master_source", src);
-    chandle = malloc(sizeof(char)*(strlen(argv[1]) + 9));
     sink_capabilities = EVclient_register_sink_handler(cm, "simple_handler", simple_format_list,
 				(EVSimpleHandlerFunc) simple_handler, NULL);
     test_client = EVclient_assoc(cm, argv[1], argv[2], source_capabilities, sink_capabilities);
