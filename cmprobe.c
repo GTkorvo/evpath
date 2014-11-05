@@ -22,7 +22,7 @@ main(argc, argv)
     cm = CManager_create();
     (void) CMfork_comm_thread(cm);
 
-    atom_t CM_REBWM_RLEN=-1, CM_REBWM_REPT=-1, CM_BW_MEASURE_INTERVAL=-1, CM_BW_MEASURE_SIZE=-1, CM_BW_MEASURE_SIZEINC=-1, CM_BW_MEASURED_VALUE=-1, CM_BW_MEASURED_COF=-1, CM_TRANSPORT=-1;
+    atom_t CM_REBWM_RLEN=-1, CM_REBWM_REPT=-1, CM_BW_MEASURE_INTERVAL=-1, CM_BW_MEASURE_SIZE=-1, CM_BW_MEASURE_SIZEINC=-1, CM_TRANSPORT=-1;
 
     if (atom_init == 0) {
 	CM_REBWM_RLEN = attr_atom_from_string("CM_REBWM_RLEN");
@@ -30,8 +30,6 @@ main(argc, argv)
 	CM_BW_MEASURE_INTERVAL = attr_atom_from_string("CM_BW_MEASURE_INTERVAL");
 	CM_BW_MEASURE_SIZE = attr_atom_from_string("CM_BW_MEASURE_SIZE");
 	CM_BW_MEASURE_SIZEINC = attr_atom_from_string("CM_BW_MEASURE_SIZEINC");
-	CM_BW_MEASURED_VALUE = attr_atom_from_string("CM_BW_MEASURED_VALUE");
-	CM_BW_MEASURED_COF = attr_atom_from_string("CM_BW_MEASURED_COF");
 	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
 	atom_init++;
     }
