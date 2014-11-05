@@ -1196,6 +1196,7 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	ncd->nnti_port = cm->nnti_port;
 	ncd->remote_contact_port = cm->enet_port;
 	ncd->remote_IP = cm->enet_ip;
+	ncd->piggyback_size_max = NNTI_REQUEST_BUFFER_SIZE;
 
 	ncd->size = NNTI_REQUEST_BUFFER_SIZE;
 	ncd->raddr = 0;
@@ -2205,7 +2206,14 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
 	    }	  
 	    
 	    /* kick this upstairs */
-	    svc->add_buffer_to_pending_queue(trans->cm, ncd->conn, read_buffer, request->size);
+	    if (!getenv("HANDLE_MESSAGES_IN_NNTI_THREAD")) {
+		svc->add_buffer_to_pending_queue(trans->cm, ncd->conn, read_buffer, request->size);
+	    } else {
+		ncd->read_buffer = read_buffer;
+		ncd->read_buf_len = request->size;
+		trans->data_available(trans, ncd->conn);
+		svc->return_data_buffer(trans->cm, read_buffer);
+	    }
 	    if (!ncd->ntd->cache_maps) {
 		NNTI_unregister_memory(&ncd->mr_pull);
 		ncd->read_buffer = NULL;
@@ -2385,6 +2393,7 @@ attr_list attrs;
         svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET outbound piggybacking %d bytes of data in control message", size);
 	if (send_control_message(h) == 0) return 0;
     } else {
+	svc->trace_out(ncd->ntd->cm, "CMNNTI/ENET outbound size is %d > %d, doing pull request\n", size, ncd->piggyback_size_max);
         if (copy_full_buffer_and_send_pull_request(svc, ncd, iov, iovcnt, attrs) == 0)
 	    return 0;
     }
