@@ -307,7 +307,7 @@ perform_actions_on_nodes(EVdfg_configuration config, EVmaster master)
     for (i=0; i < config->pending_action_count; i++) {
 	EVdfg_config_action act = config->pending_action_queue[i];
 	int local = 0;
-	CMConnection conn;
+	CMConnection conn = NULL;
 	if (CMtrace_on(cm, EVdfgVerbose)) {
 	    fdump_dfg_config_action(master->cm->CMTrace_file, act);
 	}
