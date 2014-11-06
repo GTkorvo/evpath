@@ -7,7 +7,7 @@
 #cmakedefine ENET_FOUND
 
 /* Define to 1 if you have the IB header and libraries */
-#define IB_FOUND @IB_FOUND@
+#cmakedefine IB_FOUND 
 
 /* Define to 1 if you have the df_shm header and libraries */
 #cmakedefine DF_SHM_FOUND
