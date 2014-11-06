@@ -8,6 +8,9 @@ FUNCTION (CHECK_BROKEN_TITAN_COMPILER )
   if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GCC")
      RETURN()
   endif()
+  if (NOT EXISTS "${CMAKE_PLATFORM_INFO_DIR}/CMakeCCompiler.cmake")
+     RETURN()
+  endif()
   FILE(READ "${CMAKE_PLATFORM_INFO_DIR}/CMakeCCompiler.cmake" contents)
 
   # Convert file contents into a CMake list (where each element in the list
