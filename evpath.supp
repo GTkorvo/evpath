@@ -69,6 +69,41 @@
 {
    Intel compilers fool valgrind.
    Memcheck:Cond
+   fun:__intel_sse2_strcpy
+}
+{
+   Intel compilers fool valgrind.
+   Memcheck:Addr4
+   fun:__intel_sse2_strcpy
+}
+{
+   Intel compilers fool valgrind.
+   Memcheck:Addr8
+   fun:__intel_sse2_strcpy
+}
+{
+   Intel compilers fool valgrind.
+   Memcheck:Addr8
+   fun:__intel_sse2_strchr
+}
+{
+   Intel compilers fool valgrind.
+   Memcheck:Cond
+   fun:__intel_sse2_strcat
+}
+{
+   Intel compilers fool valgrind.
+   Memcheck:Value8
+   fun:__intel_sse2_strcat
+}
+{
+   Intel compilers fool valgrind.
+   Memcheck:Addr8
+   fun:__intel_sse2_strcat
+}
+{
+   Intel compilers fool valgrind.
+   Memcheck:Cond
    fun:FMstr_to_data_type
 }
 {
@@ -170,4 +205,14 @@
    fun:*
    fun:INT_CMwrite_raw
    fun:internal_write_event
+}
+
+{
+  don't warn about uninit write vectors.  Too common...
+    Memcheck:Param
+    writev(vector[...])
+    ...
+    fun:*
+    fun:INT_CMwrite_raw
+    fun:internal_write_event
 }
