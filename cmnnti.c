@@ -710,22 +710,16 @@ attr_list conn_attr_list;
     }
 
     /* register memory regions */
-    char *req_buf = malloc (NNTI_REQUEST_BUFFER_SIZE);
-    err = NNTI_register_memory(&ntd->trans_hdl, req_buf, NNTI_REQUEST_BUFFER_SIZE, 1,
-                                NNTI_SEND_SRC, &nnti_conn_data->mr_send);
+    err = NNTI_alloc(&ntd->trans_hdl, NNTI_REQUEST_BUFFER_SIZE, 1,
+                 NNTI_SEND_SRC, &nnti_conn_data->mr_send);
+
+    
     if (err != NNTI_OK) {
-        fprintf (stderr, "Error: NNTI_register_memory(SEND_SRC) for client message returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
+        fprintf (stderr, "Error: NNTI_alloc(SEND_SRC) for client message returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
         return 1;
     }
 
-    svc->trace_out(trans->cm, " register ACK memory...");
-
-    if (err != NNTI_OK) {
-        fprintf (stderr, "Error: NNTI_register_memory(RECV_DST) for server message returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
-        return 1;
-    }
-
-    cmsg = (void*)req_buf;
+    cmsg = (void*)NNTI_BUFFER_C_POINTER(&nnti_conn_data->mr_send);
     cmsg->message_type = CMNNTI_CONNECT;
     cmsg->nnti_port = ntd->self_port;
     cmsg->enet_port = ntd->enet_listen_port;
@@ -793,7 +787,7 @@ attr_list conn_attr_list;
     nnti_conn_data->nnti_port = int_port_num;
     nnti_conn_data->nnti_params = params;
     nnti_conn_data->ntd = ntd;
-    nnti_conn_data->send_buffer = req_buf;
+    nnti_conn_data->send_buffer = (char*)NNTI_BUFFER_C_POINTER(&nnti_conn_data->mr_send);;
     return 1;
 }
 
@@ -1213,16 +1207,17 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	ncd->conn = svc->connection_create(trans, ncd, conn_attr_list);
 	ncd->attrs = conn_attr_list;
 	add_connection(ntd, ncd);
-	ncd->send_buffer = malloc(NNTI_REQUEST_BUFFER_SIZE);
-	err = NNTI_register_memory (&ntd->trans_hdl,
-				    ncd->send_buffer,
-				    NNTI_REQUEST_BUFFER_SIZE, 1, NNTI_SEND_SRC,
-				    &ncd->mr_send);
+	/* alloc memory regions */
+	err = NNTI_alloc(&ntd->trans_hdl, NNTI_REQUEST_BUFFER_SIZE, 1,
+                 NNTI_SEND_SRC, &ncd->mr_send);
+
+    
 	if (err != NNTI_OK) {
-	    fprintf (stderr, "Error: NNTI_register_memory(NNTI_SEND_SRC) for server message returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
+	    fprintf (stderr, "Error: NNTI_alloc(SEND_SRC) for client message returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
 	    return;
 	}
-	
+
+	ncd->send_buffer = (void*)NNTI_BUFFER_C_POINTER(&ncd->mr_send);
 #ifdef DF_SHM_FOUND
         if (cm->shm_contact_len != 0) {
             /* attach to the shared memory region to complete connection setup */
@@ -1789,20 +1784,19 @@ setup_nnti_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
     add_attr(listen_list, CM_NNTI_TRANSPORT, Attr_String,
 	     (attr_value) strdup(url));
 
-    ntd->incoming  = malloc (incoming_size * NNTI_REQUEST_BUFFER_SIZE);
-    memset (ntd->incoming, 0, incoming_size * NNTI_REQUEST_BUFFER_SIZE);
-    
-    err = NNTI_register_memory(&trans_hdl, (char*)ntd->incoming, 
-			       NNTI_REQUEST_BUFFER_SIZE, incoming_size,
+    /* register memory regions */
+    err = NNTI_alloc(&trans_hdl, NNTI_REQUEST_BUFFER_SIZE, incoming_size,
 			       NNTI_RECV_QUEUE, &ntd->mr_recvs);
+
     NNTI_create_work_request(&ntd->mr_recvs, &ntd->wr_recvs);
 
     if (err != NNTI_OK) {
-      fprintf (stderr, "Error: NNTI_register_memory(NNTI_RECV_DST) for client messages returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
-      return;
+	fprintf (stderr, "Error: NNTI_alloc(NNTI_RECV_QUEUE) for client messages returned non-zero: %d %s\n", err, NNTI_ERROR_STRING(err));
+	return;
     } else {
-      ntd->svc->trace_out(trans->cm, "Successfully registered memory on listen side incoming %p", ntd->incoming);
+	ntd->svc->trace_out(trans->cm, "Successfully registered memory on listen side incoming %p", (void*)NNTI_BUFFER_C_POINTER(&ntd->mr_recvs));
     }
+    ntd->incoming = (void*)NNTI_BUFFER_C_POINTER(&ntd->mr_recvs);
     
     ntd->self_port = int_port_num;
     ntd->trans_hdl = trans_hdl;
@@ -2184,7 +2178,7 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
 	int timeout = 500;
 	err = NNTI_ETIMEDOUT;
 	DROP_CM_LOCK(svc, trans->cm);
-	while ( (err == NNTI_ETIMEDOUT ) && (timeout < 520)) {
+	while (err == NNTI_ETIMEDOUT ) {
 	    err = NNTI_wait(&ncd->wr_pull, timeout, &status);
 	    timeout ++;
 	}
