@@ -1398,6 +1398,10 @@ max_output_for_action(char *action, int cur_max)
 	break;
     case Action_Filter:
     case Action_Immediate:
+	if (strncmp(action, "Router Action", 13) == 0) {
+	    /* router spec, could be lots */
+	    return -1;
+	}
 	if (cur_max < 1) {
 	    return 1;
 	} else {
