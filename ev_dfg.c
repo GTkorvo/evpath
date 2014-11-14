@@ -273,7 +273,7 @@ assign_actions_to_nodes(EVdfg_configuration config, EVmaster master)
 	    config->pending_action_queue[i].type = ACT_no_op;
 	} else {
 	    if (CMtrace_on(master->cm, EVdfgVerbose)) {
-		printf("Assigning action to node %d -> ", node);
+		fprintf(master->cm->CMTrace_file, "Assigning action to node %d -> ", node);
 		fdump_dfg_config_action(master->cm->CMTrace_file, act);
 	    }
 	    config->pending_action_queue[i].node_for_action = node;
