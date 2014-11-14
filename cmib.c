@@ -1607,7 +1607,7 @@ attr_list listen_info;
 		int size = high_bound - low_bound;
 		int tries = 10;
 		int result = SOCKET_ERROR;
-		srand48(time(NULL));
+		srand48(time(NULL)+getpid());
 		while (tries > 0) {
 			int target = low_bound + size * drand48();
 			sock_addr.sin_port = htons(target);
