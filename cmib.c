@@ -213,6 +213,7 @@ typedef struct tbuffer_
 	uint64_t offset;
 	struct tbuffer_ *parent;
 	int childcount;    
+        int inuse;
 	LIST_ENTRY(tbuffer_) entries;    
 }tbuffer;
 
@@ -293,6 +294,7 @@ static void free_func(void *cbd)
 	tbuffer *tb = (tbuffer*)cbd;
 	tbuffer *temp;
     
+	tb->inuse = 0;
 	if(tb->childcount == 0)
 	{
 		//we can merge upwards
@@ -858,7 +860,6 @@ int handle_piggyback(CMtrans_services svc,
 	int iget = 0;
 	
 	CMbuffer cb = svc->get_data_buffer(scd->sd->cm, msg->u.pb.total_length - offset);
-
 	memcpy(cb->buffer, &(msg->u.pb.body[0]), sizeof(struct control_message)-offset);
 	int left = msg->u.pb.total_length - sizeof(struct control_message);
 	char *buffer = (char*)cb->buffer + sizeof(struct control_message)- offset;
@@ -914,8 +915,9 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 		iget = handle_piggyback(svc, scd, &msg);
 		if(iget == 0)
 		{
-			trans->data_available(trans, conn);
-			svc->return_data_buffer(trans->cm, scd->read_buffer);
+		    CMbuffer tmp = scd->read_buffer;
+		    trans->data_available(trans, conn);
+		    svc->return_data_buffer(trans->cm, tmp);
 		}
 		break;
 	case msg_response:
@@ -1737,12 +1739,12 @@ int *len_ptr;
 	*len_ptr = scd->read_buffer_len;
 	if (scd->read_buffer) {
 	    CMbuffer tmp = scd->read_buffer;
-//	    scd->read_buffer = NULL;
-//	    scd->read_buffer_len = 0;
+	    scd->read_buffer = NULL;
+	    scd->read_buffer_len = 0;
 	    return tmp;
 	}
-//	if(scd->tb)
-//	    return scd->tb->buf;
+	if(scd->tb)
+	    return scd->tb->buf;
 	return NULL;  
 }
 
@@ -1982,12 +1984,12 @@ CMtrans_services svc;
 		return NULL;    
 	}    
 	tbuffer *tb = (tbuffer*)malloc(sizeof(tbuffer));
-	CMbuffer cb = svc->create_data_buffer(socket_data->cm, buffer, bsize);
+	CMbuffer cb = svc->create_data_and_link_buffer(socket_data->cm, buffer, bsize);
 	cb->return_callback = free_func;
 	cb->return_callback_data = (void*)tb;
     
-    
 	tb->buf = cb;
+	tb->inuse = 1;
 	tb->scd = NULL;
 	tb->size = bsize;
 	tb->offset = 0;
@@ -2391,7 +2393,7 @@ static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd,
     
 	for(temp = memlist.lh_first;temp != NULL; temp = temp->entries.le_next)
 	{
-		if((temp->size - temp->offset) >= req_size)
+	    if(((temp->size - temp->offset) >= req_size) && (temp->inuse ==0))
 		{
 			//possible match
 			if(!prov || (prov->size - prov->offset) >= (temp->size - temp->offset))
@@ -2411,10 +2413,11 @@ static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd,
 			return NULL;    
 		}
     
-		CMbuffer cb = svc->create_data_buffer(sd->cm, buffer, req_size);
+		CMbuffer cb = svc->create_data_and_link_buffer(sd->cm, buffer, req_size);
 		tb->buf = cb;
 		tb->scd = scd;
 		tb->size = req_size;
+		tb->inuse = 1;
 		tb->offset = 0;
 		cb->return_callback = free_func;
 		cb->return_callback_data = (void*)tb;
@@ -2464,10 +2467,10 @@ static tbuffer *findMemory(ib_conn_data_ptr scd, ib_client_data_ptr sd,
 			fprintf(stderr, "lost some memory here\n");     
 		}
 
-		tb->buf = svc->create_data_buffer(sd->cm, buffer, tb->size);
+		tb->buf = svc->create_data_and_link_buffer(sd->cm, buffer, tb->size);
 		tb->buf->return_callback = free_func;
 		tb->buf->return_callback_data = tb;
-
+		tb->inuse = 1;
 		tb->offset = req_size;
 
 		tb->scd = scd;
