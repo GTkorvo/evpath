@@ -2148,7 +2148,7 @@ int perform_pull_request_message(nnti_conn_data_ptr ncd, CMtrans_services svc, t
 	err = NNTI_alloc(&ncd->ntd->trans_hdl, request->size, 1, NNTI_GET_DST, &ncd->mr_pull);
 
 	data = NNTI_BUFFER_C_POINTER(&ncd->mr_pull);
-	read_buffer = svc->create_data_buffer(ncd->ntd->cm, data, request->size);
+	read_buffer = svc->create_data_and_link_buffer(ncd->ntd->cm, data, request->size);
         svc->trace_out(ncd->ntd->cm, "CMNNTI alloced region at %p, size %d",
 		       data, read_buffer->size);
 
