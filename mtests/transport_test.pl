@@ -1,18 +1,19 @@
 # read in config files: system first, then user
 use Data::Dumper;
 $return = 0;
+$quiet = 0;
 my @file_list = ("./test_spec", "../test_spec", "../../mtests/test_spec");
 ARG: while (@ARGV && $ARGV[0] =~ s/^-(?=.)//) {
     OPT: for (shift @ARGV) {
          m/^$/       && do {                             next ARG; };
          m/^-$/      && do {                             last ARG; };
-	 m/^f.*/      && do {@file_list = (); push (@file_list, shift(@ARGV)); 	 print "File list is @file_list\n"; next ARG;};
+	 m/^f.*/      && do {@file_list = (); push (@file_list, shift(@ARGV)); 	 print "File list is @file_list\n" unless $quiet; next ARG;};
          m/^o.*/      && do {$output_file = shift(@ARGV);
 			    open(OUTFILE, ">", "$output_file") 
 				or die "cannot open > $output_file: $!";
 			    next ARG; };
          s/^ssh//      && do { $ssh_host = shift(@ARGV);        next ARG; };
-         s/^i(.*)//  && do { $In_Place = $1 || ".bak";   next ARG; };
+         s/^q(.*)//  && do { $quiet = 1 ; next ARG; };
          print("Unknown option: $_");
     }
 }
@@ -26,16 +27,15 @@ for (@file_list)
     warn "couldn't do $file: $!"    unless defined $return;
     warn "couldn't run $file"       unless $return;
   } else {
-    print "Loaded file $file\n";
+    print "Loaded file $file\n" unless $quiet;
     last;
   }
 }
 die "No test spec file found in list : @file_list\n" unless $return;
 
 $change = 1;
-
 while ( my ($key, $value) = each(%test_set) ) {
-    print "$key => ".@{$value}." ". Dumper($value)."\n";
+    print "$key => ".@{$value}." ". Dumper($value)."\n" unless $quiet;
     if (@{$value} == 0) {
 	$test_set{$key}=undef;
 	$test_set{$key} = [];
@@ -83,8 +83,9 @@ while ( my ($key, $value) = each(%test_set) ) {
 
 
 while ( my ($key, $value) = each(%test_set) ) {
-  print "$key $#value=> ".scalar(@{$value}). Dumper($value)."\n";
+  print "$key $#value=> ".scalar(@{$value}). Dumper($value)."\n" unless $quiet;
 }
+$ret_val = 0;
 while ( my ($transport, $value) = each(%test_set) ) {
   $value = $test_set{$transport};
   foreach (@{$value}) {
@@ -94,18 +95,20 @@ while ( my ($transport, $value) = each(%test_set) ) {
     }
 
     $_ = "./trans_test -transport $transport $_ 2> /dev/null";
-    print "Running: $_ \n";
+    print "Running: $_ \n" unless $quiet;
     my $output = `$_`;
     my $my_exit_code = $?;
     if ($my_exit_code != 0) {
       print ("Error while running $_\n");
       print ("Output was:\n");
       print "$output";
+      $ret_val = 1;
     } else {
-      print ("success\n");
-      print OUTFILE "$output";
+	print ("success\n") unless $quiet;
+	print OUTFILE "$output" unless $quiet;
     }
   }
 }
 
 close OUTFILE;
+exit $ret_val;
