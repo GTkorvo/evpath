@@ -773,6 +773,18 @@ attr_list listen_info;
 	int size = high_bound - low_bound;
 	int tries = 30;
 	int result = SOCKET_ERROR;
+	char *port_range;
+	if ((port_range = getenv("CM_PORT_RANGE")) != NULL) {
+	    if (sscanf(port_range, "%d:%d", &high_bound, &low_bound) != 2) {
+		printf("CM_PORT_RANGE spec not understood \"%s\"\n", port_range);
+	    } else {
+		if (high_bound < low_bound) {
+		    int tmp = high_bound;
+		    high_bound = low_bound;
+		    low_bound = tmp;
+		}
+	    }
+	}
 	srand48(seedval);
 	while (tries > 0) {
 	    int target = low_bound + size * drand48();
