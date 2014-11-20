@@ -44,17 +44,17 @@ file (WRITE "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec"
 "      );\n")
 file (APPEND "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
 "\$test_set{\"sockets\"} = \"basic_size_list all_read_buffer_styles all_write_buffer_styles\";\n")
-IF (NNTI_FOUND)
+IF (RUN_NNTI_TESTS)
     file (APPEND "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
          "\$test_set{\"nnti\"} = \"basic_size_list all_read_buffer_styles all_write_buffer_styles\";\n")
-ENDIF (NNTI_FOUND)
-IF (ENET_FOUND)
+ENDIF (RUN_NNTI_TESTS)
+IF (RUN_ENET_TESTS)
     file (APPEND "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
          "\$test_set{\"enet\"} = \"basic_size_list all_read_buffer_styles all_write_buffer_styles\";\n")
-ENDIF (ENET_FOUND)
-IF (IB_FOUND)
+ENDIF (RUN_ENET_TESTS)
+IF (RUN_IB_TESTS)
     file (APPEND "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
          "\$test_set{\"ib\"} = \"basic_size_list all_read_buffer_styles all_write_buffer_styles\";\n")
-ENDIF (IB_FOUND)
+ENDIF (RUN_IB_TESTS)
 
 ADD_TEST (all_transports perl ./transport_test.pl -q -f ./correctness_spec)
