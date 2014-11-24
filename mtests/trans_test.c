@@ -11,7 +11,7 @@
 #include "evpath.h"
 #include <errno.h>
 #include "cercs_env.h"
-#ifdef MPI_C_FOUND
+#ifdef BUILD_WITH_MPI
 #include "mpi.h"
 #define CONTACTLEN 1024
 #else
@@ -274,6 +274,9 @@ main(argc, argv)
     int cur_subproc_arg = start_subproc_arg_count;
     char *transport = NULL;
     char path[10240];
+#ifdef BUILD_WITH_MPI
+    use_mpi = 1;
+#endif
 
     if (getcwd(&path[0], sizeof(path)) == NULL) {
         printf("Couldn't get pwd\n");
@@ -390,10 +393,10 @@ main(argc, argv)
 	    timeout = 600;
 	} else if (strcmp(&argv[1][1], "mpi") == 0) {
 	    start_subprocess = 0;
-#ifdef MPI_C_FOUND
+#ifdef BUILD_WITH_MPI
 	    use_mpi = 1;
 #else
-	    printf("Argument -mpi specified, but MPI not found at Cmake time\n");
+	    printf("Argument -mpi specified to trans_test, use mpi_trans_test instead\n");
 	    exit(1);
 #endif
 	} else {
@@ -404,7 +407,7 @@ main(argc, argv)
 	argc--;
     }
 
-#ifdef MPI_C_FOUND
+#ifdef BUILD_WITH_MPI
     if (use_mpi) {
 	MPI_Init(&argc, &argv);                /* Initialize MPI */
 	MPI_Comm_size(MPI_COMM_WORLD, &np);    /* Get nr of processes */
@@ -476,7 +479,7 @@ main(argc, argv)
 	global_exit_condition = CMCondition_get(cm, NULL);
 	if (start_subprocess) {
 	    subproc_proc = run_subprocess(&subproc_args[start_subproc_arg_count]);
-#ifdef MPI_C_FOUND
+#ifdef BUILD_WITH_MPI
 	} else if (use_mpi) {
 	    char master_contact[CONTACTLEN];             /* Local host name string */
 	    strcpy(master_contact, attr_list_to_string(contact_list));
@@ -517,7 +520,7 @@ main(argc, argv)
 		}
 	    }
 	} else {
-#ifdef MPI_C_FOUND
+#ifdef BUILD_WITH_MPI
 	    char master_contact[CONTACTLEN];             /* Local host name string */
 	    MPI_Bcast(master_contact,CONTACTLEN,MPI_CHAR,0,MPI_COMM_WORLD);
 	    contact_list = attr_list_from_string(master_contact);
@@ -546,7 +549,7 @@ main(argc, argv)
 	add_int_attr(test_list, CM_TRANS_TEST_VERBOSE, verbose);
 	add_int_attr(test_list, CM_TRANS_TEST_NODE, me);
 		
-#ifdef MPI_C_FOUND
+#ifdef BUILD_WITH_MPI
 	if (use_mpi) {
 	    MPI_Barrier(MPI_COMM_WORLD);
 	}
