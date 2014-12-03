@@ -304,6 +304,20 @@ send_control_message(send_handle h)
 	    svc->trace_out(cm, "CMNNTI/ENET control write failed.");
 	    return 0;
 	}
+	enet_host_flush (h.ncd->ntd->enet_server);
+#ifdef NOT_DEF
+	static time_t last_flush_call = 0;
+	if (last_flush_call == 0) {
+	    enet_host_flush (h.ncd->ntd->enet_server);
+	    last_flush_call = time(NULL);
+	} else {
+	    time_t now = time(NULL);
+	    if (now > last_flush_call) {
+		last_flush_call = now;
+		enet_host_flush (h.ncd->ntd->enet_server);
+	    }
+	}
+#endif
 #endif
     } else {
         svc->trace_out(cm, "CMNNTI control write of %d bytes",
@@ -1453,7 +1467,7 @@ nnti_enet_service_network(CManager cm, void *void_trans)
 	return;
     }
 
-    /* Wait up to 1000 milliseconds for an event. */
+    /* Wait up to 1 milliseconds for an event. */
     while (enet_host_service (ntd->enet_server, & event, 1) > 0) {
         switch (event.type) {
 	case ENET_EVENT_TYPE_NONE:
@@ -1679,7 +1693,7 @@ setup_enet_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
 	    //return EXIT_FAILURE;
 	}
     }
-    svc->add_periodic_task(cm, 1, 0, nnti_enet_service_network_lock, (void*)trans);
+    svc->add_periodic_task(cm, 0, 30*1000, nnti_enet_service_network_lock, (void*)trans);
     svc->trace_out(cm, "CMNNTI begin ENET listen\n");
 
     srand48(seedval);
