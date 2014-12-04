@@ -2227,13 +2227,8 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 	}
     }
     if (performance_msg || evcontrol_msg) {
-#if SIZEOF_LONG == 4
-	performance_func = 0xff & (data_length >> 24);
-	data_length &= 0xffffff;
-#else
 	performance_func = 0xff & (data_length >> 56);
 	data_length &= 0xffffffffffffff;
-#endif
 	data_length -= 12;  /* subtract off header size */
     }
     if (handshake) {
