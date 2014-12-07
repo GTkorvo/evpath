@@ -12,8 +12,12 @@ foreach (TEST ${TESTS} )
     SET_TARGET_PROPERTIES(dfg_${TEST} PROPERTIES LINKER_LANGUAGE ${C_EXECUTABLE_LINKER_LANGUAGE})
     TARGET_LINK_LIBRARIES(dfg_${TEST} evpath ${BASE_LIBS})
     ADD_TEST(dfg_${TEST} dfg_${TEST})
+    LIST( APPEND DFG_TESTS "dfg_${TEST}")
 endforeach()
 
 ADD_TEST(dfg_chain_test_one_proc dfg_chain_test 1)
 ADD_TEST(dfg_dchain_test_one_proc dfg_dchain_test 1)
 
+if (TEST_INSTALL_DIRECTORY) 
+  install(TARGETS ${DFG_TESTS} DESTINATION "${TEST_INSTALL_DIRECTORY}")
+endif (TEST_INSTALL_DIRECTORY) 
