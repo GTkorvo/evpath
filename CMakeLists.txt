@@ -80,7 +80,7 @@ ENDIF (NOT DEFINED CM_SELF_FORMATS)
 
 IF (TARGET_CNL)   # This should be set to true if compiling for compute note linux
   set (NO_DYNAMIC_LINKING 1)   # dummy dyn linking in cm.c and cm_transport.c
-  list (APPEND EVPATH_SRC_LIST cmsockets.c cmudp.c cmselect.c)  # link sockets and select mechanisms in main lib
+  list (APPEND EVPATH_SRC_LIST ip_config.c cmsockets.c cmudp.c cmselect.c)  # link sockets and select mechanisms in main lib
   list (APPEND CERCS_FIND_OPTIONS "STATIC")
   set (NO_TRANSPORT_MODULES TRUE)
   set (BUILD_SHARED_STATIC STATIC)
@@ -115,7 +115,7 @@ LINK_DIRECTORIES(${LIB_DIRS})
 SET (CM_DEFAULT_TRANSPORT "sockets")
 
 if (NOT NO_TRANSPORT_MODULES)
-  add_library(cmsockets MODULE cmsockets.c)
+  add_library(cmsockets MODULE cmsockets.c ip_config.c)
   add_library(cmselect MODULE cmselect.c)
   add_library(cmudp MODULE cmudp.c)
   add_library(cmmulticast MODULE cmmulticast.c)
@@ -158,7 +158,7 @@ SET(RUN_IB_TESTS False)
 IF (ENET_FOUND)
    SET(RUN_ENET_TESTS True)
    If (NOT NO_TRANSPORT_MODULES)
-      add_library(cmenet MODULE cmenet.c)
+      add_library(cmenet MODULE cmenet.c ip_config.c)
       list (APPEND TARGETS cmenet)
       TARGET_LINK_LIBRARIES(cmenet ${ENET_LIBRARIES} ${BASE_LIBS})
    ELSE (NOT NO_TRANSPORT_MODULES)
