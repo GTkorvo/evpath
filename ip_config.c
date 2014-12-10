@@ -419,6 +419,7 @@ get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int
 	    use_hostname = 1;
 	    trace_func(trace_data, "CM<IP_CONFIG> CM_HOSTNAME set to \"%s\", running with that.", preferred_hostname);
 	    host = gethostbyname(preferred_hostname);
+	    strcpy(determined_hostname, preferred_hostname);
 	    if (!host) {
 		printf("Warning, CM_HOSTNAME is \"%s\", but gethostbyname fails for that string.\n", preferred_hostname);
 	    } else {
