@@ -374,7 +374,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 
     svc->trace_out(cm, "--> Connection established");
     enet_conn_data->remote_host = host_name == NULL ? NULL : strdup(host_name);
-    enet_conn_data->remote_IP = host_ip;
+    enet_conn_data->remote_IP = htonl(host_ip);
     enet_conn_data->remote_contact_port = int_port_num;
     enet_conn_data->sd = sd;
     enet_conn_data->peer = peer;
@@ -492,7 +492,6 @@ libcmenet_LTX_connection_eq(CManager cm, CMtrans_services svc,
 	svc->trace_out(cm, "IP translation for hostname %s is %x", host_name,
 		       requested_IP);
     }
-
     svc->trace_out(cm, "ENET Conn_eq comparing IP/ports %x/%d and %x/%d",
 		   scd->remote_IP, scd->remote_contact_port,
 		   requested_IP, int_port_num);
@@ -527,7 +526,7 @@ build_listen_attrs(CManager cm, CMtrans_services svc, enet_client_data_ptr sd,
     }
     if ((IP != 0) && !use_hostname) {
 	add_attr(ret_list, CM_ENET_ADDR, Attr_Int4,
-		 (attr_value) (long)IP);
+		 (attr_value) (long)htonl(IP));
     }
     if ((cercs_getenv("CMEnetsUseHostname") != NULL) || 
 	use_hostname) {
