@@ -156,6 +156,10 @@ struct _transport_item {
     CMTransport_get_transport_characteristics get_transport_characteristics;
 };
 
+extern void
+get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int *port_range_high_p, 
+	      int *use_hostname_p, attr_list attrs, CMTransport_trace trace_func, void *trace_data);
+
 #if defined(__cplusplus) || defined(c_plusplus)
 }
 #endif
