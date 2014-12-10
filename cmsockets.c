@@ -118,7 +118,6 @@ static atom_t CM_PEER_CONN_PORT = -1;
 static atom_t CM_PEER_IP = -1;
 static atom_t CM_PEER_HOSTNAME = -1;
 static atom_t CM_PEER_LISTEN_PORT = -1;
-static atom_t CM_NETWORK_POSTFIX = -1;
 static atom_t CM_TRANSPORT_RELIABLE = -1;
 static atom_t CM_IP_PORT = -1;
 static atom_t CM_IP_HOSTNAME = -1;
@@ -329,8 +328,6 @@ socket_conn_data_ptr scd;
 }
 
 
-#include "qual_hostname.c"
-
 static int
 is_private_192(int IP)
 {
@@ -430,52 +427,24 @@ attr_list conn_attr_list;
 #endif
     } else {
 	/* INET socket connection, host_name is the machine name */
-	char *network_string;
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR) {
 	    svc->trace_out(cm, " CMSocket connect FAILURE --> Couldn't create socket");
 	    return -1;
 	}
 	((struct sockaddr_in *) &sock_addr)->sin_family = AF_INET;
-	if (((network_string = cercs_getenv("CM_NETWORK")) != NULL) &&
-	    (host_name != NULL)) {
-	    int name_len = strlen(host_name) + 2 + strlen(network_string);
-	    char *new_host_name = svc->malloc_func(name_len);
-	    char *first_dot = strchr(host_name, '.');
-	    memset(new_host_name, 0, name_len);
-	    if (first_dot == NULL) {
-		strcpy(new_host_name, host_name);
-		strcat(new_host_name, network_string);
-	    } else {
-		strncpy(new_host_name, host_name, first_dot - host_name);
-		strcat(new_host_name, network_string);
-		strcat(new_host_name, first_dot);
-	    }
-	    if (check_host(new_host_name, (void *) &sock_addr.s_I4.sin_addr) == 0) {
-		/* host has no NETWORK interface */
-		if (check_host(host_name, (void *) &sock_addr.s_I4.sin_addr) == 0) {
-		    svc->trace_out(cm, "--> Host not found \"%s\"",
-				   host_name);
+	if (host_name != NULL) {
+	    if (check_host(host_name, (void *) &sock_addr.s_I4.sin_addr) == 0) {
+		if (host_ip == 0) {
+		    svc->trace_out(cm, "CMSocket connect FAILURE --> Host not found \"%s\", no IP addr supplied in contact list", host_name);
+		} else {
+		    svc->trace_out(cm, "CMSOCKET --> Host not found \"%s\", Using supplied IP addr %x",
+				   host_name == NULL ? "(unknown)" : host_name,
+				   host_ip);
+		    sock_addr.s_I4.sin_addr.s_addr = ntohl(host_ip);
 		}
-	    } else {
-		svc->trace_out(cm, "--> Using non default network interface with hostname %s",
-			       new_host_name);
 	    }
-	    svc->free_func(new_host_name);
 	} else {
-	    if (host_name != NULL) {
-		if (check_host(host_name, (void *) &sock_addr.s_I4.sin_addr) == 0) {
-		    if (host_ip == 0) {
-			svc->trace_out(cm, "CMSocket connect FAILURE --> Host not found \"%s\", no IP addr supplied in contact list", host_name);
-		    } else {
-			svc->trace_out(cm, "CMSOCKET --> Host not found \"%s\", Using supplied IP addr %x",
-			     host_name == NULL ? "(unknown)" : host_name,
-				       host_ip);
-			sock_addr.s_I4.sin_addr.s_addr = ntohl(host_ip);
-		    }
-		}
-	    } else {
-		sock_addr.s_I4.sin_addr.s_addr = ntohl(host_ip);
-	    }
+	    sock_addr.s_I4.sin_addr.s_addr = ntohl(host_ip);
 	}
 	sock_addr.s_I4.sin_port = htons(port_num);
 	remote_IP = ntohl(sock_addr.s_I4.sin_addr.s_addr);
@@ -491,13 +460,14 @@ attr_list conn_attr_list;
 	svc->trace_out(cm, "Attempting TCP/IP socket connection, host=\"%s\", IP = %s, port %d",
 		       host_name == 0 ? "(unknown)" : host_name, 
 		       inet_ntoa(sock_addr.s_I4.sin_addr),
-		       int_port_num);
+		       ntohs(sock_addr.s_I4.sin_port));
 	if (connect(sock, (struct sockaddr *) &sock_addr,
-		    sizeof sock_addr) == SOCKET_ERROR) {
+		    sizeof(sock_addr.s_I4)) == SOCKET_ERROR) {
 #ifdef WSAEWOULDBLOCK
 	    int err = WSAGetLastError();
 	    if (err != WSAEWOULDBLOCK || err != WSAEINPROGRESS) {
 #endif
+		printf("Errno was %d\n", errno);
 		svc->trace_out(cm, "CMSocket connect FAILURE --> Connect() to IP %s failed", inet_ntoa(sock_addr.s_I4.sin_addr));
 		close(sock);
 #ifdef WSAEWOULDBLOCK
@@ -622,8 +592,10 @@ attr_list attrs;
     char my_host_name[256];
     static int IP = 0;
 
+    get_IP_config(my_host_name, sizeof(host_name), &IP, NULL, NULL, NULL,
+		  NULL, svc->trace_out, (void *)cm);
+
     if (IP == 0) {
-	IP = get_self_ip_addr(cm, svc);
 	if (IP == 0) IP = INADDR_LOOPBACK;
     }
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
@@ -642,8 +614,6 @@ attr_list attrs;
 	svc->trace_out(cm, "CMself check TCP/IP transport found no IP_PORT attribute");
 	return 0;
     }
-    get_qual_hostname(cm, my_host_name, sizeof(my_host_name), svc, NULL, NULL);
-
     if (host_name && (strcmp(host_name, my_host_name) != 0)) {
 	svc->trace_out(cm, "CMself check - Hostnames don't match");
 	return 0;
@@ -722,7 +692,10 @@ attr_list listen_info;
     int conn_sock;
     int attr_port_num = 0;
     u_short port_num = 0;
-    char *network_string;
+    int port_range_low, port_range_high;
+    int use_hostname = 0;
+    int IP;
+    char host_name[256];
 
     conn_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (conn_sock == SOCKET_ERROR) {
@@ -749,6 +722,9 @@ attr_list listen_info;
     }
 
     svc->trace_out(cm, "CMSocket begin listen, requested port %d", attr_port_num);
+    get_IP_config(host_name, sizeof(host_name), &IP, &port_range_low, &port_range_high, 
+		  &use_hostname, listen_info, svc->trace_out, (void *)cm);
+
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_addr.s_addr = INADDR_ANY;
     sock_addr.sin_port = htons(port_num);
@@ -767,27 +743,13 @@ attr_list listen_info;
 	}
     } else {
 	long seedval = time(NULL) + getpid();
-	/* port num is free.  Constrain to range 26000 : 26100 */
-	int low_bound = 26000;
-	int high_bound = 26100;
-	int size = high_bound - low_bound;
+	/* port num is free.  Constrain to range to standards */
+	int size = port_range_high - port_range_low;
 	int tries = 30;
 	int result = SOCKET_ERROR;
-	char *port_range;
-	if ((port_range = getenv("CM_PORT_RANGE")) != NULL) {
-	    if (sscanf(port_range, "%d:%d", &high_bound, &low_bound) != 2) {
-		printf("CM_PORT_RANGE spec not understood \"%s\"\n", port_range);
-	    } else {
-		if (high_bound < low_bound) {
-		    int tmp = high_bound;
-		    high_bound = low_bound;
-		    low_bound = tmp;
-		}
-	    }
-	}
 	srand48(seedval);
 	while (tries > 0) {
-	    int target = low_bound + size * drand48();
+	    int target = port_range_low + size * drand48();
 	    sock_addr.sin_port = htons(target);
 	    svc->trace_out(cm, "CMSocket trying to bind port %d", target);
 	    result = bind(conn_sock, (struct sockaddr *) &sock_addr,
@@ -799,12 +761,12 @@ attr_list listen_info;
 		srand48(time(NULL) + getpid());
 	    }
 	    if (tries == 20) {
-		/* damn, tried a lot, increase the range */
-		size = 1000;
+		/* damn, tried a lot, increase the range (This might violate specified range) */
+		size *= 10;
 	    }
 	    if (tries == 10) {
-		/* damn, tried a lot more, increase the range */
-		size = 10000;
+		/* damn, tried a lot more, increase the range (This might violate specified range) */
+		size *= 10;
 	    }
 	}
 	if (result == SOCKET_ERROR) {
@@ -834,50 +796,24 @@ attr_list listen_info;
     svc->fd_add_select(cm, conn_sock, socket_accept_conn,
 		       (void *) trans, (void *) (long)conn_sock);
 
-    /* in the event the DE is shut down, close the socket */
-    /* 
-     *  -- Don't do this...  Close() seems to hang on sockets after 
-     *  listen() for some reason.  I haven't found anywhere that defines 
-     *  this behavior, but it seems relatively uniform. 
-     */
-    /* DExchange_add_close(de, close_socket_fd, (void*)conn_sock, NULL); */
-
     {
-	char host_name[256];
 	int int_port_num = ntohs(sock_addr.sin_port);
 	attr_list ret_list;
-	int IP = get_self_ip_addr(cm, svc);
-	int network_added = 0;
 
 	svc->trace_out(cm, "CMSocket listen succeeded on port %d, fd %d",
 		       int_port_num, conn_sock);
 	ret_list = create_attr_list();
-#if !NO_DYNAMIC_LINKING
-	get_qual_hostname(cm, host_name, sizeof(host_name), svc, listen_info, 
-			  &network_added);
-#endif 
 
 	sd->hostname = strdup(host_name);
 	sd->listen_port = int_port_num;
-	if ((IP != 0) && (cercs_getenv("CM_NETWORK") == NULL) &&
-	    (!query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
-			 (attr_value *) (long)& network_string))) {
+	if ((IP != 0) && (!use_hostname)) {
 	    add_attr(ret_list, CM_IP_ADDR, Attr_Int4,
 		     (attr_value) (long)IP);
 	}
 	if ((cercs_getenv("CMSocketsUseHostname") != NULL) || 
-	    (cercs_getenv("CM_NETWORK") != NULL) ||
-	    (query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
-			 (attr_value *) (long)& network_string))) {
+	    use_hostname) {
 	    add_attr(ret_list, CM_IP_HOSTNAME, Attr_String,
 		     (attr_value) strdup(host_name));
-	    if (network_added) {
-		if (query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
-			       (attr_value *) (long)& network_string)) {
-		    add_attr(ret_list, CM_NETWORK_POSTFIX, Attr_String,
-			     (attr_value) strdup(network_string));
-		}
-	    }
 	} else if (IP == 0) {
 	    add_attr(ret_list, CM_IP_ADDR, Attr_Int4, 
 		     (attr_value)INADDR_LOOPBACK);
@@ -1256,7 +1192,6 @@ libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc, transport_entry t
 	CM_PEER_IP = attr_atom_from_string("PEER_IP");
 	CM_PEER_HOSTNAME = attr_atom_from_string("PEER_HOSTNAME");
 	CM_PEER_LISTEN_PORT = attr_atom_from_string("PEER_LISTEN_PORT");
-	CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
 	CM_TRANSPORT_RELIABLE = attr_atom_from_string("CM_TRANSPORT_RELIABLE");
 	atom_init++;
     }

@@ -324,15 +324,19 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
     ENetEvent event;
     ENetPeer *peer;
     sin_addr.s_addr = host_ip;
-    svc->trace_out(cm, "Attempting ENET RUDP connection, host=\"%s\", IP = %s, port %d",
-		   host_name == 0 ? "(unknown)" : host_name, 
-		   inet_ntoa(sin_addr),
-		   int_port_num);
 
     if (host_name) {
 	enet_address_set_host (& address, host_name);
+	svc->trace_out(cm, "Attempting ENET RUDP connection, host=\"%s\", IP = %s, port %d",
+		       host_name == 0 ? "(unknown)" : host_name, 
+		       inet_ntoa(sin_addr),
+		       int_port_num);
     } else {
 	address.host = host_ip;
+	svc->trace_out(cm, "Attempting ENET RUDP connection, host=\"%s\", IP = %s, port %d",
+		       host_name == 0 ? "(unknown)" : host_name, 
+		       inet_ntoa(sin_addr),
+		       int_port_num);
     }
     address.port = (unsigned short) int_port_num;
 
@@ -400,7 +404,6 @@ libcmenet_LTX_initiate_conn(CManager cm, CMtrans_services svc,
     return conn;
 }
 
-#include "qual_hostname.c"
 
 /* 
  * Check to see that if we were to attempt to initiate a connection as
@@ -420,9 +423,9 @@ libcmenet_LTX_self_check(CManager cm, CMtrans_services svc,
     char my_host_name[256];
     static int IP = 0;
 
-    if (IP == 0) {
-	IP = ntohl(get_self_ip_addr(cm, svc));
-    }
+    get_IP_config(my_host_name, sizeof(host_name), &IP, NULL, NULL, NULL,
+		  NULL, svc->trace_out, (void *)cm);
+
     if (IP == 0) {
 	IP = ntohl(INADDR_LOOPBACK);
     }
@@ -508,41 +511,28 @@ build_listen_attrs(CManager cm, CMtrans_services svc, enet_client_data_ptr sd,
 {
     char host_name[256];
     attr_list ret_list;
-    int IP = ntohl(get_self_ip_addr(cm, svc));
-    int network_added = 0;
-    char *network_string;
+    int IP;
+    int use_hostname = 0;
     
     svc->trace_out(cm, "CMEnet listen succeeded on port %d",
 		       int_port_num);
+    get_IP_config(host_name, sizeof(host_name), &IP, NULL, NULL,
+		  &use_hostname, listen_info, svc->trace_out, (void *)cm);
+
     ret_list = create_attr_list();
-#if !NO_DYNAMIC_LINKING
-    get_qual_hostname(cm, host_name, sizeof(host_name), svc, listen_info, 
-		      &network_added);
-#endif 
 
     if (sd) {
 	sd->hostname = strdup(host_name);
 	sd->listen_port = int_port_num;
     }
-    if ((IP != 0) && (cercs_getenv("CM_NETWORK") == NULL) &&
-	(!query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
-		     (attr_value *) (long)& network_string))) {
+    if ((IP != 0) && !use_hostname) {
 	add_attr(ret_list, CM_ENET_ADDR, Attr_Int4,
 		 (attr_value) (long)IP);
     }
     if ((cercs_getenv("CMEnetsUseHostname") != NULL) || 
-	(cercs_getenv("CM_NETWORK") != NULL) ||
-	(query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
-		    (attr_value *) (long)& network_string))) {
+	use_hostname) {
 	add_attr(ret_list, CM_ENET_HOSTNAME, Attr_String,
 		 (attr_value) strdup(host_name));
-	if (network_added) {
-	    if (query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
-			   (attr_value *) (long)& network_string)) {
-	      add_attr(ret_list, CM_NETWORK_POSTFIX, Attr_String,
-		       (attr_value) strdup(network_string));
-	    }
-	}
     } else if (IP == 0) {
         add_int_attr(ret_list, CM_ENET_ADDR, htonl(INADDR_LOOPBACK));
     }
