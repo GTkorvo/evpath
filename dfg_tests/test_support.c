@@ -292,7 +292,6 @@ main(int argc, char **argv)
 		if (second_colon) *second_colon = 0;
 		if (sscanf(first_colon+1, "%d", &ssh_port_int) != 1) {
 		    second_colon = first_colon;
-		    printf("Failed scanf, second colon is %s\n", second_colon);
 		}  else {
 		    start_subproc_arg_count-=2;
 		    ssh_port = first_colon + 1;
@@ -329,7 +328,6 @@ main(int argc, char **argv)
 	if (remote_directory[strlen(remote_directory)-1] != '/')
 	    strcat(subproc_args[cur_subproc_arg], "/");
 	strcat(subproc_args[cur_subproc_arg], argv0);
-	printf("Remote is %s\n", subproc_args[cur_subproc_arg]);
     } else {
         subproc_args[cur_subproc_arg] = argv0;
     }
