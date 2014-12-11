@@ -327,14 +327,14 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 
     if (host_name) {
 	enet_address_set_host (& address, host_name);
-	svc->trace_out(cm, "Attempting ENET RUDP connection, host=\"%s\", IP = %s, port %d",
+	sin_addr.s_addr = address.host;
+	svc->trace_out(cm, "Attempting ENET RUDP connection, USING host=\"%s\", IP = %s, port %d",
 		       host_name == 0 ? "(unknown)" : host_name, 
 		       inet_ntoa(sin_addr),
 		       int_port_num);
     } else {
 	address.host = host_ip;
-	svc->trace_out(cm, "Attempting ENET RUDP connection, host=\"%s\", IP = %s, port %d",
-		       host_name == 0 ? "(unknown)" : host_name, 
+	svc->trace_out(cm, "Attempting ENET RUDP connection, USING IP = %s, port %d",
 		       inet_ntoa(sin_addr),
 		       int_port_num);
     }
