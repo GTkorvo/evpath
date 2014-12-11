@@ -322,12 +322,14 @@ main(int argc, char **argv)
 	argc--;
     }
     if (remote_directory[0] != 0) {
+        if (rindex(argv0, '/')) argv0 = rindex(argv0, '/') + 1;
         subproc_args[cur_subproc_arg] = malloc(strlen(remote_directory) + 
 					       strlen(argv0) + 4);
 	strcpy(subproc_args[cur_subproc_arg], remote_directory);
 	if (remote_directory[strlen(remote_directory)-1] != '/')
 	    strcat(subproc_args[cur_subproc_arg], "/");
 	strcat(subproc_args[cur_subproc_arg], argv0);
+	printf("Remote is %s\n", subproc_args[cur_subproc_arg]);
     } else {
         subproc_args[cur_subproc_arg] = argv0;
     }
