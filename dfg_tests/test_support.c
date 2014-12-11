@@ -166,22 +166,31 @@ run_subprocess(char **args)
 
 static char *argv0;
 static pid_t *pid_list = NULL;
+static int start_subproc_arg_count;
+static char **subproc_args;
+static int cur_subproc_arg;
+static char remote_directory[1024];
 
 extern void
 test_fork_children(char **list, char *master_contact)
 {
-    char *args[] = {argv0, "-c", NULL, NULL, NULL, NULL, NULL};
-    int node_index = 0;
+    char *args[20];
+    int i = 0;
     int list_index = 1;
     /* assume that we are list[0] */
-    while(args[node_index] != NULL) node_index++;
+    while(subproc_args[start_subproc_arg_count + i] != NULL) {
+        args[i] = subproc_args[start_subproc_arg_count+i];
+	i++;
+    }
     if (quiet < 1) {
-	args[node_index++] = "-v";
+	args[i++] = "-v";
     }	
-    args[node_index+1] = master_contact;
+    args[i++] = "-c";
+    args[i+1] = master_contact;
+    args[i+2] = NULL;
     pid_list = malloc(sizeof(pid_list[0]));
     while(list[list_index] != NULL) {
-	args[node_index] = list[list_index];
+	args[i] = list[list_index];
 	pid_list[list_index -1 ] = run_subprocess(args);
 	list_index++;
 	pid_list = realloc(pid_list, sizeof(pid_list[0]) * list_index);
@@ -225,12 +234,31 @@ static int regression = 1;
 
 static void fail_and_die(int signal);
 
+static void
+usage()
+{
+    printf("Usage:  %s <options> \n", argv0);
+    printf("  Options:\n");
+    printf("\t-q  quiet\n");
+    printf("\t-v  verbose\n");
+    printf("\t-n  No regression test.  I.E. just run the master and print \n\t\twhat command would have been run for client.\n");
+    printf("\t-ssh <hostname>:<ssh_port>:<remote directory>  parameters to use for remote client via ssh.\n");
+    printf("\t-ssh <hostname>:<remote directory>  parameters to use for remote client via ssh.\n");
+
+    exit(1);
+}
+
 int
 main(int argc, char **argv)
 {
     int regression_master = 1;
 
     argv0 = argv[0];
+    start_subproc_arg_count = 8; /* leave a few open at the beginning */
+    subproc_args = calloc((argc + start_subproc_arg_count + 8), sizeof(argv[0]));
+    cur_subproc_arg = start_subproc_arg_count;
+    remote_directory[0] = 0;
+
     while (argv[1] && (argv[1][0] == '-')) {
 	if (argv[1][1] == 'c') {
 	    regression_master = 0;
@@ -242,6 +270,49 @@ main(int argc, char **argv)
 	    regression = 0;
 	    quiet = -1;
 	    no_fork = 1;
+	} else if (strcmp(&argv[1][1], "ssh") == 0) {
+	    char *destination_host;
+	    char *first_colon, *second_colon;
+	    char *ssh_port = NULL;
+	    if (!argv[2]) {
+	        printf("Missing --ssh destination\n");
+		usage();
+	    }
+	    first_colon = index(argv[2], ':');
+	    if (first_colon) {
+	        *first_colon = 0;
+		second_colon = index(first_colon+1, ':');
+	    } else {
+	        second_colon = NULL;
+	    }
+	    destination_host = strdup(argv[2]);
+	    start_subproc_arg_count-=2;
+	    if (first_colon) {
+	        int ssh_port_int;
+		if (second_colon) *second_colon = 0;
+		if (sscanf(first_colon+1, "%d", &ssh_port_int) != 1) {
+		    second_colon = first_colon;
+		    printf("Failed scanf, second colon is %s\n", second_colon);
+		}  else {
+		    start_subproc_arg_count-=2;
+		    ssh_port = first_colon + 1;
+		}
+	    }
+	    if (second_colon) {
+	        strcpy(remote_directory, second_colon+1);
+	    }
+	    if (strlen(SSH_PATH) == 0) {
+		printf("SSH_PATH in config.h is empty!  Can't run ssh\n");
+		exit(1);
+	    }
+	    subproc_args[start_subproc_arg_count] = strdup(SSH_PATH);
+	    subproc_args[start_subproc_arg_count+1] = destination_host;
+	    if (ssh_port != NULL) {
+	        subproc_args[start_subproc_arg_count+2] = "-p";
+	        subproc_args[start_subproc_arg_count+3] = ssh_port;
+	    }
+	    subproc_args[cur_subproc_arg] = NULL;
+	    argv++; argc--;
 	} else if (argv[1][1] == '-') {
 	    argv++;
 	    argc--;
@@ -250,6 +321,18 @@ main(int argc, char **argv)
 	argv++;
 	argc--;
     }
+    if (remote_directory[0] != 0) {
+        subproc_args[cur_subproc_arg] = malloc(strlen(remote_directory) + 
+					       strlen(argv0) + 4);
+	strcpy(subproc_args[cur_subproc_arg], remote_directory);
+	if (remote_directory[strlen(remote_directory)-1] != '/')
+	    strcat(subproc_args[cur_subproc_arg], "/");
+	strcat(subproc_args[cur_subproc_arg], argv0);
+    } else {
+        subproc_args[cur_subproc_arg] = argv0;
+    }
+    subproc_args[cur_subproc_arg+1] = NULL;
+    cur_subproc_arg++;
     srand48(getpid());
 
 #ifdef HAVE_WINDOWS_H
