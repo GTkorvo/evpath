@@ -21,5 +21,6 @@ ADD_TEST(dfg_chain_test_one_proc dfg_chain_test 1)
 ADD_TEST(dfg_dchain_test_one_proc dfg_dchain_test 1)
 
 if (TEST_INSTALL_DIRECTORY) 
-  install(TARGETS ${DFG_TESTS} ${CMAKE_CURRENT_BINARY_DIR}/dfg_tests.tsts DESTINATION "${TEST_INSTALL_DIRECTORY}")
+  install(TARGETS ${DFG_TESTS} DESTINATION "${TEST_INSTALL_DIRECTORY}")
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/dfg_tests.tsts DESTINATION "${TEST_INSTALL_DIRECTORY}")
 endif (TEST_INSTALL_DIRECTORY) 
