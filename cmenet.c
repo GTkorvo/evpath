@@ -609,11 +609,13 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
     } else {
 	long seedval = time(NULL) + getpid();
 	/* port num is free.  Constrain to range 26000 : 26100 */
-	int low_bound = 26000;
-	int high_bound = 26100;
+	int low_bound, high_bound;
 	int size;
 	int tries;
 	srand48(seedval);
+	get_IP_config(NULL, 0, NULL, &low_bound, &high_bound,
+		      NULL, listen_info, svc->trace_out, (void *)cm);
+
     restart:
 	size = high_bound - low_bound;
 	tries = 10;

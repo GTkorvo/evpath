@@ -20,6 +20,7 @@
 #ifdef HAVE_MEMORY_H
 #include <memory.h>
 #endif
+#include <arpa/inet.h>
 
 #include <atl.h>
 #include <cercs_env.h>
@@ -606,8 +607,6 @@ unlink_connection(nnti_transport_data_ptr ntd, nnti_conn_data_ptr ncd)
 }
 
 
-#include "qual_hostname.c"
-
 enum {CMNNTI_CONNECT=1, CMNNTI_PIGGYBACK=2, CMNNTI_PULL_REQUEST=3, CMNNTI_PULL_COMPLETE=4, CMNNTI_PULL_SHM_REQUEST=5, CMNNTI_LAST_MSG_TYPE=7};
 char *msg_type_name[] = 
 {"NO MESSAGE", "CMNNTI_CONNECT", "CMNNTI_PIGGYBACK", "CMNNTI_PULL_REQUEST", "CMNNTI_PULL_COMPLETE", "CMNNTI_PULL_SHM_REQUEST"};
@@ -1031,8 +1030,11 @@ attr_list attrs;
     char my_host_name[256];
     static int IP = 0;
 
+    get_IP_config(my_host_name, sizeof(host_name), &IP, NULL, NULL, NULL,
+		  NULL, svc->trace_out, (void *)cm);
+
     if (IP == 0) {
-	IP = get_self_ip_addr(cm, svc);
+	IP = ntohl(INADDR_LOOPBACK);
     }
     if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
@@ -1044,7 +1046,6 @@ attr_list attrs;
 	svc->trace_out(cm, "CMself check NNTI transport found no NNTI_PORT attribute");
 	return 0;
     }
-    get_qual_hostname(cm, my_host_name, sizeof(my_host_name), svc, NULL, NULL);
 
     if (host_name && (strcmp(host_name, my_host_name) != 0)) {
 	svc->trace_out(cm, "CMself check - Hostnames don't match");
@@ -1682,10 +1683,12 @@ setup_enet_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
     ENetHost * server;
     long seedval = time(NULL) + getpid();
     /* port num is free.  Constrain to range 26000 : 26100 */
-    int low_bound = 26000;
-    int high_bound = 26100;
+    int low_bound, high_bound;
     int size = high_bound - low_bound;
     int tries = size;
+
+    get_IP_config(NULL, 0, NULL, &low_bound, &high_bound,
+		  NULL, listen_list, svc->trace_out, (void *)cm);
 
     if (socket_global_init++ == 0) {
 	if (enet_initialize () != 0) {
