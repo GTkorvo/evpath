@@ -223,6 +223,9 @@ static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
 static atom_t CM_CONN_BLOCKING;
 
+char *transport = NULL;
+#include "support.c"
+
 int
 main(int argc, char **argv)
 {
@@ -230,35 +233,8 @@ main(int argc, char **argv)
     int regression_master = 1;
     int forked = 0;
 
-    while (argv[1] && (argv[1][0] == '-')) {
-	if (strcmp(&argv[1][1], "size") == 0) {
-	    if (sscanf(argv[2], "%d", &size) != 1) {
-		printf("Unparseable argument to -size, %s\n", argv[2]);
-	    }
-	    if (vecs == 0) { vecs = 1; printf("vecs not 1\n");}
-	    argv++;
-	    argc--;
-	} else 	if (strcmp(&argv[1][1], "vecs") == 0) {
-	    if (sscanf(argv[2], "%d", &vecs) != 1) {
-		printf("Unparseable argument to -vecs, %s\n", argv[2]);
-	    }
-	    argv++;
-	    argc--;
-	} else if (argv[1][1] == 'c') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 's') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 'q') {
-	    quiet++;
-	} else if (argv[1][1] == 'v') {
-	    quiet--;
-	} else if (argv[1][1] == 'n') {
-	    regression = 0;
-	    quiet = -1;
-	}
-	argv++;
-	argc--;
-    }
+    PARSE_ARGS();
+
     srand48(getpid());
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
     CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
@@ -376,35 +352,6 @@ fail_and_die(int signal)
 	kill(subproc_proc, 9);
     }
     exit(1);
-}
-
-static
-pid_t
-run_subprocess(char **args)
-{
-#ifdef HAVE_WINDOWS_H
-    int child;
-    child = _spawnv(_P_NOWAIT, "./block_test.exe", args);
-    if (child == -1) {
-	printf("failed for block_test\n");
-	perror("spawnv");
-    }
-    return child;
-#else
-#if 1
-    pid_t child = fork();
-    if (child == 0) {
-	/* I'm the child */
-	execv("./block_test", args);
-    }
-    return child;
-#else
-    int count = 0;
-    printf("Would have run \"");
-    while (args[count] != NULL) printf("%s ", args[count++]);
-    printf("\"\n");
-#endif
-#endif
 }
 
 static int

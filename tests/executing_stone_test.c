@@ -104,6 +104,9 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 
 char *transport = NULL;
 
+#include "support.c"
+int regression_master, regression;  /* not used in this test */
+
 int
 main(int argc, char **argv)
 {
@@ -111,15 +114,8 @@ main(int argc, char **argv)
     EVstone sink1, sink2, sink3;
     simple_rec data;
 
-    while (argv[1] && (argv[1][0] == '-')) {
-	if (argv[1][1] == 'q') {
-	    quiet++;
-	} else if (argv[1][1] == 'v') {
-	    quiet--;
-	}
-	argv++;
-	argc--;
-    }
+    PARSE_ARGS();
+
     srand48(getpid());
 
     cm = CManager_create();

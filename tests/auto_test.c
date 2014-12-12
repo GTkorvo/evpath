@@ -149,28 +149,18 @@ char *ECL_generate = "{\n\
     return count == 1;\n\
 }";
 
+char *transport = NULL;
+
+#include "support.c"
+
 int
 main(int argc, char **argv)
 {
     CManager cm;
     int regression_master = 1;
 
-    while (argv[1] && (argv[1][0] == '-')) {
-	if (argv[1][1] == 'c') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 's') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 'q') {
-	    quiet++;
-	} else if (argv[1][1] == 'v') {
-	    quiet--;
-	} else if (argv[1][1] == 'n') {
-	    regression = 0;
-	    quiet = -1;
-	}
-	argv++;
-	argc--;
-    }
+    PARSE_ARGS();
+
     srand48(getpid());
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
     CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
@@ -185,11 +175,11 @@ main(int argc, char **argv)
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
-	char *transport = NULL;
 	char *postfix = NULL;
 	char *string_list;
 	EVstone stone;
-	if ((transport = getenv("CMTransport")) != NULL) {
+	if (!transport) transport = getenv("CMTransport");
+	if (transport != NULL) {
 	    if (listen_list == NULL) listen_list = create_attr_list();
 	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		     (attr_value) strdup(transport));
@@ -265,30 +255,6 @@ fail_and_die(int signal)
 	kill(subproc_proc, 9);
     }
     exit(1);
-}
-
-static
-pid_t
-run_subprocess(char **args)
-{
-#ifdef HAVE_WINDOWS_H
-    int child;
-    child = _spawnv(_P_NOWAIT, "./evtest.exe", args);
-    if (child == -1) {
-	printf("failed for evtest\n");
-	perror("spawnv");
-    }
-    return child;
-#else
-    pid_t child;
-    if (quiet <=0) {printf("Forking subprocess\n");}
-    child = fork();
-    if (child == 0) {
-	/* I'm the child */
-	execv("./evtest", args);
-    }
-    return child;
-#endif
 }
 
 static int

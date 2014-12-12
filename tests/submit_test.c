@@ -194,28 +194,17 @@ char *submit_spec = "{\n\
 	return 0;\n\
 }\0\0";
 
+char *transport = NULL;
+#include "support.c"
+
 int
 main(int argc, char **argv)
 {
     CManager cm;
     int regression_master = 1;
 
-    while (argv[1] && (argv[1][0] == '-')) {
-	if (argv[1][1] == 'c') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 's') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 'q') {
-	    quiet++;
-	} else if (argv[1][1] == 'v') {
-	    quiet--;
-	} else if (argv[1][1] == 'n') {
-	    regression = 0;
-	    quiet = -1;
-	}
-	argv++;
-	argc--;
-    }
+    PARSE_ARGS();
+
     srand48(getpid());
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
     CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
@@ -324,35 +313,6 @@ fail_and_die(int signal)
 	kill(subproc_proc, 9);
     }
     exit(1);
-}
-
-static
-pid_t
-run_subprocess(char **args)
-{
-#ifdef HAVE_WINDOWS_H
-    int child;
-    child = _spawnv(_P_NOWAIT, "./submit_test.exe", args);
-    if (child == -1) {
-	printf("failed for submit_test\n");
-	perror("spawnv");
-    }
-    return child;
-#else
-#ifndef NOTDEF
-    pid_t child;
-    if (quiet <=0) {printf("Forking subprocess\n");}
-    child = fork();
-    if (child == 0) {
-	/* I'm the child */
-	execv("./submit_test", args);
-    }
-    return child;
-#else
-    printf("nothing doing  %s %s\n", args[1], args[2]);
-    sleep(20);
-#endif
-#endif
 }
 
 static int

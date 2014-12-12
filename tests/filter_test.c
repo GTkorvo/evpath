@@ -166,6 +166,9 @@ static atom_t CM_NETWORK_POSTFIX;
 static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
 
+char *transport = NULL;
+#include "support.c"
+
 int
 main(int argc, char **argv)
 {
@@ -173,24 +176,8 @@ main(int argc, char **argv)
     int regression_master = 1;
     int do_dll = 0;
 
-    while (argv[1] && (argv[1][0] == '-')) {
-	if (argv[1][1] == 'c') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 's') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 'q') {
-	    quiet++;
-	} else if (argv[1][1] == 'd') {
-	    do_dll++;
-	} else if (argv[1][1] == 'v') {
-	    quiet--;
-	} else if (argv[1][1] == 'n') {
-	    regression = 0;
-	    quiet = -1;
-	}
-	argv++;
-	argc--;
-    }
+    PARSE_ARGS();
+
     srand48(getpid());
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
     CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
@@ -209,13 +196,13 @@ main(int argc, char **argv)
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
-	char *transport = NULL;
 	char *postfix = NULL;
 	char *string_list;
 	char *filter;
 	EVstone term, fstone;
 	EVaction faction;
-	if ((transport = getenv("CMTransport")) != NULL) {
+	if (!transport) transport = getenv("CMTransport");
+	if (transport != NULL) {
 	    if (listen_list == NULL) listen_list = create_attr_list();
 	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		     (attr_value) strdup(transport));
@@ -312,35 +299,6 @@ fail_and_die(int signal)
 	kill(subproc_proc, 9);
     }
     exit(1);
-}
-
-static
-pid_t
-run_subprocess(char **args)
-{
-#ifdef HAVE_WINDOWS_H
-    int child;
-    child = _spawnv(_P_NOWAIT, "./filter_test.exe", args);
-    if (child == -1) {
-	printf("failed for filter_test\n");
-	perror("spawnv");
-    }
-    return child;
-#else
-#ifndef NOTDEF
-    pid_t child;
-    if (quiet <=0) {printf("Forking subprocess\n");}
-    child = fork();
-    if (child == 0) {
-	/* I'm the child */
-	execv("./filter_test", args);
-    }
-    return child;
-#else
-    printf("would have run with:  %s %s\n", args[1], args[2]);
-    sleep(20);
-#endif
-#endif
 }
 
 static int

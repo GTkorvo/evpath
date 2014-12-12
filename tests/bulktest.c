@@ -187,6 +187,8 @@ static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
 char *transport = NULL;
 
+#include "support.c"
+
 int
 main(int argc, char **argv)
 {
@@ -194,6 +196,7 @@ main(int argc, char **argv)
     int regression_master = 1;
     int forked = 0;
 
+    argv0 = argv[0];\
     while (argv[1] && (argv[1][0] == '-')) {
 	if (strcmp(&argv[1][1], "size") == 0) {
 	    if (sscanf(argv[2], "%d", &size) != 1) {
@@ -208,6 +211,47 @@ main(int argc, char **argv)
 	    }
 	    argv++;
 	    argc--;
+	} else if (strcmp(&argv[1][1], "ssh") == 0) {
+	    char *destination_host;
+	    char *first_colon, *second_colon;
+	    char *ssh_port = NULL;
+	    if (!argv[2]) {
+	        printf("Missing --ssh destination\n");
+		usage();
+	    }
+	    first_colon = index(argv[2], ':');
+	    if (first_colon) {
+	        *first_colon = 0;
+		second_colon = index(first_colon+1, ':');
+	    } else {
+	        second_colon = NULL;
+	    }
+	    destination_host = strdup(argv[2]);
+	    if (first_colon) {
+	        int ssh_port_int;
+		if (second_colon) *second_colon = 0;
+		if (sscanf(first_colon+1, "%d", &ssh_port_int) != 1) {
+		    second_colon = first_colon;
+		}  else {
+		    ssh_port = first_colon + 1;
+		}
+	    }
+	    if (second_colon) {
+	        strcpy(remote_directory, second_colon+1);
+	    }
+	    if (strlen(SSH_PATH) == 0) {
+		printf("SSH_PATH in config.h is empty!  Can't run ssh\n");
+		exit(1);
+	    }
+	    ssh_args[0] = strdup(SSH_PATH);
+	    ssh_args[1] = destination_host;
+	    ssh_args[2] = NULL;
+	    if (ssh_port != NULL) {
+	        ssh_args[2] = "-p";
+	        ssh_args[3] = ssh_port;
+		ssh_args[4] = NULL;
+	    }
+	    argv++; argc--;
 	} else if (argv[1][1] == 'c') {
 	    regression_master = 0;
 	} else if (argv[1][1] == 's') {
@@ -349,35 +393,6 @@ fail_and_die(int signal)
 	kill(subproc_proc, 9);
     }
     exit(1);
-}
-
-static
-pid_t
-run_subprocess(char **args)
-{
-#ifdef HAVE_WINDOWS_H
-    int child;
-    child = _spawnv(_P_NOWAIT, "./bulktest.exe", args);
-    if (child == -1) {
-	printf("failed for bulktest\n");
-	perror("spawnv");
-    }
-    return child;
-#else
-#if 1
-    pid_t child = fork();
-    if (child == 0) {
-	/* I'm the child */
-	execv("./bulktest", args);
-    }
-    return child;
-#else
-    int count = 0;
-    printf("Would have run \"");
-    while (args[count] != NULL) printf("%s ", args[count++]);
-    printf("\"\n");
-#endif
-#endif
 }
 
 static int

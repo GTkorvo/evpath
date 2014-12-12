@@ -479,25 +479,16 @@ static void do_remote_test(void) {
     /* CManager_close(cm); */
 }
 
+char *transport = NULL;
+#include "support.c"
 
 int
 main(int argc, char **argv)
 { 
     int remote_child = 0;
 
-    while (argv[1] && (argv[1][0] == '-')) {
-	if (argv[1][1] == 'q') {
-	    quiet++;
-	} else if (argv[1][1] == 'v') {
-	    quiet--;
-	} else if (argv[1][1] == 'n') {
-	    quiet = -1;
-	} else if (argv[1][1] == 'r') {
-            remote_child = 1;
-        }
-	argv++;
-	argc--;
-    }
+    PARSE_ARGS();
+
     srand48(getpid());
     if (remote_child) {
         use_remote = 1;
@@ -516,36 +507,6 @@ main(int argc, char **argv)
     do_remote_test();
 
     return failures;
-}
-
-/* utility functions */
-static pid_t run_subprocess(char **args)
-{
-#ifdef HAVE_WINDOWS_H
-    int child;
-    child = _spawnv(_P_NOWAIT, "./store_pressure_test.exe", args);
-    if (child == -1) {
-	printf("failed for extract_test\n");
-	perror("spawnv");
-    }
-    return child;
-#else
-#ifndef NOTDEF
-    pid_t child;
-    if (quiet <= 0) {
-	printf("Forking subprocess\n");
-    }
-    child = fork();
-    if (child == 0) {
-	/* I'm the child */
-	execv("./store_pressure_test", args);
-    }
-    return child;
-#else
-    printf("nothing doing  %s %s\n", args[1], args[2]);
-    sleep(20);
-#endif
-#endif
 }
 
 static void wait_for_subprocess(void) {
