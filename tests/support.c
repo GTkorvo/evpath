@@ -108,7 +108,7 @@ run_subprocess(char **args)
 	    i++;
 	}
 	if (remote_directory[0] != 0) {
-	  if (rindex(args[0], '/')) args[0] = rindex(args[0], '/') + 1;
+	  if (rindex(argv0, '/')) argv0 = rindex(argv0, '/') + 1;
 	  run_args[i] = malloc(strlen(remote_directory) + 
 			       strlen(argv0) + 4);
 	  strcpy(run_args[i], remote_directory);
