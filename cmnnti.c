@@ -1684,11 +1684,13 @@ setup_enet_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr
     long seedval = time(NULL) + getpid();
     /* port num is free.  Constrain to range 26000 : 26100 */
     int low_bound, high_bound;
-    int size = high_bound - low_bound;
-    int tries = size;
-
+    int size, tries;
+    
     get_IP_config(NULL, 0, NULL, &low_bound, &high_bound,
 		  NULL, listen_list, svc->trace_out, (void *)cm);
+    size = high_bound - low_bound;
+
+    tries = 50;
 
     if (socket_global_init++ == 0) {
 	if (enet_initialize () != 0) {
