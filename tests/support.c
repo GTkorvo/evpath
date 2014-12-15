@@ -123,6 +123,7 @@ run_subprocess(char **args)
 	    run_args[i] = args[j+1];
 	    i++; j++;
 	}
+	run_args[i] = NULL;
     } else {
         run_args[0] = argv0;
     }
@@ -133,11 +134,11 @@ run_subprocess(char **args)
 	if (child == 0) {
 	    /* I'm the child */
 	  int i=0;
-	printf("Would have run : ");
-	while(args[i]) {
+	  printf("Would have run : ");
+	  while(run_args[i]) {
 	    printf("%s ", run_args[i++]);
-	}
-	printf("'\n");
+	  }
+	  printf("'\n");
 	    execv(run_args[0], run_args);
 	}
     }
