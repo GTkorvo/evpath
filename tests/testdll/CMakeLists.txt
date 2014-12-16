@@ -3,3 +3,7 @@ cmake_minimum_required(VERSION 2.8)
 INCLUDE_DIRECTORIES(BEFORE ${evpath_BINARY_DIR} ${evpath_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
 add_library(foo MODULE foo.c)
+
+if (TEST_INSTALL_DIRECTORY) 
+  install(TARGETS foo DESTINATION "${TEST_INSTALL_DIRECTORY}/testdll")
+endif (TEST_INSTALL_DIRECTORY) 
