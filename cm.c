@@ -1314,18 +1314,27 @@ CMControlList_free(CManager cm, CMControlList cl)
     }
 }
 
-#include "qual_hostname.c"
-
 extern void
 CMget_qual_hostname(CManager cm, char *buf, int len)
 {
-    get_qual_hostname(cm, buf, len, &CMstatic_trans_svcs, NULL, NULL);
+    get_IP_config(buf, len, NULL, NULL, NULL, NULL, NULL,
+		  CMstatic_trans_svcs.trace_out, cm);
+}
+
+extern void
+CMget_port_range(CManager cm, int *high_bound, int *low_bound)
+{
+    get_IP_config(NULL, 0, NULL, low_bound, high_bound, NULL, NULL,
+		  CMstatic_trans_svcs.trace_out, cm);
 }
 
 extern int
 INT_CMget_self_ip_addr(CManager cm)
 {
-    return get_self_ip_addr(cm, &CMstatic_trans_svcs);
+    int IP;
+    get_IP_config(NULL, 0, &IP, NULL, NULL, NULL, NULL,
+		  CMstatic_trans_svcs.trace_out, cm);
+    return IP;
 }
 
 #define CURRENT_HANDSHAKE_VERSION 1

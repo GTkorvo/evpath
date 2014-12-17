@@ -68,7 +68,8 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
 set (EVPATH_SRC_LIST cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c 
                        cm_lock.c cm_perf.c cm_pbio.c cm_interface.c version.c
-                       cm_threadio.c cm_evol.c evp.c response.c metrics.c dlloader.c
+                       cm_threadio.c cm_evol.c evp.c response.c metrics.c 
+		       dlloader.c ip_config.c 
                        revp.c evp_compat.c thin_server.c evp_threads.c ev_dfg.c)
 
 set (CERCS_FIND_OPTIONS)
@@ -80,7 +81,7 @@ ENDIF (NOT DEFINED CM_SELF_FORMATS)
 
 IF (TARGET_CNL)   # This should be set to true if compiling for compute note linux
   set (NO_DYNAMIC_LINKING 1)   # dummy dyn linking in cm.c and cm_transport.c
-  list (APPEND EVPATH_SRC_LIST ip_config.c cmsockets.c cmudp.c cmselect.c)  # link sockets and select mechanisms in main lib
+  list (APPEND EVPATH_SRC_LIST cmsockets.c cmudp.c cmselect.c)  # link sockets and select mechanisms in main lib
   list (APPEND CERCS_FIND_OPTIONS "STATIC")
   set (NO_TRANSPORT_MODULES TRUE)
   set (BUILD_SHARED_STATIC STATIC)

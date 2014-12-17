@@ -22,6 +22,8 @@ extern void CMget_qual_hostname(CManager cm, char *buf, int len);
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
 #endif
+extern void
+CMget_port_range(CManager cm, int *high_bound, int *low_bound);
 
 extern int
 EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
@@ -34,6 +36,8 @@ EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
     int int_port_num = 0;
     u_short port_num = 0;
     char host_name[256];
+    int high_bound, low_bound;
+    CMget_port_range(cm, &high_bound, &low_bound);
 
     conn_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (conn_sock == SOCKET_ERROR) {
@@ -48,11 +52,41 @@ EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
 	fprintf(stderr, "Failed to set 1REUSEADDR on INET socket\n");
 	return 0;
     }
-    if (bind(conn_sock, (struct sockaddr *) &sock_addr,
+    {
+	long seedval = time(NULL) + getpid();
+	/* port num is free.  Constrain to range to standards */
+	int size = high_bound - low_bound;
+	int tries = 30;
+	int result = SOCKET_ERROR;
+	srand48(seedval);
+	while (tries > 0) {
+	    int target = low_bound + size * drand48();
+	    sock_addr.sin_port = htons(target);
+	    CMtrace_out(cm, CMConnectionVerbose, "CMSocket trying to bind port %d", target);
+	    result = bind(conn_sock, (struct sockaddr *) &sock_addr,
+			  sizeof sock_addr);
+	    int_port_num = target;
+	    tries--;
+	    if (result != SOCKET_ERROR) tries = 0;
+	    if (tries%5 == 4) {
+		/* try reseeding in case we're in sync with another process */
+		srand48(time(NULL) + getpid());
+	    }
+	    if (tries == 20) {
+		/* damn, tried a lot, increase the range (This might violate specified range) */
+		size *= 10;
+	    }
+	    if (tries == 10) {
+		/* damn, tried a lot more, increase the range (This might violate specified range) */
+		size *= 10;
+	    }
+	}
+    }
+    /*    if (bind(conn_sock, (struct sockaddr *) &sock_addr,
 	     sizeof sock_addr) == SOCKET_ERROR) {
 	fprintf(stderr, "Cannot bind INET socket\n");
 	return 0;
-    }
+	}*/
     sock_opt_val = 1;
     if (setsockopt(conn_sock, SOL_SOCKET, SO_REUSEADDR, (char *) &sock_opt_val,
 		   sizeof(sock_opt_val)) != 0) {
@@ -75,7 +109,7 @@ EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
 		    (void *) cm, (void *) (long)conn_sock);
     
 
-    int_port_num = (unsigned short)(ntohs(sock_addr.sin_port));
+    //    int_port_num = (unsigned short)(ntohs(sock_addr.sin_port));
 
     CMget_qual_hostname(cm, host_name, sizeof(host_name));
 	
