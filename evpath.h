@@ -2212,6 +2212,15 @@ EVadd_standard_routines(CManager cm, char *extern_string,
 #endif
 
 /*!
+ * Add a directory to search for DLL-based functions
+ *
+ * \param path_string The name of a directory to include for searches
+ */
+/*NOLOCK*/
+extern void
+EVadd_dll_search_dir(char *path_string);
+
+/*!
  * Add a set of structure types that will be visible in COD.
  *
  * \param cm The CManager in which the routines should be visible

@@ -12,6 +12,7 @@
 #include "evpath.h"
 #include "cm_internal.h"
 #include "response.h"
+#include "dlloader.h"
 
 extern 
 FMFormat EVregister_format_set(CManager cm, FMStructDescList list);
@@ -144,6 +145,12 @@ stone_struct(event_path_data evp, int stone_num)
         return NULL;
     }
     return &evp->stone_map[stone_num - evp->stone_base_num];
+}
+
+void
+INT_EVadd_dll_search_dir(char *path_string)
+{
+    CMdladdsearchdir(path_string);
 }
 
 EVstone

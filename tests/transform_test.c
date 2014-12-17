@@ -219,6 +219,12 @@ main(int argc, char **argv)
 
     PARSE_ARGS();
 
+    if (rindex(argv0, '/')) {
+	char *last_slash = rindex(argv0, '/');
+	*last_slash = 0;
+	EVadd_dll_search_dir(argv0);
+	*last_slash = '/';
+    }
     srand48(getpid());
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
     CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");

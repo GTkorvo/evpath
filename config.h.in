@@ -6,6 +6,9 @@
 /* Place where evpath transport libraries are installed */
 #undef EVPATH_LIBRARY_INSTALL_DIR
 
+/* Place where evpath tests are to be installed */
+#undef EVPATH_TEST_INSTALL_DIR
+
 /* define if unistd.h declares getdomainname */
 #undef GETDOMAINNAME_DEFINED
 

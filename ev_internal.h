@@ -341,6 +341,9 @@ INT_EVstone_add_split_target(CManager cm, EVstone stone, EVstone target_stone);
 extern void
 INT_EVstone_remove_split_target(CManager cm, EVstone stone, EVstone target_stone);
 
+void
+INT_EVadd_dll_search_dir(char *path_string);
+
 extern int
 INT_EVaction_set_output(CManager cm, EVstone stone, EVaction action, 
 		    int output_index, EVstone output_stone);

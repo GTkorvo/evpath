@@ -389,6 +389,10 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/EVPathConfig.cmake ${CMAKE_CURRENT_BIN
 
 CONFIGURE_FILE( ${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h )
 
+if (TEST_INSTALL_DIRECTORY) 
+   SET (EVPATH_TEST_INSTALL_DIR ${TEST_INSTALL_DIRECTORY})
+endif()
+
 # display status message for important variables
 MESSAGE( STATUS )
 MESSAGE( STATUS "-------------------------------------------------------------------------------" )
