@@ -37,19 +37,6 @@ static int ipv4_is_loopback(int addr)
   return (htonl(addr) & htonl(0xff000000)) == htonl(0x7f000000);
 }
 
-/*
- *  qual_hostname.c
- *
- *  This file lives in the CM project.  It is used by many transports 
- *  and servers to abstract the cumbersomeness in determining a 
- *  reasonable IP contact address.  
- *
- *  If you found this file in ECho, or in another project that has a 
- *  need for determining IP or fully qualified hostnames, 
- *                 -- DON'T CHANGE THE LOCAL COPY --
- *  Instead, change it in CM and reimport the changed version.
- */
-
 static int
 get_self_ip_addr(CMTransport_trace trace_func, void* trace_data)
 {
@@ -475,7 +462,7 @@ get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int
     {
 	char buf[256];
 	int net_byte_order = htonl(determined_IP);
-	trace_func(trace_data, "CM<IP_CONFIG> returning hostname \"%s\", IP %s, use_hostname = %d",
-		   determined_hostname, inet_ntop(AF_INET, &net_byte_order, &buf[0], 256), use_hostname);
+	trace_func(trace_data, "CM<IP_CONFIG> returning hostname \"%s\", IP %s, use_hostname = %d, port range %d:%d",
+		   determined_hostname, inet_ntop(AF_INET, &net_byte_order, &buf[0], 256), use_hostname, port_range_low, port_range_high);
     }
 }
