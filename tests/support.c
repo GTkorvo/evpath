@@ -133,12 +133,6 @@ run_subprocess(char **args)
         child = fork();
 	if (child == 0) {
 	    /* I'm the child */
-	  int i=0;
-	  printf("Would have run : ");
-	  while(run_args[i]) {
-	    printf("%s ", run_args[i++]);
-	  }
-	  printf("'\n");
 	    execv(run_args[0], run_args);
 	}
     }
