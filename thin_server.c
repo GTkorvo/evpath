@@ -152,6 +152,7 @@ thin_data_available(void *cmv, void * conn_datav)
 	free_FFSfile(cd->ffsfile);
 	for (i=0; i < cd->format_count; i++) {
 	    int j = 0;
+	    if (cd->format_list[i] == NULL) continue;
 	    while((cd->format_list[i])[j].format_name != NULL) {
 		int k = 0;
 		free(cd->format_list[i][j].format_name);
