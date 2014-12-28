@@ -1,7 +1,19 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
+use Data::Dumper;
+
 my $target = $ARGV[0];
+my $hostname = `hostname`;
+my $build;
+my (%build_for_host, %source_dir, %build_name, %external_hostname, %local_port_range, %external_ssh_arg);
+sub load_db();
+
+load_db();
+chomp($hostname);
+
+$build = $build_for_host{$hostname};
+print "Using build $build on host $hostname\n";
 
 opendir(DIR, ".");
 my @files = grep(/\.tsts$/,readdir(DIR));
@@ -80,12 +92,32 @@ ctest_submit(                                              RETURN_VALUE res)
 message(" -- Finished ${MODEL}  - ${CTEST_BUILD_NAME} --")
 
 END
-print TEST "set(CTEST_SOURCE_DIRECTORY 	\"/home/eisen/evpath_tests\")\n";
-print TEST "set(CTEST_BUILD_NAME 	\"Pi-to-Jedi\")\n";
-print TEST "SET( ENV{SSH_PARAMS}    \"jedi080.cc.gatech.edu:/users/c/chaos/evpath_tests/rhe6-64\" )\n";
-print TEST "SET( ENV{CM_HOSTNAME} \"eisenhauer.dyndns.org\")\n";
-print TEST "SET( ENV{CM_PORT_RANGE} \"62000:62100\")\n";
+print TEST "set(CTEST_SOURCE_DIRECTORY 	\"$source_dir{$build}\")\n";
+print TEST "set(CTEST_BUILD_NAME 	\"$build_name{$build}-to-$build_name{$target}\")\n";
+print TEST "SET( ENV{SSH_PARAMS}    \"$external_ssh_arg{$target}:$source_dir{$target}\" )\n";
+if (defined $external_hostname{$build}) {
+    print TEST "SET( ENV{CM_HOSTNAME} \"eisenhauer.dyndns.org\")\n";
+}
+if (defined $local_port_range{$build}) {
+    print TEST "SET( ENV{CM_PORT_RANGE} \"62000:62100\")\n";
+}
 print TEST $TEST_BODY;
 close TEST;
 
 system("ctest -V -S $target.cmake");
+
+
+sub load_db() {
+    %build_for_host = (
+        'jedi080', 'jedi',
+	'raspberry', 'raspberry',
+	);
+    $source_dir{"jedi"} = "/users/c/chaos/evpath_tests/rhe6-64";
+    $source_dir{"raspberry"} = "/home/eisen/evpath_tests";
+    $build_name{"jedi"} = "Jedi";
+    $build_name{"raspberry"} = "Pi";
+    $external_hostname{"raspberry"} = "eisenhauer.dyndns.org";
+    $local_port_range{"raspberry"} = "62000:62100";
+    $external_ssh_arg{"jedi"} = "chaos\@jedi080.cc.gatech.edu";
+    $external_ssh_arg{"raspberry"} = "eisen\@eisenhauer.dyndns.org:4022";
+}
