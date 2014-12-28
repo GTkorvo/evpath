@@ -60,3 +60,6 @@ IF (RUN_IB_TESTS)
 ENDIF (RUN_IB_TESTS)
 
 ADD_TEST (all_transports perl ./transport_test.pl -q -f ./correctness_spec)
+if (TEST_INSTALL_DIRECTORY) 
+  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/run_remote_tests.pl DESTINATION "${TEST_INSTALL_DIRECTORY}")
+endif (TEST_INSTALL_DIRECTORY) 
