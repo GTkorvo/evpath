@@ -110,7 +110,7 @@ system("ctest -V -S $target.cmake");
 sub load_db() {
     %build_for_host = (
         'jedi080', 'jedi',
-	'raspberry', 'raspberry',
+	'raspberrypi', 'raspberry',
 	);
     $source_dir{"jedi"} = "/users/c/chaos/evpath_tests/rhe6-64";
     $source_dir{"raspberry"} = "/home/eisen/evpath_tests";
