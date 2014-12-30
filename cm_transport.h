@@ -10,7 +10,7 @@ typedef struct _transport_item *CMTransport;
 
 typedef struct _CMbuffer {
     void *buffer;
-    int size;
+    long size;
     int ref_count;
     struct _CMbuffer *next;
     void (*return_callback)(void *);

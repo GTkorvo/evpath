@@ -804,7 +804,7 @@ CManager_free(CManager cm)
     i=0;
     while (list != NULL) {
 	CMbuffer next = list->next;
-	CMtrace_out(cm, CMBufferVerbose, "Final buffer disposition buf %d, %p, size %d, ref_count %d\n", i++, list, list->size, list->ref_count);
+	CMtrace_out(cm, CMBufferVerbose, "Final buffer disposition buf %d, %p, size %ld, ref_count %d\n", i++, list, list->size, list->ref_count);
 	INT_CMfree(list->buffer);
 	INT_CMfree(list);
 	list = next;
@@ -1617,7 +1617,7 @@ cm_get_data_buf(CManager cm, int length)
     CMtrace_out(cm, CMBufferVerbose, "cm_get_data_buf called with len %d\n",
 		length);
     while (tmp != NULL) {
-	CMtrace_out(cm, CMBufferVerbose, "  buffer %d %p, size is %d, data %p, ref_count %d\n",
+	CMtrace_out(cm, CMBufferVerbose, "  buffer %d %p, size is %ld, data %p, ref_count %d\n",
 		    buffer_count, tmp, tmp->size, tmp->buffer, tmp->ref_count);
 	buffer_count++;
 	tmp = tmp->next;
@@ -1746,6 +1746,19 @@ cm_buffer_lookup(CManager cm, void *buffer)
 	    ((char*)buffer < ((char*)tmp->buffer + tmp->size))){
 	    return tmp;
 	}
+	tmp = tmp->next;
+    }
+    return NULL;
+}
+
+static CMbuffer
+cm_buffer_dump_list(CManager cm)
+{
+    CMbuffer tmp = cm->cm_buffer_list;
+    printf("Known CM buffers are:\n");
+    while (tmp != NULL) {
+	printf("Buffer begin %p, size %ld, end %p\n",
+	       tmp->buffer, tmp->size, (char*)tmp->buffer + tmp->size);
 	tmp = tmp->next;
     }
     return NULL;
@@ -2081,7 +2094,7 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
     int header_len;
     int stone_id;
     char *decode_buffer = NULL, *data_buffer;
-    FFSTypeHandle format;
+    FFSTypeHandle local_format, original_format;
     CManager cm = conn->cm;
     CMincoming_format_list cm_format = NULL;
     int message_key;
@@ -2343,43 +2356,44 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 	    }
 	}
     }
-    format = FFS_target_from_encode(conn->cm->FFScontext, data_buffer);
-    if (format == NULL) {
+    local_format = FFS_target_from_encode(conn->cm->FFScontext, data_buffer);
+    original_format = FFSTypeHandle_from_encode(conn->cm->FFScontext, data_buffer);
+    if (local_format == NULL) {
 	fprintf(stderr, "invalid format in incoming buffer\n");
 	return 0;
     }
     CMtrace_out(cm, CMDataVerbose, "CM - Receiving record of type %s, FFSformat %p\n", 
-		name_of_FMformat(FMFormat_of_original(format)), format);
+		name_of_FMformat(FMFormat_of_original(original_format)), original_format);
     for (i=0; i< cm->in_format_count; i++) {
-	if (cm->in_formats[i].format == format) {
+	if (cm->in_formats[i].format == local_format) {
 	    cm_format = &cm->in_formats[i];
 	    CMtrace_out(cm, CMDataVerbose, "CM - Found incoming cm_format %p, matching FFSformat %p\n", 
-			cm_format, format);
+			cm_format, local_format);
 	}
     }
     if (cm_format == NULL) {
 	cm_format = CMidentify_rollbackCMformat(cm, data_buffer);
 	CMtrace_out(cm, CMDataVerbose, "CM - Created cm_format %p, matching FFSformat %p\n", 
-		    cm_format, format);
+		    cm_format, original_format);
 	if(cm_format) {
 	    CMtrace_out(cm, CMDataVerbose, "CM - Calling CMcreate_conversion type %s, format %p\n", 
-			name_of_FMformat(FMFormat_of_original(format)), format);
+			name_of_FMformat(FMFormat_of_original(original_format)), original_format);
 	    CMcreate_conversion(cm, cm_format);
 	    CMtrace_out(cm, CMDataVerbose, "CM - after CMcreate_conversion format %p, has_conversion is %d\n", 
-			format, FFShas_conversion(format));
+			original_format, FFShas_conversion(original_format));
 	}
     }
 
     if ((cm_format == NULL) || (cm_format->handler == NULL)) {
 	fprintf(stderr, "CM - No handler for incoming data of this version of format \"%s\"\n",
-		name_of_FMformat(FMFormat_of_original(format)));
+		name_of_FMformat(FMFormat_of_original(original_format)));
 	return 0;
-    } else if (!FFShas_conversion(format)) {
+    } else if (!FFShas_conversion(original_format)) {
 	CMcreate_conversion(cm, cm_format);
     }
-    assert(FFShas_conversion(format));
+    assert(FFShas_conversion(original_format));
 
-    if (FFSdecode_in_place_possible(format)) {
+    if (FFSdecode_in_place_possible(original_format)) {
 	if (!FFSdecode_in_place(cm->FFScontext, data_buffer, 
 				       (void**) (long) &decode_buffer)) {
 	    printf("Decode failed\n");
@@ -2451,7 +2465,7 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 	attrs = NULL;
     }
     CMtrace_out(cm, CMDataVerbose, "CM - Finish processing - record of type %s\n", 
-		name_of_FMformat(FMFormat_of_original(format)));
+		name_of_FMformat(FMFormat_of_original(original_format)));
     return 0;
 }
 
@@ -2460,7 +2474,8 @@ INT_CMtake_buffer(CManager cm, void *data)
 {
     CMbuffer buf = cm_buffer_lookup(cm, data);
     if (buf == NULL) {
-	fprintf(stderr, "Error: INT_CMtake_buffer called with record not associated with cm\n");
+	fprintf(stderr, "Error: INT_CMtake_buffer called with record %p not associated with cm\n", data);
+	cm_buffer_dump_list(cm);
 	return NULL;
     } else {
 	buf->ref_count++;
@@ -2474,7 +2489,8 @@ INT_CMreturn_buffer(CManager cm, void *data)
 {
     CMbuffer buf = cm_buffer_lookup(cm, data);
     if (buf == NULL) {
-	fprintf(stderr, "Error: INT_CMreturn_buffer called with record %lx not associated with cm\n", (long)data);
+	fprintf(stderr, "Error: INT_CMreturn_buffer called with record %p not associated with cm\n", data);
+	cm_buffer_dump_list(cm);
 	return;
     }
     CMtrace_out(cm, CMBufferVerbose, "CMreturn_buffer, data %p found buffer %p, ref_count now %d, calling cm_return_data_buf\n", data, buf, buf->ref_count);
