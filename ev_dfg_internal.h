@@ -120,6 +120,8 @@ typedef enum {ACT_no_op, ACT_create, ACT_add_action, ACT_set_auto_period, ACT_li
 	      ACT_unlink_port, ACT_unlink_dest, ACT_set_attrs, ACT_destroy, ACT_freeze, ACT_unfreeze, 
 	      ACT_assign_node, ACT_create_bridge} EVconfig_action_type;
 
+extern char *ACT_string[];
+
 typedef struct _EVdfg_config_action {
     EVconfig_action_type type;
     int stone_id;
