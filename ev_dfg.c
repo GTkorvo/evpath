@@ -56,6 +56,9 @@ char *str_state[] = {"DFG_Joining", "DFG_Starting", "DFG_Running", "DFG_Reconfig
 static char *master_msg_str[] = {"DFGnode_join", "DFGdeploy_ack", "DFGshutdown_contrib", "DFGconn_shutdown", 
 			  "DFGflush_reconfig", NULL};
 char *stone_condition_str[EVstone_condition_last] = {"Undeployed", "Deployed", "Frozen", "Lost"};
+char *ACT_string[] = {"ACT_no_op", "ACT_create", "ACT_add_action", "ACT_set_auto_period", "ACT_link_port", "ACT_link_dest", 
+		      "ACT_unlink_port", "ACT_unlink_dest", "ACT_set_attrs", "ACT_destroy", "ACT_freeze", "ACT_unfreeze",
+		      "ACT_assign_node", "ACT_create_bridge"};
 
 
 static void handle_conn_shutdown(EVmaster master, EVmaster_msg_ptr msg);
@@ -382,7 +385,7 @@ perform_actions_on_nodes(EVdfg_configuration config, EVmaster master)
 	    break;
 	}
 	default:
-	    printf("Bad action in perform_action_on_nodes\n");
+	    printf("Bad action in perform_action_on_nodes %s (%d)\n", ACT_string[act.type], act.type);
 	    break;
 	}
     }
@@ -632,7 +635,7 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	break;
     }
     default:
-	printf("Bad action in perform_action_on_state\n");
+	printf("Bad action in perform_act_on_state %s (%d)\n", ACT_string[act.type], act.type);
 	return 0;
 	break;
     }
@@ -1722,7 +1725,13 @@ dfg_assoc_client(CManager cm, char* node_name, char *master_contact, EVmaster ma
     EVclient client;
     int i;
 
-
+    register_msg = INT_CMlookup_format(cm, EVdfg_ready_format_list);
+    if ((master && master->client) ||
+	(!master && register_msg)) {
+	fprintf(stderr, "Rejecting attempt to associate a DFG client with another DFG or with the same DFG multiple tiems.\n");
+	fprintf(stderr, "Only one call to EVclient_assoc() or EVclient_assoc_local() per CManager allowed.\n");
+	return NULL;
+    }
     dfg_extern_map[0].extern_value = (void*)(long)cod_EVdfg_trigger_reconfig;
     dfg_extern_map[1].extern_value = (void*)(long)cod_EVdfg_flush_attrs;
 
@@ -1989,7 +1998,7 @@ build_deploy_msg_for_node_stones(EVdfg_configuration config, int act_num, EVmast
 	case ACT_destroy:
 	    break;
 	default:
-	    printf("Bad action in build_deploy_msg_for_nodes\n");
+	    printf("Bad action in build_deploy_msg_for_nodes %s (%d)\n", ACT_string[act.type], act.type);
 	    break;
 	}
     }
