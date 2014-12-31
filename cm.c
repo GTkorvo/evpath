@@ -2508,8 +2508,14 @@ INT_CMregister_handler(CMFormat format, CMHandlerFunc handler,
 
     for (i=0; i< cm->in_format_count; i++) {
 	if (cm->in_formats[i].format == format->ffsformat) {
-	    cm->in_formats[i].handler = handler;
-	    cm->in_formats[i].client_data = client_data;
+	    if (!cm->in_formats[i].handler) {
+		cm->in_formats[i].handler = handler;
+		cm->in_formats[i].client_data = client_data;
+	    } else if ((cm->in_formats[i].handler != handler) ||
+		       (cm->in_formats[i].client_data != client_data)) {
+		fprintf(stderr, "Warning, CMregister_handler() called multiple times for the same format with different handler or client_data\n");
+		fprintf(stderr, "Repeated calls will be ignored\n");
+	    }
 	}
     }
 }
