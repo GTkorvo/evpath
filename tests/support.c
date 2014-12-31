@@ -127,6 +127,13 @@ run_subprocess(char **args)
     } else {
         run_args[0] = argv0;
     }
+    if (quiet <= 0) {
+        int i=0;
+	printf("Subproc arguments are: ");
+	while(run_args[i]) {
+	    printf("%s ", run_args[i++]);
+	}
+    }
     if (no_fork) {
 	child = -1;
     } else {
