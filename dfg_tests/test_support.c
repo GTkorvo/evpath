@@ -252,6 +252,7 @@ int
 main(int argc, char **argv)
 {
     int regression_master = 1;
+    int ret = 0;
 
     argv0 = argv[0];
     start_subproc_arg_count = 8; /* leave a few open at the beginning */
@@ -352,7 +353,10 @@ main(int argc, char **argv)
 #endif
 
     if (!regression_master) {
-	return be_test_child(argc, argv);
+	ret = be_test_child(argc, argv);
+    } else {
+	ret = be_test_master(argc-1, &argv[1]);
     }
-    return be_test_master(argc-1, &argv[1]);
+    free(subproc_args);
+    return ret;
 }
