@@ -102,7 +102,8 @@ be_test_master(int argc, char **argv)
     EVdfg_assign_node(sink2, "a");
     EVdfg_link_dest(src, sink);
     EVdfg_link_dest(src, sink2);
-
+    free_attr_list(attrs1);
+    free_attr_list(attrs2);
     EVdfg_realize(test_dfg);
 
 /* We're node 0 in the process group */

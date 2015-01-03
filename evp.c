@@ -3554,6 +3554,7 @@ INT_EVset_attr_list(CManager cm, EVstone stone_id, attr_list stone_attrs)
     stone_type stone;
     stone = stone_struct(evp, stone_id);
     if (!stone) return;
+    if (stone->stone_attrs) free_attr_list(stone->stone_attrs);
     stone->stone_attrs = stone_attrs;
     add_ref_attr_list(stone_attrs);
 }
