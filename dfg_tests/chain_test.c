@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "string.h"
 
 #include "config.h"
 #include "evpath.h"
@@ -91,11 +92,12 @@ be_test_master(int argc, char **argv)
     last = src;
 
     for (i=1; i < node_count -1; i++) {
-	tmp = EVdfg_create_stone(test_dfg, filter);
+        tmp = EVdfg_create_stone(test_dfg, strdup(filter));
 	EVdfg_link_dest(last, tmp);
 	EVdfg_assign_node(tmp, nodes[i]);
 	last = tmp;
     }
+    free(filter);
     sink = EVdfg_create_sink_stone(test_dfg, "simple_handler");
     EVdfg_link_dest(last, sink);
     EVdfg_assign_node(sink, nodes[node_count-1]);

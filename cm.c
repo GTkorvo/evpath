@@ -1294,6 +1294,9 @@ CMwake_server_thread(CManager cm)
     (cl->wake_select)((void*)&CMstatic_trans_svcs, &cl->select_data);
 }
 
+extern void
+internal_condition_free(CMControlList cl);
+
 static void
 CMControlList_free(CManager cm, CMControlList cl)
 {
@@ -1310,6 +1313,7 @@ CMControlList_free(CManager cm, CMControlList cl)
 	    INT_CMfree(cl->polling_function_list);
 	}
 	thr_mutex_free(cl->list_mutex);
+	internal_condition_free(cl);
 	INT_CMfree(cl);
     }
 }

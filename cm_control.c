@@ -152,6 +152,14 @@ CMCondition_destroy(CMControlList cl, int condition)
     }
 }
 
+extern void
+internal_condition_free(CMControlList cl)
+{
+    while(cl->condition_list) {
+        CMCondition_destroy(cl, cl->condition_list->condition_num);
+    }
+}
+
 extern int
 INT_CMCondition_has_signaled(CManager cm, int condition)
 {
