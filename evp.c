@@ -325,14 +325,14 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
             break; 
 	}
     }
-    if (stone->proto_actions != NULL) free(stone->proto_actions);
-    if (stone->response_cache != NULL) free_response_cache(stone);
-    
     while (stone->queue->queue_head != NULL) {
       int action_id;
       event_item *event = dequeue_event(cm, stone, &action_id);
       return_event(evp, event);
     }
+    if (stone->proto_actions != NULL) free(stone->proto_actions);
+    if (stone->response_cache != NULL) free_response_cache(stone);
+    
     free(stone->queue);
       
     /* XXX unsquelch senders */
