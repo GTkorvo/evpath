@@ -21,6 +21,7 @@ include(CheckBrokenTitanCompiler)
 
 include(FindCERCSProject)
 include(CTest)
+configure_file(CTestCustom.ctest.in CTestCustom.ctest @ONLY)
 
 if(MSVC)
   # Force to always compile with W4
