@@ -153,12 +153,13 @@ char *COD_monitor = "{\n\
     EVdfg_assign_node(S1, "b");
     T1 = EVdfg_create_sink_stone(test_dfg, "event_handler");
     T1_name_attrs = create_attr_list();
-    set_string_attr(T1_name_attrs, attr_atom_from_string("EVP_STONE_NAME"), "my_data_stone");
+    set_string_attr(T1_name_attrs, attr_atom_from_string("EVP_STONE_NAME"), strdup("my_data_stone"));
     EVdfg_set_attr_list(T1, T1_name_attrs);  /* this one will cause reconfig */
+    free_attr_list(T1_name_attrs);
     T2 = EVdfg_create_sink_stone(test_dfg, "result_handler");
 
     A1_action_spec = create_transform_action_spec(NULL, result_format_list, COD_monitor);
-    A1 = EVdfg_create_stone(test_dfg, strdup(A1_action_spec));
+    A1 = EVdfg_create_stone(test_dfg, A1_action_spec);
     EVdfg_assign_node(S1, "b");
     EVdfg_assign_node(T1, "a");
     EVdfg_assign_node(A1, "a");
