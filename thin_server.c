@@ -161,8 +161,10 @@ thin_data_available(void *cmv, void * conn_datav)
 		    free((char*)cd->format_list[i][j].field_list[k].field_type);
 		    k++;
 		}
+		free(cd->format_list[i][j].field_list);
 		j++;
 	    }
+	    free(cd->format_list[i]);
 	}
 	free(cd->format_list);
 	for (i=0; i <= cd->max_src_list; i++) {
