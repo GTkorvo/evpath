@@ -8,6 +8,7 @@ my $hostname = `hostname`;
 my $build;
 my (%build_for_host, %source_dir, %build_name, %external_hostname, %local_port_range, %external_ssh_arg);
 sub load_db();
+sub build_env_scripts($);
 
 load_db();
 chomp($hostname);
@@ -15,6 +16,10 @@ chomp($hostname);
 $build = $build_for_host{$hostname};
 print "Using build $build on host $hostname\n";
 
+if ($ARGV[0] eq "-build_scripts") {
+    build_env_scripts($ARGV[1]);
+    exit(0);
+}
 opendir(DIR, ".");
 my @files = grep(/\.tsts$/,readdir(DIR));
 closedir(DIR);
@@ -96,10 +101,10 @@ print TEST "set(CTEST_SOURCE_DIRECTORY 	\"$source_dir{$build}\")\n";
 print TEST "set(CTEST_BUILD_NAME 	\"$build_name{$build}-to-$build_name{$target}\")\n";
 print TEST "SET( ENV{SSH_PARAMS}    \"$external_ssh_arg{$target}:$source_dir{$target}\" )\n";
 if (defined $external_hostname{$build}) {
-    print TEST "SET( ENV{CM_HOSTNAME} \"eisenhauer.dyndns.org\")\n";
+    print TEST "SET( ENV{CM_HOSTNAME} \"$external_hostname{$build}\")\n";
 }
 if (defined $local_port_range{$build}) {
-    print TEST "SET( ENV{CM_PORT_RANGE} \"62000:62100\")\n";
+    print TEST "SET( ENV{CM_PORT_RANGE} \"$local_port_range{$build}\")\n";
 }
 print TEST $TEST_BODY;
 close TEST;
@@ -107,13 +112,38 @@ close TEST;
 system("ctest -V -S $target.cmake");
 
 
+sub build_env_scripts($) {
+    my $exe_dir = shift;
+    my $file;
+    print "Building scripts for executable directory $exe_dir\n";
+    mkdir("$exe_dir/scripts");
+    chdir ("$exe_dir");
+    @files = <*>;
+    foreach $file (@files) {
+	if (-x $file && ! -d $file) {
+	    print $file . "\n";
+	    open SCRIPT, ">scripts/$file";
+	    print SCRIPT "#!/bin/bash\n";
+	    if (defined $external_hostname{$build}) {
+		print SCRIPT "export CM_HOSTNAME=$external_hostname{$build}\n";
+	    }
+	    if (defined $local_port_range{$build}) {
+		print SCRIPT "export CM_PORT_RANGE=$local_port_range{$build}\n";
+	    }
+	    print SCRIPT "$exe_dir/$file \"\$\@\"\n";
+	    close SCRIPT;
+	    chmod 0755, "scripts/$file"
+	}
+    }
+}
+
 sub load_db() {
     %build_for_host = (
         'jedi080', 'jedi',
 	'raspberrypi', 'raspberry',
 	);
     $source_dir{"jedi"} = "/users/c/chaos/evpath_tests/rhe6-64";
-    $source_dir{"raspberry"} = "/home/eisen/evpath_tests";
+    $source_dir{"raspberry"} = "/home/eisen/evpath_tests/scripts";
     $build_name{"jedi"} = "Jedi";
     $build_name{"raspberry"} = "Pi";
     $external_hostname{"raspberry"} = "eisenhauer.dyndns.org";
