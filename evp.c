@@ -1042,7 +1042,6 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
 		    global_name_of_FMFormat(stone->response_cache[i].reference_format), action_str[stone->response_cache[i].action_type],
 		    stone->response_cache[i].stage, stone->response_cache[i].requires_decoded);
         if (!compatible_stages(stage, stone->response_cache[i].stage)) {
-	    printf("Rejecting cache [%d] because of incompatible stages\n", i);
             continue;
         }
         if ((stage != stone->response_cache[i].stage) && 
