@@ -1349,8 +1349,9 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    response_cache_element *resp;
 
 	    conversion_target_format = NULL;
-	    if (proto->matching_reference_formats)
+	    if (proto->matching_reference_formats) {
 		conversion_target_format = proto->matching_reference_formats[0];
+	    }
 
 	    /* we'll install the conversion later, first map the response */
 	    if (stone->response_cache_count == 0) {
@@ -1382,7 +1383,15 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 		return_value = 1;
 	    } else {
 		if (event->reference_format != conversion_target_format) {
-		    printf("Bad things.  Conversion necessary, but event is not encoded\n");
+		    /* 
+		     * create a decode action anyway, the event will be
+		     * encoded to a buffer and then decoded into the target
+		     * format.  Doing this more efficiently is difficult. 
+		     */
+		    INT_EVassoc_conversion_action(cm, stone->local_id, stage,
+						  conversion_target_format,
+						  event->reference_format);
+		    return_value = 1;
 		} else {
 		    return_value = 1;
 		}

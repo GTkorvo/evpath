@@ -192,17 +192,20 @@ INT_EValloc_stone(CManager cm)
     evp->stone_count++;
     return stone_num;
 }
+
 static void
-empty_queue(queue_ptr queue)
+empty_queue(event_path_data evp, queue_ptr queue)
 {
     while(queue->queue_head != NULL && queue->queue_tail != NULL) {
-        free(queue->queue_head->item->ioBuffer);
+	queue_item *tmp = queue->queue_head;
+	return_event(evp, queue->queue_head->item);
         if(queue->queue_head == queue->queue_tail) {
 	    queue->queue_head = NULL;
 	    queue->queue_tail = NULL;
-	}       
-	else
+	} else {
 	    queue->queue_head = queue->queue_head->next;
+	}
+	free(tmp);
     }
 }
 
@@ -909,7 +912,7 @@ ensure_ev_owned(CManager cm, event_item *event)
 static void
 storage_queue_default_empty(CManager cm, storage_queue_ptr queue) {
     (void)cm;
-    empty_queue(&queue->u.queue); 
+    empty_queue(cm->evp, &queue->u.queue); 
 }
 
 static void
@@ -1029,11 +1032,17 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
     if (event->reference_format == NULL) {
 	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is NULL\n");
     } else {
-	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %p (%s)\n",
-	   event->reference_format, global_name_of_FMFormat(event->reference_format));
+	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %p (%s), stage is %d, encoded is %d\n",
+		    event->reference_format, global_name_of_FMFormat(event->reference_format),
+		    stage, event->event_encoded);
     }
     for (i=0; i < stone->response_cache_count; i++) {
+	CMtrace_out(cm, EVerbose, "Response cache %d reference_format is %p (%s), Type %s, stage is %d, requires_decoded is %d\n", i, 
+		    stone->response_cache[i].reference_format, 
+		    global_name_of_FMFormat(stone->response_cache[i].reference_format), action_str[stone->response_cache[i].action_type],
+		    stone->response_cache[i].stage, stone->response_cache[i].requires_decoded);
         if (!compatible_stages(stage, stone->response_cache[i].stage)) {
+	    printf("Rejecting cache [%d] because of incompatible stages\n", i);
             continue;
         }
         if ((stage != stone->response_cache[i].stage) && 
@@ -1049,9 +1058,10 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
 	    if (event->event_encoded && stone->response_cache[i].requires_decoded) {
 		continue;
 	    }
-	    if (!event->event_encoded && 
-		(stone->response_cache[i].action_type == Action_Decode)) {
-		continue;
+	    if (!event->event_encoded &&
+	    	(stone->response_cache[i].action_type == Action_Decode) &&
+	    	(stone->response_cache[i].o.decode.target_reference_format == event->reference_format)) {
+	    	continue;
 	    }
 	    return i;
 	} else if (stone->response_cache[i].reference_format == NULL &&
@@ -1094,13 +1104,6 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
         resp->stage = stage;
 	return return_response;
     }
-/*    if (CMtrace_on(cm, EVWarning)) {
-	char *tmp;
-	printf("Warning!  No action found for incoming an event on stone %x\n",
-	       stone->local_id);
-	printf("A NO_ACTION response has been installed into the response cache for event type \"%s\" (%p)\n", tmp = global_name_of_FMFormat(event->reference_format), event->reference_format);
-	dump_stone(stone);
-	}*/
 
     stone->response_cache[return_response].action_type = Action_NoAction;
     stone->response_cache[return_response].stage = stage;
@@ -1182,6 +1185,9 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
 {
     event_path_data evp = cm->evp;
     if (!event->event_encoded) {
+	if (event->reference_format == act->o.decode.target_reference_format) {
+	    return event;
+	}
 	assert(0);
     }
 	
@@ -1262,7 +1268,9 @@ encode_event(CManager cm, event_item *event)
 	return;
     }
 	
-    if (event->ioBuffer != NULL) return;  /* already encoded */
+    if (event->ioBuffer != NULL) {
+	return;  /* already encoded */
+    }
     event->ioBuffer = create_FFSBuffer();
     event->encoded_event = 
 	FFSencode(event->ioBuffer, event->reference_format,
@@ -1616,6 +1624,9 @@ INT_EVexecuting_stone(CManager cm)
     return rec->stone_id;
 }
 
+static event_item *
+reassign_memory_event(CManager cm, event_item *event, int do_decode);
+
 static int
 process_events_stone(CManager cm, int s, action_class c)
 {
@@ -1696,6 +1707,13 @@ process_events_stone(CManager cm, int s, action_class c)
 	    resp = &stone->response_cache[resp_id];
 	    if (resp->action_type == Action_Decode) {
 		event_item *event_to_submit;
+		if (!event->event_encoded) {
+		    event_item *old_data_event;
+		    CMtrace_out(cm, EVerbose, "Encoding event prior to decode for conversion, action id %d\n", resp_id);
+		    old_data_event = reassign_memory_event(cm, event, 0);  /* reassign memory */
+		    return_event(evp, old_data_event);
+		    event->ref_count++;
+		}
 		CMtrace_out(cm, EVerbose, "Decoding event, action id %d\n", resp_id);
 		event_to_submit = decode_action(cm, event, resp);
 		if (event_to_submit == NULL) return more_pending;
@@ -1718,7 +1736,7 @@ process_events_stone(CManager cm, int s, action_class c)
         assert(item->action_id < stone->response_cache_count);
         backpressure_check(cm, s);
         if (!compatible_stages(c, act->stage)) {
-            /* do nothing */
+	    /* do nothing */
         } else if (is_immediate_action(act)) {
 	    event_item *event = dequeue_item(cm, stone, item);
 	    ev_handler_activation_rec act_rec;
@@ -3158,7 +3176,7 @@ static void free_ioBuffer(void *event_data, void *client_data)
 }    
 
 static event_item *
-reassign_memory_event(CManager cm, event_item *event)
+reassign_memory_event(CManager cm, event_item *event, int do_decode)
 {
     /* 
      *  The old event item is enqueued on stones elsewhere in EVPath.  We must make the data memory 
@@ -3176,35 +3194,36 @@ reassign_memory_event(CManager cm, event_item *event)
     CMtrace_out(cm, EVerbose, "Doing deep copy to free up event before returning from EVsubmit()\n");
     *tmp_event = *event;
     tmp_event->ref_count = 1;   /* we're going to make sure the enqueued events don't reference anything that this does */
-    CMadd_ref_attr_list(cm, event->attrs);
-    encode_event(cm, event);  /* Copy all data to an FFS encode buffer in event->ioBuffer */
-    event->decoded_event = NULL;      /* we're not touching this anymore */
+    tmp_event->attrs = CMadd_ref_attr_list(cm, event->attrs);
     event->free_func = NULL;   /* if these were present, no longer applicable */
     event->free_arg = NULL;
     event->cm = cm;
-
-    tmp_context = create_FFSContext_FM(cm->evp->fmc);
-    format = FFSTypeHandle_from_encode(tmp_context, event->encoded_event);
-    establish_conversion(tmp_context, format, format_list_of_FMFormat(event->reference_format));
-
-    if (!FFSdecode_in_place(tmp_context, event->encoded_event, &decode_buffer)) {
-	printf("Decode failed\n");
-	return 0;
-    }
+    encode_event(cm, event);  /* Copy all data to an FFS encode buffer in event->ioBuffer */
+    event->decoded_event = NULL;      /* we're not touching this anymore */
+    event->contents = Event_Freeable; /* it's all our data */
+    event->free_arg = event->ioBuffer;
+    event->ioBuffer = NULL;
+    event->free_func = free_ioBuffer;
     /*
      * The new event type is a bit unique in EVPath.  event->ioBuffer is meant to hold only encoded data, but we 
      * want to decode that stuff, so we don't leave our data there.   Rather, the FFSbuffer created by this will be freed 
      * via the Event_Freeable mechanism.
      */
-    event->decoded_event = decode_buffer;
-    event->contents = Event_Freeable; /* it's all our data */
-    event->free_arg = event->ioBuffer;
-    event->ioBuffer = NULL;
-    event->free_func = free_ioBuffer;
-    event->encoded_event = NULL;
-    event->event_encoded = 0;
+    if (do_decode) {
+	tmp_context = create_FFSContext_FM(cm->evp->fmc);
+	format = FFSTypeHandle_from_encode(tmp_context, event->encoded_event);
+	establish_conversion(tmp_context, format, format_list_of_FMFormat(event->reference_format));
+
+	if (!FFSdecode_in_place(tmp_context, event->encoded_event, &decode_buffer)) {
+	    printf("Decode failed\n");
+	    return 0;
+	}
+	event->decoded_event = decode_buffer;
+	event->encoded_event = NULL;
+	event->event_encoded = 0;
+	free_FFSContext(tmp_context);
+    }
     event->ref_count--;   /* we've essentially split the event.  tmp_event will be dereferenced */
-    free_FFSContext(tmp_context);
     return tmp_event;
 }
 
@@ -3257,7 +3276,7 @@ INT_EVsubmit(EVsource source, void *data, attr_list attrs)
     internal_path_submit(source->cm, source->local_stone_id, event);
     while (process_local_actions(source->cm));
     if (event->ref_count != 1 && (event->contents == Event_App_Owned)) {
-	event = reassign_memory_event(source->cm, event);  /* reassign memory */
+	event = reassign_memory_event(source->cm, event, 1);  /* reassign memory */
     }
     return_event(source->cm->evp, event);
 }
@@ -3596,7 +3615,7 @@ INT_EVdestroy_stone(CManager cm, EVstone stone_id)
     stone = stone_struct(evp, stone_id);
     if (!stone) return -1;
     INT_EVdrain_stone(cm, stone_id);
-    empty_queue(stone->queue);
+    empty_queue(evp, stone->queue);
     INT_EVfree_stone(cm, stone_id);  
     return 1;      
 } 
