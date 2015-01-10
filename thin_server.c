@@ -193,7 +193,7 @@ thin_data_available(void *cmv, void * conn_datav)
 		realloc(cd->format_list, 
 			(format_num + 1) * sizeof(cd->format_list[0]));
 	    memset(cd->format_list + cd->format_count, 0,
-		   sizeof(cd->format_list[0]) * (format_num -cd->format_count ));
+		   sizeof(cd->format_list[0]) * (format_num -cd->format_count +1));
 	    cd->format_count = format_num + 1;
 	}
 	cd->format_list[format_num] = formats;
@@ -209,7 +209,7 @@ thin_data_available(void *cmv, void * conn_datav)
 	    cd->src_list = realloc(cd->src_list, 
 				   (format_num+1) * sizeof(cd->src_list[0]));
 	    memset(&cd->src_list[cd->max_src_list], 0,
-		   (format_num - cd->max_src_list) * sizeof(cd->src_list[0]));
+		   (format_num - cd->max_src_list + 1) * sizeof(cd->src_list[0]));
 	    cd->max_src_list = format_num;
 	}
 	if (cd->src_list[format_num] == NULL) {
