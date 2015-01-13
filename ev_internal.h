@@ -81,7 +81,7 @@ typedef struct immediate_action_struct {
 
 typedef struct queue_item {
     event_item *item;
-    int action_id;
+    int handled;
     struct queue_item *next;
 } queue_item;
 

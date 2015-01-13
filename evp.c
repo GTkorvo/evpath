@@ -23,7 +23,7 @@ static void dump_stone(stone_type stone);
 static void fdump_stone(FILE* out, stone_type stone);
 static int is_bridge_stone(CManager cm, EVstone stone_num);
 static event_item *
-dequeue_event(CManager cm, stone_type stone, int *act_p);
+dequeue_event(CManager cm, stone_type stone);
 
 static const char *action_str[] = { "Action_NoAction","Action_Bridge", "Action_Thread_Bridge", "Action_Terminal", "Action_Filter", "Action_Immediate", "Action_Multi", "Action_Decode", "Action_Encode_to_Buffer", "Action_Split", "Action_Store", "Action_Congestion", "Action_Source"};
 
@@ -329,8 +329,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	}
     }
     while (stone->queue->queue_head != NULL) {
-      int action_id;
-      event_item *event = dequeue_event(cm, stone, &action_id);
+      event_item *event = dequeue_event(cm, stone);
       return_event(evp, event);
     }
     if (stone->proto_actions != NULL) free(stone->proto_actions);
@@ -765,7 +764,7 @@ typedef struct action_tracking_state {
 } *action_state;
 
 static void
-raw_enqueue_event(CManager cm, queue_ptr queue, int action_id, event_item *event)
+raw_enqueue_event(CManager cm, queue_ptr queue, event_item *event)
 {
     queue_item *item;
     event_path_data evp = cm->evp;
@@ -776,7 +775,7 @@ raw_enqueue_event(CManager cm, queue_ptr queue, int action_id, event_item *event
 	evp->queue_items_free_list = item->next;
     }
     item->item = event;
-    item->action_id = action_id;
+    item->handled = 0;
     reference_event(event);
     if (queue->queue_head == NULL) {
 	queue->queue_head = item;
@@ -792,7 +791,7 @@ raw_enqueue_event(CManager cm, queue_ptr queue, int action_id, event_item *event
 static void backpressure_check(CManager, EVstone);
 
 static void
-enqueue_event(CManager cm, int stone_id, int action_id, event_item *event)
+enqueue_event(CManager cm, int stone_id, event_item *event)
 {
     event_path_data evp = cm->evp;
     stone_type stone = stone_struct(evp, stone_id);
@@ -801,7 +800,7 @@ enqueue_event(CManager cm, int stone_id, int action_id, event_item *event)
 	as = evp->as = malloc(sizeof(*as));
 	memset(as, 0, sizeof(*as));
     }
-    raw_enqueue_event(cm, stone->queue, action_id, event);
+    raw_enqueue_event(cm, stone->queue, event);
     stone->new_enqueue_flag = 1;
     stone->queue_size++;
     backpressure_check(cm, stone_id);
@@ -810,7 +809,7 @@ enqueue_event(CManager cm, int stone_id, int action_id, event_item *event)
 }
 
 static event_item *
-raw_dequeue_event(CManager cm, queue_ptr q, int *act_p)
+raw_dequeue_event(CManager cm, queue_ptr q)
 {
     event_path_data evp = cm->evp;
     queue_item *item = q->queue_head;
@@ -823,21 +822,19 @@ raw_dequeue_event(CManager cm, queue_ptr q, int *act_p)
     } else {
 	q->queue_head = q->queue_head->next;
     }   
-    if (act_p)
-        *act_p = item->action_id;
     item->next = evp->queue_items_free_list;
     evp->queue_items_free_list = item;
     return event;
 }
 
 static event_item *
-dequeue_event(CManager cm, stone_type stone, int *act_p)
+dequeue_event(CManager cm, stone_type stone)
 {
     queue_ptr q = stone->queue;
     event_path_data evp = cm->evp;
     action_state as = evp->as;
     event_item *event = NULL;
-    event = raw_dequeue_event(cm, q, act_p);
+    event = raw_dequeue_event(cm, q);
     stone->queue_size--;
     as->events_in_play--;
     return event;
@@ -918,12 +915,12 @@ storage_queue_default_empty(CManager cm, storage_queue_ptr queue) {
 static void
 storage_queue_default_enqueue(CManager cm, storage_queue_ptr queue, event_item *item) {
     ensure_ev_owned(cm, item);
-    raw_enqueue_event(cm, &queue->u.queue, -1, item);
+    raw_enqueue_event(cm, &queue->u.queue, item);
 }
 
 static event_item *
 storage_queue_default_dequeue(CManager cm, storage_queue_ptr queue) {
-    event_item *ev = raw_dequeue_event(cm, &queue->u.queue, NULL);
+    event_item *ev = raw_dequeue_event(cm, &queue->u.queue);
     return ev;
 }
 
@@ -1025,35 +1022,28 @@ compatible_stages(int real_stage, int cache_stage) {
 static action_class cached_stage_for_action(proto_action*);
 
 static int
-determine_action(CManager cm, stone_type stone, action_class stage, event_item *event, int recursed_already)
+check_response_cache(CManager cm, stone_type stone, action_class stage, event_item *event)
 {
     int i;
-    int return_response;
-    if (event->reference_format == NULL) {
-	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is NULL\n");
-    } else {
-	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %p (%s), stage is %d, encoded is %d\n",
-		    event->reference_format, global_name_of_FMFormat(event->reference_format),
-		    stage, event->event_encoded);
-    }
     for (i=0; i < stone->response_cache_count; i++) {
-	CMtrace_out(cm, EVerbose, "Response cache %d reference_format is %p (%s), Type %s, stage is %d, requires_decoded is %d\n", i, 
-		    stone->response_cache[i].reference_format, 
-		    global_name_of_FMFormat(stone->response_cache[i].reference_format), action_str[stone->response_cache[i].action_type],
-		    stone->response_cache[i].stage, stone->response_cache[i].requires_decoded);
-        if (!compatible_stages(stage, stone->response_cache[i].stage)) {
-            continue;
-        }
-        if ((stage != stone->response_cache[i].stage) && 
-	    (stone->response_cache[i].action_type == Action_NoAction)) {
-            continue;
-        }
+//	CMtrace_out(cm, EVerbose, "Response cache %d reference_format is %p (%s), Type %s, stage is %d, requires_decoded is %d\n", i, 
+//		    stone->response_cache[i].reference_format, 
+//		    global_name_of_FMFormat(stone->response_cache[i].reference_format), action_str[stone->response_cache[i].action_type],
+//		    stone->response_cache[i].stage, stone->response_cache[i].requires_decoded);
 	if (stone->response_cache[i].reference_format == event->reference_format) {
 	    /* 
 	     * if the event is encoded and the action requires decoded data,
 	     * this action won't do.  Scan further for decode action or 
 	     * generate one with response_determination().
 	     */
+	    if ((stone->response_cache[i].action_type == Action_NoAction) &&
+		(stage != stone->response_cache[i].stage)) {
+		/* don't return NoAction unless we're querying this exact stage */
+		continue;
+	    }
+	    if (!compatible_stages(stage, stone->response_cache[i].stage)) {
+		continue;
+	    }
 	    if (event->event_encoded && stone->response_cache[i].requires_decoded) {
 		continue;
 	    }
@@ -1068,9 +1058,29 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
             return i;
         }
     }
-    if (!recursed_already && (response_determination(cm, stone, stage, event) == 1)) {
-	return determine_action(cm, stone, stage, event, 1);
+    return -1;
+}
+
+static int
+determine_action(CManager cm, stone_type stone, action_class stage, event_item *event, int recursed_already)
+{
+    int return_response;
+    if (event->reference_format == NULL) {
+	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is NULL\n");
+    } else {
+	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %p (%s), stage is %d, encoded is %d\n",
+		    event->reference_format, global_name_of_FMFormat(event->reference_format),
+		    stage, event->event_encoded);
     }
+    return_response = check_response_cache(cm, stone, stage, event);
+
+    if (return_response != -1) return return_response;
+
+    if (response_determination(cm, stone, stage, event) == 1) {
+	return_response = check_response_cache(cm, stone, stage, event);
+	return return_response;
+    }
+
     /* 
      * there was no action for this event, install a dummy so we 
      * don't search again.
@@ -1103,7 +1113,6 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
         resp->stage = stage;
 	return return_response;
     }
-
     stone->response_cache[return_response].action_type = Action_NoAction;
     stone->response_cache[return_response].stage = stage;
     stone->response_cache[return_response].requires_decoded = 0;
@@ -1479,7 +1488,7 @@ internal_path_submit(CManager cm, int local_path_id, event_item *event)
     event_item *event_to_submit = event;
 
     assert(CManager_locked(cm));
-    enqueue_event(cm, local_path_id, -1, event_to_submit);
+    enqueue_event(cm, local_path_id, event_to_submit);
     return 1;
 }
 
@@ -1635,18 +1644,21 @@ process_events_stone(CManager cm, int s, action_class c)
     event_path_data evp = cm->evp;
     stone_type stone = NULL;
     int more_pending = 0;
+    int did_something = 0;
     queue_item *item;
     action_state as = evp->as;
 
+
+    if (s == -1) return 0;
+    if (as->last_active_stone == s) as->last_active_stone = -1;
+    stone = stone_struct(cm->evp, s);
+    if (!stone) return 0;
+    if (stone->queue_size == 0) return 0;
     if (CMtrace_on(cm, EVerbose)) {
 	fprintf(cm->CMTrace_file, "Considering events on ");
 	fprint_stone_identifier(cm->CMTrace_file, evp, s);
 	fprintf(cm->CMTrace_file, "\n");
     }
-    if (s == -1) return 0;
-    if (as->last_active_stone == s) as->last_active_stone = -1;
-    stone = stone_struct(cm->evp, s);
-    if (!stone) return 0;
     if (stone->local_id == -1) return 0;
     if (stone->is_draining == 2) return 0;
     if (stone->is_frozen == 1) return 0;
@@ -1671,9 +1683,10 @@ process_events_stone(CManager cm, int s, action_class c)
 	queue_item *next = item->next;
 	response_cache_element *resp;
 	response_cache_element *act = NULL;
-        if (c != Congestion && item->action_id != -1) {
-             act = &stone->response_cache[item->action_id];
-        } else {
+	if (item->handled) {
+	    item = next;
+	    continue;
+	} else {
 	    /* determine what kind of action to take here */
 	    int resp_id;
 	    event_item *event = item->item;
@@ -1728,11 +1741,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		fdump_action(cm->CMTrace_file, stone, resp, resp->proto_action_id, "    ");
 	    }
             act = &stone->response_cache[resp_id];
-            if (c == Immediate_and_Multi && act->action_type != Action_NoAction) {
-                item->action_id = resp_id;
-            }
 	}
-        assert(item->action_id < stone->response_cache_count);
         backpressure_check(cm, s);
         if (!compatible_stages(c, act->stage)) {
 	    /* do nothing */
@@ -1757,7 +1766,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		    new->next = cm->evp->current_event_list;
 		    cm->evp->current_event_list = new;
 		}
-		stone->new_enqueue_flag = 0;
+		did_something=1;
 		stone->is_processing = 1;
 		if ((p->data_state == Requires_Contig_Encoded) && 
 		    (event->event_encoded == 0)) {
@@ -1842,7 +1851,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		client_data = act->o.imm.client_data;
 		out_stones = stone->output_stone_ids;
 		out_count = stone->output_count;
-		stone->new_enqueue_flag = 0;
+		did_something = 1;
 		stone->is_processing = 1;
 		func(cm, event, client_data, event->attrs, out_count, out_stones);
 		stone = stone_struct(cm->evp, s);
@@ -1883,19 +1892,24 @@ process_events_stone(CManager cm, int s, action_class c)
 	} else if (is_multi_action(act) || is_congestion_action(act)) {
 	    /* event_item *event = dequeue_item(cm, stone->queue, item); XXX */
 	    if (stone->new_enqueue_flag) {
-		stone->new_enqueue_flag = 0;
-		stone->is_processing = 1;
-		if ((act->o.multi.handler)(cm, stone->queue, item,
-					   act->o.multi.client_data, stone->output_count,
-					   stone->output_stone_ids))
-		    more_pending++;
-		stone = stone_struct(cm->evp, s);
-		stone->is_processing = 0;
-		next = NULL;  /* call only once, not once per item in the queue */
+		if (!item->handled) {
+		    did_something = 1;
+		    stone->is_processing = 1;
+		    item->handled = 1;
+		    if ((act->o.multi.handler)(cm, stone->queue, item,
+					       act->o.multi.client_data, stone->output_count,
+					       stone->output_stone_ids))
+			more_pending++;
+		    stone = stone_struct(cm->evp, s);
+		    stone->is_processing = 0;
+		}
 	    }
             break;    
 	} 
 	item = next;
+    }
+    if (did_something) {
+	stone->new_enqueue_flag = 0;
     }
     return more_pending;
 }
@@ -2049,7 +2063,7 @@ do_bridge_action(CManager cm, int s)
 	}
     }
     while (stone->queue->queue_head != NULL) {
-	int action_id, ret = 1;
+	int ret = 1;
 	if (act->o.bri.conn && 
 	    INT_CMConnection_write_would_block(act->o.bri.conn)) {
 /*            queue_item *q = stone->queue->queue_head;*/
@@ -2078,7 +2092,7 @@ do_bridge_action(CManager cm, int s)
 		return 0;
 	    }*/
 	}
-	event_item *event = dequeue_event(cm, stone, &action_id);
+	event_item *event = dequeue_event(cm, stone);
 	long event_length = 0;
 	if (act->o.bri.conn == NULL) {
 	    CMtrace_out(cm, EVerbose, "Bridge stone %x has closed connection\n", s);

@@ -827,7 +827,7 @@ static void cod_ev_discard_and_submit(cod_exec_context ec,
 	return;
     }
 
-    item->action_id = -1;
+    item->handled = 0;
 
     internal_path_submit(cm, target_stone, item->item);
 
@@ -855,7 +855,7 @@ static void cod_ev_submit(cod_exec_context ec,
 	return;
     }
 
-    item->action_id = -1;
+    item->handled = 0;
 
     internal_path_submit(cm, target_stone, item->item);
 
