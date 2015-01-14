@@ -388,7 +388,6 @@ be_test_master(int argc, char **argv)
     EVdfg_stone srca, srcb, srcc, srccommand, multiq, sink;
     EVsource a_handle, b_handle, c_handle, command_handle;
     char * q_action_spec;
-    int i;
     int node_count = 3;
     char *src_node = "a";
     char *queue_node = "b";
@@ -414,8 +413,8 @@ be_test_master(int argc, char **argv)
 	    terminal_node = nodes[0];
 	    break;
 	case 2:
-	    src_node = nodes[0];
-	    queue_node = nodes[1];
+	    src_node = nodes[1];
+	    queue_node = nodes[0];
 	    terminal_node = nodes[1];
 	    break;
 	case 3:
@@ -496,120 +495,6 @@ be_test_master(int argc, char **argv)
 
     if (EVclient_source_active(a_handle)) {
 	generate_event_sequence(a_handle, b_handle, c_handle, command_handle);
-    }
-/*
-  generate event sequence:  
-0: a=1
-1: c=2
-2: c=3
-3: b=4
-4: b=5
-5: a=6
-6: a=7
-7: b=8
-8: c=9
-9: a=10
-10: command = 1
-11: a=11
-12: c=12
-13: a=13
-14: b=14
-15: b=15
-16: c=16
-17: a=17
-18: b=18
-19: a=19
-20: c=20
-21: command = 2
-
-on command = 1 release top a, then all a from 0
-0: a=10
-1: a=1
-2: a=6
-3: a=7
-release half (6) of anonymous from top
-4: c=20    
-5: b=18
-6: c=16
-7: b=15
-8: b=14
-9: c=12
-There are 11 total events, discard half (5) from top (recent) down (skipping command)
-10: a=19
-11: a=17
-12: a=13
-13: a=11
-14: c=9
-submit any remaining a from bottom (oldest)
-submit any remaining anon from bottom (oldest)
-15: c=2
-16: c=3
-17: b=4
-18: b=5
-19: b=8
-*/
-    /* we know the sources are here, just do submits */
-    for (i=0; i < EVENT_COUNT + COMMAND_COUNT; i++) {
-	switch (i) {
-	case 0:
-	case 5:
-	case 6:
-	case 9:
-	case 11:
-	case 13:
-	case 17:
-	case 19:{
-	    rec_a_ptr a = malloc(sizeof(*a));
-	    a->a_field = 1;
-	    generate_a_record(a);
-	    
-	    if (quiet <=0) {printf("submitting a -> %d\n", a->a_field);}
-	    EVsubmit_general(a_handle, a, (EVFreeFunction)free, NULL);
-	    break;
-	}
-	case 3:
-	case 4:
-	case 7: 
-	case 14:
-	case 15:
-	case 18: {
-	    rec_b_ptr b = malloc(sizeof(*b));
-	    b->b_field = 2;
-	    generate_b_record(b);
-	    
-	    if (quiet <=0) {printf("submitting b -> %d\n", b->b_field);}
-	    EVsubmit_general(b_handle, b, (EVFreeFunction)free, NULL);
-
-	    break;
-	}
-	case 1:
-	case 2:
-	case 8:	
-	case 12:
-	case 16:
-	case 20: {
-	    rec_c_ptr c = malloc(sizeof(*c));
-	    c->c_field = 3;
-	    generate_c_record(c);
-	    
-	    if (quiet <=0) {printf("submitting c -> %d\n", c->c_field);}
-	    EVsubmit_general(c_handle, c, (EVFreeFunction)free, NULL);
-
-	    break;
-	}
-	case 21: {
-	    rec_command_ptr com = malloc(sizeof(*com));
-	    com->command_field = 2;
-	    EVsubmit(command_handle, com, NULL);
-	    break;
-	}
-	case 10: {
-	    rec_command_ptr com = malloc(sizeof(*com));
-	    com->command_field = 1;
-	    EVsubmit(command_handle, com, NULL);
-	    break;
-	}
-	}
     }
     CMsleep(cm, 1);
 
