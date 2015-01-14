@@ -129,7 +129,7 @@ enet_service_network(CManager cm, void *void_trans)
     }
 
     /* Wait up to 1000 milliseconds for an event. */
-    while (enet_host_service (ecd->server, & event, 1) > 0) {
+    while (ecd->server && (enet_host_service (ecd->server, & event, 1) > 0)) {
         switch (event.type) {
 	case ENET_EVENT_TYPE_NONE:
 	    break;
