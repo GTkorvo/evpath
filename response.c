@@ -1336,7 +1336,7 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    INT_EVassoc_mutated_multi_action(cm, stone->local_id, nearest_proto_action,
 					     queued_wrapper, instance,
 					     proto->matching_reference_formats, free_multi_response);
-	    if (mrd->u.multityped.accept_anonymous && (conversion_target_format == NULL)) {
+	    if (mrd->u.multityped.accept_anonymous && (matching_format == NULL)) {
 		/* we're accepting this as an anonymous target */
 		INT_EVassoc_anon_multi_action(cm, stone->local_id, nearest_proto_action, queued_wrapper, instance,
 					      event->reference_format);

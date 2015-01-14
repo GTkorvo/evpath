@@ -1736,8 +1736,9 @@ process_events_stone(CManager cm, int s, action_class c)
 	    if (CMtrace_on(cm, EVerbose)) {
 		fprintf(cm->CMTrace_file, "next action event %lx on ", (long)event);
 		fprint_stone_identifier(cm->CMTrace_file, evp, s);
-		fprintf(cm->CMTrace_file, " action %lx\n", (long)resp);
-		
+		fprintf(cm->CMTrace_file, " action type is %s, reference_format is %p (%s), stage is %d, requires_decoded is %d\n",
+			action_str[resp->action_type], resp->reference_format, global_name_of_FMFormat(resp->reference_format), 
+			resp->stage, resp->requires_decoded);
 		fdump_action(cm->CMTrace_file, stone, resp, resp->proto_action_id, "    ");
 	    }
             act = &stone->response_cache[resp_id];
