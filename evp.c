@@ -2234,6 +2234,7 @@ INT_EVassoc_anon_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
     resp->proto_action_id = act_num;
     resp->o.multi.handler = func;
     resp->o.multi.client_data = client_data;
+    resp->o.multi.free_func = NULL;
     resp->stage = cached_stage_for_action(&stone->proto_actions[act_num]);
     resp->reference_format = anon_target;
     if (CMtrace_on(cm, EVerbose)) {
