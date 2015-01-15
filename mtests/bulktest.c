@@ -183,7 +183,23 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
 static int do_regression_master_test();
 static int regression = 1;
 static atom_t CM_TRANSPORT;
-static char *argv0;
+static char *transport;
+
+#define PARSE_EXTRA_ARGS } else if (strcmp(&argv[1][1], "size") == 0) {\
+	    if (sscanf(argv[2], "%d", &size) != 1) {\
+		printf("Unparseable argument to -size, %s\n", argv[2]);\
+	    }\
+	    if (vecs == 0) { vecs = 1; printf("vecs not 1\n");}\
+	    argv++;\
+	    argc--;\
+	} else 	if (strcmp(&argv[1][1], "vecs") == 0) {\
+	    if (sscanf(argv[2], "%d", &vecs) != 1) {\
+		printf("Unparseable argument to -vecs, %s\n", argv[2]);\
+	    }\
+	    argv++;\
+	    argc--;
+
+#include "support.c"
 
 int
 main(int argc, char **argv)
@@ -193,37 +209,8 @@ main(int argc, char **argv)
     CMFormat format;
     int regression_master = 1;
 
-    argv0 = argv[0];
-    while (argv[1] && (argv[1][0] == '-')) {
-	if (strcmp(&argv[1][1], "size") == 0) {
-	    if (sscanf(argv[2], "%d", &size) != 1) {
-		printf("Unparseable argument to -size, %s\n", argv[2]);
-	    }
-	    if (vecs == 0) { vecs = 1; printf("vecs not 1\n");}
-	    argv++;
-	    argc--;
-	} else 	if (strcmp(&argv[1][1], "vecs") == 0) {
-	    if (sscanf(argv[2], "%d", &vecs) != 1) {
-		printf("Unparseable argument to -vecs, %s\n", argv[2]);
-	    }
-	    argv++;
-	    argc--;
-	} else if (argv[1][1] == 'c') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 's') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 'q') {
-	    quiet++;
-	} else if (argv[1][1] == 'v') {
-	    quiet--;
-	} else if (argv[1][1] == 'n') {
-	    regression = 0;
-	    quiet = -1;
-	}
-	argv++;
-	argc--;
-    }
-    srand48(getpid());
+    PARSE_ARGS();
+
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
 
     if (regression && regression_master) {
@@ -234,8 +221,10 @@ main(int argc, char **argv)
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
-	char *transport = NULL;
-	if ((transport = getenv("CMTransport")) != NULL) {
+	if (transport == NULL) {
+	    transport = getenv("CMTransport");
+	}
+	if (transport != NULL) {
 	    listen_list = create_attr_list();
 	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		     (attr_value) strdup(transport));
@@ -316,28 +305,6 @@ fail_and_die(int signal)
     exit(1);
 }
 
-static
-pid_t
-run_subprocess(char **args)
-{
-#ifdef HAVE_WINDOWS_H
-    int child;
-    child = _spawnv(_P_NOWAIT, "./bulktest.exe", args);
-    if (child == -1) {
-	printf("failed for cmtest\n");
-	perror("spawnv");
-    }
-    return child;
-#else
-    pid_t child = fork();
-    if (child == 0) {
-	/* I'm the child */
-	execv(argv0, args);
-    }
-    return child;
-#endif
-}
-
 static int
 do_regression_master_test()
 {
@@ -346,7 +313,7 @@ do_regression_master_test()
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
-    char *string_list, *transport;
+    char *string_list;
     char size_str[4];
     char vec_str[4];
     CMFormat format;
@@ -364,11 +331,14 @@ do_regression_master_test()
 #endif
     cm = CManager_create();
     forked = CMfork_comm_thread(cm);
-    if ((transport = getenv("CMTransport")) != NULL) {
+    if (transport == NULL) {
+	transport = getenv("CMTransport");
+    }
+    if (transport != NULL) {
 	listen_list = create_attr_list();
 	add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		 (attr_value) strdup(transport));
-    printf("TRANSPORT IS %s\n", transport);
+	printf("TRANSPORT IS %s\n", transport);
     }
     CMlisten_specific(cm, listen_list);
     contact_list = CMget_contact_list(cm);

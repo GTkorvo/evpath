@@ -10,11 +10,14 @@ ENABLE_TESTING()
 
 INCLUDE_DIRECTORIES(BEFORE ${evpath_BINARY_DIR} ${evpath_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/cmtests.tsts "" )
 foreach (TEST ${TESTS} )
     ADD_EXECUTABLE(mtests_${TEST} ${TEST}.c)
     TARGET_LINK_LIBRARIES(mtests_${TEST} evpath ${BASE_LIBS})
     ADD_TEST(mtests_${TEST} mtests_${TEST})
     SET_TARGET_PROPERTIES(mtests_${TEST} PROPERTIES LINKER_LANGUAGE ${C_EXECUTABLE_LINKER_LANGUAGE})
+    LIST( APPEND CMTESTS "mtests_${TEST}")
+    file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/cmtests.tsts "mtests_${TEST}\n" )
 endforeach()
 
 ADD_TEST (mtests_cmtest_UDP mtests_cmtest -t udp)
@@ -64,4 +67,7 @@ ENDIF (RUN_IB_TESTS)
 ADD_TEST (all_transports perl ./transport_test.pl -q -f ./correctness_spec)
 if (TEST_INSTALL_DIRECTORY) 
   install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/run_remote_tests.pl DESTINATION "${TEST_INSTALL_DIRECTORY}")
+  install(TARGETS ${CMTESTS} DESTINATION "${TEST_INSTALL_DIRECTORY}")
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cmtests.tsts DESTINATION "${TEST_INSTALL_DIRECTORY}")
 endif (TEST_INSTALL_DIRECTORY) 
+

@@ -154,8 +154,9 @@ static atom_t CM_TRANSPORT;
 static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
 
-char *argv0 = NULL;
-char *arg_transport = NULL;
+char *transport = NULL;
+
+#include "support.c"
 
 int
 main(int argc, char **argv)
@@ -163,26 +164,9 @@ main(int argc, char **argv)
     CManager cm;
     CMConnection conn = NULL;
     int regression_master = 1;
-    argv0 = argv[0];
-    while (argv[1] && (argv[1][0] == '-')) {
-	if (argv[1][1] == 'c') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 's') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 'q') {
-	    quiet++;
-	} else if (argv[1][1] == 'v') {
-	    quiet--;
-	} else if (argv[1][1] == 'n') {
-	    regression = 0;
-	    quiet = -1;
-	} else if (argv[1][1] == 't') {
-	    arg_transport = argv[2];
-	    argv++;
-	}
-	argv++;
-	argc--;
-    }
+
+    PARSE_ARGS();
+
     srand48(getpid());
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
     CM_MCAST_PORT = attr_atom_from_string("MCAST_PORT");
@@ -196,7 +180,6 @@ main(int argc, char **argv)
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
-	char *transport = arg_transport;
 	char *string_list;
 	if (transport == NULL) {
 	    transport = getenv("CMTransport");
@@ -284,28 +267,6 @@ fail_and_die(int signal)
     exit(1);
 }
 
-static
-pid_t
-run_subprocess(char **args)
-{
-#ifdef HAVE_WINDOWS_H
-    int child;
-    child = _spawnv(_P_NOWAIT, "./cmping.exe", args);
-    if (child == -1) {
-	printf("failed for cmtest\n");
-	perror("spawnv");
-    }
-    return child;
-#else
-    pid_t child = fork();
-    if (child == 0) {
-	/* I'm the child */
-	execv(argv0, args);
-    }
-    return child;
-#endif
-}
-
 static int
 do_regression_master_test()
 {
@@ -329,7 +290,6 @@ do_regression_master_test()
 #endif
     cm = CManager_create();
     forked = CMfork_comm_thread(cm);
-    transport = arg_transport;
     if (!transport) transport = getenv("CMTransport");
     if (transport != NULL) {
 	listen_list = create_attr_list();
