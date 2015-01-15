@@ -3,9 +3,10 @@ use strict;
 use warnings;
 use Data::Dumper;
 
-my $target = $ARGV[0];
+my $target;
 my $hostname = `hostname`;
 my $build;
+my $quiet = 0;
 my (%build_for_host, %source_dir, %build_name, %external_hostname, %local_port_range, %external_ssh_arg);
 sub load_db();
 sub build_env_scripts($);
@@ -14,12 +15,17 @@ load_db();
 chomp($hostname);
 
 $build = $build_for_host{$hostname};
-print "Using build $build on host $hostname\n";
 
 if ($ARGV[0] eq "-build_scripts") {
     build_env_scripts($ARGV[1]);
     exit(0);
 }
+if ($ARGV[0] eq "-q") {
+    shift(@ARGV);
+    $quiet = 1;
+}
+$target = $ARGV[0];
+print "Using build $build on host $hostname\n" unless $quiet;
 opendir(DIR, ".");
 my @files = grep(/\.tsts$/,readdir(DIR));
 closedir(DIR);
@@ -53,7 +59,7 @@ print CTEST "# generated from files: ";
 print CTEST join( ', ', @files );
 print CTEST "\n";
 print CTEST "# \n";
-print CTEST "message (\"SSH params are \$ENV{SSH_PARAMS}\")";
+print CTEST "message (\"SSH params are \$ENV{SSH_PARAMS}\")" unless $quiet;
 
 foreach my $file (@files) {
     open(TSTS, $file) or die("Could not open  $file.");
@@ -86,17 +92,18 @@ set(CTEST_TIMEOUT           "7200")
 set( $ENV{LC_MESSAGES}      "en_EN" )
 ctest_start(${MODEL} TRACK ${MODEL})
 
-message(" -- Test ${MODEL} - ${CTEST_BUILD_NAME} --")
-ctest_test(     BUILD  "${CTEST_BINARY_DIRECTORY}" RETURN_VALUE res)
-
-
-## -- SUBMIT
-message(" -- Submit ${MODEL} - ${CTEST_BUILD_NAME} --")
-ctest_submit(                                              RETURN_VALUE res)
-
-message(" -- Finished ${MODEL}  - ${CTEST_BUILD_NAME} --")
-
 END
+$TEST_BODY .= 'message(" -- Test ${MODEL} - ${CTEST_BUILD_NAME} --")
+' unless $quiet;
+$TEST_BODY .= 'ctest_test(     BUILD  "${CTEST_BINARY_DIRECTORY}" RETURN_VALUE res)
+';
+
+$TEST_BODY .= 'message(" -- Submit ${MODEL} - ${CTEST_BUILD_NAME} --")
+' unless $quiet;
+$TEST_BODY .= "ctest_submit(  RETURN_VALUE res)\n";
+$TEST_BODY .= 'message(" -- Finished ${MODEL}  - ${CTEST_BUILD_NAME} --")
+' unless $quiet;
+
 print TEST "set(CTEST_SOURCE_DIRECTORY 	\"$source_dir{$build}\")\n";
 print TEST "set(CTEST_BUILD_NAME 	\"$build_name{$build}-to-$build_name{$target}\")\n";
 print TEST "SET( ENV{SSH_PARAMS}    \"$external_ssh_arg{$target}:$source_dir{$target}\" )\n";
@@ -109,8 +116,11 @@ if (defined $local_port_range{$build}) {
 print TEST $TEST_BODY;
 close TEST;
 
-system("ctest -V -S $target.cmake");
-
+if ($quiet) {
+    system("ctest -S $target.cmake");
+} else {
+    system("ctest -V -S $target.cmake");
+}
 
 sub build_env_scripts($) {
     my $exe_dir = shift;
