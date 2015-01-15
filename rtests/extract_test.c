@@ -178,28 +178,17 @@ handshake_with_parent(CManager cm, attr_list parent_contact_list)
     CMwrite(conn, alive_format, &alive);
 }
 
-static char* argv0;
+static int regression = 1;
+static char* transport = NULL;
+#include "../mtests/support.c"
 
 int
 main(int argc, char **argv)
 {
     int be_the_child = 0;
+    int regression_master = 1;
+    PARSE_ARGS();
 
-    argv0 = argv[0];
-    while (argv[1] && (argv[1][0] == '-')) {
-	if (argv[1][1] == 's') {
-	    be_the_child = 1;
-	} else if (argv[1][1] == 'q') {
-	    quiet++;
-	} else if (argv[1][1] == 'v') {
-	    quiet--;
-	} else if (argv[1][1] == 'n') {
-	    dont_fork = 1;
-	    quiet = -1;
-	}
-	argv++;
-	argc--;
-    }
     srand48(getpid());
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
     CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
@@ -230,40 +219,6 @@ fail_and_die(int signal)
 	kill(subproc_proc, 9);
     }
     exit(1);
-}
-
-static
-pid_t
-run_subprocess(char **args)
-{
-    if (dont_fork) {
-	int i = 0;
-	printf("Would have run :\n");
-	while(args[i] != NULL) {
-	    printf("%s ", args[i++]);
-	}
-	printf("\n");
-	return 0;
-    } else {
-#ifdef HAVE_WINDOWS_H
-	int child;
-	child = _spawnv(_P_NOWAIT, args[0], args);
-	if (child == -1) {
-	    printf("failed for evtest\n");
-	    perror("spawnv");
-	}
-	return child;
-#else
-	pid_t child;
-	if (quiet <=0) {printf("Forking subprocess\n");}
-	child = fork();
-	if (child == 0) {
-	    /* I'm the child */
-	    execv(args[0], args);
-	}
-	return child;
-#endif
-    }
 }
 
 static char *router_func = "{\n\
@@ -366,7 +321,7 @@ do_regression_master_test()
     int forked = 0;
     int ret, i;
     attr_list contact_list, listen_list = NULL;
-    char *string_list, *transport, *postfix;
+    char *string_list, *postfix;
     CMFormat alive_format;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
@@ -381,7 +336,10 @@ do_regression_master_test()
 #endif
     cm = CManager_create();
     forked = CMfork_comm_thread(cm);
-    if ((transport = getenv("CMTransport")) != NULL) {
+    if (!transport) {
+	transport = getenv("CMTransport");
+    }
+    if (transport != NULL) {
 	listen_list = create_attr_list();
 	add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		 (attr_value) strdup(transport));
