@@ -136,6 +136,7 @@ static
 pid_t
 run_subprocess(char **args)
 {
+    static int count = 0;
 #ifdef HAVE_WINDOWS_H
     int child;
     child = _spawnv(_P_NOWAIT, "./evtest.exe", args);
@@ -160,6 +161,7 @@ run_subprocess(char **args)
 	/* I'm the child */
 	execv(args[0], args);
     }
+    if(count++ > 0) sleep(1);  /* don't go too fast */
     return child;
 #endif
 }
