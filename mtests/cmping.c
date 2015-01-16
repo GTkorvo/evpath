@@ -275,7 +275,7 @@ do_regression_master_test()
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
-    char *string_list, *transport;
+    char *string_list, *transport = NULL;
     int message_count = 0, i;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
