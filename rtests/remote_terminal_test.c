@@ -177,7 +177,6 @@ static char* transport = NULL;
 int
 main(int argc, char **argv)
 {
-    int be_the_child = 0;
     int regression_master = 1;
 
     PARSE_ARGS();
@@ -188,7 +187,7 @@ main(int argc, char **argv)
     CM_MCAST_PORT = attr_atom_from_string("MCAST_PORT");
     CM_MCAST_ADDR = attr_atom_from_string("MCAST_ADDR");
 
-    if (be_the_child) {
+    if (!regression_master) {
 	CManager cm = CManager_create();
 	attr_list parent_contact_list = attr_list_from_string(argv[1]);
 	handshake_with_parent(cm, parent_contact_list);
