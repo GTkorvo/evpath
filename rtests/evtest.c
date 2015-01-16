@@ -180,7 +180,6 @@ int
 main(int argc, char **argv)
 {
     int regression_master = 1;
-    int regression = 1;
 
     PARSE_ARGS();
 
