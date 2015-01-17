@@ -14,8 +14,10 @@ sub build_env_scripts($);
 load_db();
 chomp($hostname);
 
-$build = $build_for_host{$hostname};
+die "No build for this host" unless defined $build_for_host{$hostname};
 
+$build = $build_for_host{$hostname};
+die "Usage: run_remote_tests.pl <target>" unless defined $ARGV[0];
 if ($ARGV[0] eq "-build_scripts") {
     build_env_scripts($ARGV[1]);
     exit(0);
@@ -25,12 +27,13 @@ if ($ARGV[0] eq "-q") {
     $quiet = 1;
 }
 $target = $ARGV[0];
+die "No build for target \"$target\"" unless defined $source_dir{$target};
 print "Using build $build on host $hostname\n" unless $quiet;
 opendir(DIR, ".");
 my @files = grep(/\.tsts$/,readdir(DIR));
 closedir(DIR);
 
-open CTEST_CONFIG, ">CTestConfig.cmake" or die $1;
+open CTEST_CONFIG, ">$source_dir{$build}/CTestConfig.cmake" or die $1;
 my $dartsubmitinfo = <<'END';
 SET (CTEST_NIGHTLY_START_TIME "10:00:00 GMT")
 SET (CTEST_START_WITH_EMPTY_BINARY_DIRECTORY FALSE)
@@ -52,7 +55,7 @@ END
 print CTEST_CONFIG "$dartsubmitinfo\n";
 close CTEST_CONFIG;
 
-open CTEST, ">CTestTestfile.cmake" or die $1;
+open CTEST, ">$source_dir{$build}/CTestTestfile.cmake" or die $1;
 
 print CTEST "# \n";
 print CTEST "# generated from files: ";
@@ -75,7 +78,7 @@ foreach my $file (@files) {
 
 close CTEST;
 
-open TEST, ">$target.cmake" or die $1;
+open TEST, ">$source_dir{$build}/$target.cmake" or die $1;
 my $TEST_BODY = <<'END';
 ## -- Set hostname
 ## --------------------------
