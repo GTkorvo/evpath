@@ -202,7 +202,7 @@ be_test_master(int argc, char **argv)
     }
 
     if (EVclient_source_active(source_handle)) {
-	for (i=0 ; i < REPEAT_COUNT + 5; i++) {
+	for (i=0 ; i < REPEAT_COUNT + 20; i++) {
 	    simple_rec rec;
 	    atom_t hop_count_atom;
 	    attr_list attrs = create_attr_list();
