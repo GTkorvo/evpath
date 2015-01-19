@@ -29,7 +29,7 @@ if ($ARGV[0] eq "-q") {
 $target = $ARGV[0];
 die "No build for target \"$target\"" unless defined $source_dir{$target};
 print "Using build $build on host $hostname\n" unless $quiet;
-opendir(DIR, ".");
+opendir(DIR, "$source_dir{$build}");
 my @files = grep(/\.tsts$/,readdir(DIR));
 closedir(DIR);
 
@@ -65,7 +65,7 @@ print CTEST "# \n";
 print CTEST "message (\"SSH params are \$ENV{SSH_PARAMS}\")" unless $quiet;
 
 foreach my $file (@files) {
-    open(TSTS, $file) or die("Could not open  $file.");
+    open(TSTS, "$source_dir{$build}/$file") or die("Could not open  $source_dir{$build}/$file.");
     print CTEST "# \n";
     print CTEST "# tests from $file\n";
     print CTEST "# \n";
@@ -119,6 +119,7 @@ if (defined $local_port_range{$build}) {
 print TEST $TEST_BODY;
 close TEST;
 
+chdir ("$source_dir{$build}");
 if ($quiet) {
     system("ctest -S $target.cmake");
 } else {
