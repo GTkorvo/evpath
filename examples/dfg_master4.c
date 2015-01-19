@@ -34,22 +34,20 @@ void
 join_handler_func(EVmaster master, char *identifier, void*cur_unused1, void*cur_unused2)
 {
     EVdfg_stone src, mid, sink;
-    static int i = 1;
+    static int i = 0;
     EVdfg dfg;
+    char *expected_nodes[] = {"a", "b", "c"};
 
-    if (i == 1) {
-	/* first client joining becomes "b" */
-	EVmaster_assign_canonical_name(master, identifier, "b");
-	i++;
+    /* Nth client joining is named for that element in expected_nodes[] */
+    EVmaster_assign_canonical_name(master, identifier, expected_nodes[i]);
+    i++;
 
-	/* nothing else to do yet, so return */
+    if (i < sizeof(expected_nodes)/sizeof(expected_nodes[0])) {
+	/* not everyone is here yet, so return */
 	return;
-    } else {
-	/* must be second client (we need two plus master) */
-	EVmaster_assign_canonical_name(master, identifier, "c");
-	/* fall through to create dfg */
     }
 
+    /* actually create the DFG and assign stones to nodes */
     dfg = EVdfg_create(master);
 
     /* EVdfg stone creation and assignment occurs here */
