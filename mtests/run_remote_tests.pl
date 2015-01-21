@@ -32,6 +32,14 @@ print "Using build $build on host $hostname\n" unless $quiet;
 opendir(DIR, "$source_dir{$build}");
 my @files = grep(/\.tsts$/,readdir(DIR));
 closedir(DIR);
+my $tsts_dir = "$source_dir{$build}";
+
+if (! @files ) {
+    opendir(DIR, "$source_dir{$build}/..");
+    @files = grep(/\.tsts$/,readdir(DIR));
+    closedir(DIR);
+    $tsts_dir = "$source_dir{$build}/..";
+}
 
 open CTEST_CONFIG, ">$source_dir{$build}/CTestConfig.cmake" or die $1;
 my $dartsubmitinfo = <<'END';
@@ -65,7 +73,7 @@ print CTEST "# \n";
 print CTEST "message (\"SSH params are \$ENV{SSH_PARAMS}\")" unless $quiet;
 
 foreach my $file (@files) {
-    open(TSTS, "$source_dir{$build}/$file") or die("Could not open  $source_dir{$build}/$file.");
+    open(TSTS, "$tsts_dir/$file") or die("Could not open  $tsts_dir/$file.");
     print CTEST "# \n";
     print CTEST "# tests from $file\n";
     print CTEST "# \n";
