@@ -2829,7 +2829,7 @@ INT_CMwrite_raw_notify(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVec
     }
     ((int*)full_vec[0].iov_base)[0] = 
 	(((int*)full_vec[0].iov_base)[0] & 0xffffff00) | (unsigned char) checksum;
-    if (conn->do_non_blocking_write == 1) {
+    if ((conn->do_non_blocking_write == 1) && (conn->trans->NBwritev_func)) {
         int actual_bytes;
         actual_bytes = 
             conn->trans->NBwritev_func(&CMstatic_trans_svcs, 
