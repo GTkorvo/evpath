@@ -314,8 +314,8 @@ do_regression_master_test()
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
     char *string_list;
-    char size_str[4];
-    char vec_str[4];
+    char size_str[40];
+    char vec_str[40];
     CMFormat format;
     int done = 0;
 #ifdef HAVE_WINDOWS_H
