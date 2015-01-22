@@ -910,7 +910,7 @@ int non_blocking;
 	set_block_state(svc, scd, Non_Block);
     }
     iget = read(scd->fd, (char *) buffer, requested_len);
-    if (iget == -1) {
+    if ((iget == -1) || (iget == 0)) {
 	int lerrno = errno;
 	if ((lerrno != EWOULDBLOCK) &&
 	    (lerrno != EAGAIN) &&
@@ -927,11 +927,6 @@ int non_blocking;
 	    }
 	    return -1;
 	}
-    } else if (iget == 0) {
-	/* serious error */
-	svc->trace_out(scd->sd->cm, "CMSocket iget was 0, errno is %d, returning -1 for read",
-		       errno);
-	return -1;
     }
     left = requested_len - iget;
     while (left > 0) {
