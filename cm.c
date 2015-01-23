@@ -2609,7 +2609,7 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 	}
     }
     if (conn->queued_data.buffer_to_free) {
-//	cm_return_data_buf(conn->cm, conn->queued_data.buffer_to_free);
+	cm_return_data_buf(conn->cm, conn->queued_data.buffer_to_free);
     }
     conn->write_pending = 0;
     conn->trans->set_write_notify(conn->trans, &CMstatic_trans_svcs, 

@@ -22,6 +22,8 @@ endforeach()
 
 ADD_TEST (mtests_cmtest_UDP mtests_cmtest -t udp)
 ADD_TEST (mtests_cmping_UDP mtests_cmping -t udp)
+ADD_TEST (mtests_non_blocking_bulk mtests_bulktest -size 1024000)
+SET_TESTS_PROPERTIES(mtests_non_blocking_bulk PROPERTIES ENVIRONMENT "CMNonBlockWrite=1")
 ADD_EXECUTABLE (trans_test trans_test.c)
 SET_TARGET_PROPERTIES(trans_test PROPERTIES LINKER_LANGUAGE ${C_EXECUTABLE_LINKER_LANGUAGE})
 TARGET_LINK_LIBRARIES(trans_test evpath ${BASE_LIBS})
@@ -65,6 +67,9 @@ IF (RUN_IB_TESTS)
 ENDIF (RUN_IB_TESTS)
 
 ADD_TEST (all_transports perl ./transport_test.pl -q -f ./correctness_spec)
+ADD_TEST (non_blocking_transports perl ./transport_test.pl -q -f ./correctness_spec)
+SET_TESTS_PROPERTIES(non_blocking_transports PROPERTIES ENVIRONMENT "CMNonBlockWrite=1")
+
 if (TEST_INSTALL_DIRECTORY) 
   install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/run_remote_tests.pl DESTINATION "${TEST_INSTALL_DIRECTORY}")
   install(TARGETS ${CMTESTS} DESTINATION "${TEST_INSTALL_DIRECTORY}")
