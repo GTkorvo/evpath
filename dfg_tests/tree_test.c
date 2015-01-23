@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "config.h"
 #include "ev_dfg.h"
@@ -42,6 +43,7 @@ be_test_master(int argc, char **argv)
     EVclient_sinks sink_capabilities;
     EVclient_sources source_capabilities;
 
+    alarm(240);  /* reset time limit to 4 minutes */
     if (argc == 1) {
 	sscanf(argv[0], "%d", &level_count);
     }

@@ -58,6 +58,7 @@ be_test_master(int argc, char **argv)
     EVdfg test_dfg;
     EVclient_sinks sink_capabilities;
 
+    alarm(240);  /* reset time limit to 4 minutes */
     if (argc == 1) {
 	sscanf(argv[0], "%d", &level_count);
     }
