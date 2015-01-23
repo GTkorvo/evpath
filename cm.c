@@ -1177,12 +1177,12 @@ INT_CMConnection_dereference(CMConnection conn)
 	return;
     }
     if (conn->ref_count < 0) return;   /*  BAD! */
-    conn->closed = 1;
     CMtrace_out(conn->cm, CMConnectionVerbose, "CM - Shut down connection %p\n",
 		(void*)conn);
     if (conn->write_pending) {
 	wait_for_pending_write(conn);
     }
+    conn->closed = 1;
     if (conn->failed == 0) {
 	CMConnection_failed(conn, 0);
     }
@@ -2351,7 +2351,13 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 	return 0;
     }
     {
-	char *incoming_name = name_of_FMformat(FMformat_from_ID(FMContext_from_FFS(cm->FFScontext), data_buffer));
+	FMFormat format = FMformat_from_ID(FMContext_from_FFS(cm->FFScontext), data_buffer);
+	char *incoming_name;
+	if (format == NULL) {
+	    printf("BAD INCOMING DATA\n");
+	    return 0;
+	}
+	incoming_name = name_of_FMformat(format);
 
 	for (i = 0; i < cm->reg_format_count; i++) {
 	    if ((cm->reg_formats[i]->registration_pending) && 
@@ -2536,7 +2542,6 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
     CMtrace_out(conn->cm, CMLowLevelVerbose, "CMWriteQueuedData, conn %lx, header %d, attr %d\n", 
 		(long)conn, conn->queued_data.rem_header_len, 
 		conn->queued_data.rem_attr_len);
-    CManager_lock(conn->cm);
     if (conn->queued_data.rem_header_len != 0) {
 	struct FFSEncodeVec tmp_vec[1];
 	int actual;
@@ -2551,7 +2556,6 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 	    memmove(&conn->queued_data.rem_header[0],
 		    &conn->queued_data.rem_header[actual],
 		    conn->queued_data.rem_header_len);
-	    CManager_unlock(conn->cm);
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMWriteQueuedData, conn %p, remaining header %d\n", 
 			conn, conn->queued_data.rem_header_len);
 	    return;
@@ -2571,11 +2575,10 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 	    conn->queued_data.rem_attr_base += actual;
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMWriteQueuedData, conn %p, remaining attr %d\n", 
 			conn, conn->queued_data.rem_attr_len);
-	    CManager_unlock(conn->cm);
 	    return;
 	}
     }
-    {
+    if (conn->queued_data.vector_data) {
 	int vec_count = 0;
 	int length = 0;
 	FFSEncodeVector vec = conn->queued_data.vector_data;
@@ -2600,11 +2603,13 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 	    vec[i].iov_len -= actual;
 	    vec[i].iov_base = (char*)vec[i].iov_base + actual;
 	    conn->queued_data.vector_data = &vec[i];
-	    CManager_unlock(conn->cm);
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "CMWriteQueuedData, conn %lx, %d remaining data vectors\n", 
 			(long)conn, vec_count);
 	    return;
 	}
+    }
+    if (conn->queued_data.buffer_to_free) {
+//	cm_return_data_buf(conn->cm, conn->queued_data.buffer_to_free);
     }
     conn->write_pending = 0;
     conn->trans->set_write_notify(conn->trans, &CMstatic_trans_svcs, 
@@ -2614,12 +2619,12 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 	printf("Not LOCKED in write queued data!\n");
     }
     cm_wake_any_pending_write(conn);
-    CManager_unlock(conn->cm);
 }
 
 static void
 transport_wake_any_pending_write(CMConnection conn)
 {
+
     conn->write_pending = 0;
     CMtrace_out(conn->cm, CMTransportVerbose, "UNSet Pending write for conn %p\n", conn);
     cm_wake_any_pending_write(conn);
@@ -2661,17 +2666,46 @@ queue_remaining_write(CMConnection conn, FFSEncodeVector tmp_vec,
 		      int attrs_present)
 {
     int i = 0, j = 0;
-    (void) vec_count;
-    (void) attrs;
+    int total_bytes = 0;
+    i = 0;
+    int remaining_bytes = total_bytes - actual_bytes_written;
     while (actual_bytes_written > tmp_vec[i].iov_len) {
 	actual_bytes_written -= tmp_vec[i].iov_len;
 	i++;
     }
     tmp_vec[i].iov_len -= actual_bytes_written;
     tmp_vec[i].iov_base = (char*)tmp_vec[i].iov_base + actual_bytes_written;
+    if (attrs_present) {
+	pbio_vec[i-2] = tmp_vec[i];
+    } else {
+	pbio_vec[i-1] = tmp_vec[i];
+    }
+    actual_bytes_written = 0;
+/*
+ *    Data is either:
+ *    vec 0 = header
+ *    vec 1 = ffs
+ *    vec 2 = ffs
+
+ *    vec 0 = header
+ *    vec 1 = attrs
+ *    vec 2 = ffs
+ *    vec 2 = ffs
+
+ *    vec 0 = header
+ *    vec 1 = notffs
+ *    vec 2 = notffs
+
+ *    vec 0 = header
+ *    vec 1 = attrs
+ *    vec 2 = notffs
+ *    vec 2 = notffs
+ */
+
+    conn->queued_data.buffer_to_free = NULL;
 
     if (i == 0) {
-	/* didn't even write the 8 or 12 or 16 byte header */
+	/* didn't even write the 8 or 12 or 16 or 24 byte header */
         assert(sizeof(conn->queued_data.rem_header) >= tmp_vec[0].iov_len);
 	memcpy(&conn->queued_data.rem_header, tmp_vec[0].iov_base, 
 	       tmp_vec[0].iov_len);
@@ -2683,13 +2717,48 @@ queue_remaining_write(CMConnection conn, FFSEncodeVector tmp_vec,
 	/* got stuck in encoded attributes */
 	conn->queued_data.rem_attr_base = tmp_vec[1].iov_base;
 	conn->queued_data.rem_attr_len = tmp_vec[1].iov_len;
+	i++;
     } else {
 	conn->queued_data.rem_attr_len = 0;
     }
     
+    
     /* fixup pbio_vec */
     j = i - 1;  /* how far into the pbio vector are we? */
     if (attrs_present) j--;
+    if (j == -1) {
+	/* no PBIO data */
+	conn->queued_data.vector_data = NULL;
+	return;
+    }
+    if (pbio_vec == NULL) {
+	/* DATA NOT FFS, don't do optimized copying */
+	/* Errr, something smarter here */
+	int data_length = remaining_bytes - conn->queued_data.rem_attr_len - conn->queued_data.rem_header_len;
+	int length = data_length + (sizeof(tmp_vec[0])*2);
+	int start = i;
+	char *ptr;
+	CMbuffer buf = cm_get_data_buf(conn->cm, length);
+	FFSEncodeVector vec = buf->buffer;
+	vec[0].iov_len = data_length;
+	vec[0].iov_base = buf->buffer + (sizeof(tmp_vec[0])*2);
+	vec[1].iov_len = 0;
+	vec[1].iov_base = NULL;
+	conn->queued_data.buffer_to_free = buf;
+	conn->queued_data.vector_data = vec;
+	if (i == 0) i=1;
+	if (attrs_present && i <= 1) i=2;
+	ptr = vec[0].iov_base;
+	while (i < vec_count) {
+	    memcpy(ptr, tmp_vec[i].iov_base, tmp_vec[i].iov_len);
+	    ptr += tmp_vec[i].iov_len;
+	    data_length -= tmp_vec[i].iov_len;
+	    i++;
+	}
+	return;
+    } else {
+	conn->queued_data.buffer_to_free = NULL;
+    }
     if (j >= 0) {
         CMtrace_out(conn->cm, CMLowLevelVerbose, "Removing from pbio_vec at offset %d\n", (int) j);
 	pbio_vec[j].iov_len -= actual_bytes_written;
@@ -2705,6 +2774,8 @@ queue_remaining_write(CMConnection conn, FFSEncodeVector tmp_vec,
      */
     conn->queued_data.vector_data = 
 	copy_all_to_FFSBuffer(conn->io_out_buffer, &pbio_vec[j]);
+    tmp_vec = conn->queued_data.vector_data;
+    i = 0; 
 }
 
 static void
@@ -2835,7 +2906,7 @@ INT_CMwrite_raw_notify(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVec
             conn->trans->NBwritev_func(&CMstatic_trans_svcs, 
                                             conn->transport_data, 
                                             full_vec, vec_count, attrs);
-        if (actual_bytes < count) {
+        if (actual_bytes < length) {
             /* copy remaining and send it later */
             if (actual_bytes < 0 ) actual_bytes = 0;
             if (data_vec_stack) {
@@ -2847,8 +2918,8 @@ INT_CMwrite_raw_notify(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVec
             conn->write_pending = 1;
             CMtrace_out(conn->cm, CMLowLevelVerbose, 
                         "Partial write, queued %ld bytes\n",
-                        count - actual_bytes);
-            return -1; /* XXX */
+                        length - actual_bytes);
+            return 1;
         }
         actual = vec_count;  /* set actual for success */
     } else if (conn->trans->writev_complete_notify_func && notify_func) {
@@ -2882,7 +2953,6 @@ INT_CMwrite_evcontrol(CMConnection conn, unsigned char type, int argument) {
     vec[2].iov_len = 0;
     evcontrol_header[1] = type << 24 | (sizeof(evcontrol_header) + sizeof(int));
     success = INT_CMwrite_raw(conn, vec, vec + 1, 2, evcontrol_header[1] & 0xffffff, NULL, 1) != 0;
-    printf("done write\n");
     return success;
 }
 

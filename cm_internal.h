@@ -208,11 +208,12 @@ typedef struct _CMControlList {
 } CMControlList_s;
 
 struct queued_data_rec {
-    char rem_header[16]; /* max 12 bytes w/o attributes, 16 bytes with */
+    char rem_header[32];
     int rem_header_len;
     char *rem_attr_base;
     int rem_attr_len;
     FFSEncodeVector vector_data;
+    CMbuffer buffer_to_free;
 };
 
 typedef struct _CMCloseHandlerList {
