@@ -2667,18 +2667,25 @@ queue_remaining_write(CMConnection conn, FFSEncodeVector tmp_vec,
 {
     int i = 0, j = 0;
     int total_bytes = 0;
+    int remaining_bytes = 0;
+
+    for (i=0; i < vec_count; i++) {
+        total_bytes += tmp_vec[i].iov_len;
+    }
+    remaining_bytes = total_bytes - actual_bytes_written;
     i = 0;
-    int remaining_bytes = total_bytes - actual_bytes_written;
     while (actual_bytes_written > tmp_vec[i].iov_len) {
 	actual_bytes_written -= tmp_vec[i].iov_len;
 	i++;
     }
     tmp_vec[i].iov_len -= actual_bytes_written;
     tmp_vec[i].iov_base = (char*)tmp_vec[i].iov_base + actual_bytes_written;
-    if (attrs_present) {
-	pbio_vec[i-2] = tmp_vec[i];
-    } else {
-	pbio_vec[i-1] = tmp_vec[i];
+    if (pbio_vec) {
+        if (attrs_present) {
+	    pbio_vec[i-2] = tmp_vec[i];
+	} else {
+	    pbio_vec[i-1] = tmp_vec[i];
+	}
     }
     actual_bytes_written = 0;
 /*
@@ -2736,7 +2743,6 @@ queue_remaining_write(CMConnection conn, FFSEncodeVector tmp_vec,
 	/* Errr, something smarter here */
 	int data_length = remaining_bytes - conn->queued_data.rem_attr_len - conn->queued_data.rem_header_len;
 	int length = data_length + (sizeof(tmp_vec[0])*2);
-	int start = i;
 	char *ptr;
 	CMbuffer buf = cm_get_data_buf(conn->cm, length);
 	FFSEncodeVector vec = buf->buffer;
