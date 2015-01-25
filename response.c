@@ -631,9 +631,8 @@ router_wrapper(CManager cm, struct _event_item *event, void *client_data,
 static void
 transform_free_wrapper(void *data, void *free_data)
 {
-    response_instance instance = (response_instance)free_data;
-    FMfree_var_rec_elements(instance->u.transform.out_format,
-			    data);
+    FMFormat out_format = (FMFormat)free_data;
+    FMfree_var_rec_elements(out_format, data);
     free(data);
 }
 
@@ -690,7 +689,7 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	s.format = NULL;
 	s.reference_format = instance->u.transform.out_format;
 	s.free_func = transform_free_wrapper;
-	s.free_data = instance;
+	s.free_data = instance->u.transform.out_format;
 	s.preencoded = 0;
 	INT_EVsubmit(&s, out_event, output_attrs);
     } else {
