@@ -694,7 +694,7 @@ transform_wrapper(CManager cm, struct _event_item *event, void *client_data,
 	INT_EVsubmit(&s, out_event, output_attrs);
     } else {
 	CMtrace_out(cm, EVerbose, "Transform function returned %d, NOT submitting\n", ret);
-	transform_free_wrapper(out_event, instance);
+	transform_free_wrapper(out_event, instance->u.transform.out_format);
     }
     free_attr_list(output_attrs);
     return ret;
