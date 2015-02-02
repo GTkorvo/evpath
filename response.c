@@ -1492,6 +1492,62 @@ INT_EVadd_standard_structs(CManager cm, FMStructDescList *lists)
     }
 }
 
+static void
+cod_ffs_write(cod_exec_context ec, FFSFile fname,  int queue, int index)
+{
+    FMFormat ref_format, file_format;
+    struct ev_state_data * ev_state = (void*)cod_get_client_data(ec, 0x34567890);
+    queue_item * my_item = cod_find_index(0, ev_state, queue, index);
+    FMContext fmc;
+    attr_list *temp_attr;
+    FMStructDescList format_list;
+
+    if(!my_item) {
+	fprintf(stderr, "No corresponding item in the queue\n");
+	return;
+    }
+
+    ref_format = my_item->item->reference_format;
+    fmc = FMContext_of_file(fname);
+
+    format_list = format_list_of_FMFormat(ref_format);
+    file_format = FMregister_data_format(fmc, format_list);
+    
+    temp_attr = &my_item->item->attrs;
+    if(!*temp_attr) {
+	printf("There is no attr for: %s\n", format_list->format_name);
+    }
+    
+    if(my_item->item->event_encoded) {
+	fprintf(stderr, "Event is encoded, have not handled this case.  Can not write to file\n");
+	return;
+    } else {
+	void * temp_data = my_item->item->decoded_event;
+	if(!write_FFSfile_attrs(fname, file_format, temp_data, *temp_attr))
+	    fprintf(stderr, "Error in writing FFS_file!\n");
+    }
+    return;
+}
+
+static void
+cod_ffs_read(cod_exec_context ec, FFSFile fname, void * data, attr_list * temp, int queue)
+{
+    FMFormat ref_format;
+    struct ev_state_data * ev_state = (void*)cod_get_client_data(ec, 0x34567890);
+    FFSTypeHandle temp_type;
+    FFSContext fmc = FFSContext_of_file(fname);
+    FMStructDescList format_list;
+
+    ref_format = ev_state->instance->u.queued.formats[queue];
+    format_list = format_list_of_FMFormat(ref_format);
+    temp_type = FFSset_fixed_target(fmc, format_list);
+
+    FFSread_attr(fname, data, temp);
+
+    return;
+}
+
+
 static
 int
 cod_max_output(cod_exec_context ec)
@@ -1641,7 +1697,9 @@ add_typed_queued_routines(cod_parse_context context, int index, const char *fmt_
         "int EVpresent_%s(cod_exec_context ec, cod_closure_context queue, int index);\n"
         "void EVdiscard_and_submit_%s(cod_exec_context ec, int target, cod_closure_context queue, int index);\n"
         "void EVsubmit_%s(cod_exec_context ec, int target, cod_closure_context queue, int index);\n"
-        "attr_list EVget_attrs_%s(cod_exec_context ec, cod_closure_context queue, int index);\n";
+        "attr_list EVget_attrs_%s(cod_exec_context ec, cod_closure_context queue, int index);\n"
+	"void write_%s(cod_exec_context ec, ffs_file fname, cod_closure_context type, int index);\n"
+	"void read_%s(cod_exec_context ec, ffs_file fname, void * data, attr_list * attr_data, cod_closure_context queue);\n";
     static char *data_extern_string_fmt =
         "%s *EVdata_%s(cod_exec_context ec, cod_closure_context type, int index);\n"
         "%s *EVdata_full_%s(cod_exec_context ec, cod_closure_context type, int index);\n";
@@ -1652,6 +1710,8 @@ add_typed_queued_routines(cod_parse_context context, int index, const char *fmt_
         {"EVdiscard_and_submit_%s", (void *) 0},
         {"EVget_attrs_%s", (void *) 0},
         {"EVsubmit_%s", (void *) 0},
+	{"write_%s", (void *) 0},
+	{"read_%s", (void *) 0},
         {NULL, (void *) 0}
     };
     static cod_extern_entry data_externs_fmt[] = {
@@ -1669,7 +1729,7 @@ add_typed_queued_routines(cod_parse_context context, int index, const char *fmt_
 
     sprintf(extern_string, extern_string_fmt,
 	    fmt_name, fmt_name, fmt_name, fmt_name,
-	    fmt_name, fmt_name, fmt_name);
+	    fmt_name, fmt_name, fmt_name, fmt_name);
     sprintf(data_extern_string, data_extern_string_fmt,
 	    fmt_name, fmt_name, fmt_name, fmt_name);
     externs = malloc(sizeof(externs_fmt));
@@ -1681,6 +1741,8 @@ add_typed_queued_routines(cod_parse_context context, int index, const char *fmt_
     externs[3].extern_value = (void*) cod_ev_discard_and_submit_rel;
     externs[4].extern_value = (void*) cod_ev_get_attrs;
     externs[5].extern_value = (void*) cod_ev_submit_rel;
+    externs[6].extern_value = (void*) cod_ffs_write;
+    externs[7].extern_value = (void*) cod_ffs_read;
 
     data_externs = malloc(sizeof(externs_fmt));
     assert(data_externs);
