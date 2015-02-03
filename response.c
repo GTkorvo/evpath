@@ -1541,7 +1541,7 @@ cod_ffs_read(cod_exec_context ec, FFSFile fname, void * data, attr_list * temp, 
     ref_format = ev_state->instance->u.queued.formats[queue];
     format_list = format_list_of_FMFormat(ref_format);
     temp_type = FFSset_fixed_target(fmc, format_list);
-
+    (void)temp_type;
     FFSread_attr(fname, data, temp);
 
     return;
