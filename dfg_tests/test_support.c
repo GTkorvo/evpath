@@ -161,7 +161,7 @@ run_subprocess(char **args)
 	/* I'm the child */
 	execv(args[0], args);
     }
-    if(count++ > 0) sleep(1);  /* don't go too fast */
+    if(count++ > 0) usleep(100000);  /* don't go too fast */
     return child;
 #endif
 }
