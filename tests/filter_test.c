@@ -84,7 +84,7 @@ static FMStructDescRec simple_format_list[] =
 static FMField filter_field_list[] =
 {
     {"integer_field", "integer",
-     sizeof(short), FMOffset(simple_rec_ptr, integer_field)},
+     sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
     {NULL, NULL, 0, 0}
 };
 
