@@ -22,8 +22,6 @@ include(CERCS_package)
 
 include(FindCERCSProject)
 include(CTest)
-include(CERCS_package)
-
 configure_file(CTestCustom.ctest.in CTestCustom.ctest @ONLY)
 
 if(MSVC)
@@ -85,7 +83,7 @@ ENDIF (NOT DEFINED CM_SELF_FORMATS)
 
 IF (TARGET_CNL)   # This should be set to true if compiling for compute note linux
   set (NO_DYNAMIC_LINKING 1)   # dummy dyn linking in cm.c and cm_transport.c
-  list (APPEND EVPATH_SRC_LIST ip_config.c cmsockets.c cmudp.c cmselect.c)  # link sockets and select mechanisms in main lib
+  list (APPEND EVPATH_SRC_LIST cmsockets.c cmudp.c cmselect.c)  # link sockets and select mechanisms in main lib
   list (APPEND CERCS_FIND_OPTIONS "STATIC")
   set (NO_TRANSPORT_MODULES TRUE)
   set (BUILD_SHARED_STATIC STATIC)
@@ -93,18 +91,6 @@ IF (TARGET_CNL)   # This should be set to true if compiling for compute note lin
 ELSE (TARGET_CNL)
   find_package(DL)
 ENDIF (TARGET_CNL)
-
-if(MSVC)
-  # Force to always compile with W4
-  if(CMAKE_C_FLAGS MATCHES "/W[0-4]")
-    string(REGEX REPLACE "/W[0-4]" "/W4" CMAKE_C_FLAGS "${CMAKE_C_FLAGS}")
-  else()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4")
-  endif()
-elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
-  # Update if necessary
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-endif()
 
 if (DEFINED CERCS_USE_INSTALLED) 
    set (CERCS_USE_INSTALLED)
@@ -117,7 +103,6 @@ FIND_CERCS_PROJECT (ffs LIBRARY ffs INCLUDES ffs.h REQUIRED ${CERCS_FIND_OPTIONS
 FIND_CERCS_PROJECT (dill LIBRARY dill REQUIRED ${CERCS_FIND_OPTIONS})
 find_package (Threads)
 find_package (MPI)
-FIND_PACKAGE(OpenSSL)
 
 list (APPEND DEPLIBS "-L${CERCS_ENV_LIB_DIR}" "${CERCS_ENV_LIB_DIR}/libcercs_env.la")
 list (APPEND DEPLIBS "-L${ATL_LIB_DIR}" "${ATL_LIB_DIR}/libatl.la")
@@ -136,13 +121,8 @@ SET (CM_DEFAULT_TRANSPORT "sockets")
 if (NOT NO_TRANSPORT_MODULES)
   add_library(cmsockets MODULE cmsockets.c ip_config.c)
   add_library(cmselect MODULE cmselect.c)
-  add_library(cmudp MODULE cmudp.c ip_config.c)
-  add_library(cmmulticast MODULE cmmulticast.c ip_config.c)
-  if (OPENSSL_FOUND)
-    add_library(cmssl MODULE cmssl.c)
-    INCLUDE_DIRECTORIES(${OPEN_SSL_INCLUDE_DIRS})
-    TARGET_LINK_LIBRARIES(cmssl ${BASE_LIBS} ${OPENSSL_LIBRARIES})
-  endif (OPENSSL_FOUND)
+  add_library(cmudp MODULE cmudp.c)
+  add_library(cmmulticast MODULE cmmulticast.c)
 
   TARGET_LINK_LIBRARIES(cmselect ${BASE_LIBS})
   TARGET_LINK_LIBRARIES(cmsockets ${BASE_LIBS})
@@ -256,32 +236,6 @@ IF (HAVE_IBVERBS OR HAVE_UGNI)
         ENDIF (NOT NO_TRANSPORT_MODULES)
     ENDIF (NNTI_FOUND)
 ENDIF (HAVE_IBVERBS OR HAVE_UGNI)
-
-IF (NNTI_FOUND)
-    INCLUDE_DIRECTORIES(${NNTI_INCLUDE_DIR})
-    LINK_DIRECTORIES(${NNTI_LIB_DIR})
-    STRING(REGEX REPLACE trios_nnti trios_support NNTI_SUP_LIB ${NNTI_LIBRARIES})
-    list (APPEND NNTI_LIBRARIES ${NNTI_SUP_LIB} -lstdc++ )
-    if (NOT (DEFINED CercsArch))
-      execute_process(COMMAND cercs_arch OUTPUT_VARIABLE CercsArch ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
-      MARK_AS_ADVANCED(CercsArch)
-    endif()
-    if ("${CercsArch}" STREQUAL "sith")
-      list (APPEND NNTI_LIBRARIES -libverbs)
-    endif ("${CercsArch}" STREQUAL "sith")
-ENDIF (NNTI_FOUND)
-
-IF (NNTI_FOUND AND DF_SHM_FOUND)
-    IF (NOT NO_TRANSPORT_MODULES)
-        add_library(cmnnti MODULE cmnnti.c)
-        list (APPEND TARGETS cmnnti)
-	TARGET_LINK_LIBRARIES(cmnnti ${NNTI_LIBRARIES} ${ENET_LIBRARIES} ${DF_SHM_LIBRARIES} ${BASE_LIBS})
-    ELSE (NOT NO_TRANSPORT_MODULES)
-        list (APPEND EVPATH_SRC_LIST cmnnti.c)  # link nnti in main lib
-	list (APPEND EVPATH_TRANSPORT_DEP_LIBS ${NNTI_LIBRARIES} ${ENET_LIBRARIES} ${DF_SHM_LIBRARIES})
-	list (APPEND DEPLIBS ${NNTI_LIBRARIES})
-    ENDIF (NOT NO_TRANSPORT_MODULES)
-ENDIF (NNTI_FOUND AND DF_SHM_FOUND)
 
 add_custom_command(
   OUTPUT "cm_interface.c" "revp.c" "revpath.h"
