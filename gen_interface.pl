@@ -339,6 +339,7 @@ sub mod_EVhandler {
 	    $cm_only = 1;
 	    next;
 	}
+	$a=~s/ /\\ /g;
 	$cat_args .= "$a ";
 	if ($a =~ /ev_dfg/) {
 	    $has_evdfg = 1;
