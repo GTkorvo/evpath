@@ -119,7 +119,6 @@ get_self_ip_addr(void *cm, CMtrans_services svc)
 				       *(((unsigned char *) &in->s_addr) + 1),
 				       *(((unsigned char *) &in->s_addr) + 2),
 				       *(((unsigned char *) &in->s_addr) + 3));
-		    free(if_addrs);
 		    return (ntohl(in->s_addr));
 		}
 	    }

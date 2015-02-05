@@ -3033,6 +3033,26 @@ EVauto_submit_func(CManager cm, void* vstone)
     CManager_unlock(cm);
 }
 
+struct delayed_event {
+    EVstone to_stone;
+    event_item *event;
+};
+
+static void
+EVdelayed_submit_func(CManager cm, void* vdelayed)
+{
+    struct delayed_event *delayed = (struct delayed_event *)vdelayed;
+    int stone_num = delayed->to_stone;
+    event_item *event = delayed->event;
+    free(delayed);
+    CManager_lock(cm);
+    event = get_free_event(cm->evp);
+    internal_path_submit(cm, stone_num, event);
+    while (process_local_actions(cm));
+    return_event(cm->evp, event);
+    CManager_unlock(cm);
+}
+
 extern EVstone
 INT_EVcreate_auto_stone(CManager cm, int period_sec, int period_usec, 
 			char *action_spec, EVstone out_stone)
