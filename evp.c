@@ -3002,6 +3002,12 @@ INT_EVhandle_control_message(CManager cm, CMConnection conn, unsigned char type,
     }
 }
 
+extern void
+do_local_actions(CManager cm)
+{
+    while (process_local_actions(cm));
+}
+
 extern FMFormat
 EVregister_format_set(CManager cm, FMStructDescList list)
 {
@@ -3027,26 +3033,6 @@ EVauto_submit_func(CManager cm, void* vstone)
     event->free_func = NULL;
     event->attrs = NULL;
     event->cm = cm;
-    internal_path_submit(cm, stone_num, event);
-    while (process_local_actions(cm));
-    return_event(cm->evp, event);
-    CManager_unlock(cm);
-}
-
-struct delayed_event {
-    EVstone to_stone;
-    event_item *event;
-};
-
-static void
-EVdelayed_submit_func(CManager cm, void* vdelayed)
-{
-    struct delayed_event *delayed = (struct delayed_event *)vdelayed;
-    int stone_num = delayed->to_stone;
-    event_item *event = delayed->event;
-    free(delayed);
-    CManager_lock(cm);
-    event = get_free_event(cm->evp);
     internal_path_submit(cm, stone_num, event);
     while (process_local_actions(cm));
     return_event(cm->evp, event);

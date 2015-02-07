@@ -1569,8 +1569,29 @@ cod_target_stone_on_port(cod_exec_context ec, int port, void *data, void *type_i
     return target_stone;
 }
 
+struct delayed_event {
+    EVstone to_stone;
+    event_item *event;
+};
+
+extern void do_local_actions(CManager cm);
+
 static void
-internal_cod_submit_attr(cod_exec_context ec, int port, void *data, void *type_info, attr_list attrs)
+EVdelayed_submit_func(CManager cm, void* vdelayed)
+{
+    struct delayed_event *delayed = (struct delayed_event *)vdelayed;
+    int stone_num = delayed->to_stone;
+    event_item *event = delayed->event;
+    free(delayed);
+    CManager_lock(cm);
+    internal_path_submit(cm, stone_num, event);
+    do_local_actions(cm);
+    return_event(cm->evp, event);
+    CManager_unlock(cm);
+}
+
+static void
+internal_cod_submit_general(cod_exec_context ec, int port, void *data, void *type_info, attr_list attrs, struct timeval *tp)
 {
     struct ev_state_data *ev_state = (void*)cod_get_client_data(ec, 0x34567890);
     CManager cm = ev_state->cm;
@@ -1589,7 +1610,16 @@ internal_cod_submit_attr(cod_exec_context ec, int port, void *data, void *type_i
 	CMtrace_out(cm, EVerbose,
 		    "Internal COD submit, resubmission of current input event to stone %d\n",
 		    target_stone);
-	internal_path_submit(ev_state->cm, target_stone, ev_state->cur_event);
+	if (tp) {
+	    /* delayed event */
+	    struct delayed_event *ev = malloc(sizeof(struct delayed_event));
+	    ev->to_stone = target_stone;
+	    ev->event = ev_state->cur_event;
+	    ev_state->cur_event->ref_count++;
+	    INT_CMadd_delayed_task(cm, tp->tv_sec, tp->tv_usec, EVdelayed_submit_func, (void*)ev);
+	} else {
+	    internal_path_submit(ev_state->cm, target_stone, ev_state->cur_event);
+	}
     } else {
 	FMFormat event_format = NULL;
 	CMtrace_out(cm, EVerbose,
@@ -1615,15 +1645,33 @@ internal_cod_submit_attr(cod_exec_context ec, int port, void *data, void *type_i
 	cod_encode_event(cm, event);  /* map to memory we trust */
 	event->event_encoded = 1;
 	event->decoded_event = NULL;  /* lose old data */
-	internal_path_submit(cm, target_stone, event);
-	return_event(cm->evp, event);
+	if (tp) {
+	    /* delayed event */
+	    struct delayed_event {
+		EVstone to_stone;
+		event_item *event;
+	    };
+	    struct delayed_event *ev = malloc(sizeof(struct delayed_event));
+	    ev->to_stone = target_stone;
+	    ev->event = event;
+	    INT_CMadd_delayed_task(cm, tp->tv_sec, tp->tv_usec, EVdelayed_submit_func, (void*)ev);
+	} else {
+	    internal_path_submit(cm, target_stone, event);
+	    return_event(cm->evp, event);
+	}
     }
+}
+
+static void
+internal_cod_submit_attr(cod_exec_context ec, int port, void *data, void *type_info, attr_list attrs)
+{
+    internal_cod_submit_general(ec, port, data, type_info, attrs, NULL);
 }
 
 static void
 internal_cod_submit(cod_exec_context ec, int port, void *data, void *type_info)
 {
-    internal_cod_submit_attr(ec, port, data, type_info, NULL);
+    internal_cod_submit_general(ec, port, data, type_info, NULL, NULL);
 }
 
 static void
@@ -1641,6 +1689,7 @@ add_standard_routines(stone_type stone, cod_parse_context context)
 		int EVtarget_stone_on_port(cod_exec_context ec, int port);\n\
 		void EVsubmit(cod_exec_context ec, int port, void* d, cod_type_spec dt);\n\
 		void EVsubmit_attr(cod_exec_context ec, int port, void* d, cod_type_spec dt, attr_list list);\n\
+		void EVsubmit_delayed(cod_exec_context ec, int port, void* d, cod_type_spec dt, attr_list list, timeval *tp);\n\
         	attr_list EVget_stone_attrs(cod_exec_context ec, char *stone_name);\n \
 		attr_list stone_attrs;\n";
 		//time_t time(time_t *timer);\n";
@@ -1655,6 +1704,7 @@ add_standard_routines(stone_type stone, cod_parse_context context)
 	{"stone_attrs", (void *) 0},
 	{"EVsubmit", (void *) 0},
 	{"EVsubmit_attr", (void *) 0},
+	{"EVsubmit_delayed", (void *) 0},
 	{"sleep", (void*) 0},
 	{"EVmax_output", (void*)0},
 	{"EVtarget_stone_on_port", (void*)0},
@@ -1677,10 +1727,11 @@ add_standard_routines(stone_type stone, cod_parse_context context)
     externs[6].extern_value = (void *) (long) &stone->stone_attrs;
     externs[7].extern_value = (void *) (long) &internal_cod_submit;
     externs[8].extern_value = (void *) (long) &internal_cod_submit_attr;
-    externs[9].extern_value = (void *) (long) &sleep;
-    externs[10].extern_value = (void *) (long) &cod_max_output;
-    externs[11].extern_value = (void *) (long) &cod_target_stone_on_port;
-    externs[12].extern_value = (void *) (long) &cod_ev_get_stone_attrs;
+    externs[9].extern_value = (void *) (long) &internal_cod_submit_general;
+    externs[10].extern_value = (void *) (long) &sleep;
+    externs[11].extern_value = (void *) (long) &cod_max_output;
+    externs[12].extern_value = (void *) (long) &cod_target_stone_on_port;
+    externs[13].extern_value = (void *) (long) &cod_ev_get_stone_attrs;
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
