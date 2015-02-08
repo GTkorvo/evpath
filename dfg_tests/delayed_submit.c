@@ -38,12 +38,9 @@ static
 int
 event_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
-    EVstone this_stone;
-    attr_list stone_attrs;
     outbound_ptr event = vevent;
     static int message_count = 0;
     static int failure = 0;
-    static atom_t MSG_COUNT_ATOM = -1;
     struct timeval now, delay;
     (void)cm;
     (void)client_data;
@@ -51,8 +48,8 @@ event_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     gettimeofday(&now, NULL);
     timersub(&now, &event->submit_time, &delay);
     if (quiet <= 0) {
-	printf("Now is %ld.%06d, sent %ld.%06d\n", now.tv_sec, now.tv_usec, event->submit_time.tv_sec, event->submit_time.tv_usec);
-	printf("Delay is %ld.%06d\n", delay.tv_sec, delay.tv_usec);
+        printf("Now is %ld.%06d, sent %ld.%06d\n", (long)now.tv_sec, (int)now.tv_usec, (long)event->submit_time.tv_sec, (int)event->submit_time.tv_usec);
+	printf("Delay is %ld.%06d\n", (long)delay.tv_sec, (int)delay.tv_usec);
     }
     if ((message_count % 2) == 0) {
 	if (abs(delay.tv_sec *1000000 + delay.tv_usec - 1000000) > 100000) {
@@ -100,7 +97,6 @@ be_test_master(int argc, char **argv)
     EVclient_sinks sink_capabilities;
     EVclient_sources source_capabilities;
     char *M1_action_spec;
-    attr_list T1_name_attrs;
     (void)argc; (void)argv;
     cm = CManager_create();
     CMlisten(cm);
