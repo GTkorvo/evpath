@@ -1130,8 +1130,9 @@ INT_CMConnection_set_character(CMConnection conn, attr_list attrs)
 	data->conn = conn;
 	data->attrs = CMattr_copy_list(conn->cm, attrs);
 	/* do one task almost immediately */
-	(void) INT_CMadd_delayed_task(conn->cm, 0, 1000, do_bw_measure, 
+	task = INT_CMadd_delayed_task(conn->cm, 0, 1000, do_bw_measure, 
 				  (void*)data);
+	free(task);
 	/* schedule tasks periodically */
 	task = INT_CMadd_periodic_task(conn->cm, interval_value, 0, 
 				   do_bw_measure, (void*)data);
