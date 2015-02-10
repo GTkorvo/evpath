@@ -1651,10 +1651,12 @@ internal_cod_submit_general(cod_exec_context ec, int port, void *data, void *typ
 		EVstone to_stone;
 		event_item *event;
 	    };
+	    CMTaskHandle handle;
 	    struct delayed_event *ev = malloc(sizeof(struct delayed_event));
 	    ev->to_stone = target_stone;
 	    ev->event = event;
-	    INT_CMadd_delayed_task(cm, tp->tv_sec, tp->tv_usec, EVdelayed_submit_func, (void*)ev);
+	    handle = INT_CMadd_delayed_task(cm, tp->tv_sec, tp->tv_usec, EVdelayed_submit_func, (void*)ev);
+	    free(handle);
 	} else {
 	    internal_path_submit(cm, target_stone, event);
 	    return_event(cm->evp, event);
