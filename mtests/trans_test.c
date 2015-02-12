@@ -477,6 +477,7 @@ main(argc, argv)
 	subproc_args[cur_subproc_arg++] = attr_list_to_string(contact_list);
 	subproc_args[cur_subproc_arg] = NULL;
 	global_exit_condition = CMCondition_get(cm, NULL);
+	if (use_mpi) start_subprocess = 0;
 	if (start_subprocess) {
 	    subproc_proc = run_subprocess(&subproc_args[start_subproc_arg_count]);
 #ifdef BUILD_WITH_MPI
