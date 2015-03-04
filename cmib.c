@@ -397,6 +397,7 @@ create_ib_conn_data(svc)
 	CMtrans_services svc;
 {
 	ib_conn_data_ptr ib_conn_data = svc->malloc_func(sizeof(struct ib_connection_data));
+	memset(ib_conn_data, 0, sizeof(struct ib_connection_data));
 	ib_conn_data->remote_host = NULL;
 	ib_conn_data->remote_contact_port = -1;
 	ib_conn_data->fd = 0;
@@ -664,7 +665,7 @@ static int handle_response(CMtrans_services svc,
 	{
 	    ibv_dereg_mr(write_request->mrlist[i]);	    
 	}
-	
+
 	if(write_request->wr)
 	{       
 	    free_sg_list(write_request->wr->sg_list, write_request->mrlen, free_data_elements);
@@ -725,15 +726,19 @@ static int handle_response(CMtrans_services svc,
 		break;      
 	    }
 	    
+#ifdef DO_DEREG_ON_FINISH
 	    for(i = 0; i < write_request->mrlen; i ++)
 	    {
 		ibv_dereg_mr(write_request->mrlist[i]);       
-		
+		write_request->mrlist[i] = NULL;
 	    }
 	    
 	    free_sg_list(write_request->wr->sg_list, write_request->mrlen, free_data_elements);
+	    free(write_request->mrlist);
 	    free(write_request->wr);
-	    
+	    write_request->wr = NULL;
+#endif
+
 	    //no we wait for the send even to get anoutput
 	    retval = waitoncq(scd, scd->sd, svc, scd->sd->send_cq);
 	    if(retval)
@@ -1777,6 +1782,8 @@ libcmib_LTX_writev_complete_notify_func(CMtrans_services svc,
 	int wrlen = 0;
 	double start = 0, end = 0;
 	struct control_message msg; 
+	int can_reuse_mapping = 0;
+	rinfo *last_write_request = &scd->infolist[scd->infocount];
 
 	writev_t = getlocaltime();
     
@@ -1810,6 +1817,42 @@ libcmib_LTX_writev_complete_notify_func(CMtrans_services svc,
 
 	svc->set_pending_write(scd->conn);
 
+	if (notify_func) {
+	    can_reuse_mapping = 1;
+	    /* OK, we're not going to copy the data */
+	    if (last_write_request->mrlen == iovcnt) {
+		int i;
+		for(i=0; i < last_write_request->mrlen; i++) {
+		    if ((iov[i].iov_len != last_write_request->wr->sg_list[i].length) ||
+			(iov[i].iov_base != last_write_request->wr->sg_list[i].addr)) {
+			can_reuse_mapping = 0;
+			svc->trace_out(scd->sd->cm, "CMIB already mapped data, doesn't match write, buf %d, %p vs. %p, %d vs. %d",
+				       i, iov[i].iov_base, last_write_request->wr->sg_list[i].addr, iov[i].iov_len, last_write_request->wr->sg_list[i].length);
+		    break;
+		    }
+		}
+	    } else {
+		svc->trace_out(scd->sd->cm, "CMIB either no already mapped data, or wrong buffer count");
+		can_reuse_mapping = 0;
+	    }
+	} else {
+	    svc->trace_out(scd->sd->cm, "CMIB User-owned data with no notify, so no reuse\n");
+	}
+#ifndef DO_DEREG_ON_FINISH
+	if (last_write_request->wr && !(can_reuse_mapping)) {
+	    int free_data_elements = (last_write_request->notify_func == NULL);
+	    for(i = 0; i < last_write_request->mrlen; i ++)
+	    {
+		ibv_dereg_mr(last_write_request->mrlist[i]);       
+		last_write_request->mrlist[i] = NULL;
+	    }
+	    
+	    free_sg_list(last_write_request->wr->sg_list, last_write_request->mrlen, free_data_elements);
+	    free(last_write_request->mrlist);
+	    free(last_write_request->wr);
+	    last_write_request->wr = NULL;
+	}
+#endif
 	if (notify_func == NULL) {
 	    /* 
 	     * Semantics are that *MUST* be done with the data when we return,
@@ -1836,10 +1879,12 @@ libcmib_LTX_writev_complete_notify_func(CMtrans_services svc,
 	write_t = end - start;
     
 	start = getlocaltime();
-	scd->infolist[scd->infocount].mrlist = regblocks(scd->sd, tmp_iov, iovcnt,
-	                                                 IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE
-	                                                 |IBV_ACCESS_REMOTE_READ,
-	                                                 &scd->infolist[scd->infocount].mrlen);
+	if (!can_reuse_mapping) {
+	    scd->infolist[scd->infocount].mrlist = regblocks(scd->sd, tmp_iov, iovcnt,
+							     IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE
+							     |IBV_ACCESS_REMOTE_READ,
+							     &scd->infolist[scd->infocount].mrlen);
+	}
 	scd->infolist[scd->infocount].notify_func = notify_func;
 	scd->infolist[scd->infocount].notify_client_data = notify_client_data;
 	end = getlocaltime();
