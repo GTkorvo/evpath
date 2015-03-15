@@ -1824,7 +1824,7 @@ libcmib_LTX_writev_complete_notify_func(CMtrans_services svc,
 		int i;
 		for(i=0; i < last_write_request->mrlen; i++) {
 		    if ((iov[i].iov_len != last_write_request->wr->sg_list[i].length) ||
-			(iov[i].iov_base != last_write_request->wr->sg_list[i].addr)) {
+			(int64_from_ptr(iov[i].iov_base) != last_write_request->wr->sg_list[i].addr)) {
 			can_reuse_mapping = 0;
 			svc->trace_out(scd->sd->cm, "CMIB already mapped data, doesn't match write, buf %d, %p vs. %p, %d vs. %d",
 				       i, iov[i].iov_base, last_write_request->wr->sg_list[i].addr, iov[i].iov_len, last_write_request->wr->sg_list[i].length);
