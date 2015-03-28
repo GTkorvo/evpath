@@ -119,6 +119,7 @@ static pid_t subproc_proc = 0;
 int quiet = 1;
 static int no_fork = 0;
 void(*on_exit_handler)() = NULL;
+static int doing_ssh = 0;
 
 static void
 fail_and_die(int signal)
@@ -161,7 +162,7 @@ run_subprocess(char **args)
 	/* I'm the child */
 	execv(args[0], args);
     }
-    if(count++ > 0) usleep(100000);  /* don't go too fast */
+    if((count++ > 0) && doing_ssh) usleep(500000);  /* don't go too fast */
     return child;
 #endif
 }
@@ -313,6 +314,7 @@ main(int argc, char **argv)
 	        subproc_args[start_subproc_arg_count+2] = "-p";
 	        subproc_args[start_subproc_arg_count+3] = ssh_port;
 	    }
+	    doing_ssh++;
 	    subproc_args[cur_subproc_arg] = NULL;
 	    argv++; argc--;
 	} else if (argv[1][1] == '-') {
