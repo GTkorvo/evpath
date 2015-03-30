@@ -8,7 +8,7 @@ ENDIF()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "cercs_env, dill, atl, ffs")
-
+set(CPACK_RPM_PACKAGE_REQUIRES "cercs_env, dill, atl, ffs")
 
 include(CheckFunctionExists)
 include(CheckIncludeFiles)
