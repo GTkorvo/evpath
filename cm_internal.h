@@ -538,3 +538,4 @@ extern void INT_CMinstall_perf_upcall(CManager cm, CMperf_upcall upcall);
 extern attr_list INT_CMtest_transport(CMConnection conn, attr_list how);
 extern void INT_CMConnection_wait_for_pending_write(CMConnection conn);
 extern EVstone INT_EVexecuting_stone(CManager cm);
+extern void wait_for_pending_write(CMConnection conn);

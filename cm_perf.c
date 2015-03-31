@@ -623,7 +623,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	memcpy(write_vec, tmp_vec, sizeof(write_vec[0]) * (vecs + 2));
 	for (count = 0; count < vecs; count++) {
 	    /* On each iteration, increment the write base for each buffer by 1 */
-	    write_vec[count+1].iov_base += i;
+//	    write_vec[count+1].iov_base += i;
 	}
 	write_data = malloc(sizeof(struct _free_struct));
 	write_data->write_vec = write_vec;
@@ -644,6 +644,9 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	if (actual != 1) {
 	    free(tmp_vec);
 	    return NULL;
+	}
+	if (conn->write_pending) {
+	    wait_for_pending_write(conn);
 	}
     }
     ((int*)header)[1] = 0 | (CMPerfTestEnd<<24);
