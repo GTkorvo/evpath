@@ -1185,7 +1185,7 @@ handle_request_buffer_event(listen_struct_p lsp, NNTI_status_t *wait_status)
 	ncd = ncd->next;
     }
     if ((cm->message_type <= 0) || (cm->message_type > CMNNTI_LAST_MSG_TYPE)) {
-	printf("BAD INCOMING SHORT MESSAGE!\n");
+        printf("BAD INCOMING SHORT MESSAGE! (value was %d)\n", cm->message_type);
 	exit(1);
     }
     switch (cm->message_type){
