@@ -45,9 +45,9 @@ configure_file(transport_test.pl transport_test.pl COPYONLY)
 configure_file(test_spec test_spec COPYONLY)
 file (WRITE "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
 "%macro = (\n"
-"        basic_size_list  => [ \"size:20 vectors:1 msg_count:10\",\n"
+"        basic_size_list  => [ \"size:24 vectors:1 msg_count:10\",\n"
 "			      \"size:102400 vectors:1 msg_count:3\" ],\n"
-"        tiny_size_list  => [ \"size:20 vectors:1 msg_count:10 \"],\n"
+"        tiny_size_list  => [ \"size:24 vectors:1 msg_count:10 \"],\n"
 "	all_read_buffer_styles  => [ \"take_receive_buffer:0\", \"take_receive_buffer:1\" ],\n"
 "	all_write_buffer_styles  => [ \"reuse_write_buffers:0\", \"reuse_write_buffers:1\" ],\n"
 "      );\n")

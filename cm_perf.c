@@ -410,7 +410,7 @@ INT_CMprobe_bandwidth(CMConnection conn, long size, attr_list attrs)
 
     cond = INT_CMCondition_get(conn->cm, conn);
 
-    if (size < 20) size = 20;
+    if (size < 24) size = 24;
     if (repeat_count < 10) repeat_count = 10;
     if (max_block_size == 0) {
 	char *new_block = malloc(size);
@@ -544,10 +544,10 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	printf("Stupid vecs value in CMtest_transport, %d\n", vecs);
 	return 0;
     }
-    if (((float)size / (float) vecs) < 20.0) {
+    if (((float)size / (float) vecs) < 24.0) {
       vecs = 1;
-      if (size < 20) {
-	size = 20;
+      if (size < 24) {
+	size = 24;
       }
     }
     get_int_attr(how, CM_TRANS_TEST_VERBOSE, &verbose);
@@ -878,7 +878,7 @@ INT_CMregressive_probe_bandwidth(CMConnection conn, long size, attr_list attrs)
     double covXY=0.0, cofXY=0.0;
     struct FFSEncodeVec tmp_vec[1];
 
-    if (size < 20) size = 20;
+    if (size < 24) size = 24;
 
     if (attrs != NULL) {
 	get_int_attr(attrs, CM_REBWM_RLEN, &N);
