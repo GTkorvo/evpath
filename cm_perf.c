@@ -544,8 +544,11 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	printf("Stupid vecs value in CMtest_transport, %d\n", vecs);
 	return 0;
     }
-    if (((float)size / (float) vecs) < 16.0) {
-	size = vecs * 16;  /* minimum */
+    if (((float)size / (float) vecs) < 20.0) {
+      vecs = 1;
+      if (size < 20) {
+	size = 20;
+      }
     }
     get_int_attr(how, CM_TRANS_TEST_VERBOSE, &verbose);
     get_int_attr(how, CM_TRANS_TEST_REPEAT, &repeat_count);
@@ -602,7 +605,11 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 		    ((int*)tmp_vec[count+1].iov_base)[j] = lrand48();
 		}
 	    }
-	    tmp_vec[1].iov_len -= tmp_vec[0].iov_len;
+	    if (tmp_vec[1].iov_len > tmp_vec[0].iov_len) {
+	      tmp_vec[1].iov_len -= tmp_vec[0].iov_len;
+	    } else {
+	      tmp_vec[1].iov_len = 1;  /* just so there's something */
+	    }
 	}
 	tmp_vec[0].iov_base = malloc(5 * sizeof(int)); /* body header */
 	((int*)tmp_vec[0].iov_base)[0] = 0x434d5000;
