@@ -1180,7 +1180,7 @@ INT_CMConnection_dereference(CMConnection conn)
 	return;
     }
     if (conn->ref_count < 0) {
-	CMtrace_out(conn->cm, CMFreeVerbose, "CM - connection reference count less than 0, conn %p\n", conn);
+      //	CMtrace_out(conn->cm, CMFreeVerbose, "CM - connection reference count less than 0, conn %p\n", conn);
 	return;   /*  BAD! */
     }
     CMtrace_out(conn->cm, CMFreeVerbose, "CM - Shut down connection %p\n",
