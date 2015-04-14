@@ -168,6 +168,9 @@
 /* Set to 1 if NNTI libraries and include file are found */
 #cmakedefine NNTI_FOUND
 
+/* Set to 1 if NVML libraries and include file are found */
+#cmakedefine NVML_FOUND
+
 /* Set to 1 if CM should default to CMSelfFormats */
 #define CM_SELF_FORMATS @CM_SELF_FORMATS@
 

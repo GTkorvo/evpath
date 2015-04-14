@@ -21,6 +21,11 @@
 #ifdef HAVE_MAC_SYSCTL
 #include <sys/types.h>
 #include <sys/sysctl.h>
+#include <sys/socketvar.h>
+#include <netinet/ip.h>
+#include <netinet/ip_var.h>
+#include <netinet/tcp.h>
+#include <netinet/tcp_var.h>
 #endif
 
 #ifdef HAVE_UNAME
@@ -160,6 +165,54 @@ unsigned long total_jiffies_func ( void ) {
           wio_jiffies + irq_jiffies + sirq_jiffies; 
 }   
 
+void cpu_and_core_usage_func (double usage[])
+{
+   char *p;
+   int n, numcores, i;
+   numcores = num_cpustates_func();
+   n = numcores + 1;
+   unsigned long user_jiffies[n], last_user_jiffies[n],  nice_jiffies[n], last_nice_jiffies[n], system_jiffies[n], last_system_jiffies[n], idle_jiffies[n], last_idle_jiffies[n],  wio_jiffies[n], last_wio_jiffies[n], irq_jiffies[n], last_irq_jiffies[n], sirq_jiffies[n], last_sirq_jiffies[n], delta_busy[n], delta_total[n];
+      sensor_slurp proc_stat = { "/proc/stat" };
+   p = update_file(&proc_stat);
+   p = skip_token(p);
+   p = skip_whitespace(p);
+   for(i=0;i<n;++i)
+   {
+	user_jiffies[i] = (unsigned int)strtod( p, &p );
+	p = skip_whitespace(p);
+	nice_jiffies[i] = (unsigned int)strtod( p, &p );
+	p = skip_whitespace(p);
+	system_jiffies[i] = (unsigned int)strtod( p , &p );
+	p = skip_whitespace(p);
+	idle_jiffies[i] = (unsigned int)strtod( p , &p );
+	p = skip_whitespace(p);
+	wio_jiffies[i] = (unsigned int)strtod( p , &p );
+	p = skip_whitespace(p);
+	irq_jiffies[i] = (unsigned int)strtod( p , &p );
+	p = skip_whitespace(p);
+	sirq_jiffies[i] = (unsigned int)strtod( p , &p );
+	p = skip_whitespace(p);
+	delta_busy[i] = (user_jiffies[i] - last_user_jiffies[i]) + (nice_jiffies[i] - last_nice_jiffies[i]) + (system_jiffies[i] - last_system_jiffies[i]);
+	delta_total[i] = delta_busy[i] + (idle_jiffies[i] - last_idle_jiffies[i]) + (wio_jiffies[i] - last_wio_jiffies[i]) + (irq_jiffies[i] - last_irq_jiffies[i]) + (sirq_jiffies[i] - last_sirq_jiffies[i]);
+	usage[i] = (double) delta_busy[i] / (double) delta_total[i] ;
+	last_user_jiffies[i] = user_jiffies[i];
+	last_nice_jiffies[i] = nice_jiffies[i];
+	last_system_jiffies[i] = system_jiffies[i];
+	last_idle_jiffies[i] = idle_jiffies[i];
+	last_wio_jiffies[i] = wio_jiffies[i];
+	last_irq_jiffies[i] = irq_jiffies[i];
+	last_sirq_jiffies[i] = sirq_jiffies[i];
+	while (strncmp(p,"cpu",3)) {
+	p = skip_token(p);
+	p = skip_whitespace(p);
+	}
+	p = skip_token(p);
+        p = skip_whitespace(p);
+
+   }
+	
+}
+
 double cpu_user_func ( void )
 {
     char *p;
@@ -167,7 +220,7 @@ double cpu_user_func ( void )
     static double last_user_jiffies, last_total_jiffies;
     double user_jiffies, total_jiffies, diff;
    
-	sensor_slurp proc_stat    = { "/proc/stat" };
+      sensor_slurp proc_stat    = { "/proc/stat" };
     p = update_file(&proc_stat);
 
     p = skip_token(p);
@@ -194,7 +247,7 @@ double cpu_nice_func ( void )
     static double last_nice_jiffies, last_total_jiffies;
     double nice_jiffies, total_jiffies, diff;
     
-	sensor_slurp proc_stat    = { "/proc/stat" };
+      sensor_slurp proc_stat    = { "/proc/stat" };
     p = update_file(&proc_stat);
  
     p = skip_token(p);
@@ -222,7 +275,7 @@ double cpu_system_func ( void )
     static double last_system_jiffies,  system_jiffies,
 	last_total_jiffies, total_jiffies, diff;
  
-	sensor_slurp proc_stat    = { "/proc/stat" };
+      sensor_slurp proc_stat    = { "/proc/stat" };
     p = update_file(&proc_stat);
     p = skip_token(p);
     p = skip_token(p);
@@ -258,8 +311,8 @@ double cpu_idle_func ( void )
     static double val; 
     static double last_idle_jiffies,  idle_jiffies,
 	last_total_jiffies, total_jiffies, diff;
-									  
-	sensor_slurp proc_stat    = { "/proc/stat" };
+									   
+      sensor_slurp proc_stat    = { "/proc/stat" };
     p = update_file(&proc_stat);
 		      
     p = skip_token(p);
@@ -279,6 +332,232 @@ double cpu_idle_func ( void )
     last_total_jiffies = total_jiffies;
     return val; 
 }
+
+/**************NET FUNCTIONS*****************/
+long received_bytes(char *interface)
+{
+	static long r_bytes=0;
+#ifdef HAVE_MAC_SYSCTL
+	char *buf = NULL, *lim, *next;
+	static int mib[6];
+  	size_t mlen,vlen;
+	struct if_msghdr *ifm;
+	unsigned int ifindex;
+  	mib[0] = CTL_NET;
+  	mib[1] = PF_ROUTE;
+	mib[2] = 0;
+	mib[3] = 0;
+	mib[4] = NET_RT_IFLIST;
+	mib[5] = 0;
+	
+	mlen = 6;
+	ifindex = if_nametoindex(interface);
+	sysctl(mib,mlen,NULL,&vlen,NULL,0);
+	buf = malloc(vlen);
+	sysctl(mib,mlen,buf,&vlen,NULL,0);
+	lim = buf+vlen;
+	for(next = buf; next < lim; )
+	{	
+		ifm = (struct if_msghdr *)next;
+		next += ifm->ifm_msglen;
+	//	printf("Index %d, ifm index %d\n",ifindex,ifm->ifm_index);
+	//	printf("ibytes %ld\n",ifm->ifm_data.ifi_ibytes);
+		if(ifindex == ifm->ifm_index)
+		{
+			//printf("Correct interface\n");
+			r_bytes = (long) ifm->ifm_data.ifi_ibytes;
+			break;
+		}
+	}
+	//printf("Received bytes %ld\n",r_bytes);
+	free(buf);
+	
+#else
+	char *temp_if;
+	char *p;
+	if(interface == NULL)
+	   temp_if = strdup("eth0");
+	else
+	   temp_if = strdup((const char *)interface);
+	sensor_slurp proc_net = { "/proc/net/dev" };
+	p = update_file(&proc_net);
+	while (p && strncmp(p,temp_if,strlen(temp_if)))
+	{
+		p = skip_token(p);
+		p = skip_whitespace(p);
+	}
+
+	p = skip_token(p);
+	p = skip_whitespace(p);
+	r_bytes = strtol( p ,NULL,10);
+	free(temp_if);
+#endif // end HAVE_MAC_SYSCTL
+	return r_bytes;
+}
+
+long sent_bytes(char *interface)
+{
+	long s_bytes;
+#ifdef HAVE_MAC_SYSCTL
+
+	char *buf = NULL, *lim, *next;
+	static int mib[6];
+  	size_t mlen,vlen;
+	struct if_msghdr *ifm;
+	unsigned int ifindex;
+  	mib[0] = CTL_NET;
+  	mib[1] = PF_ROUTE;
+	mib[2] = 0;
+	mib[3] = 0;
+	mib[4] = NET_RT_IFLIST;
+	mib[5] = 0;
+	
+	mlen = 6;
+	ifindex = if_nametoindex(interface);
+	sysctl(mib,mlen,NULL,&vlen,NULL,0);
+	buf = malloc(vlen);
+	sysctl(mib,mlen,buf,&vlen,NULL,0);
+	lim = buf+vlen;
+	for(next = buf; next < lim; )
+	{	
+		ifm = (struct if_msghdr *)next;
+		next += ifm->ifm_msglen;
+		if(ifindex == ifm->ifm_index)
+		{
+		//	printf("Correct interface\n");
+			s_bytes = (long) ifm->ifm_data.ifi_obytes;
+			break;
+		}
+	}
+//	printf("Sent bytes %ld\n",s_bytes);
+	free(buf);
+#else
+
+        char *temp_if;
+        char *p;
+	int  i=0;
+        if(interface == NULL)
+           temp_if = strdup("eth0");
+        else
+           temp_if = strdup((const char *)interface);
+        sensor_slurp proc_net = { "/proc/net/dev" };
+        p = update_file(&proc_net);
+	while (p && strncmp(p,temp_if,strlen(temp_if)))
+        {
+                p = skip_token(p);
+                p = skip_whitespace(p);
+        }
+	while(i <= 8) {
+	 	p = skip_token(p);
+		p = skip_whitespace(p);
+		++i;
+	}
+	s_bytes = strtol (p, NULL,10);
+	free(temp_if);
+#endif // end HAVE_MAC_SYSCTL
+	return s_bytes;
+	
+	
+}
+/* 
+ * This function returns the bandwidth of the network(in bits per second) as sampled over a certain window of time.
+ * stage can be "start" where the network sampling begins, and at stage end the monitored network 
+ * bandwidth is returned. On OS X the two calls have to be atleast 425 microseconds apart.
+ * */
+
+double net_bw(char *interface, char *stage)
+{
+	static long old_s_bytes, new_s_bytes, old_r_bytes, new_r_bytes, start_time, end_time;
+	long s_bytes, r_bytes;
+	struct timeval t;
+	double net_bw;
+#ifdef HAVE_MAC_SYSCTL
+	char *buf = NULL, *lim, *next;
+	static int mib[6];
+  	size_t mlen,vlen;
+	struct if_msghdr *ifm;
+	unsigned int ifindex;
+  	mib[0] = CTL_NET;
+  	mib[1] = PF_ROUTE;
+	mib[2] = 0;
+	mib[3] = 0;
+	mib[4] = NET_RT_IFLIST;
+	mib[5] = 0;
+	
+	mlen = 6;
+	ifindex = if_nametoindex(interface);
+	sysctl(mib,mlen,NULL,&vlen,NULL,0);
+	buf = malloc(vlen);
+	sysctl(mib,mlen,buf,&vlen,NULL,0);
+	lim = buf+vlen;
+	for(next = buf; next < lim; )
+	{	
+		ifm = (struct if_msghdr *)next;
+		next += ifm->ifm_msglen;
+	//	printf("Index %d, ifm index %d\n",ifindex,ifm->ifm_index);
+	//	printf("ibytes %ld\n",ifm->ifm_data.ifi_ibytes);
+		if(ifindex == ifm->ifm_index)
+		{
+	//		printf("Correct interface\n");
+			r_bytes = (long) ifm->ifm_data.ifi_ibytes;
+			s_bytes = (long) ifm->ifm_data.ifi_obytes;
+			break;
+		}
+	}
+//	printf("Received bytes %ld Sent bytes %ld\n",r_bytes,s_bytes);
+	free(buf);
+	
+#else
+
+	int i=0;
+	char *temp_if;
+	char *p;
+
+	if(interface == NULL)
+		temp_if = strdup("eth0");
+	else
+		temp_if = strdup((const char*)interface);
+	sensor_slurp proc_net = { "/proc/net/dev" };
+        p = update_file(&proc_net);
+	gettimeofday(&t,NULL);
+
+        while (p && strncmp(p,temp_if,strlen(temp_if)))
+        {
+                p = skip_token(p);
+                p = skip_whitespace(p);
+        }
+	
+        p = skip_token(p);
+        p = skip_whitespace(p);
+        r_bytes = strtol( p ,NULL,10);
+	while(i <= 7) {
+                p = skip_token(p);
+                p = skip_whitespace(p);
+                ++i;
+        }
+	s_bytes = strtol (p, NULL,10);
+	free(temp_if);
+#endif // end HAVE_MAC_SYSCTL
+	if(strncmp(stage,"start",3)==0)
+	{
+		printf("Start %ld %ld \n",s_bytes,r_bytes);
+		
+		old_s_bytes = s_bytes;
+		old_r_bytes = r_bytes;
+		start_time = t.tv_sec * 1000000 + t.tv_usec;
+
+		return 0.0;
+	}
+	printf("End %ld %ld \n",s_bytes,r_bytes);
+	new_s_bytes = s_bytes;
+	new_r_bytes = r_bytes;
+	end_time = t.tv_sec * 1000000 + t.tv_usec;
+	net_bw = (double) (((new_s_bytes - old_s_bytes) + (new_r_bytes - old_r_bytes)) / (double)(end_time - start_time))*1000000*8;
+	printf("Bandwidth = %f\n",net_bw);
+	return net_bw;			
+	
+}
+
 /**************TIMING FUNCTIONS**************/
 
 double dgettimeofday( void )
@@ -385,7 +664,7 @@ double stat_loadavg_five ( void )
 #else      
     char *p;
  
-	sensor_slurp proc_loadavg = { "/proc/loadavg" };
+      sensor_slurp proc_loadavg = { "/proc/loadavg" };
     p = update_file(&proc_loadavg);
     p = skip_token(p);
     val = strtod( p, (char **)NULL);
@@ -520,7 +799,7 @@ unsigned long vm_swap_free ( void )
 #else
     char *p;
    
-	sensor_slurp proc_meminfo = { "/proc/meminfo" };
+      sensor_slurp proc_meminfo = { "/proc/meminfo" };
     p = strstr( update_file(&proc_meminfo), "SwapFree:" );
     if(p) {
 	p = skip_token(p);
@@ -638,7 +917,7 @@ void
 add_metrics_routines(stone_type stone, cod_parse_context context)
 {
     static char extern_string[] = "\
-       double    dgettimeofday();         \n	\
+       double    dgettimeofday();         \n		\
 /* number of cpus */  \n				\
        int           hw_cpus();           \n		\
 /* minimum allowed frequency in MHz */ \n	\
@@ -671,7 +950,7 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
        unsigned long    vm_swap_free();     \n";
 
     static cod_extern_entry externs[] = {
-        {"dgettimeofday", (void *) 0},	        // 0
+	{"dgettimeofday", (void *) 0},	        // 0
 	{"hw_cpus", (void *) 0},		// 1
 	{"hw_cpu_min_freq", (void *) 0},	// 2
 	{"hw_cpu_max_freq", (void *) 0},	// 3
@@ -814,7 +1093,7 @@ double mem_cached_func ( void )
     char *p;
     double val;
 
-	sensor_slurp proc_meminfo = { "/proc/meminfo" };
+      sensor_slurp proc_meminfo = { "/proc/meminfo" };
     p = strstr( update_file(&proc_meminfo), "Cached:");
     if(p) {
 	p = skip_token(p);
@@ -830,7 +1109,7 @@ double mem_buffers_func ( void )
     char *p;
     double val;
 
-	sensor_slurp proc_meminfo = { "/proc/meminfo" };
+      sensor_slurp proc_meminfo = { "/proc/meminfo" };
     p = strstr( update_file(&proc_meminfo), "Buffers:" );
     if(p) {
 	p = skip_token(p);
@@ -843,3 +1122,116 @@ double mem_buffers_func ( void )
 }
 
 */
+
+#ifdef NVML_FOUND
+#include "nvml.h"
+
+void gpu_mon_init_func()
+{
+   nvmlInit();
+}
+
+void gpu_mon_cleanup_func()
+{
+   nvmlShutdown();
+}
+
+unsigned int num_gpus_func()
+{
+   unsigned int ret;
+   nvmlDeviceGetCount(&ret);
+   return ret;
+}
+
+void gpu_utilization_func(unsigned int *gpu_util_rates)
+{
+   unsigned int num_dev, i;
+   unsigned int *util;
+   nvmlUtilization_t nvmlUtil;
+   nvmlDevice_t dev;
+   num_dev = num_gpus_func();
+ //  gpu_util_rates=(unsigned int *)malloc(sizeof(unsigned int)*num_dev);
+   for(i=0;i<num_dev;++i)
+   {
+	nvmlDeviceGetHandleByIndex(i,&dev);
+	nvmlDeviceGetUtilizationRates(dev,&nvmlUtil);
+	*(gpu_util_rates+i)=nvmlUtil.gpu;
+   }
+      
+}
+
+void gpu_free_mem_func(unsigned long long *gpu_free_mem)
+{
+   unsigned int num_dev,i;
+   nvmlDevice_t dev;
+   nvmlMemory_t mem;
+   num_dev=num_gpus_func();
+  // gpu_free_mem=(unsigned long long *)malloc(sizeof(unsigned long long)*num_dev);
+   for(i=0;i<num_dev;++i)
+   {
+	nvmlDeviceGetHandleByIndex(i,&dev);
+	nvmlDeviceGetMemoryInfo(dev,&mem);
+	*(gpu_free_mem+i)=mem.free;
+   }
+}
+
+void gpu_total_mem_func(unsigned long long *gpu_total_mem)
+{
+   unsigned int num_dev,i;
+   nvmlDevice_t dev;
+   nvmlMemory_t mem;
+   num_dev=num_gpus_func();
+ //  gpu_total_mem=(unsigned long long *)malloc(sizeof(unsigned long long)*num_dev);
+   for(i=0;i<num_dev;++i)
+   {
+        nvmlDeviceGetHandleByIndex(i,&dev);
+        nvmlDeviceGetMemoryInfo(dev,&mem);
+        *(gpu_total_mem+i)=mem.total;
+   }
+}
+
+void gpu_used_mem_func(unsigned long long *gpu_used_mem)
+{
+   unsigned int num_dev,i;
+   nvmlDevice_t dev;
+   nvmlMemory_t mem;
+   num_dev=num_gpus_func();
+ //  gpu_used_mem=(unsigned long long *)malloc(sizeof(unsigned long long)*num_dev);
+   for(i=0;i<num_dev;++i)
+   {
+        nvmlDeviceGetHandleByIndex(i,&dev);
+        nvmlDeviceGetMemoryInfo(dev,&mem);
+        *(gpu_used_mem+i)=mem.used;
+   }
+}
+
+void gpu_temp_func(unsigned int *temp)
+{
+   unsigned int num_dev,i,t;
+   nvmlDevice_t dev;
+   num_dev=num_gpus_func();
+//   temp=(unsigned int *)malloc(sizeof(unsigned int)*num_dev);
+   for(i=0;i<num_dev;++i)
+   {
+	nvmlDeviceGetHandleByIndex(i,&dev);
+	nvmlDeviceGetTemperature(dev,NVML_TEMPERATURE_GPU,&t);
+	*(temp+i)=t;
+   }
+}
+
+void gpu_power_util_func(unsigned int *power)
+{
+   unsigned int num_dev,i,p;
+   nvmlDevice_t dev;
+   num_dev=num_gpus_func();
+//   power=(unsigned int*)malloc(sizeof(unsigned int)*num_dev);
+   for(i=0;i<num_dev;++i)
+   {
+	nvmlDeviceGetHandleByIndex(i,&dev);
+	nvmlDeviceGetPowerUsage(dev,&p);
+	*(power+i)=p;
+   }
+
+}
+
+#endif
