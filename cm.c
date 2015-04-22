@@ -2574,6 +2574,9 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 					   conn->transport_data,
 					   &tmp_vec[0], 1,
 					   attrs);
+	if (actual == -1) {
+	    goto failed;
+	}
 	if (actual < conn->queued_data.rem_header_len) {
 	    conn->queued_data.rem_header_len -= actual;
 	    memmove(&conn->queued_data.rem_header[0],
@@ -2593,6 +2596,9 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 					   conn->transport_data,
 					   &tmp_vec[0], 1,
 					   attrs);
+	if (actual == -1) {
+	    goto failed;
+	}
 	if (actual < conn->queued_data.rem_attr_len) {
 	    conn->queued_data.rem_attr_len -= actual;
 	    conn->queued_data.rem_attr_base += actual;
@@ -2615,6 +2621,9 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 					   conn->transport_data,
 					   vec, vec_count,
 					   attrs);
+	if (actual == -1) {
+	    goto failed;
+	}
 	if (actual < length) {
 	    int i = 0;
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "Continued partial pending write, %d bytes sent\n", actual);
@@ -2642,6 +2651,19 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
 	printf("Not LOCKED in write queued data!\n");
     }
     cm_wake_any_pending_write(conn);
+    return;
+ failed:
+    CMtrace_out(conn->cm, CMFreeVerbose, "Calling write failed connection failed with dereference %p\n", conn);
+    CMConnection_failed(conn, 1);
+    if (conn->queued_data.buffer_to_free) {
+        cm_return_data_buf(conn->cm, conn->queued_data.buffer_to_free);
+	conn->queued_data.buffer_to_free = NULL;
+    }
+    conn->write_pending = 0;
+    conn->trans->set_write_notify(conn->trans, &CMstatic_trans_svcs, 
+				  conn->transport_data, 0);
+    cm_wake_any_pending_write(conn);
+    return;
 }
 
 static void
@@ -2864,13 +2886,13 @@ wait_for_pending_write(CMConnection conn)
 
     if ((!cl->has_thread) || (thr_thread_self() == cl->server_thread)) {
 	/* single thread working, just poll network */
-	while(conn->write_pending) {
+	while(conn->write_pending && !conn->closed) {
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, "Control list wait for conn %p\n", conn);
 	    CMcontrol_list_wait(cl);
 	}
     } else {
 	/* other thread is handling the network wait for it to wake us up */
-	while (conn->write_pending) {
+	while (conn->write_pending && !conn->closed) {
 	    int cond = INT_CMCondition_get(conn->cm, conn);
 	    add_pending_write_callback(conn, wake_pending_write, 
 				       (void*) (long)cond);
@@ -2935,6 +2957,18 @@ INT_CMwrite_raw_notify(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVec
             conn->trans->NBwritev_func(&CMstatic_trans_svcs, 
                                             conn->transport_data, 
                                             full_vec, vec_count, attrs);
+	if (actual_bytes < 0) {
+	    CMtrace_out(conn->cm, CMFreeVerbose, "Calling write failed connection failed with dereference %p\n", conn);
+	    CMConnection_failed(conn, 1);
+	    if (conn->queued_data.buffer_to_free) {
+	        cm_return_data_buf(conn->cm, conn->queued_data.buffer_to_free);
+		conn->queued_data.buffer_to_free = NULL;
+	    }
+	    conn->write_pending = 0;
+	    conn->trans->set_write_notify(conn->trans, &CMstatic_trans_svcs, 
+					  conn->transport_data, 0);
+	    cm_wake_any_pending_write(conn);
+	}
         if (actual_bytes < length) {
             /* copy remaining and send it later */
             if (actual_bytes < 0 ) actual_bytes = 0;
