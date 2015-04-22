@@ -86,6 +86,14 @@ static FMField simple_field_list[] =
     {NULL, NULL, 0, 0}
 };
 
+static FMField done_field_list[] =
+{
+    {"integer_field", "integer",
+     sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
+    {NULL, NULL, 0, 0},
+    {NULL, NULL, 0, 0}
+};
+
 static FMStructDescRec simple_format_list[] =
 {
     {"simple", simple_field_list, sizeof(simple_rec), NULL},
@@ -135,6 +143,14 @@ generate_record(simple_rec_ptr event)
     }
 }
 
+static int done=0;
+static
+void
+done_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
+	     attr_list attrs)
+{
+    done++;
+}
 static int msg_count = 0;
 
 static
@@ -145,7 +161,6 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
     simple_rec_ptr event = vevent;
     long sum = 0, scan_sum = 0;
     (void)cm;
-    (void)conn;
     sum += event->integer_field % 100;
     sum += event->short_field % 100;
     sum += event->long_field % 100;
@@ -177,6 +192,11 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
 	if (quiet <= 0) {
 	    printf("message count = %d\n", *((int *) client_data));
 	}
+	if (msg_count == MSG_COUNT) {
+	    int done_msg = 0;
+	    CMFormat done_format = CMregister_simple_format(cm, "done", done_field_list, sizeof(int));
+	    CMwrite(conn, done_format, &done_msg);
+	}
     }
 }
 
@@ -206,7 +226,7 @@ main(int argc, char **argv)
 {
     CManager cm;
     CMConnection conn = NULL;
-    CMFormat format;
+    CMFormat format, done_format;
     int regression_master = 1;
 
     PARSE_ARGS();
@@ -256,6 +276,8 @@ main(int argc, char **argv)
 	}
 	data = malloc(sizeof(simple_rec));
 	format = CMregister_format(cm, simple_format_list);
+	done_format = CMregister_simple_format(cm, "done", done_field_list, sizeof(int));
+	CMregister_handler(done_format, done_handler, NULL);
 	generate_record(data);
 	attrs = create_attr_list();
 	CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");
@@ -282,6 +304,9 @@ main(int argc, char **argv)
 	}
 	if (quiet <= 0) printf("Write %d messages\n", MSG_COUNT);
 	free_attr_list(attrs);
+    }
+    while(!done) {
+	CMsleep(cm, 1);
     }
     CManager_close(cm);
     return 0;
@@ -316,7 +341,7 @@ do_regression_master_test()
     char *string_list;
     char size_str[40];
     char vec_str[40];
-    CMFormat format;
+    CMFormat format, done_format;
     int done = 0;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
@@ -361,6 +386,7 @@ do_regression_master_test()
     }
     srand48(1);
 
+    done_format = CMregister_simple_format(cm, "done", done_field_list, sizeof(int));
     format = CMregister_format(cm, simple_format_list);
     CMregister_handler(format, simple_handler, &message_count);
     subproc_proc = run_subprocess(args);
