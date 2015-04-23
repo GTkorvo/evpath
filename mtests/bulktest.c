@@ -341,7 +341,7 @@ do_regression_master_test()
     char *string_list;
     char size_str[40];
     char vec_str[40];
-    CMFormat format, done_format;
+    CMFormat format;
     int done = 0;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
@@ -386,7 +386,6 @@ do_regression_master_test()
     }
     srand48(1);
 
-    done_format = CMregister_simple_format(cm, "done", done_field_list, sizeof(int));
     format = CMregister_format(cm, simple_format_list);
     CMregister_handler(format, simple_handler, &message_count);
     subproc_proc = run_subprocess(args);
