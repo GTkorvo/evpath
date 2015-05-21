@@ -1489,7 +1489,7 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     char *data;
     char *ptr;
     int i, write_size = 0;
-    int err;
+    int err = NNTI_OK;
     long register_size = 0;
     nnti_message_info local_message_info = malloc(sizeof(*local_message_info));
     void *packed = NULL;
