@@ -265,7 +265,7 @@ get_qual_hostname(char *buf, int len, attr_list attrs,
 	    buf[end] = 0;
 	    /* getdomainname was useless, hope that gethostbyname helps */
 	    if (host) {
-		tmp_name = (gethostbyname(buf))->h_name;
+		tmp_name = host->h_name;
 		strncpy(buf, tmp_name, len);
 	    }		
 	}
