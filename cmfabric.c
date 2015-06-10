@@ -228,6 +228,7 @@ struct response
 struct piggyback
 {
     uint32_t total_length;
+    uint32_t padding;
     char  body[4];
 };
 
@@ -259,6 +260,7 @@ int page_size = 0;
 
 typedef struct fabric_client_data {
     CManager cm;
+    CMtrans_services svc;
     struct cs_opts opts;
     struct fi_info *hints;
 
@@ -269,7 +271,6 @@ typedef struct fabric_client_data {
 
 	char *hostname;
 	int listen_port;
-	CMtrans_services svc;
 	int lid;
 	int qpn;
 	int psn;
@@ -308,17 +309,18 @@ typedef struct fabric_connection_data {
     struct fid_mr *mr;
     struct fid_ep *conn_ep;
     size_t buffer_size;
-    char *buf;
+    char *send_buf;
+    CMbuffer read_buf;
     int max_credits;
+    void *read_buffer;
+    int read_buffer_len;
+    int read_offset;
 
 	char *remote_host;
 	int remote_IP;
 	int remote_contact_port;
 	int fd;
-	void *read_buffer;
-	int read_buffer_len;
 	struct tbuffer_ *tb;    
-	fabric_client_data_ptr sd;
 	CMConnection conn;
 	struct ibv_qp *dataqp;    
 	notify isDone;
@@ -364,7 +366,7 @@ static struct ibv_send_wr * createwrlist(fabric_conn_data_ptr conn,
                                          struct iovec *iovlist,
                                          int mrlen, int *wrlen); 
 
-static int waitoncq(fabric_conn_data_ptr scd,
+static int waitoncq(fabric_conn_data_ptr fcd,
                     fabric_client_data_ptr sd,
                     CMtrans_services svc, struct ibv_cq *cq);
 
@@ -378,15 +380,6 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi);
 static int bind_ep_res(fabric_conn_data_ptr fcd);
 static void free_ep_res(fabric_conn_data_ptr fcd);
 
-
-#ifdef WSAEWOULDBLOCK
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define EAGAIN WSAEINPROGRESS
-#define EINTR WSAEINTR
-#define errno GetLastError()
-#define read(fd, buf, len) recv(fd, buf, len, 0)
-#define write(fd, buf, len) send(fd, buf, len, 0)
-#endif
 
 static atom_t CM_FD = -1;
 static atom_t CM_THIS_CONN_PORT = -1;
@@ -522,93 +515,66 @@ int fd;
 
 #endif
 
-static int internal_read_stream(CMtrans_services svc,
-                                fabric_conn_data_ptr scd,
-                                int length,
-                                unsigned char * buffer)
-{
-	//this function is called whenever we want to read
-	//from the fd
-	
-	int left;
-	int iget = 0;
-	int requested_len;
-	int lerrno;
-
-	left = length;
-	requested_len = left;
-	
-	while(left > 0)
-	{
-		iget = read(scd->fd, (char*)buffer+requested_len - left,
-		            left);
-		lerrno = errno;
-		if (iget == -1) {
-			if ((lerrno != EWOULDBLOCK) &&
-			    (lerrno != EAGAIN) &&
-			    (lerrno != EINTR)) {
-				/* serious error */
-				svc->trace_out(scd->sd->cm, "CMFABRIC iget was -1, errno is %d, returning %d for read", 
-				               lerrno, requested_len - left);
-				return iget;
-			}
-		}
-		if (iget == 0) {
-		  return -1;
-		}
-		left -= iget;
-	}
-
-	return iget;
-
-}
-
 static int internal_write_piggyback(CMtrans_services svc,
-                                    fabric_conn_data_ptr scd,
+                                    fabric_conn_data_ptr fcd,
                                     int length, struct iovec *iov, int iovcnt)
 {
-	//this function is only called if length < piggyback
-	struct control_message *msg;
-	char *point;
-	int offset = msg_offset();
-	int i;
+    //this function is only called if length < piggyback
+    struct control_message *msg;
+    char *point;
+    int offset = msg_offset();
+    int i;
 	
-	if(length >= PIGGYBACK)
-	{
-		//should never happen
-		return -1;
-	}
+    if(length >= PIGGYBACK)
+    {
+	//should never happen
+	return -1;
+    }
 
-	msg = malloc(offset + length);
-	memset(msg, 0, offset+length);
-	msg->type = msg_piggyback;
-	msg->u.pb.total_length = length + offset;
-	point = &msg->u.pb.body[0];
-	svc->trace_out(scd->sd->cm, "CMFABRIC sending piggyback msg of length %d,", 
-		       length);
+    msg = malloc(offset + length);
+    memset(msg, 0, offset+length);
+    msg->type = msg_piggyback;
+    msg->u.pb.total_length = length + offset;
+    point = &msg->u.pb.body[0];
+    svc->trace_out(fcd->fabd->cm, "CMFABRIC sending piggyback msg of length %d,", 
+		   length);
 
 	
-	for (i = 0; i < iovcnt; i++)
-	{
-		memcpy(point, iov[i].iov_base, iov[i].iov_len);
-		point += iov[i].iov_len;
-	}
-
-	if(write(scd->fd, msg, msg->u.pb.total_length) != msg->u.pb.total_length)
-	{
-		//error in writing the whole block
-		svc->trace_out(scd->sd->cm, "CMFABRIC error in writing to %d", scd->fd);
-		free(msg);
-		return -1;
+    for (i = 0; i < iovcnt; i++)
+    {
+	memcpy(point, iov[i].iov_base, iov[i].iov_len);
+	point += iov[i].iov_len;
+    }
+    
+    {
+	
+	memcpy(fcd->send_buf, msg, msg->u.pb.total_length);
+	int ret;
+	
+	ret = fi_send(fcd->conn_ep, fcd->send_buf, msg->u.pb.total_length, fi_mr_desc(fcd->mr), 0, fcd->send_buf);
+	if (ret) {
+	    FT_PRINTERR("fi_send", ret);
+	    return ret;
 	}
 	
-	free(msg);
-	return 0;
+	/* Read send queue */
+	do {
+	    struct fi_cq_entry comp;
+	    ret = fi_cq_read(fcd->scq, &comp, 1);
+	    if (ret < 0 && ret != -FI_EAGAIN) {
+		FT_PRINTERR("fi_cq_read", ret);
+		return ret;
+	    }
+	} while (ret == -FI_EAGAIN);
+    }
+    
+    free(msg);
+    return 0;
 }
 
 
 static int internal_write_response(CMtrans_services svc,
-                                   fabric_conn_data_ptr scd,
+                                   fabric_conn_data_ptr fcd,
                                    tbuffer *tb,
                                    int length,
 				   int64_t request_ID)
@@ -631,10 +597,10 @@ static int internal_write_response(CMtrans_services svc,
 		msg.u.resp.request_ID = request_ID;
 	}
 
-	iget = write(scd->fd, &msg, sizeof(struct control_message));
+	iget = write(fcd->fd, &msg, sizeof(struct control_message));
 	if(iget != sizeof(struct control_message))
 	{
-		svc->trace_out(scd->sd->cm, "CMFABRIC error in writing response to %d", scd->fd);
+		svc->trace_out(fcd->fabd->cm, "CMFABRIC error in writing response to %d", fcd->fd);
 		return -1;
 	}
 
@@ -642,7 +608,7 @@ static int internal_write_response(CMtrans_services svc,
 }
 
 static int internal_write_request(CMtrans_services svc,
-                                  fabric_conn_data_ptr scd,
+                                  fabric_conn_data_ptr fcd,
                                   int length,
     				  void *request_ID)
 {
@@ -654,11 +620,11 @@ static int internal_write_request(CMtrans_services svc,
 	msg.u.req.length = length;
 	msg.u.req.request_ID = int64_from_ptr(request_ID);
 
-	svc->trace_out(scd->sd->cm, "Doing internal write request, writing %d bytes", sizeof(struct control_message));
-	iget = write(scd->fd, &msg, sizeof(struct control_message));
+	svc->trace_out(fcd->fabd->cm, "Doing internal write request, writing %d bytes", sizeof(struct control_message));
+	iget = write(fcd->fd, &msg, sizeof(struct control_message));
 	if(iget != sizeof(struct control_message))
 	{
-		svc->trace_out(scd->sd->cm, "CMFABRIC error in writing request to %d", scd->fd);
+		svc->trace_out(fcd->fabd->cm, "CMFABRIC error in writing request to %d", fcd->fd);
 		return -1;
 	}
 
@@ -669,7 +635,7 @@ static double write_t = 0;
 static double da_t = 0;
 
 static int handle_response(CMtrans_services svc,
-                           fabric_conn_data_ptr scd,
+                           fabric_conn_data_ptr fcd,
                            struct control_message *msg)
 {
 
@@ -694,13 +660,13 @@ static int handle_response(CMtrans_services svc,
     if (write_request->notify_func) {
 	(write_request->notify_func)( write_request->notify_client_data);
     }
-    svc->wake_any_pending_write(scd->conn);
+    svc->wake_any_pending_write(fcd->conn);
     return 0;   
     
 }
 
 static void handle_request(CMtrans_services svc,
-                           fabric_conn_data_ptr scd,
+                           fabric_conn_data_ptr fcd,
                            struct control_message *msg)
 {
 	//handling the request message
@@ -716,24 +682,24 @@ static void handle_request(CMtrans_services svc,
 	tb = NULL;
 	if(tb == NULL)
 	{
-		svc->trace_out(scd->sd->cm, "Failed to get memory\n");
-		internal_write_response(svc, scd, NULL, 0, 0);
+		svc->trace_out(fcd->fabd->cm, "Failed to get memory\n");
+		internal_write_response(svc, fcd, NULL, 0, 0);
 		goto wait_on_q; 
 	}
 
-	scd->tb = tb;
+	fcd->tb = tb;
 	mr = tb->mr;
 
-	svc->set_pending_write(scd->conn);
-	internal_write_response(svc, scd, tb, req->length, req->request_ID);
+	svc->set_pending_write(fcd->conn);
+	internal_write_response(svc, fcd, tb, req->length, req->request_ID);
 
 wait_on_q:
 	//now the sender will start the data transfer. When it finishes he will 
 	//issue a notification after which the data is in memory
-	retval = waitoncq(scd, scd->sd, svc, scd->sd->recv_cq);    
+	retval = waitoncq(fcd, fcd->fabd, svc, fcd->fabd->recv_cq);    
 	if(retval)
 	{
-		svc->trace_out(scd->sd->cm, "Error while waiting\n");
+		svc->trace_out(fcd->fabd->cm, "Error while waiting\n");
 		return;     
 	}
 
@@ -741,68 +707,72 @@ wait_on_q:
 
 	do
 	{
-		svc->trace_out(scd->sd->cm, "CMFABRIC poll cq -start");    
-		/* retval = ibv_poll_cq(scd->sd->recv_cq, 1, &wc); */
-		/* svc->trace_out(scd->sd->cm, "CMFABRIC poll cq -end");     */
+		svc->trace_out(fcd->fabd->cm, "CMFABRIC poll cq -start");    
+		/* retval = ibv_poll_cq(fcd->fabdrecv_cq, 1, &wc); */
+		/* svc->trace_out(fcd->fabd->cm, "CMFABRIC poll cq -end");     */
 		/* if(retval > 0 && wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_RECV) */
 		/* { */
 		/* 	//cool beans - send completed we can go on with our life */
         
 		/* 	//issue a reccieve so we don't run out */
-		/* 	retval = ibv_post_recv(scd->dataqp, &scd->isDone.rwr,  */
-		/* 	                       &scd->isDone.badrwr); */
+		/* 	retval = ibv_post_recv(fcd->dataqp, &fcd->isDone.rwr,  */
+		/* 	                       &fcd->isDone.badrwr); */
 		/* 	if(retval) */
 		/* 	{ */
-		/* 		scd->sd->svc->trace_out(scd->sd->cm, "Cmfabric unable to post recv %d\n", retval); */
+		/* 		fcd->fabdsvc->trace_out(fcd->fabd->cm, "Cmfabric unable to post recv %d\n", retval); */
 		/* 	} */
     
 		/* 	break;       */
 		/* } */
 		/* else */
 		/* { */
-		/* 	svc->trace_out(scd->sd->cm, "Error polling for write completion\n"); */
+		/* 	svc->trace_out(fcd->fabd->cm, "Error polling for write completion\n"); */
 		/* 	break;       */
 		/* } */
 
-		/* svc->trace_out(scd->sd->cm, "CMFABRIC poll cq looping");     */
+		/* svc->trace_out(fcd->fabd->cm, "CMFABRIC poll cq looping");     */
     
 	}while(1);
 
-	scd->read_buffer = tb->buf;
-	svc->trace_out(scd->sd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", req->length, ((unsigned char*)tb->buf->buffer)[0], ((unsigned char*)tb->buf->buffer)[1], ((unsigned char*)tb->buf->buffer)[2], ((unsigned char*)tb->buf->buffer)[3], ((unsigned char*)tb->buf->buffer)[4], ((unsigned char*)tb->buf->buffer)[5], ((unsigned char*)tb->buf->buffer)[6], ((unsigned char*)tb->buf->buffer)[7], ((unsigned char*)tb->buf->buffer)[8], ((unsigned char*)tb->buf->buffer)[9], ((unsigned char*)tb->buf->buffer)[10], ((unsigned char*)tb->buf->buffer)[11], ((unsigned char*)tb->buf->buffer)[12], ((unsigned char*)tb->buf->buffer)[13], ((unsigned char*)tb->buf->buffer)[14], ((unsigned char*)tb->buf->buffer)[15]);
-	scd->read_buffer_len = req->length;
-	svc->trace_out(scd->sd->cm, "CMFABRIC handle_request completed");    
-	svc->wake_any_pending_write(scd->conn);
+	fcd->read_buffer = tb->buf;
+	svc->trace_out(fcd->fabd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", req->length, ((unsigned char*)tb->buf->buffer)[0], ((unsigned char*)tb->buf->buffer)[1], ((unsigned char*)tb->buf->buffer)[2], ((unsigned char*)tb->buf->buffer)[3], ((unsigned char*)tb->buf->buffer)[4], ((unsigned char*)tb->buf->buffer)[5], ((unsigned char*)tb->buf->buffer)[6], ((unsigned char*)tb->buf->buffer)[7], ((unsigned char*)tb->buf->buffer)[8], ((unsigned char*)tb->buf->buffer)[9], ((unsigned char*)tb->buf->buffer)[10], ((unsigned char*)tb->buf->buffer)[11], ((unsigned char*)tb->buf->buffer)[12], ((unsigned char*)tb->buf->buffer)[13], ((unsigned char*)tb->buf->buffer)[14], ((unsigned char*)tb->buf->buffer)[15]);
+	fcd->read_buffer_len = req->length;
+	svc->trace_out(fcd->fabd->cm, "CMFABRIC handle_request completed");    
+	svc->wake_any_pending_write(fcd->conn);
 }
 
 int handle_piggyback(CMtrans_services svc,
-                      fabric_conn_data_ptr scd,
+                      fabric_conn_data_ptr fcd,
                       struct control_message *msg)
 {
 	// read rest and deliver up
 	int offset = msg_offset();
 	int iget = 0;
 	
-	CMbuffer cb = svc->get_data_buffer(scd->sd->cm, msg->u.pb.total_length - offset);
-	memcpy(cb->buffer, &(msg->u.pb.body[0]), sizeof(struct control_message)-offset);
-	int left = msg->u.pb.total_length - sizeof(struct control_message);
-	char *buffer = (char*)cb->buffer + sizeof(struct control_message)- offset;
-	iget = internal_read_stream(svc, scd, left, (unsigned char *)buffer);
-	if(iget < 0)
-	{
-		svc->return_data_buffer(scd->sd->cm, cb);
-		svc->connection_close(scd->conn);
-		return -1;
-	}
-	svc->trace_out(scd->sd->cm, "CMFABRIC received piggyback msg of length %d, added to read_buffer", 
-		       scd->read_buffer_len);
+	fcd->read_buffer_len = msg->u.pb.total_length - offset;
+	svc->trace_out(fcd->fabd->cm, "CMFABRIC received piggyback msg of length %d, added to read_buffer", 
+		       fcd->read_buffer_len);
 
-	scd->read_buffer_len = msg->u.pb.total_length - offset;
-	scd->read_buffer = cb;
+	fcd->read_buffer = fcd->read_buf;
+	fcd->read_offset = offset;
 	return 0;
    
 }
 
+
+void cq_readerr(struct fid_cq *cq, char *cq_str)
+{ 
+	struct fi_cq_err_entry cq_err;
+	const char *err_str;
+	int ret;
+
+	ret = fi_cq_readerr(cq, &cq_err, 0);
+	if (ret < 0)
+		FT_PRINTERR("fi_cq_readerr", ret);
+
+	err_str = fi_cq_strerror(cq, cq_err.prov_errno, cq_err.err_data, NULL, 0);
+	fprintf(stderr, "%s %s (%d)\n", cq_str, err_str, cq_err.prov_errno);
+}
 
 void
 CMFABRIC_data_available(transport_entry trans, CMConnection conn)
@@ -810,60 +780,70 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 	int iget;
 	fabric_client_data_ptr sd = (fabric_client_data_ptr) trans->trans_data;
 	CMtrans_services svc = sd->svc;
-	struct control_message msg;
+	struct control_message *msg;
 	double start =0;
-	fabric_conn_data_ptr scd;
+	fabric_conn_data_ptr fcd;
+	int ret;
     
 	da_t = getlocaltime();
     
-	scd = (fabric_conn_data_ptr) svc->get_transport_data(conn);
+	fcd = (fabric_conn_data_ptr) svc->get_transport_data(conn);
 
 	start = getlocaltime();    
 
-	iget = internal_read_stream(svc, scd, sizeof(struct control_message),
-	                            (unsigned char*)&msg);
-	if(iget <= 0)
-	{
-	    svc->trace_out(scd->sd->cm, "CMFABRIC iget is %d, dying\n", 
-			   iget);
+	do {
+	    struct fi_cq_entry comp;
+		ret = fi_cq_read(fcd->rcq, &comp, 1);
+		if (ret < 0 && ret != -FI_EAGAIN) {
+			if (ret == -FI_EAVAIL) {
+				cq_readerr(fcd->rcq, "rcq");
+			} else {
+				FT_PRINTERR("fi_cq_read", ret);
+				return;
+			}
+		}
+	} while (ret == -FI_EAGAIN);
 
-	    svc->connection_close(conn);
-	    return;
-	}
+	fcd = (fabric_conn_data_ptr) svc->get_transport_data(conn);
+	msg = (struct control_message *) fcd->read_buf->buffer;
+	svc->trace_out(fcd->fabd->cm, "CMFABRIC data available type = %s(%d)", 
+		       msg_string[msg->type], msg->type);
 
-	svc->trace_out(scd->sd->cm, "CMFABRIC data available type = %s(%d)", 
-		       msg_string[msg.type], msg.type);
-
-	switch(msg.type) {
+	switch(msg->type) {
 	case msg_piggyback:
-		iget = handle_piggyback(svc, scd, &msg);
+		iget = handle_piggyback(svc, fcd, msg);
 		if(iget == 0)
 		{
-		    CMbuffer tmp = scd->read_buffer;
+		    CMbuffer tmp = fcd->read_buf;
 		    trans->data_available(trans, conn);
 		    svc->return_data_buffer(trans->cm, tmp);
+		    fcd->read_buf = fcd->fabd->svc->get_data_buffer(trans->cm, MAX(fcd->buffer_size, sizeof(uint64_t)));
 		}
 		break;
 	case msg_response:
-		handle_response(svc, scd, &msg);
+		handle_response(svc, fcd, msg);
 		break;
 	case msg_request:
-		handle_request(svc, scd, &msg);
-		if(scd->isDone.done == 0)
+		handle_request(svc, fcd, msg);
+		if(fcd->isDone.done == 0)
 		{
 			trans->data_available(trans, conn);
 		}
 		else
 		{
-			svc->trace_out(scd->sd->cm, "Cmfabric data available error in the protocol");
+			svc->trace_out(fcd->fabd->cm, "Cmfabric data available error in the protocol");
 		}
 		break;
 	default:
-		printf("Bad message type %d\n", msg.type);
+		printf("Bad message type %d\n", msg->type);
 	}
 
 	//returning control to CM
-	svc->trace_out(scd->sd->cm, "CMFABRIC data_available returning");
+	ret = fi_recv(fcd->conn_ep, fcd->read_buf->buffer, fcd->buffer_size, fi_mr_desc(fcd->mr), 0, fcd->read_buf->buffer);
+	if (ret)
+		FT_PRINTERR("fi_recv", ret);
+
+	svc->trace_out(fcd->fabd->cm, "CMFABRIC data_available returning");
 }
 
 static int server_connect(fabric_conn_data_ptr fcd);
@@ -874,80 +854,87 @@ static int server_connect(fabric_conn_data_ptr fcd);
 static void
 fabric_accept_conn(void *void_trans, void *void_conn_sock)
 {
-	transport_entry trans = (transport_entry) void_trans;
-	int conn_sock = (int) (long) void_conn_sock;
-	fabric_client_data_ptr fabd = (fabric_client_data_ptr) trans->trans_data;
-	CMtrans_services svc = fabd->svc;
-	fabric_conn_data_ptr fabric_conn_data;
-	int sock;
-	struct sockaddr sock_addr;
-	unsigned int sock_len = sizeof(sock_addr);
-	int int_port_num;
-	struct linger linger_val;
-	int sock_opt_val = 1;
+    transport_entry trans = (transport_entry) void_trans;
+    int conn_sock = (int) (long) void_conn_sock;
+    fabric_client_data_ptr fabd = (fabric_client_data_ptr) trans->trans_data;
+    CMtrans_services svc = fabd->svc;
+    fabric_conn_data_ptr fcd;
+    int fd, ret;
+    struct sockaddr sock_addr;
+    unsigned int sock_len = sizeof(sock_addr);
+    int int_port_num;
+    struct linger linger_val;
+    int sock_opt_val = 1;
 
-	int delay_value = 1;
-	CMConnection conn;
-	attr_list conn_attr_list = NULL;
-	struct ibparam param, remote_param;
+    int delay_value = 1;
+    CMConnection conn;
+    attr_list conn_attr_list = NULL;
+    struct ibparam param, remote_param;
 
-	//ib stuff
-	fabric_conn_data = create_fabric_conn_data(svc);
-	fabric_conn_data->fabd = fabd;
+    //ib stuff
+    fcd = create_fabric_conn_data(svc);
+    fcd->fabd = fabd;
 
-	server_connect(fabric_conn_data);
-	//initialize the dataqp that will be used for all RC comms
+    server_connect(fcd);
+    //initialize the dataqp that will be used for all RC comms
 
-	conn_attr_list = create_attr_list();
-	conn = svc->connection_create(trans, fabric_conn_data, conn_attr_list);
-	fabric_conn_data->conn = conn;
+    conn_attr_list = create_attr_list();
+    conn = svc->connection_create(trans, fcd, conn_attr_list);
+    fcd->conn = conn;
 
-	add_attr(conn_attr_list, CM_FD, Attr_Int4,
-	         (attr_value) (long)sock);
+    sock_len = sizeof(sock_addr);
+    memset(&sock_addr, 0, sock_len);
+//    getsockname(sock, (struct sockaddr *) &sock_addr, &sock_len);
+//    int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
+    add_attr(conn_attr_list, CM_THIS_CONN_PORT, Attr_Int4,
+	     (attr_value) (long)int_port_num);
 
-	sock_len = sizeof(sock_addr);
-	memset(&sock_addr, 0, sock_len);
-	getsockname(sock, (struct sockaddr *) &sock_addr, &sock_len);
-	int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
-	add_attr(conn_attr_list, CM_THIS_CONN_PORT, Attr_Int4,
-	         (attr_value) (long)int_port_num);
+    memset(&sock_addr, 0, sizeof(sock_addr));
+    sock_len = sizeof(sock_addr);
+    /* if (getpeername(sock, &sock_addr, &sock_len) == 0) { */
+    /* 	int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port); */
+    /* 	add_attr(conn_attr_list, CM_PEER_CONN_PORT, Attr_Int4, */
+    /* 		 (attr_value) (long)int_port_num); */
+    /* 	fcd->remote_IP = ntohl(((struct sockaddr_in *) &sock_addr)->sin_addr.s_addr); */
+    /* 	add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4, */
+    /* 		 (attr_value) (long)fcd->remote_IP); */
+    /* 	if (sock_addr.sa_family == AF_INET) { */
+    /* 	    struct hostent *host; */
+    /* 	    struct sockaddr_in *in_sock = (struct sockaddr_in *) &sock_addr; */
+    /* 	    host = gethostbyaddr((char *) &in_sock->sin_addr, */
+    /* 				 sizeof(struct in_addr), AF_INET); */
+    /* 	    if (host != NULL) { */
+    /* 		fcd->remote_host = strdup(host->h_name); */
+    /* 		add_attr(conn_attr_list, CM_PEER_HOSTNAME, Attr_String, */
+    /* 			 (attr_value) strdup(host->h_name)); */
+    /* 	    } */
+    /* 	} */
+    /* } */
+    if (fcd->remote_host != NULL) {
+	svc->trace_out(fabd->cm, "Accepted CMFABRIC socket connection from host \"%s\"",
+		       fcd->remote_host);
+    } else {
+	svc->trace_out(fabd->cm, "Accepted CMFABRIC socket connection from UNKNOWN host");
+    }
 
-	memset(&sock_addr, 0, sizeof(sock_addr));
-	sock_len = sizeof(sock_addr);
-	if (getpeername(sock, &sock_addr, &sock_len) == 0) {
-		int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
-		add_attr(conn_attr_list, CM_PEER_CONN_PORT, Attr_Int4,
-		         (attr_value) (long)int_port_num);
-		fabric_conn_data->remote_IP = ntohl(((struct sockaddr_in *) &sock_addr)->sin_addr.s_addr);
-		add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
-		         (attr_value) (long)fabric_conn_data->remote_IP);
-		if (sock_addr.sa_family == AF_INET) {
-			struct hostent *host;
-			struct sockaddr_in *in_sock = (struct sockaddr_in *) &sock_addr;
-			host = gethostbyaddr((char *) &in_sock->sin_addr,
-			                     sizeof(struct in_addr), AF_INET);
-			if (host != NULL) {
-				fabric_conn_data->remote_host = strdup(host->h_name);
-				add_attr(conn_attr_list, CM_PEER_HOSTNAME, Attr_String,
-				         (attr_value) strdup(host->h_name));
-			}
-		}
-	}
-	if (fabric_conn_data->remote_host != NULL) {
-		svc->trace_out(fabd->cm, "Accepted CMFABRIC socket connection from host \"%s\"",
-		               fabric_conn_data->remote_host);
-	} else {
-		svc->trace_out(fabd->cm, "Accepted CMFABRIC socket connection from UNKNOWN host");
-	}
-
-	//here we read the incoming remote contact port number. 
-	//in IB we'll extend this to include ib connection parameters
-	param.lid  = fabd->lid;
-	param.port = fabd->port;
-	param.psn  = fabd->psn;
-
+    //here we read the incoming remote contact port number. 
+    //in IB we'll extend this to include ib connection parameters
+    param.lid  = fabd->lid;
+    param.port = fabd->port;
+    param.psn  = fabd->psn;
     
-	svc->trace_out(fabd->cm, "Falling out of accept conn\n");
+    
+    if ((ret = fi_control (&fcd->rcq->fid, FI_GETWAIT, (void *) &fd))) {
+	FT_PRINTERR("fi_control(FI_GETWAIT)", ret);
+    }
+    add_attr(conn_attr_list, CM_FD, Attr_Int4,
+	     (attr_value) (long)fd);
+
+    svc->trace_out(fabd->cm, "Cmfabric Adding trans->data_available as action on fd %d", fd);
+    svc->fd_add_select(fabd->cm, fd, (select_list_func) CMFABRIC_data_available,
+		       (void *) trans, (void *) conn);
+
+    svc->trace_out(fabd->cm, "Falling out of accept conn\n");
     free_attr_list(conn_attr_list);
 }
 
@@ -973,7 +960,6 @@ fabric_service_incoming(void *void_trans, void *void_eq)
     
     info = entry.info;
     if (event == FI_CONNREQ) {
-	printf("In service incoming, calling accept ==============================\n");
 	fabric_accept_conn(void_trans, void_eq);
     } else {
 	printf("Unexpected event %d\n", event);
@@ -981,17 +967,17 @@ fabric_service_incoming(void *void_trans, void *void_eq)
 }
 
 extern void
-libcmfabric_LTX_shutdown_conn(svc, scd)
+libcmfabric_LTX_shutdown_conn(svc, fcd)
 	CMtrans_services svc;
-fabric_conn_data_ptr scd;
+fabric_conn_data_ptr fcd;
 {
-	svc->trace_out(scd->fabd->cm, "CMFABRIC shutdown_conn, removing select %d\n",
-	               scd->fd);
-	svc->fd_remove_select(scd->fabd->cm, scd->fd);
-	close(scd->fd);
-	//free(scd->remote_host);
-	//free(scd->read_buffer);
-	free(scd);
+	svc->trace_out(fcd->fabd->cm, "CMFABRIC shutdown_conn, removing select %d\n",
+	               fcd->fd);
+	svc->fd_remove_select(fcd->fabd->cm, fcd->fd);
+	close(fcd->fd);
+	//free(fcd->remote_host);
+	//free(fcd->read_buffer);
+	free(fcd);
 }
 
 
@@ -1031,7 +1017,7 @@ static int client_connect(CManager cm, CMtrans_services svc, transport_entry tra
 	fabd->opts.dst_port = malloc(10);
 	sprintf(fabd->opts.dst_port, "%d", int_port_num);
     }
-    printf("Connecting to addr, %s, port %s\n", fabd->opts.dst_addr, fabd->opts.dst_port);
+//    printf("Connecting to addr, %s, port %s\n", fabd->opts.dst_addr, fabd->opts.dst_port);
     ret = fi_getinfo(FT_FIVERSION, fabd->opts.dst_addr, fabd->opts.dst_port, 0, fabd->hints, &fi);
     if (ret) {
 	FT_PRINTERR("fi_getinfo", ret);
@@ -1158,31 +1144,7 @@ int no_more_redirect;
 		svc->trace_out(cm, "CMFABRIC transport connect to port %d", int_port_num);
 	}
 
-	printf("Doing client connect\n");
 	client_connect(cm, svc, trans, attrs, fcd);
-	{
-	    
-	    int ret;
-		fprintf(stdout, "Posting a send...\n");
-		sprintf(fcd->buf, "Hello World!"); 
-		ret = fi_send(fcd->conn_ep, fcd->buf, sizeof("Hello World!"), fi_mr_desc(fcd->mr), 0, fcd->buf);
-		if (ret) {
-			FT_PRINTERR("fi_send", ret);
-			return ret;
-		}
-
-		/* Read send queue */
-		do {
-		    struct fi_cq_entry comp;
-			ret = fi_cq_read(fcd->scq, &comp, 1);
-			if (ret < 0 && ret != -FI_EAGAIN) {
-				FT_PRINTERR("fi_cq_read", ret);
-				return ret;
-			}
-		} while (ret == -FI_EAGAIN);
-
-		fprintf(stdout, "Send completion received\n");
-	}
 /* 	/\* INET socket connection, host_name is the machine name *\/ */
 /* 	char *network_string; */
 /* 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR) { */
@@ -1288,27 +1250,30 @@ CMtrans_services svc;
 transport_entry trans;
 attr_list attrs;
 {
-	fabric_conn_data_ptr fcd = create_fabric_conn_data(svc);
-	attr_list conn_attr_list = create_attr_list();
-	CMConnection conn;
-	int sock;
+    fabric_conn_data_ptr fcd = create_fabric_conn_data(svc);
+    attr_list conn_attr_list = create_attr_list();
+    CMConnection conn;
+    int fd, ret;
 
-	fcd->fabd = trans->trans_data;
+    fcd->fabd = trans->trans_data;
 
-	if ((sock = initiate_conn(cm, svc, trans, attrs, fcd, conn_attr_list, 0)) < 0)
-		return NULL;
+    if (initiate_conn(cm, svc, trans, attrs, fcd, conn_attr_list, 0) < 0)
+	return NULL;
 
-	add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
-	         (attr_value) (long)fcd->remote_contact_port);
-	conn = svc->connection_create(trans, fcd, conn_attr_list);
-	fcd->conn = conn;
+    add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
+	     (attr_value) (long)fcd->remote_contact_port);
+    conn = svc->connection_create(trans, fcd, conn_attr_list);
+    fcd->conn = conn;
 
-	svc->trace_out(cm, "Cmfabric Adding trans->data_available as action on fd %d", sock);
-//	svc->fd_add_select(cm, sock, (select_list_func) CMFABRIC_data_available,
-//	                   (void *) trans, (void *) conn);
+    if (fi_control (&fcd->rcq->fid, FI_GETWAIT, (void *) &fd)) {
+	FT_PRINTERR("fi_control(FI_GETWAIT)", ret);
+    }
+    svc->trace_out(cm, "Cmfabric Adding trans->data_available as action on fd %d", fd);
+    svc->fd_add_select(cm, fd, (select_list_func) CMFABRIC_data_available,
+		       (void *) trans, (void *) conn);
 
 /* dump_sockinfo("initiate ", sock); */
-	return conn;
+    return conn;
 }
 
 /* 
@@ -1367,12 +1332,12 @@ libcmfabric_LTX_self_check(CManager cm, CMtrans_services svc, transport_entry tr
 }
 
 extern int
-libcmfabric_LTX_connection_eq(cm, svc, trans, attrs, scd)
+libcmfabric_LTX_connection_eq(cm, svc, trans, attrs, fcd)
 	CManager cm;
 CMtrans_services svc;
 transport_entry trans;
 attr_list attrs;
-fabric_conn_data_ptr scd;
+fabric_conn_data_ptr fcd;
 {
 
 	int int_port_num;
@@ -1400,10 +1365,10 @@ fabric_conn_data_ptr scd;
 	}
 
 	svc->trace_out(cm, "Socket Conn_eq comparing IP/ports %x/%d and %x/%d",
-	               scd->remote_IP, scd->remote_contact_port,
+	               fcd->remote_IP, fcd->remote_contact_port,
 	               requested_IP, int_port_num);
-	if ((scd->remote_IP == requested_IP) &&
-	    (scd->remote_contact_port == int_port_num)) {
+	if ((fcd->remote_IP == requested_IP) &&
+	    (fcd->remote_contact_port == int_port_num)) {
 		svc->trace_out(cm, "Socket Conn_eq returning TRUE");
 		return 1;
 	}
@@ -1437,7 +1402,7 @@ static void free_ep_res(fabric_conn_data_ptr fcd)
 	fi_close(&fcd->mr->fid);
 	fi_close(&fcd->rcq->fid);
 	fi_close(&fcd->scq->fid);
-	free(fcd->buf);
+	free(fcd->read_buf);
 }
 
 static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
@@ -1449,8 +1414,14 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 
 	fcd->buffer_size = fabd->opts.user_options & FT_OPT_SIZE ?
 	    fabd->opts.transfer_size : PIGGYBACK;
-	fcd->buf = malloc(MAX(fcd->buffer_size, sizeof(uint64_t)));
-	if (!fcd->buf) {
+	
+	fcd->read_buf = fabd->svc->get_data_buffer(fabd->cm, MAX(fcd->buffer_size, sizeof(uint64_t)));
+	if (!fcd->read_buf) {
+		perror("malloc");
+		return -1;
+	}
+	fcd->send_buf = malloc(MAX(fcd->buffer_size, sizeof(uint64_t)));
+	if (!fcd->send_buf) {
 		perror("malloc");
 		return -1;
 	}
@@ -1484,7 +1455,7 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 //		ret = -FI_EINVAL;
 //		goto err3;
 //	}
-	ret = fi_mr_reg(fabd->dom, fcd->buf, MAX(fcd->buffer_size, sizeof(uint64_t)), 
+	ret = fi_mr_reg(fabd->dom, fcd->read_buf, MAX(fcd->buffer_size, sizeof(uint64_t)), 
 			access_mode, 0, 0, 0, &fcd->mr, NULL);
 	if (ret) {
 		FT_PRINTERR("fi_mr_reg", ret);
@@ -1512,7 +1483,8 @@ err3:
 err2:
 	fi_close(&fcd->scq->fid);
 err1:
-	free(fcd->buf);
+	free(fcd->read_buf);
+	free(fcd->send_buf);
 	return ret;
 }
 
@@ -1545,7 +1517,7 @@ static int bind_ep_res(fabric_conn_data_ptr fcd)
 	}
 	
 	/* Post the first recv buffer */
-	ret = fi_recv(fcd->conn_ep, fcd->buf, fcd->buffer_size, fi_mr_desc(fcd->mr), 0, fcd->buf);
+	ret = fi_recv(fcd->conn_ep, fcd->read_buf->buffer, fcd->buffer_size, fi_mr_desc(fcd->mr), 0, fcd->read_buf->buffer);
 	if (ret)
 		FT_PRINTERR("fi_recv", ret);
 
@@ -1775,16 +1747,17 @@ libcmfabric_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport
 	return NULL;
     }
 
-    printf("name len is %d\n", (int)addrlen);
-    for(ret = 0; ret < addrlen; ret++) {
-	printf("%02x", (unsigned char) local_addr[ret]);
-    }
+//    printf("name len is %d\n", (int)addrlen);
+//    for(ret = 0; ret < addrlen; ret++) {
+//	printf("%02x", (unsigned char) local_addr[ret]);
+//    }
 
     ret = fi_control (&fd->cmeq->fid, FI_GETWAIT, (void *) &wait_sock);
     if (ret) {
 	FT_PRINTERR("fi_control(FI_GETWAIT)", ret);
     }
 
+    svc->trace_out(cm, "Cmfabric Adding fabric_service_incoming as action on fd %d", wait_sock);
     svc->fd_add_select(cm, wait_sock, fabric_service_incoming,
 		       (void *) trans, (void *) fd->listen_ep);
     {
@@ -1826,38 +1799,36 @@ struct iovec {
 #endif
 
 extern void
-libcmfabric_LTX_set_write_notify(trans, svc, scd, enable)
+libcmfabric_LTX_set_write_notify(trans, svc, fcd, enable)
 	transport_entry trans;
 CMtrans_services svc;
-fabric_conn_data_ptr scd;
+fabric_conn_data_ptr fcd;
 int enable;
 {
 	if (enable != 0) {
-		svc->fd_write_select(trans->cm, scd->fd, (select_list_func) trans->write_possible,
-		                     (void *)trans, (void *) scd->conn);
+		svc->fd_write_select(trans->cm, fcd->fd, (select_list_func) trans->write_possible,
+		                     (void *)trans, (void *) fcd->conn);
 	} else {
 		/* remove entry */
-		svc->fd_write_select(trans->cm, scd->fd, NULL, NULL, NULL);
+		svc->fd_write_select(trans->cm, fcd->fd, NULL, NULL, NULL);
 	}   
 }
 
 
 extern CMbuffer
-libcmfabric_LTX_read_block_func(svc, scd, len_ptr)
-	CMtrans_services svc;
-fabric_conn_data_ptr scd;
-int *len_ptr;
+libcmfabric_LTX_read_block_func(CMtrans_services svc, fabric_conn_data_ptr fcd, int *len_ptr, int *offset_ptr)
 {
-	*len_ptr = scd->read_buffer_len;
-	if (scd->read_buffer) {
-	    CMbuffer tmp = scd->read_buffer;
-	    scd->read_buffer = NULL;
-	    scd->read_buffer_len = 0;
-	    return tmp;
-	}
-	if(scd->tb)
-	    return scd->tb->buf;
-	return NULL;  
+    *len_ptr = fcd->read_buffer_len;
+    if (fcd->read_buffer) {
+	CMbuffer tmp = fcd->read_buffer;
+	fcd->read_buffer = NULL;
+	fcd->read_buffer_len = 0;
+	if (offset_ptr) *offset_ptr = fcd->read_offset;
+	return tmp;
+    }
+    if(fcd->tb)
+	return fcd->tb->buf;
+    return NULL;  
 }
 
 
@@ -1873,14 +1844,14 @@ static double writev_t = 0;
 
 extern int
 libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc, 
-					fabric_conn_data_ptr scd,
+					fabric_conn_data_ptr fcd,
 					void *iovs,
 					int iovcnt,
 					attr_list attrs,
 					CMcompletion_notify_func notify_func,
 					void *notify_client_data)
 {
-    	int fd = scd->fd;
+    	int fd = fcd->fd;
 	int left = 0;
 	int iget = 0;
 	int i;
@@ -1890,7 +1861,7 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 	double start = 0, end = 0;
 	struct control_message msg; 
 	int can_reuse_mapping = 0;
-	rinfo *last_write_request = &scd->infolist[scd->infocount];
+	rinfo *last_write_request = &fcd->infolist[fcd->infocount];
 
 	writev_t = getlocaltime();
     
@@ -1900,19 +1871,19 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 	    left += iov[i].iov_len;
 	}
 
-	svc->trace_out(scd->fabd->cm, "CMFABRIC writev of %d bytes on fd %d",
+	svc->trace_out(fcd->fabd->cm, "CMFABRIC writev of %d bytes on fd %d",
 	               left, fd);
 	
 	if (left < PIGGYBACK)
 	{
 		//total size is less than the piggyback size
-		iget = internal_write_piggyback(svc, scd, left, iov, iovcnt);
+		iget = internal_write_piggyback(svc, fcd, left, iov, iovcnt);
 		if (notify_func) {
 		    (notify_func)(notify_client_data);
 		}
 		if(iget < 0)
 		{
-			svc->trace_out(scd->fabd->cm, "CMFABRIC error in writing piggyback");
+			svc->trace_out(fcd->fabd->cm, "CMFABRIC error in writing piggyback");
 			return -1;
 		}
 		if(iget == 0)
@@ -1922,7 +1893,7 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 		return -1;
 	}
 
-	svc->set_pending_write(scd->conn);
+	svc->set_pending_write(fcd->conn);
 
 	/* if (notify_func) { */
 	/*     can_reuse_mapping = 1; */
@@ -1933,22 +1904,22 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 	/* 	    if ((iov[i].iov_len != last_write_request->wr->sg_list[i].length) || */
 	/* 		(int64_from_ptr(iov[i].iov_base) != last_write_request->wr->sg_list[i].addr)) { */
 	/* 		can_reuse_mapping = 0; */
-	/* 		svc->trace_out(scd->fabd->cm, "CMFABRIC already mapped data, doesn't match write, buf %d, %p vs. %p, %d vs. %d", */
+	/* 		svc->trace_out(fcd->fabd->cm, "CMFABRIC already mapped data, doesn't match write, buf %d, %p vs. %p, %d vs. %d", */
 	/* 			       i, iov[i].iov_base, last_write_request->wr->sg_list[i].addr, iov[i].iov_len, last_write_request->wr->sg_list[i].length); */
 	/* 	    break; */
 	/* 	    } */
 	/* 	} */
 	/*     } else { */
-	/* 	svc->trace_out(scd->fabd->cm, "CMFABRIC either no already mapped data, or wrong buffer count"); */
+	/* 	svc->trace_out(fcd->fabd->cm, "CMFABRIC either no already mapped data, or wrong buffer count"); */
 	/* 	can_reuse_mapping = 0; */
 	/*     } */
 	/* } else { */
-	/*     svc->trace_out(scd->fabd->cm, "CMFABRIC User-owned data with no notify, so no reuse\n"); */
+	/*     svc->trace_out(fcd->fabd->cm, "CMFABRIC User-owned data with no notify, so no reuse\n"); */
 	/* } */
-	iget = internal_write_request(svc, scd, left, &scd->infolist[scd->infocount]);
+	iget = internal_write_request(svc, fcd, left, &fcd->infolist[fcd->infocount]);
 	if(iget < 0)
 	{
-		svc->trace_out(scd->fabd->cm, "CMFABRIC error in writing request");
+		svc->trace_out(fcd->fabd->cm, "CMFABRIC error in writing request");
 		return -1;
 	}
 
@@ -1961,14 +1932,14 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 }
 
 extern int
-libcmfabric_LTX_writev_func(svc, scd, iovs, iovcnt, attrs)
+libcmfabric_LTX_writev_func(svc, fcd, iovs, iovcnt, attrs)
 CMtrans_services svc;
-fabric_conn_data_ptr scd;
+fabric_conn_data_ptr fcd;
 void *iovs;
 int iovcnt;
 attr_list attrs;
 {
-    return libcmfabric_LTX_writev_complete_notify_func(svc, scd, iovs, iovcnt, 
+    return libcmfabric_LTX_writev_complete_notify_func(svc, fcd, iovs, iovcnt, 
 						   attrs, NULL, NULL);
 }
 
@@ -2007,6 +1978,7 @@ libcmfabric_LTX_initialize(CManager cm, CMtrans_services svc)
 		atom_init++;
 	}
 	fabd = svc->malloc_func(sizeof(struct fabric_client_data));
+	fabd->svc = svc;
 	memset(fabd, 0, sizeof(struct fabric_client_data));
 	fabd->cm = cm;
 	fabd->hostname = NULL;
@@ -2075,7 +2047,7 @@ static struct ibv_send_wr * createwrlist(fabric_conn_data_ptr conn,
 	return wr;
 }
 
-static int waitoncq(fabric_conn_data_ptr scd,
+static int waitoncq(fabric_conn_data_ptr fcd,
                     fabric_client_data_ptr fabd,
                     CMtrans_services svc, struct ibv_cq *cq)
 {
