@@ -356,16 +356,6 @@ char *ibv_wc_opcode_str[] = {
 	"IBV_WC_RECV_RDMA_WITH_IMM"
 };
 
-static struct ibv_mr ** regblocks(fabric_client_data_ptr sd,
-                                  struct iovec *iovs, int iovcnt, int flags,
-                                  int *mrlen);
-
-
-static struct ibv_send_wr * createwrlist(fabric_conn_data_ptr conn, 
-                                         struct ibv_mr **mrlist,
-                                         struct iovec *iovlist,
-                                         int mrlen, int *wrlen); 
-
 static int waitoncq(fabric_conn_data_ptr fcd,
                     fabric_client_data_ptr sd,
                     CMtrans_services svc, struct ibv_cq *cq);
@@ -401,41 +391,6 @@ static double getlocaltime()
 	dt = (double) t.tv_usec / 1e6 + t.tv_sec;
 	return dt;
 }
-
-static void free_func(void *cbd)
-{
-	tbuffer *tb = (tbuffer*)cbd;
-	tbuffer *temp;
-    
-	tb->inuse = 0;
-	if(tb->childcount == 0)
-	{
-		//we can merge upwards
-		temp = tb->parent;
-		if(!temp)
-		{
-			//is the top level - at the top it means we don't need to merge or do anything other than drop offset to 0
-			tb->offset = 0;     
-		}
-		else
-		{
-			//is a child of someone - we merge up
-			temp->size += tb->size;
-			temp->childcount --;
-        
-			//we can free the CMbuffer now
-			free(tb->buf);
-        
-			//now remove tb from list and free it
-			LIST_REMOVE(tb, entries);
-			free(tb);       
-		}
-	}
-    
-    
-    
-}
-
 
 static int
 check_host(hostname, sin_addr)
@@ -631,7 +586,6 @@ static int internal_write_request(CMtrans_services svc,
 	return 0;
 }
 	
-static double write_t = 0;
 static double da_t = 0;
 
 static int handle_response(CMtrans_services svc,
@@ -640,10 +594,6 @@ static int handle_response(CMtrans_services svc,
 {
 
     //read back response
-    int iget = 0;
-    struct ibv_send_wr *bad_wr;    
-    int retval = 0;
-    int i = 0;
     struct response *rep;
     rinfo *write_request;
     int free_data_elements;
@@ -747,7 +697,6 @@ int handle_piggyback(CMtrans_services svc,
 {
 	// read rest and deliver up
 	int offset = msg_offset();
-	int iget = 0;
 	
 	fcd->read_buffer_len = msg->u.pb.total_length - offset;
 	svc->trace_out(fcd->fabd->cm, "CMFABRIC received piggyback msg of length %d, added to read_buffer", 
@@ -855,21 +804,16 @@ static void
 fabric_accept_conn(void *void_trans, void *void_conn_sock)
 {
     transport_entry trans = (transport_entry) void_trans;
-    int conn_sock = (int) (long) void_conn_sock;
     fabric_client_data_ptr fabd = (fabric_client_data_ptr) trans->trans_data;
     CMtrans_services svc = fabd->svc;
     fabric_conn_data_ptr fcd;
     int fd, ret;
     struct sockaddr sock_addr;
     unsigned int sock_len = sizeof(sock_addr);
-    int int_port_num;
-    struct linger linger_val;
-    int sock_opt_val = 1;
 
-    int delay_value = 1;
     CMConnection conn;
     attr_list conn_attr_list = NULL;
-    struct ibparam param, remote_param;
+    struct ibparam param;
 
     //ib stuff
     fcd = create_fabric_conn_data(svc);
@@ -886,8 +830,8 @@ fabric_accept_conn(void *void_trans, void *void_conn_sock)
     memset(&sock_addr, 0, sock_len);
 //    getsockname(sock, (struct sockaddr *) &sock_addr, &sock_len);
 //    int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
-    add_attr(conn_attr_list, CM_THIS_CONN_PORT, Attr_Int4,
-	     (attr_value) (long)int_port_num);
+//    add_attr(conn_attr_list, CM_THIS_CONN_PORT, Attr_Int4,
+//	     (attr_value) (long)int_port_num);
 
     memset(&sock_addr, 0, sizeof(sock_addr));
     sock_len = sizeof(sock_addr);
@@ -950,7 +894,6 @@ fabric_service_incoming(void *void_trans, void *void_eq)
     uint32_t event;
     struct fi_info *info = NULL;
     ssize_t rd;
-    int ret;
 
     rd = fi_eq_sread(fabd->cmeq, &event, &entry, sizeof entry, -1, FI_PEEK);
     if (rd != sizeof entry) {
@@ -980,24 +923,6 @@ fabric_conn_data_ptr fcd;
 	free(fcd);
 }
 
-
-static int
-is_private_192(int IP)
-{
-	return ((IP & 0xffff0000) == 0xC0A80000);   /* equal 192.168.x.x */
-}
-
-static int
-is_private_182(int IP)
-{
-	return ((IP & 0xffff0000) == 0xB6100000);   /* equal 182.16.x.x */
-}
-
-static int
-is_private_10(int IP)
-{
-	return ((IP & 0xff000000) == 0x0A000000);   /* equal 10.x.x.x */
-}
 
 static int client_connect(CManager cm, CMtrans_services svc, transport_entry trans, attr_list attrs, fabric_conn_data_ptr fcd)
 {
@@ -1097,27 +1022,14 @@ fabric_conn_data_ptr fcd;
 attr_list conn_attr_list;
 int no_more_redirect;
 {
-	int delay_value = 1;
-	struct linger linger_val;
-	int sock_opt_val = 1;
 	int int_port_num;
-	u_short port_num;
 	fabric_client_data_ptr fabd = (fabric_client_data_ptr) trans->trans_data;
 	char *host_name;
 	int remote_IP = -1;
 	static int host_ip = 0;
-	unsigned int sock_len;
-	union {
-	    struct sockaddr s;
-	    struct sockaddr_in s_I4;
-	    struct sockaddr_in6 s_l6;
-	} sock_addr;
-	struct ibparam param, remote_param;
 
 	//fabric stuff
 
-	int retval = 0;
-    
 	if (!query_attr(attrs, CM_IP_HOSTNAME, /* type pointer */ NULL,
 	                /* value pointer */ (attr_value *)(long) & host_name)) {
 		svc->trace_out(cm, "CMFABRIC transport found no IP_HOST attribute");
@@ -1265,7 +1177,7 @@ attr_list attrs;
     conn = svc->connection_create(trans, fcd, conn_attr_list);
     fcd->conn = conn;
 
-    if (fi_control (&fcd->rcq->fid, FI_GETWAIT, (void *) &fd)) {
+    if ((ret = fi_control (&fcd->rcq->fid, FI_GETWAIT, (void *) &fd))) {
 	FT_PRINTERR("fi_control(FI_GETWAIT)", ret);
     }
     svc->trace_out(cm, "Cmfabric Adding trans->data_available as action on fd %d", fd);
@@ -1661,9 +1573,6 @@ extern attr_list
 libcmfabric_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr_list listen_info)
 {
     fabric_client_data_ptr fd = trans->trans_data;
-    unsigned int length;
-    struct sockaddr_in sock_addr;
-    int sock_opt_val = 1;
     int wait_sock;
     int attr_port_num = 0;
     u_short port_num = 0;
@@ -1837,11 +1746,6 @@ libcmfabric_LTX_read_block_func(CMtrans_services svc, fabric_conn_data_ptr fcd, 
 #define IOV_MAX 16
 #endif
 
-static double reg_t = 0;
-
-static double writev_t = 0;
-
-
 extern int
 libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc, 
 					fabric_conn_data_ptr fcd,
@@ -1856,16 +1760,6 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 	int iget = 0;
 	int i;
 	struct iovec * iov = (struct iovec*) iovs;
-	struct iovec * tmp_iov;
-	int wrlen = 0;
-	double start = 0, end = 0;
-	struct control_message msg; 
-	int can_reuse_mapping = 0;
-	rinfo *last_write_request = &fcd->infolist[fcd->infocount];
-
-	writev_t = getlocaltime();
-    
-	start = getlocaltime();
     
 	for (i = 0; i < iovcnt; i++) {
 	    left += iov[i].iov_len;
@@ -1923,11 +1817,6 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 		return -1;
 	}
 
-	if (notify_func == NULL) {
-	    /* it was our tmp_iov */
-	    free(tmp_iov);
-	}
-
 	return iovcnt;
 }
 
@@ -1942,8 +1831,6 @@ attr_list attrs;
     return libcmfabric_LTX_writev_complete_notify_func(svc, fcd, iovs, iovcnt, 
 						   attrs, NULL, NULL);
 }
-
-static int socket_global_init = 0;
 
 static void
 free_fabric_data(CManager cm, void *fdv)
@@ -2005,47 +1892,6 @@ libcmfabric_LTX_initialize(CManager cm, CMtrans_services svc)
 	return (void *) fabd;
 }
 
-
-static struct ibv_mr ** regblocks(fabric_client_data_ptr fabd,
-                                  struct iovec *iovs, int iovcnt, int flags, 
-                                  int *mrlen)                 
-{
-	int i =0;
-    
-	struct ibv_mr **mrlist;
-
-    
-	mrlist = (struct ibv_mr**) malloc(sizeof(struct ibv_mr *) * iovcnt);
-	if(mrlist == NULL)
-	{
-		//failed to allocate memory - big issue
-		return NULL;    
-	}
-    
-	for(i = 0; i < iovcnt; i++)
-	{
-    
-	}
-	*mrlen = iovcnt;
-    
-	return mrlist;    
-}
-
-
-
-static struct ibv_send_wr * createwrlist(fabric_conn_data_ptr conn, 
-                                         struct ibv_mr **mrlist,
-                                         struct iovec *iovlist,
-                                         int mrlen, int *wrlen)
-{
-	//create an array of work requests that can be posted for the transter
-	int retval = 0;
-	fabric_client_data_ptr fabd = conn->fabd;
-	struct ibv_send_wr *wr;
-    
-    
-	return wr;
-}
 
 static int waitoncq(fabric_conn_data_ptr fcd,
                     fabric_client_data_ptr fabd,
