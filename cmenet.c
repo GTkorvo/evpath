@@ -661,13 +661,15 @@ struct iovec {
 
 extern void *
 libcmenet_LTX_read_block_func(CMtrans_services svc,
-			      enet_conn_data_ptr conn_data, int *actual_len)
+			      enet_conn_data_ptr conn_data, int *actual_len,
+			      int *offset_ptr)
 {
     CMbuffer cb;
 
     if (conn_data->read_buffer_len == -1) return NULL;
 
     *actual_len = conn_data->read_buffer_len;
+    *offset_ptr = 0;
     cb = conn_data->read_buffer;
     conn_data->read_buffer_len = 0;
     conn_data->read_buffer = NULL;

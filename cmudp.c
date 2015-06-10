@@ -622,12 +622,14 @@ struct iovec {
  *  that are more efficient if they allocate their own buffer space.
  */
 extern void *
-libcmudp_LTX_read_block_func(svc, ucd, actual_len)
+libcmudp_LTX_read_block_func(svc, ucd, actual_len, offset_ptr)
 CMtrans_services svc;
 udp_conn_data_ptr ucd;
 int *actual_len;
+int *offset_ptr;
 {
     *actual_len = ucd->read_buf_len;
+    *offset_ptr = 0;
     ucd->read_buf_len = 0;
     return ucd->read_buffer;
 }

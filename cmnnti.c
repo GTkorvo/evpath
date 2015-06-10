@@ -1449,16 +1449,18 @@ struct iovec {
  *  that are more efficient if they allocate their own buffer space.
  */
 extern void *
-libcmnnti_LTX_read_block_func(svc, ncd, actual_len)
+libcmnnti_LTX_read_block_func(svc, ncd, actual_len, offset_ptr)
 CMtrans_services svc;
 nnti_conn_data_ptr ncd;
 int *actual_len;
+int *offset_ptr;
 {
     CMbuffer cb;
 
     if (ncd->read_buf_len == -1) return NULL;
 
     *actual_len = ncd->read_buf_len;
+    *offset_ptr = 0;
     cb = ncd->read_buffer;
     ncd->read_buf_len = 0;
     ncd->read_buffer = NULL;

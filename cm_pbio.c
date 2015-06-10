@@ -514,8 +514,8 @@ conn_read_to_buffer(CMConnection conn, void *buffer, int length)
 	void *tmp_buffer;
 	int actual;
 	tmp_buffer = trans->read_block_func(&CMstatic_trans_svcs, 
-				      conn->transport_data,
-				      &actual);
+					    conn->transport_data,
+					    &actual, NULL);
 	if (actual < length) {
 	    INT_CMConnection_close(conn);
 	    return 0;

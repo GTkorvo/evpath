@@ -1980,9 +1980,10 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	    }
 	    data_length = buffer_data_end;
 	} else {
+	    int offset;
 	    message_buffer = trans->read_block_func(&CMstatic_trans_svcs, 
 						    conn->transport_data,
-						    &data_length);
+						    &data_length, &offset);
 	    if (message_buffer == NULL) {
 		CMtrace_out(cm, CMLowLevelVerbose, 
 			    "CMdata NULL return from read_block_func");
@@ -1990,7 +1991,7 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	    }
 	    message_buffer->ref_count++;
 	    CMtrace_out(cm, CMBufferVerbose, "Received buffer %p from transport read_block_func, increment ref count, now is %d\n", message_buffer, message_buffer->ref_count);
-	    tmp_message_buffer = message_buffer->buffer;
+	    tmp_message_buffer = message_buffer->buffer + offset;
 	    buffer_data_end = data_length;
 	    cm->abort_read_ahead = 1;
 

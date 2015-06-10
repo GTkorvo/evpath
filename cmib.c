@@ -1736,12 +1736,10 @@ int enable;
 
 
 extern CMbuffer
-libcmib_LTX_read_block_func(svc, scd, len_ptr)
-	CMtrans_services svc;
-ib_conn_data_ptr scd;
-int *len_ptr;
+libcmib_LTX_read_block_func(CMtrans_services svc, ib_conn_data_ptr scd, int *len_ptr, int *offset_ptr)
 {
 	*len_ptr = scd->read_buffer_len;
+	*offset_ptr = 0;
 	if (scd->read_buffer) {
 	    CMbuffer tmp = scd->read_buffer;
 	    scd->read_buffer = NULL;

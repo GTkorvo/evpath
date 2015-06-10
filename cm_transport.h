@@ -90,7 +90,7 @@ typedef attr_list (*CMTransport_listen_func)(CManager cm,
 					     attr_list listen_info);
 typedef void *(*CMTransport_read_block_func)(CMtrans_services svc,
 					     void *conn_data,
-					     int *actual);
+					     int *actual, int *offset);
 typedef int (*CMTransport_read_to_buffer_func)(CMtrans_services svc,
 					       void *conn_data,
 					       void *buffer,
@@ -263,7 +263,7 @@ get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int
  *      actually read and placed in the buffer.  A return value of -1
  *      indicates a fatal error and initiates a shutdown of the
  *      connection.
- *  -  CMBuffer read_block(CMtrans_services svc, void *conn_data, int *actual);
+ *  -  CMBuffer read_block(CMtrans_services svc, void *conn_data, int *actual, int *offset);
  *      This "read" call is designed for use by transports which have
  *      a stronger sense of message boundaries and may need to manage
  *      their own buffers.  Generally this is called by trans->
@@ -273,8 +273,10 @@ get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int
  *      read_to_buffer(), a length of -1 or a return value of NULL,
  *      indicates a fatal error and connection shutdown is initated.
  *      A length of 0 indicates that a complete message has not yet
- *      been received.  The return value should be a CMBuffer value
- *      containing the data (or partial data) available on the connection.
+ *      been received.  The offset value should be the offset of the start
+ * 	of data (in case the transport requires a header). The return value 
+ *      should be a CMBuffer value containing the data (or partial data) 
+ *	available on the connection.
  *  -  int writev(CMtrans_services svc, void *conn_data, void *iov, 
  *                int iovcnt, attr_list attrs);
  *      writev() is the basic vector write function (similar to Posix
