@@ -749,4 +749,5 @@ extern int EVclient_test_for_shutdown(EVclient client);
 }
 #endif
 
+#define __EV_DFG__H__
 #endif
