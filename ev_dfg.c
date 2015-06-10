@@ -1641,7 +1641,7 @@ INT_EVclient_register_source(char *name, EVsource src)
 	evp->sources = realloc(evp->sources,
 			       sizeof(evp->sources[0]) * (evp->source_count + 1));
     }
-    evp->sources[evp->source_count].name = name;
+    evp->sources[evp->source_count].name = strdup(name);
     evp->sources[evp->source_count].src = src;
     evp->source_count++;
     return evp->sources;
@@ -1657,7 +1657,7 @@ INT_EVclient_register_sink_handler(CManager cm, char *name, FMStructDescList lis
 	evp->sink_handlers = realloc(evp->sink_handlers,
 				     sizeof(evp->sink_handlers[0]) * (evp->sink_handler_count + 1));
     }
-    evp->sink_handlers[evp->sink_handler_count].name = name;
+    evp->sink_handlers[evp->sink_handler_count].name = strdup(name);
     evp->sink_handlers[evp->sink_handler_count].format_list = list;
     evp->sink_handlers[evp->sink_handler_count].handler = handler;
     evp->sink_handlers[evp->sink_handler_count].client_data = client_data;
@@ -1675,7 +1675,7 @@ INT_EVclient_register_raw_sink_handler(CManager cm, char *name, EVRawHandlerFunc
 	evp->sink_handlers = realloc(evp->sink_handlers,
 				     sizeof(evp->sink_handlers[0]) * (evp->sink_handler_count + 1));
     }
-    evp->sink_handlers[evp->sink_handler_count].name = name;
+    evp->sink_handlers[evp->sink_handler_count].name = strdup(name);
     evp->sink_handlers[evp->sink_handler_count].format_list = NULL;
     evp->sink_handlers[evp->sink_handler_count].handler = (EVSimpleHandlerFunc)handler;
     evp->sink_handlers[evp->sink_handler_count].client_data = client_data;
