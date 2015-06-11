@@ -3345,8 +3345,20 @@ free_evp(CManager cm, void *not_used)
 	free(evp->queue_items_free_list);
 	evp->queue_items_free_list = tmp;
     }
-    if (evp->sources) free(evp->sources);
-    if (evp->sink_handlers) free(evp->sink_handlers);
+    if (evp->sources) {
+	int i;
+	for (i=0; i<evp->source_count; i++) {
+	    if (evp->sources[i].name) free(evp->sources[i].name);
+	}
+	free(evp->sources);
+    }
+    if (evp->sink_handlers) {
+	int i;
+	for (i=0; i<evp->sink_handler_count; i++) {
+	    if (evp->sink_handlers[i].name) free(evp->sink_handlers[i].name);
+	}
+	free(evp->sink_handlers);
+    }
     if (evp->stone_lookup_table) free(evp->stone_lookup_table);
     if (evp->externs) free(evp->externs);
     thr_mutex_free(evp->lock);
