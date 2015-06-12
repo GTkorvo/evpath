@@ -293,7 +293,8 @@ preload_pbio_format(CMConnection conn, FMFormat ioformat)
 		"CMpbio preloading format %s on connection %p\n", 
 		name_of_FMformat(ioformat), conn);
     if (CMpbio_send_format_preload(ioformat, conn) != 1) {
-	CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio preload failed\n");
+	if (!conn->closed) 
+	    CMtrace_out(conn->cm, CMFormatVerbose, "CMpbio preload failed\n");
 	return;
     }
 #ifndef MODULE
@@ -321,6 +322,8 @@ CMformat_preload(CMConnection conn, CMFormat format)
     if (remote_FFSserver_ID != my_FFSserver_ID) preload = 1;  /* if we're both using a format server, but not the same one, preload */
 
     if (preload == 0) return;
+
+    if (conn->closed) return;
 
     while (loaded_list && (*loaded_list != NULL)) {
 	if (*loaded_list == format) return;

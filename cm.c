@@ -2932,7 +2932,8 @@ INT_CMwrite_raw_notify(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVec
     int i, j, start;
     long count = 0;
     long length = 0;
-    assert(!conn->closed && !conn->failed);
+    if (conn->closed || conn->failed) return 0;
+
     if (conn->write_pending) {
 	wait_for_pending_write(conn);
     }
@@ -3064,6 +3065,9 @@ INT_CMwrite_attr(CMConnection conn, CMFormat format, void *data,
     }
     CMformat_preload(conn, format);
 
+    if (conn->closed != 0) {
+	return 0;
+    }
     if (CMtrace_on(conn->cm, CMDataVerbose)) {
 	static int dump_char_limit = 256;
 	static int warned = 0;
