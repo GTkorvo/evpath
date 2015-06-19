@@ -1196,6 +1196,8 @@ static void
 free_client(CManager cm, void *vclient)
 {
     EVclient client = (EVclient)vclient;
+    if (client->master_connection) 
+	INT_CMConnection_close(client->master_connection);
     if (client->master_contact_str) free(client->master_contact_str);
     if (client->shutdown_conditions) free(client->shutdown_conditions);
     free(client);

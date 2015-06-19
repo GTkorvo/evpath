@@ -216,3 +216,10 @@
     fun:INT_CMwrite_raw
     fun:internal_write_event
 }
+{
+   known_leak
+   Memcheck:Leak
+   fun:malloc
+   fun:INT_CMregister_simple_format
+   fun:CMregister_simple_format
+}

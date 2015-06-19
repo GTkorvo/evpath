@@ -240,6 +240,7 @@ main(int argc, char **argv)
 	    free_attr_list(contact_list);
 	}
 	format = CMregister_format(cm, simple_format_list);
+	memset(&data, 0, sizeof(data));
 	generate_record(&data);
 	attrs = create_attr_list();
 	CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");
@@ -247,6 +248,9 @@ main(int argc, char **argv)
 	CMwrite_attr(conn, format, &data, attrs);
 	CMsleep(cm, 1);
 	free_attr_list(attrs);
+    }
+    if (conn) {
+	CMConnection_close(conn);
     }
     CManager_close(cm);
     return 0;

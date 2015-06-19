@@ -299,8 +299,10 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
 	case Action_Thread_Bridge:
 	    break;
 	case Action_Bridge:
-	    if (act->o.bri.conn)
+	    if (act->o.bri.conn) {
+		CMtrace_out(cm, CMFreeVerbose, "Closing and dereferencing conn %p in free stone\n", act->o.bri.conn);
 		INT_CMConnection_dereference(act->o.bri.conn);
+	    }
 	    if (act->o.bri.remote_path) 
 		free(act->o.bri.remote_path);
 	    break;
@@ -2008,6 +2010,7 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
 	    (act->o.bri.conn == conn)) {
 	    act->o.bri.conn_failed = 1;
 	    act->o.bri.conn = NULL;
+	    CMtrace_out(cm, CMFreeVerbose, "Closing and dereferencing conn %p\n", conn);
 	    INT_CMConnection_close(conn);   /* dereference the connection */
 /*	    while (act->queue->queue_head != NULL) {
 		int action_id;
@@ -2130,8 +2133,10 @@ do_bridge_action(CManager cm, int s)
 		fprint_stone_identifier(cm->CMTrace_file, evp, s);
 		fprintf(cm->CMTrace_file, " disabled\n");
 	    }
-	    if (act->o.bri.conn != NULL) 
+	    if (act->o.bri.conn != NULL)  {
+		CMtrace_out(cm, CMFreeVerbose, "Closing and dereferencing conn after write failure %p\n", act->o.bri.conn);
 		INT_CMConnection_close(act->o.bri.conn);
+	    }
 	    act->o.bri.conn_failed = 1;
 	    act->o.bri.conn = NULL;
 	} else {
