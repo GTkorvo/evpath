@@ -321,6 +321,7 @@ libcmsockets_LTX_shutdown_conn(svc, scd)
 CMtrans_services svc;
 socket_conn_data_ptr scd;
 {
+    svc->connection_deref(scd->conn);
     svc->fd_remove_select(scd->sd->cm, scd->fd);
     close(scd->fd);
     free(scd->remote_host);
@@ -568,6 +569,8 @@ attr_list attrs;
 
     free_attr_list(conn_attr_list);
 /* dump_sockinfo("initiate ", sock); */
+    svc->connection_addref(conn);  /* one ref count went to select (and CM), 
+				the other to the user */
     return conn;
 }
 

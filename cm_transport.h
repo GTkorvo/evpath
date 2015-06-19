@@ -78,6 +78,8 @@ typedef struct CMtrans_services_s {
     CMTransport_modify_global_lock return_CM_lock_status;
     CMTransport_cond_wait_CM_lock cond_wait_CM_lock;
     CMTransport_add_buffer_to_pending_queue add_buffer_to_pending_queue;
+    CMTransport_connection_close connection_deref;
+    CMTransport_connection_close connection_addref;
 } *CMtrans_services;
 #define DROP_CM_LOCK(svc, cm) (svc)->drop_CM_lock((cm), __FILE__, __LINE__)
 #define ACQUIRE_CM_LOCK(svc, cm) (svc)->acquire_CM_lock((cm), __FILE__, __LINE__)

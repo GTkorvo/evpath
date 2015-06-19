@@ -53,6 +53,7 @@ extern void libcmselect_LTX_select_stop(CMtrans_services svc,void *client_data);
 
 
 static void CMinitialize (CManager cm);
+static void CMConnection_failed (CMConnection conn);
 
 static atom_t CM_TRANSPORT = -1;
 static atom_t CM_NETWORK_POSTFIX = -1;
@@ -80,27 +81,29 @@ static void add_buffer_to_pending_queue(CManager cm, CMConnection conn, CMbuffer
 static void cond_wait_CM_lock(CManager cm, void *cond, char *file, int line);
 
 struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, INT_CMfree, 
-					       INT_CM_fd_add_select, 
-					       CM_fd_write_select, 
-					       CM_fd_remove_select, 
-					       CMtransport_trace,
-					       CMConnection_create,
-					       INT_CMadd_shutdown_task,
-					       INT_CMadd_periodic_task,
-					       INT_CMadd_poll,
-					       cm_get_data_buf,
-					       cm_return_data_buf,
-					       INT_CMConnection_close,
-					       cm_create_transport_buffer,
-					       cm_create_transport_and_link_buffer,
-					       INT_CMget_transport_data,
-					       cm_set_pending_write,
-					       transport_wake_any_pending_write,
-					       drop_CM_lock,
-					       acquire_CM_lock,
-					       return_CM_lock_status,
-					       cond_wait_CM_lock,
-					       add_buffer_to_pending_queue
+						 INT_CM_fd_add_select, 
+						 CM_fd_write_select, 
+						 CM_fd_remove_select, 
+						 CMtransport_trace,
+						 CMConnection_create,
+						 INT_CMadd_shutdown_task,
+						 INT_CMadd_periodic_task,
+						 INT_CMadd_poll,
+						 cm_get_data_buf,
+						 cm_return_data_buf,
+						 internal_connection_close,
+						 cm_create_transport_buffer,
+						 cm_create_transport_and_link_buffer,
+						 INT_CMget_transport_data,
+						 cm_set_pending_write,
+						 transport_wake_any_pending_write,
+						 drop_CM_lock,
+						 acquire_CM_lock,
+						 return_CM_lock_status,
+						 cond_wait_CM_lock,
+						 add_buffer_to_pending_queue,
+						 INT_CMConnection_dereference,
+						 INT_CMConnection_add_reference
 };
 static void INT_CMControlList_close(CMControlList cl, CManager cm);
 static int CMcontrol_list_poll(CMControlList cl);
@@ -758,6 +761,7 @@ INT_CManager_create()
 }
 
 static void CMControlList_free(CManager cm, CMControlList cl);
+static void remove_conn_from_CM(CManager cm, CMConnection conn);
 
 static void
 CManager_free(CManager cm)
@@ -830,8 +834,9 @@ INT_CManager_close(CManager cm)
     while (cm->connection_count != 0) {
 	/* connections are moved down as they are closed... */
 	CMtrace_out(cm, CMFreeVerbose, "CManager in close, closing connection %p , ref count %d\n", cm->connections[0],
-		    cm->connections[0]->ref_count);
-	INT_CMConnection_close(cm->connections[0]);
+		    cm->connections[0]->conn_ref_count);
+	internal_connection_close(cm->connections[0]);
+	CMConnection_failed(cm->connections[0]);
     }
 
     if (cm->shutdown_functions != NULL) {
@@ -921,6 +926,7 @@ add_conn_to_CM(CManager cm, CMConnection conn)
 	INT_CMrealloc(cm->connections, 
 		  (cm->connection_count + 1) * sizeof(cm->connections[0]));
     cm->connections[cm->connection_count] = conn;
+    INT_CMConnection_add_reference(conn);
     cm->connection_count++;
 }
 
@@ -932,6 +938,7 @@ remove_conn_from_CM(CManager cm, CMConnection conn)
     for (i=0; i < cm->connection_count; i++) {
 	if (cm->connections[i] == conn) {
 	    found++;
+	    INT_CMConnection_dereference(conn);
 	} else if (found) {
 	    /* copy down */
 	    cm->connections[i-1] = cm->connections[i];
@@ -997,7 +1004,7 @@ CMConnection_create(transport_entry trans, void *transport_data,
     conn->cm = trans->cm;
     conn->trans = trans;
     conn->transport_data = transport_data;
-    conn->ref_count = 1;
+    conn->conn_ref_count = 1;
     conn->closed = 0;
     conn->failed = 0;
     conn->downloaded_formats = NULL;
@@ -1168,19 +1175,17 @@ INT_CMget_indexed_conn(CManager cm, int i)
     }
 }
 
-static void CMConnection_failed (CMConnection conn, int do_dereference);
-
 void
 INT_CMConnection_dereference(CMConnection conn)
 {
-    conn->ref_count--;
-    if (conn->ref_count > 0) {
+    conn->conn_ref_count--;
+    if (conn->conn_ref_count > 0) {
 	CMtrace_out(conn->cm, CMFreeVerbose, "CM - Dereference connection %p, ref count now %d\n",
-		    (void*)conn, conn->ref_count);
+		    (void*)conn, conn->conn_ref_count);
 	return;
     }
-    if (conn->ref_count < 0) {
-      //	CMtrace_out(conn->cm, CMFreeVerbose, "CM - connection reference count less than 0, conn %p\n", conn);
+    if (conn->conn_ref_count < 0) {
+	CMtrace_out(conn->cm, CMFreeVerbose, "CM - connection reference count less than 0, conn %p\n", conn);
 	return;   /*  BAD! */
     }
     CMtrace_out(conn->cm, CMFreeVerbose, "CM - Shut down connection %p\n",
@@ -1191,7 +1196,7 @@ INT_CMConnection_dereference(CMConnection conn)
     conn->closed = 1;
     if (conn->failed == 0) {
 	CMtrace_out(conn->cm, CMFreeVerbose, "Calling connection failed with no dereference %p\n", conn);
-	CMConnection_failed(conn, 0);
+	CMConnection_failed(conn);
     }
     if (conn->write_callbacks) INT_CMfree(conn->write_callbacks);
     INT_CMfree(conn->downloaded_formats);
@@ -1205,7 +1210,7 @@ INT_CMConnection_dereference(CMConnection conn)
 }
 
 static void
-CMConnection_failed(CMConnection conn, int do_dereference)
+CMConnection_failed(CMConnection conn)
 {
     CMTaskHandle prior_task = NULL;
     if (conn->failed) return;
@@ -1216,7 +1221,6 @@ CMConnection_failed(CMConnection conn, int do_dereference)
     CMtrace_out(conn->cm, CMFreeVerbose, "CMConnection failed conn=%lx\n", 
 		(long) conn);
     CMconn_fail_conditions(conn);
-    remove_conn_from_CM(conn->cm, conn);
     conn->trans->shutdown_conn(&CMstatic_trans_svcs, conn->transport_data);
     get_long_attr(conn->characteristics, CM_BW_MEASURE_TASK, 
 		  (long*)(long)&prior_task);
@@ -1242,16 +1246,23 @@ CMConnection_failed(CMConnection conn, int do_dereference)
 	}
     }
     conn->closed = 1;
-    if (do_dereference) {
-	INT_CMConnection_dereference(conn);
-    }
+    remove_conn_from_CM(conn->cm, conn);
+}
+
+void
+internal_connection_close(CMConnection conn)
+{
+    CMtrace_out(conn->cm, CMFreeVerbose, "internal_connection_close conn=%lx ref count is %d\n", 
+		(long) conn, conn->conn_ref_count);
+    conn->closed = 1;
 }
 
 void
 INT_CMConnection_close(CMConnection conn)
 {
-    CMtrace_out(conn->cm, CMFreeVerbose, "CMConnection close conn=%lx ref count will be %d\n", 
-		(long) conn, conn->ref_count - 1);
+    internal_connection_close(conn);
+    CMtrace_out(conn->cm, CMFreeVerbose, "User CMConnection close conn=%lx ref count will be %d\n", 
+		(long) conn, conn->conn_ref_count - 1);
     INT_CMConnection_dereference(conn);
 }
 
@@ -1489,7 +1500,7 @@ fdump_CMConnection(FILE *out, CMConnection conn)
 	return;
     }
     fprintf(out, "CMConnection %lx, reference count %d, closed %d\n\tattrs : ", 
-	   (long) conn, conn->ref_count, conn->closed);
+	   (long) conn, conn->conn_ref_count, conn->closed);
     fdump_attr_list(out, conn->attrs);
     fprintf(out, "\tbuffer_full_point %ld, current buffer_end %ld\n", 
 	    conn->buffer_full_point, conn->buffer_data_end);
@@ -1522,7 +1533,10 @@ INT_CMinitiate_conn(CManager cm, attr_list attrs)
 void
 INT_CMConnection_add_reference(CMConnection conn)
 {
-    conn->ref_count++;
+    conn->conn_ref_count++;
+    if (CMtrace_val[CMFreeVerbose]) {
+	printf("Add reference to connection %p, value is now %d\n", conn, conn->conn_ref_count);
+    }
 }
 
 CMConnection
@@ -1542,8 +1556,8 @@ CMinternal_get_conn(CManager cm, attr_list attrs)
 				       tmp->transport_data)) {
 	    
 	    CMtrace_out(tmp->cm, CMFreeVerbose, "internal_get_conn found conn=%p ref count will be %d\n", 
-			tmp, tmp->ref_count +1);
-	    tmp->ref_count++;
+			tmp, tmp->conn_ref_count +1);
+	    tmp->conn_ref_count++;
 	    conn = tmp;
 	    break;
 	}
@@ -1552,13 +1566,12 @@ CMinternal_get_conn(CManager cm, attr_list attrs)
 	conn = CMinternal_initiate_conn(cm, attrs);
 	if (conn) {
 	    CMtrace_out(conn->cm, CMFreeVerbose, "internal_get_conn initiated connection %p ref count now %d\n", 
-			conn, conn->ref_count);
+			conn, conn->conn_ref_count);
 	}
     }
     if (conn != NULL) {
-	conn->ref_count++;
 	CMtrace_out(conn->cm, CMFreeVerbose, "internal_get_conn returning conn=%p ref count %d\n", 
-		    conn, conn->ref_count);
+		    conn, conn->conn_ref_count);
     }
     if (CMtrace_on(cm, CMConnectionVerbose)) {
 	fprintf(cm->CMTrace_file, "CMinternal_get_conn returning ");
@@ -1964,7 +1977,7 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 		CMtrace_out(cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d, failing connection %p\n", actual, conn);
 		CMtrace_out(conn->cm, CMFreeVerbose, "Calling connection failed read_len with dereference %p\n", conn);
-		CMConnection_failed(conn, 1);
+		CMConnection_failed(conn);
 		return;
 	    }
 	    buffer_data_end += actual;
@@ -1999,7 +2012,7 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 		CMtrace_out(cm, CMLowLevelVerbose, 
 			    "CMdata read failed, actual %d, failing connection %p\n", data_length, conn);
 		CMtrace_out(conn->cm, CMFreeVerbose, "Calling connection failed with dereference, data length %p\n", conn);
-		CMConnection_failed(conn, 1);
+		CMConnection_failed(conn);
 		return;
 	    }
 	    if (data_length == 0) {
@@ -2008,7 +2021,7 @@ extern void CMDataAvailable(transport_entry trans, CMConnection conn)
 	    if (tmp_message_buffer == NULL) {
 		CMtrace_out(cm, CMLowLevelVerbose, "CMdata read_block failed, failing connection %p\n", conn);
 		CMtrace_out(conn->cm, CMFreeVerbose, "Calling connection failed read_block withdereference %p\n", conn);
-		CMConnection_failed(conn, 1);
+		CMConnection_failed(conn);
 		return;
 	    }
 	    CMtrace_out(cm, CMLowLevelVerbose, "CMdata read_block returned %d bytes of data\n", data_length);
@@ -2183,7 +2196,7 @@ CMact_on_data(CMConnection conn, CMbuffer cm_buffer, char *buffer, long length)
 	  if (ret == -1) {
 	      printf("Unknown message on connection %lx, failed %d, closed %d, %x\n", (long) conn, conn->failed, conn->closed, *(int*)buffer);
 	      CMtrace_out(conn->cm, CMFreeVerbose, "Calling connection unknown message failed with dereference %p\n", conn);
-	      CMConnection_failed(conn, 1);
+	      CMConnection_failed(conn);
 	  }
 	  return 0;
       }
@@ -2655,7 +2668,7 @@ extern void CMWriteQueuedData(transport_entry trans, CMConnection conn)
     return;
  failed:
     CMtrace_out(conn->cm, CMFreeVerbose, "Calling write failed connection failed with dereference %p\n", conn);
-    CMConnection_failed(conn, 1);
+    CMConnection_failed(conn);
     if (conn->queued_data.buffer_to_free) {
         cm_return_data_buf(conn->cm, conn->queued_data.buffer_to_free);
 	conn->queued_data.buffer_to_free = NULL;
@@ -2961,7 +2974,7 @@ INT_CMwrite_raw_notify(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVec
                                             full_vec, vec_count, attrs);
 	if (actual_bytes < 0) {
 	    CMtrace_out(conn->cm, CMFreeVerbose, "Calling write failed connection failed with dereference %p\n", conn);
-	    CMConnection_failed(conn, 1);
+	    CMConnection_failed(conn);
 	    if (conn->queued_data.buffer_to_free) {
 	        cm_return_data_buf(conn->cm, conn->queued_data.buffer_to_free);
 		conn->queued_data.buffer_to_free = NULL;
@@ -3311,7 +3324,7 @@ internal_write_event(CMConnection conn, CMFormat format, void *remote_path_id,
 	if (actual == 0) {
 	    /* fail */
 	    CMtrace_out(conn->cm, CMFreeVerbose, "Calling connection (write failed) failed with dereference %p\n", conn);
-	    CMConnection_failed(conn, 1);
+	    CMConnection_failed(conn);
 	    CMtrace_out(conn->cm, CMLowLevelVerbose, 
 			"Writev failed\n");
 	    return 0;

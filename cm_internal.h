@@ -234,7 +234,7 @@ struct _CMConnection {
 
     transport_entry trans;
     void *transport_data;
-    int ref_count;
+    int conn_ref_count;
     FFSBuffer io_out_buffer;
     int closed;
     int failed;
@@ -385,6 +385,7 @@ extern void INT_CManager_close(CManager cm);
 extern CManager INT_CManager_create ();
 extern int INT_CMlisten_specific(CManager cm, attr_list listen_info);
 extern void INT_CMConnection_close(CMConnection conn);
+extern void internal_connection_close(CMConnection conn);
 extern void INT_CMremove_task(CMTaskHandle handle);
 extern CMTaskHandle INT_CMadd_periodic(CManager cm, long period, 
 					     CMPollFunc func, void *client_data);

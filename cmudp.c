@@ -203,6 +203,7 @@ CMtrans_services svc;
 udp_conn_data_ptr ucd;
 {
     unlink_connection(ucd->utd, ucd);
+    svc->connection_deref(ucd->conn);
     free_attr_list(ucd->attrs);
     free(ucd);
 }
@@ -421,6 +422,8 @@ attr_list attrs;
     add_connection(udp_conn_data->utd, udp_conn_data);
     udp_conn_data->conn = conn;
     udp_conn_data->attrs = conn_attr_list;
+    svc->connection_addref(conn);  /* one ref count went to select (and CM), 
+				the other to the user */
     return conn;
 }
 

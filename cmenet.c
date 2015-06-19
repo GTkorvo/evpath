@@ -273,7 +273,7 @@ enet_accept_conn(enet_client_data_ptr sd, transport_entry trans,
 extern void
 libcmenet_LTX_shutdown_conn(CMtrans_services svc, enet_conn_data_ptr scd)
 {
-    (void) svc;
+    svc->connection_deref(scd->conn);
     if (scd->remote_host) free(scd->remote_host);
     free(scd);
 }
@@ -341,7 +341,8 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
     address.port = (unsigned short) int_port_num;
 
     if (sd->server == NULL) {
-	libcmenet_LTX_non_blocking_listen(cm, svc, trans, NULL);
+	attr_list l = libcmenet_LTX_non_blocking_listen(cm, svc, trans, NULL);
+	if (l) free_attr_list(l);
     }
 
     /* Initiate the connection, allocating the two channels 0 and 1. */
@@ -400,6 +401,9 @@ libcmenet_LTX_initiate_conn(CManager cm, CMtrans_services svc,
 	     (attr_value) (long)enet_conn_data->remote_contact_port);
     conn = svc->connection_create(trans, enet_conn_data, conn_attr_list);
     enet_conn_data->conn = conn;
+    free_attr_list(conn_attr_list);
+    svc->connection_addref(conn);  /* one ref count went to CM, 
+				the other to the user */
 
     return conn;
 }
