@@ -286,6 +286,7 @@ main(int argc, char **argv)
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
 	    EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
+	    free_attr_list(contact_list);
 	}
 	attrs = create_attr_list();
 	CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");
@@ -300,6 +301,7 @@ main(int argc, char **argv)
 		count--;
 	    }
 	}
+	EVfree_source(source_handle);
 	CMsleep(cm, 10);
 	free_attr_list(attrs);
     }

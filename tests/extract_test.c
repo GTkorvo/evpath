@@ -281,17 +281,21 @@ main(int argc, char **argv)
 	    contact_list = attr_list_from_string(list_str);
 	    term0 = EValloc_stone(cm);
 	    EVassoc_bridge_action(cm, term0, contact_list, remote_stone0);
+	    free_attr_list(contact_list);
 	    term1 = EValloc_stone(cm);
 	    contact_list = attr_list_from_string(list_str);
 	    EVassoc_bridge_action(cm, term1, contact_list, remote_stone1);
+	    free_attr_list(contact_list);
 	    term2 = EValloc_stone(cm);
 	    contact_list = attr_list_from_string(list_str);
 	    EVassoc_bridge_action(cm, term2, contact_list, remote_stone2);
+	    free_attr_list(contact_list);
 	}
 	filter = create_router_action_spec(filter_format_list, router_func);
     
 	stone = EValloc_stone(cm);
 	faction = EVassoc_immediate_action(cm, stone, filter, NULL);
+	free(filter);
 	EVaction_set_output(cm, stone, faction, 0, term0);
 	EVaction_set_output(cm, stone, faction, 1, term1);
 	EVaction_set_output(cm, stone, faction, 2, term2);
@@ -311,6 +315,7 @@ main(int argc, char **argv)
 	    }
 	}
 	CMsleep(cm, 10);
+	EVfree_source(source_handle);
 	EVdrain_stone(cm, term1);
 	events = EVextract_stone_events(cm, term1);
 	count = 0;
@@ -320,6 +325,7 @@ main(int argc, char **argv)
 	}
 	CMsleep(cm, 5);
 	free_attr_list(attrs);
+	free(events);
     }
     CManager_close(cm);
     return 0;

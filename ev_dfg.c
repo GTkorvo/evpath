@@ -1168,6 +1168,10 @@ dfg_deploy_handler(CManager cm, CMConnection conn, void *vmsg,
     if (first_time_deploy) {
 	first_time_deploy = 0;
     }
+    if (auto_stones == 0) {
+	free(auto_list);
+	auto_list = NULL;
+    }
     client->pending_auto_list = auto_list;
     
     CManager_unlock(cm);

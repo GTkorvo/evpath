@@ -158,7 +158,7 @@ static atom_t CM_NETWORK_POSTFIX;
 static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
 
-static void
+static CMConnection
 handshake_with_parent(CManager cm, attr_list parent_contact_list)
 {
     CMConnection conn = CMinitiate_conn(cm, parent_contact_list);
@@ -167,9 +167,11 @@ handshake_with_parent(CManager cm, attr_list parent_contact_list)
     attr_list tmp_list;
     alive.contact = attr_list_to_string(tmp_list = CMget_contact_list(cm));
     free_attr_list(tmp_list);
+    free_attr_list(parent_contact_list);
     alive_format = CMregister_format(cm, alive_formats);
     if (quiet <= 0) printf("Sending alive message\n");
     CMwrite(conn, alive_format, &alive);
+    return conn;
 }
 
 static int regression = 1;
@@ -192,9 +194,10 @@ main(int argc, char **argv)
     if (!regression_master) {
 	CManager cm = CManager_create();
 	attr_list parent_contact_list = attr_list_from_string(argv[1]);
-	handshake_with_parent(cm, parent_contact_list);
+	CMConnection conn = handshake_with_parent(cm, parent_contact_list);
 /*    (void) CMfork_comm_thread(cm);*/
 	CMsleep(cm, 5);
+	CMConnection_close(conn);
 	CManager_close(cm);
 	return 0;
     } else {

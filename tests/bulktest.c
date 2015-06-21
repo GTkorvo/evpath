@@ -358,6 +358,7 @@ main(int argc, char **argv)
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
 	    EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
+	    free_attr_list(contact_list);
 	}
 	data = malloc(sizeof(simple_rec));
 	generate_record(data);
@@ -373,6 +374,13 @@ main(int argc, char **argv)
 	}
 	if (quiet <= 0) printf("Write %d messages\n", msg_limit);
 	CMsleep(cm, 30);
+	free_attr_list(attrs);
+	for (i=0; i < vecs; i++) {
+	    free(data->vecs[i].iov_base);
+	}
+	free(data->vecs);
+	free(data);
+	EVfree_source(source_handle);
     }
     CManager_close(cm);
     return 0;

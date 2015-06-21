@@ -222,6 +222,7 @@ main(int argc, char **argv)
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
 	    EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
+	    free_attr_list(contact_list);
 	}
 	generate_record(&data);
 	attrs = create_attr_list();
@@ -235,6 +236,7 @@ main(int argc, char **argv)
 	CMsleep(cm, 3);
 	free_attr_list(attrs);
 	EVfree_source(source_handle);
+	EVfree_source(source_handle2);
     }
     if (c) free_FFSContext(c);
     CManager_close(cm);

@@ -268,6 +268,7 @@ sub gen_handler {
     } else {
 	print REVP "    ret = $subr(cm";
     }
+    $after = "";
     foreach $arg (split (", ", $args[1])) {
 	$_ = $arg;
 	if (/^\s*(.*\W+)(\w+)$\s*/) {
@@ -278,7 +279,7 @@ sub gen_handler {
 	    $argtype =~ s/(?!\W)\s+(?=\w)//;  #remove unnecessary white space
 	    $argright = "request->$argname";
 	  switch:for ($argtype) {
-	      /attr_list/ && do {$argright = "$argname"; last;};
+	      /attr_list/ && do {$argright = "$argname"; $after .= "free_attr_list($argname);\n"; last;};
 	      /EVSimpleHandlerFunc/ && do {$argright = "$argname"; last;};
 	      /FMStructDescList/ && do {$argright = "$argname"; last;};
 	  }
@@ -287,6 +288,7 @@ sub gen_handler {
     }
     if ($has_client_data == 1) {print REVP ", NULL";}
     print REVP ");\n";
+    print REVP "$after";
   switch:for ($return_type{$subr}) {
       /attr_list/ && do {print REVP "    response.ret = attr_list_to_string(ret);\n"; last;};
       /void/ && do {last;};

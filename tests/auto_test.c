@@ -229,9 +229,11 @@ main(int argc, char **argv)
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
 	    EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
+	    free_attr_list(contact_list);
 	}
 	auto_stone = EValloc_stone (cm);
 	auto_action = EVassoc_immediate_action (cm, auto_stone, action_spec, 0);
+	free(action_spec);
 	EVaction_set_output(cm, auto_stone, auto_action, 0, stone);
 	EVenable_auto_stone(cm, auto_stone, 1, 0);
 	attrs = create_attr_list();

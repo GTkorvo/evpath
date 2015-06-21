@@ -240,6 +240,7 @@ char **argv;
 	    for (i=0; i < 8; i++) {
 		last_row_stones[i] = EVcreate_bridge_action(cm, contact_list, remote_stone);
 	    }
+	    free_attr_list(contact_list);
 	    for (i=0; i < 4; i++) {
 		list[0] = last_row_stones[i*2];
 		list[1] = last_row_stones[i*2 + 1];
@@ -265,6 +266,7 @@ char **argv;
 	EVsubmit(source_handle, &data, attrs);
 	CMsleep(cm, 1);
 	free_attr_list(attrs);
+	EVfree_source(source_handle);
     }
     CManager_close(cm);
     return 0;

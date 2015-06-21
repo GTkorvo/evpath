@@ -227,6 +227,7 @@ main(int argc, char **argv)
 	    contact_list = attr_list_from_string(list_str);
 	    stone = EValloc_stone(cm);
 	    EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
+	    free_attr_list(contact_list);
 	}
 	generate_record(&data);
 	attrs = create_attr_list();
@@ -236,6 +237,7 @@ main(int argc, char **argv)
 	if (quiet <= 0) printf("submitting %d\n", data.integer_field);
 	EVsubmit(source_handle, &data, attrs);
 	CMsleep(cm, 1);
+	EVfree_source(source_handle);
 	free_attr_list(attrs);
     }
     CManager_close(cm);
