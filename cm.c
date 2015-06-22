@@ -1551,6 +1551,7 @@ CMinternal_get_conn(CManager cm, attr_list attrs)
     }
     for (i=0; i<cm->connection_count; i++) {
 	CMConnection tmp = cm->connections[i];
+	if (tmp->closed || tmp->failed) continue;
 	if (tmp->trans->connection_eq(cm, &CMstatic_trans_svcs,
 				       tmp->trans, attrs,
 				       tmp->transport_data)) {
