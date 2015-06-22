@@ -103,7 +103,7 @@ main(int argc, char **argv)
 
     PARSE_ARGS();
 
-    argv0 = "thin_client";  /* override */
+    argv0 = "./thin_client";  /* override */
     srand48(getpid());
     if (regression && regression_master) {
 	return do_regression_master_test();
