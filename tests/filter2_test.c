@@ -60,6 +60,7 @@ typedef struct _simple_rec {
     nested nested_field;
     double double_field;
     char char_field;
+    char *string_field;
     int scan_sum;
 } simple_rec, *simple_rec_ptr;
 
@@ -71,6 +72,7 @@ typedef struct _bigger_rec {
     nested nested_field;
     double double_field;
     char char_field;
+    char *string_field;
     int scan_sum;
 } bigger_rec, *bigger_rec_ptr;
 
@@ -94,6 +96,8 @@ static FMField simple_field_list[] =
      sizeof(double), FMOffset(simple_rec_ptr, double_field)},
     {"char_field", "char",
      sizeof(char), FMOffset(simple_rec_ptr, char_field)},
+    {"string_field", "string",
+     sizeof(char*), FMOffset(simple_rec_ptr, string_field)},
     {"scan_sum", "integer",
      sizeof(int), FMOffset(simple_rec_ptr, scan_sum)},
     {NULL, NULL, 0, 0}
@@ -115,6 +119,8 @@ static FMField bigger_field_list[] =
      sizeof(double), FMOffset(bigger_rec_ptr, double_field)},
     {"char_field", "char",
      sizeof(char), FMOffset(bigger_rec_ptr, char_field)},
+    {"string_field", "string",
+     sizeof(char*), FMOffset(bigger_rec_ptr, string_field)},
     {"scan_sum", "integer",
      sizeof(int), FMOffset(bigger_rec_ptr, scan_sum)},
     {NULL, NULL, 0, 0}
@@ -163,6 +169,10 @@ generate_record(simple_rec_ptr event)
     sum += ((int) (event->double_field * 100.0)) % 100;
     event->char_field = lrand48() % 128;
     sum += event->char_field;
+    if (event->long_field % 2) 
+	event->string_field = strdup("odd");
+    else 
+	event->string_field = strdup("even");
     sum = sum % 100;
     event->scan_sum = (int) sum;
 }
@@ -190,6 +200,10 @@ generate_bigger_record(bigger_rec_ptr event)
     sum += ((int) (event->double_field * 100.0)) % 100;
     event->char_field = lrand48() % 128;
     sum += event->char_field;
+    if (event->long_field % 2) 
+	event->string_field = strdup("odd");
+    else 
+	event->string_field = strdup("even");
     sum = sum % 100;
     event->scan_sum = (int) sum;
 }
@@ -223,6 +237,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 	printf("	long_field = %ld\n", event->long_field);
 	printf("	double_field = %g\n", event->double_field);
 	printf("	char_field = %c\n", event->char_field);
+	printf("	string_field = %s\n", event->string_field);
 	printf("Data was received with attributes : \n");
 	if (attrs) dump_attr_list(attrs);
     }
@@ -262,6 +277,7 @@ bigger_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 	printf("	long_field = %ld\n", event->long_field);
 	printf("	double_field = %g\n", event->double_field);
 	printf("	char_field = %c\n", event->char_field);
+	printf("	string_field = %s\n", event->string_field);
 	printf("Data was received with attributes : \n");
 	if (attrs) dump_attr_list(attrs);
     }
@@ -345,8 +361,9 @@ main(int argc, char **argv)
 	term = EValloc_stone(cm);
 	EVassoc_terminal_action(cm, term, simple_format_list, simple_handler, NULL);
 	EVassoc_terminal_action(cm, term, bigger_format_list, bigger_handler, NULL);
-	filter = create_filter_action_spec(simple_format_list, "{\
-    return input.long_field % 2;\
+	filter = create_filter_action_spec(simple_format_list, "#include <string.h>\n\
+{\
+    return strcmp(input.string_field, \"odd\");\
 }\0\0");
 	
 	fstone = EValloc_stone(cm);

@@ -1684,7 +1684,6 @@ add_standard_routines(stone_type stone, cod_parse_context context)
 		void *malloc(int size);\n\
 		void sleep(int seconds);\n\
 		void free(void *pointer);\n\
-		char * strstr(char * haystack, char * needle);\n\
 		long lrand48();\n\
 		double drand48();\n\
 		int EVmax_output(cod_exec_context ec);\n\
@@ -1700,7 +1699,6 @@ add_standard_routines(stone_type stone, cod_parse_context context)
 	{"printf", (void *) 0},
 	{"malloc", (void*) 0},
 	{"free", (void*) 0},
-	{"strstr", (void*) 0},
 	{"lrand48", (void *) 0},
 	{"drand48", (void *) 0},
 	{"stone_attrs", (void *) 0},
@@ -1723,17 +1721,16 @@ add_standard_routines(stone_type stone, cod_parse_context context)
     externs[0].extern_value = (void *) (long) printf;
     externs[1].extern_value = (void *) (long) malloc;
     externs[2].extern_value = (void *) (long) free;
-    externs[3].extern_value = (void *) (long) strstr;
-    externs[4].extern_value = (void *) (long) lrand48;
-    externs[5].extern_value = (void *) (long) drand48;
-    externs[6].extern_value = (void *) (long) &stone->stone_attrs;
-    externs[7].extern_value = (void *) (long) &internal_cod_submit;
-    externs[8].extern_value = (void *) (long) &internal_cod_submit_attr;
-    externs[9].extern_value = (void *) (long) &internal_cod_submit_general;
-    externs[10].extern_value = (void *) (long) &sleep;
-    externs[11].extern_value = (void *) (long) &cod_max_output;
-    externs[12].extern_value = (void *) (long) &cod_target_stone_on_port;
-    externs[13].extern_value = (void *) (long) &cod_ev_get_stone_attrs;
+    externs[3].extern_value = (void *) (long) lrand48;
+    externs[4].extern_value = (void *) (long) drand48;
+    externs[5].extern_value = (void *) (long) &stone->stone_attrs;
+    externs[6].extern_value = (void *) (long) &internal_cod_submit;
+    externs[7].extern_value = (void *) (long) &internal_cod_submit_attr;
+    externs[8].extern_value = (void *) (long) &internal_cod_submit_general;
+    externs[9].extern_value = (void *) (long) &sleep;
+    externs[10].extern_value = (void *) (long) &cod_max_output;
+    externs[11].extern_value = (void *) (long) &cod_target_stone_on_port;
+    externs[12].extern_value = (void *) (long) &cod_ev_get_stone_attrs;
 
     cod_assoc_externs(context, externs);
     cod_parse_for_context(extern_string, context);
