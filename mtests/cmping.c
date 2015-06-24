@@ -237,6 +237,7 @@ main(int argc, char **argv)
 		printf("\n");
 		exit(1);
 	    }
+	    free_attr_list(contact_list);
 	}
 	format = CMregister_format(cm, simple_format_list);
 	CMregister_handler(format, simple_handler, NULL);
@@ -249,6 +250,7 @@ main(int argc, char **argv)
 	CMwrite_attr(conn, format, &data, attrs);
 	CMsleep(cm, 10);
 	free_attr_list(attrs);
+	if (conn) CMConnection_close(conn);
     }
     CManager_close(cm);
     return 0;
