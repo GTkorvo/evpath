@@ -184,7 +184,7 @@ IF (HAVE_IBVERBS)
    if( ${GOOD_MEMLOCK_LIMIT} )
 	message( STATUS "Check for large enough MEMLOCK rlimit to run IB tests - yes" )
 	SET(RUN_IB_TESTS True)
-	SET(RUN_NNTI_TESTS True)
+	SET(RUN_NNTI_TESTS False)
    else()
 	message( STATUS "Check for large enough MEMLOCK rlimit to run IB tests - no")
 	message( WARNING 
