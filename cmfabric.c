@@ -552,12 +552,24 @@ static int internal_write_response(CMtrans_services svc,
 		msg.u.resp.request_ID = request_ID;
 	}
 
-	iget = write(fcd->fd, &msg, sizeof(struct control_message));
-	if(iget != sizeof(struct control_message))
-	{
-		svc->trace_out(fcd->fabd->cm, "CMFABRIC error in writing response to %d", fcd->fd);
-		return -1;
+	memcpy(fcd->send_buf, &msg, sizeof(msg));
+	int ret;
+	
+	ret = fi_send(fcd->conn_ep, fcd->send_buf, sizeof(msg), fi_mr_desc(fcd->mr), 0, fcd->send_buf);
+	if (ret) {
+	    FT_PRINTERR("fi_send", ret);
+	    return ret;
 	}
+	
+	/* Read send queue */
+	do {
+	    struct fi_cq_entry comp;
+	    ret = fi_cq_read(fcd->scq, &comp, 1);
+	    if (ret < 0 && ret != -FI_EAGAIN) {
+		FT_PRINTERR("fi_cq_read", ret);
+		return ret;
+	    }
+	} while (ret == -FI_EAGAIN);
 
 	return 0;
 }
@@ -568,7 +580,7 @@ static int internal_write_request(CMtrans_services svc,
     				  void *request_ID)
 {
 	struct control_message msg;
-	int iget = 0;
+	int ret;
 
 	msg.type = msg_request;
 	msg.u.req.magic = 0xdeadbeef;
@@ -576,12 +588,24 @@ static int internal_write_request(CMtrans_services svc,
 	msg.u.req.request_ID = int64_from_ptr(request_ID);
 
 	svc->trace_out(fcd->fabd->cm, "Doing internal write request, writing %d bytes", sizeof(struct control_message));
-	iget = write(fcd->fd, &msg, sizeof(struct control_message));
-	if(iget != sizeof(struct control_message))
-	{
-		svc->trace_out(fcd->fabd->cm, "CMFABRIC error in writing request to %d", fcd->fd);
-		return -1;
+
+	memcpy(fcd->send_buf, &msg, sizeof(msg));
+	
+	ret = fi_send(fcd->conn_ep, fcd->send_buf, sizeof(msg), fi_mr_desc(fcd->mr), 0, fcd->send_buf);
+	if (ret) {
+	    FT_PRINTERR("fi_send", ret);
+	    return ret;
 	}
+	
+	/* Read send queue */
+	do {
+	    struct fi_cq_entry comp;
+	    ret = fi_cq_read(fcd->scq, &comp, 1);
+	    if (ret < 0 && ret != -FI_EAGAIN) {
+		FT_PRINTERR("fi_cq_read", ret);
+		return ret;
+	    }
+	} while (ret == -FI_EAGAIN);
 
 	return 0;
 }
