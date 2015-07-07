@@ -3146,17 +3146,18 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     event_item *event = get_free_event(evp);
     stone_type stone;
     (void)cm_data_buf;
-    FFSTypeHandle ffsh = FFSTypeHandle_from_encode(evp->ffsc, buffer);
-    if (ffsh == NULL) {
+    FMFormat reference_format = FMformat_from_ID(evp->fmc, buffer);
+    if (reference_format == NULL) {
 	printf("FFS failure format not found, incoming data incomprehensible, ignored\n");
 	printf("  This could be a FFS format server issue, a CMSelfFormats issue, a transport corruption issue, or something else...\n");
+	printf(" This could be a problem with the FFS format server, with CMSelfFormats, with a transport data corruption or something else\n");
 	return;
     }
     event->contents = Event_CM_Owned;
     event->event_encoded = 1;
     event->event_len = length;
     event->encoded_event = buffer;
-    event->reference_format = FMFormat_of_original(ffsh);
+    event->reference_format = reference_format;
     event->attrs = CMadd_ref_attr_list(cm, attrs);
     event->cm = cm;
     event->format = NULL;
