@@ -3148,7 +3148,8 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     (void)cm_data_buf;
     FFSTypeHandle ffsh = FFSTypeHandle_from_encode(evp->ffsc, buffer);
     if (ffsh == NULL) {
-	printf("FFS failure, incoming data incomprehensible, ignored\n");
+	printf("FFS failure format not found, incoming data incomprehensible, ignored\n");
+	printf("  This could be a FFS format server issue, a CMSelfFormats issue, a transport corruption issue, or something else...\n");
 	return;
     }
     event->contents = Event_CM_Owned;
