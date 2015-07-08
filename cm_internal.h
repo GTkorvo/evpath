@@ -239,7 +239,7 @@ struct _CMConnection {
     int closed;
     int failed;
 
-    CMFormat *downloaded_formats;
+    FMFormat *preloaded_formats;
     int remote_format_server_ID;   /* ID for the FFS format server in use by the peer */
     int remote_CManager_ID;   /* random, unique ID */
     int handshake_condition;

@@ -1007,7 +1007,7 @@ CMConnection_create(transport_entry trans, void *transport_data,
     conn->conn_ref_count = 1;
     conn->closed = 0;
     conn->failed = 0;
-    conn->downloaded_formats = NULL;
+    conn->preloaded_formats = NULL;
     conn->remote_format_server_ID = 0;
     conn->remote_CManager_ID = 0;
     conn->handshake_condition = -1;
@@ -1199,7 +1199,7 @@ INT_CMConnection_dereference(CMConnection conn)
 	CMConnection_failed(conn);
     }
     if (conn->write_callbacks) INT_CMfree(conn->write_callbacks);
-    INT_CMfree(conn->downloaded_formats);
+    INT_CMfree(conn->preloaded_formats);
     INT_CMfree_attr_list(conn->cm, conn->attrs);
     free_FFSBuffer(conn->io_out_buffer);
     free_AttrBuffer(conn->attr_encode_buffer);

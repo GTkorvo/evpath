@@ -535,7 +535,6 @@ static int internal_write_response(CMtrans_services svc,
 				   int64_t request_ID)
 {
 	struct control_message msg;
-	int iget = 0;
 
 	msg.type = msg_response;
 	if(tb != NULL)

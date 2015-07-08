@@ -311,7 +311,7 @@ extern void
 CMformat_preload(CMConnection conn, CMFormat format)
 {
     int load_count = 0;
-    CMFormat *loaded_list = conn->downloaded_formats;
+    FMFormat *loaded_list = conn->preloaded_formats;
     int my_FFSserver_ID = conn->cm->FFSserver_identifier;
     int remote_FFSserver_ID = conn->remote_format_server_ID;
     int preload = 0;
@@ -325,21 +325,27 @@ CMformat_preload(CMConnection conn, CMFormat format)
 
     if (conn->closed) return;
 
+    /* if (CMtrace_on(conn->cm, CMFormatVerbose)) { */
+    /* 	int junk; */
+    /* 	fprintf(conn->cm->CMTrace_file, "Considering CMpbio Preload of format "); */
+    /* 	fprint_server_ID(conn->cm->CMTrace_file, (unsigned char *)get_server_ID_FMformat(format->fmformat, &junk)); */
+    /* 	fprintf(conn->cm->CMTrace_file, " value %p\n", format); */
+    /* } */
     while (loaded_list && (*loaded_list != NULL)) {
-	if (*loaded_list == format) return;
+      if (*loaded_list == format->fmformat) return;
 	loaded_list++;
 	load_count++;
     }
     
     preload_pbio_format(conn, format->fmformat);
 
-    if (conn->downloaded_formats == NULL) {
+    if (conn->preloaded_formats == NULL) {
 	loaded_list = malloc(2*sizeof(*loaded_list));
     } else {
-	loaded_list = realloc(conn->downloaded_formats, 
+	loaded_list = realloc(conn->preloaded_formats, 
 			      sizeof(*loaded_list) * (load_count + 2));
     }
-    loaded_list[load_count] = format;
+    loaded_list[load_count] = format->fmformat;
     loaded_list[load_count+1] = NULL;
-    conn->downloaded_formats = loaded_list;
+    conn->preloaded_formats = loaded_list;
 }
