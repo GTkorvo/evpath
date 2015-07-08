@@ -3149,8 +3149,11 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
     FMFormat reference_format = FMformat_from_ID(evp->fmc, buffer);
     if (reference_format == NULL) {
 	printf("FFS failure format not found, incoming data incomprehensible, ignored\n");
+	fprintf(cm->CMTrace_file, "Buffer format is ");
+	fprint_server_ID(cm->CMTrace_file, buffer);
+	fprintf(cm->CMTrace_file, "\n");
+
 	printf("  This could be a FFS format server issue, a CMSelfFormats issue, a transport corruption issue, or something else...\n");
-	printf(" This could be a problem with the FFS format server, with CMSelfFormats, with a transport data corruption or something else\n");
 	return;
     }
     event->contents = Event_CM_Owned;
