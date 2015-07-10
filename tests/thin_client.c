@@ -78,6 +78,8 @@ main(int argc, char **argv)
     generate_record(&rec);
     write_FFSfile(out_connection, ioformat, &rec);
     close_FFSfile(out_connection);
+    free_FFSfile(out_connection);
+    free(comment);
     return 0;
 }
 
@@ -122,6 +124,7 @@ void
 generate_record(simple_rec_ptr event)
 {
     long sum = 0;
+    memset(event, 0, sizeof(*event));
     event->integer_field = (int) lrand48() % 100;
     sum += event->integer_field % 100;
     event->short_field = ((short) lrand48());
