@@ -327,6 +327,7 @@ char **argv;
 	    printf("Write %d messages\n", MSG_COUNT);
 	}
 	free_attr_list(attrs);
+	CMConnection_close(conn);
     }
     CManager_close(cm);
     return 0;

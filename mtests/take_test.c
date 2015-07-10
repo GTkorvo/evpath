@@ -115,6 +115,7 @@ generate_record(simple_rec_ptr event)
 {
     int i;
     long sum = 0;
+    memset(event, 0, sizeof(*event));
     event->integer_field = (int) lrand48() % 100;
     sum += event->integer_field % 100;
     event->short_field = ((short) lrand48());
@@ -135,9 +136,11 @@ generate_record(simple_rec_ptr event)
     event->scan_sum = (int) sum;
     event->vec_count = vecs;
     event->vecs = malloc(sizeof(event->vecs[0]) * vecs);
+    memset(event->vecs, 0, sizeof(event->vecs[0]) * vecs);
     for (i=0; i < vecs; i++) {
 	event->vecs[i].iov_len = size/vecs;
 	event->vecs[i].iov_base = malloc(event->vecs[i].iov_len);
+	memset(event->vecs[i].iov_base, 0, event->vecs[i].iov_len);
     }
 }
 
@@ -314,6 +317,7 @@ main(int argc, char **argv)
 	    printf("Write %d messages\n", MSG_COUNT);
 	}
 	free_attr_list(attrs);
+	CMConnection_close(conn);
     }
     for (i=0 ; i<QUEUE_SIZE; i++) {
         if (queue[i] != NULL )  CMreturn_buffer(cm, queue[i]);
