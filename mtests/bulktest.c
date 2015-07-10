@@ -136,11 +136,24 @@ generate_record(simple_rec_ptr event)
     event->scan_sum = (int) sum;
     event->vec_count = vecs;
     event->vecs = malloc(sizeof(event->vecs[0]) * vecs);
+    memset(event->vecs, 0, sizeof(event->vecs[0]) * vecs);
     if (quiet <= 0) printf("Sending %d vecs of size %d\n", vecs, size/vecs);
     for (i=0; i < vecs; i++) {
 	event->vecs[i].iov_len = size/vecs;
 	event->vecs[i].iov_base = malloc(event->vecs[i].iov_len);
+	memset(event->vecs[i].iov_base, 0, event->vecs[i].iov_len);
     }
+}
+
+static
+void 
+free_record(simple_rec_ptr event)
+{
+    int i;
+    for (i=0; i < event->vec_count; i++) {
+      free(event->vecs[i].iov_base);
+    }
+    free(event->vecs);
 }
 
 static int done=0;
@@ -267,6 +280,7 @@ main(int argc, char **argv)
 	    attr_list contact_list;
 	    contact_list = attr_list_from_string(argv[1]);
 	    conn = CMinitiate_conn(cm, contact_list);
+	    free_attr_list(contact_list);
 	    if (conn == NULL) {
 		printf("No connection, attr list was :");
 		dump_attr_list(contact_list);
@@ -304,10 +318,13 @@ main(int argc, char **argv)
 	}
 	if (quiet <= 0) printf("Write %d messages\n", MSG_COUNT);
 	free_attr_list(attrs);
+	free_record(data);
+	free(data);
     }
     while(!done) {
 	CMsleep(cm, 1);
     }
+    if (conn) CMConnection_close(conn);
     CManager_close(cm);
     return 0;
 }
