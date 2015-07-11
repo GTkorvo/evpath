@@ -180,6 +180,7 @@ test_fork_children(char **list, char *master_contact)
     char *args[20];
     int i = 0;
     int list_index = 1;
+    static int pid_index = 1;
     /* assume that we are list[0] */
     while(subproc_args[start_subproc_arg_count + i] != NULL) {
         args[i] = subproc_args[start_subproc_arg_count+i];
@@ -191,14 +192,15 @@ test_fork_children(char **list, char *master_contact)
     args[i++] = "-c";
     args[i+1] = master_contact;
     args[i+2] = NULL;
-    pid_list = malloc(sizeof(pid_list[0]));
+    if (!pid_list) pid_list = malloc(sizeof(pid_list[0]));
     while(list[list_index] != NULL) {
 	args[i] = list[list_index];
-	pid_list[list_index -1 ] = run_subprocess(args);
+	pid_list[pid_index -1 ] = run_subprocess(args);
 	list_index++;
-	pid_list = realloc(pid_list, sizeof(pid_list[0]) * list_index);
+	pid_index++;
+	pid_list = realloc(pid_list, sizeof(pid_list[0]) * pid_index);
     }
-    pid_list[list_index - 1] = 0;
+    pid_list[pid_index - 1] = 0;
 }
 
 static void
