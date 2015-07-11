@@ -384,6 +384,22 @@ perform_actions_on_nodes(EVdfg_configuration config, EVmaster master)
 	    }
 	    break;
 	}
+	case ACT_freeze: {
+	    if (local) {
+		INT_EVfreeze_stone(cm, act.stone_id);
+	    } else {
+		INT_REVfreeze_stone(conn, act.stone_id);
+	    }
+	    break;
+	}
+	case ACT_unfreeze: {
+	    if (local) {
+		INT_EVunfreeze_stone(cm, act.stone_id);
+	    } else {
+		INT_REVunfreeze_stone(conn, act.stone_id);
+	    }
+	    break;
+	}
 	default:
 	    printf("Bad action in perform_action_on_nodes %s (%d)\n", ACT_string[act.type], act.type);
 	    break;
@@ -1913,6 +1929,23 @@ add_bridge_stones(EVdfg dfg, EVdfg_configuration config)
 }
 
 static void
+add_unfreeze_actions(EVdfg dfg, EVdfg_configuration config)
+{
+    int i;
+    for (i=0; i< config->stone_count; i++) {
+	EVdfg_stone_state cur = config->stones[i];
+	if (cur->condition == EVstone_Frozen) {
+	    EVdfg_config_action fact;
+	    fact.type = ACT_unfreeze;
+	    fact.stone_id = cur->stone_id;
+	    fact.node_for_action = cur->node;
+	    EVdfg_add_act_to_queue(config, fact);
+	    cur->condition = EVstone_Deployed;
+	}
+    }
+}
+
+static void
 add_stone_to_deploy_msg(EVdfg_configuration config, EVdfg_deploy_msg *msg, EVdfg_stone_state dstone) 	    
 {
     deploy_msg_stone mstone;
@@ -2002,6 +2035,8 @@ build_deploy_msg_for_node_stones(EVdfg_configuration config, int act_num, EVmast
 	case ACT_set_attrs:
 	case ACT_assign_node:
 	case ACT_destroy:
+	case ACT_freeze:
+	case ACT_unfreeze:
 	    break;
 	default:
 	    printf("Bad action in build_deploy_msg_for_nodes %s (%d)\n", ACT_string[act.type], act.type);
@@ -2296,7 +2331,7 @@ perform_deployment(EVdfg dfg)
 	assert(master->state == DFG_Reconfiguring);
 	assign_actions_to_nodes(dfg->working_state, dfg->master);
 	add_bridge_stones(dfg, dfg->working_state);
-//	add_unfreeze_actions(dfg, dfg->working_state);
+	add_unfreeze_actions(dfg, dfg->working_state);
 	if (CMtrace_on(master->cm, EVdfgVerbose)) {
 	    fprintf(master->cm->CMTrace_file, "EVDFG pending actions to be done on nodes\n");
 	    for (i=0; i < dfg->working_state->pending_action_count; i++) {
