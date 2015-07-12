@@ -214,7 +214,23 @@
     ...
     fun:*
     fun:INT_CMwrite_raw
-    fun:internal_write_event
+}
+{
+  don't warn about uninit write vectors.  Too common...
+    Memcheck:Param
+    writev(vector[...])
+    fun:*
+    fun:*
+    fun:*
+    fun:INT_CMwrite_raw
+}
+{
+  don't warn about uninit write vectors.  Too common...
+    Memcheck:Param
+    writev(vector[...])
+    fun:*
+    fun:*
+    fun:INT_CMwrite_raw
 }
 {
    known_leak
@@ -222,4 +238,13 @@
    fun:malloc
    fun:INT_CMregister_simple_format
    fun:CMregister_simple_format
+}
+{
+  don't warn about uninit write vectors.  Too common...
+    Memcheck:Param
+     socketcall.sendmsg(msg.msg_iov[i])
+    obj:/lib/x86_64-linux-gnu/libpthread-2.15.so
+    ...
+    fun:*
+    fun:INT_CMwrite_raw
 }
