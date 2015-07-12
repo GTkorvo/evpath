@@ -123,6 +123,7 @@ be_test_master(int argc, char **argv)
 	    EVdfg_link_dest(last[j/base], tmp[j]);
 	    EVdfg_assign_node(tmp[j], nodes[n-1]);
 	}
+	free(chandle);
     } else {
 	/* fanin */
 	EVdfg_stone sink;
@@ -198,6 +199,7 @@ be_test_child(int argc, char **argv)
     sprintf(chandle,"handler%s", argv[1]);
     sink_capabilities = EVclient_register_sink_handler(cm,chandle, simple_format_list,
 				(EVSimpleHandlerFunc) simple_handler, NULL);
+    free(chandle);
     test_client = EVclient_assoc(cm, argv[1], argv[2], source_capabilities, sink_capabilities);
     EVclient_ready_wait(test_client);
     if (EVclient_active_sink_count(test_client) == 0) {
