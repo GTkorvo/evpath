@@ -741,7 +741,10 @@ libcmenet_LTX_writev_func(CMtrans_services svc, enet_conn_data_ptr ecd,
     }
 
     /* Send the packet to the peer over channel id 0. */
-    if (enet_peer_send (ecd->peer, 0, packet) == -1) return -1;
+    if (enet_peer_send (ecd->peer, 0, packet) == -1) {
+        enet_packet_destroy(packet);
+	return -1;
+    }
     if (last_flush_call == 0) {
 	enet_host_flush(ecd->sd->server);
 	last_flush_call = time(NULL);
