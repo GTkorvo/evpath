@@ -351,6 +351,8 @@ install_response_handler(CManager cm, int stone_id, char *response_spec,
 	    struct_list[j] = in_list;
 	    if (struct_list[j]->field_list == NULL) {  /* anonymous */
 		free(struct_list[j]->format_name);
+		free(in_list);
+		struct_list[j] = NULL;
 		list_count--;
 		j--;
 		accept_anonymous++;
