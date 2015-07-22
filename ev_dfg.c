@@ -1057,6 +1057,7 @@ handle_node_join(EVmaster master, EVmaster_msg_ptr msg)
 		    master->nodes[node].self = 1;
 		    master->client->my_node_id = node;
 		} else {
+		    INT_CMConnection_add_reference(conn);  /* cause we'll be keeping this */
 		    master->nodes[node].conn = conn;
 		    master->nodes[node].str_contact_list = strdup(contact_string);
 		    master->nodes[node].contact_list = attr_list_from_string(master->nodes[node].str_contact_list);
@@ -2483,6 +2484,11 @@ possibly_signal_shutdown(EVmaster master, int value, CMConnection conn)
     }
     /* sleep briefly to let the shutdown messages go out */
     INT_CMsleep(master->cm, 1);
+    for (i=0; i < master->node_count; i++) {
+	if (master->nodes[i].conn != NULL) {
+	    INT_CMConnection_close(master->nodes[i].conn);
+	}
+    }
     if (master->client) {
 	master->client->shutdown_value = status;
 	i = 0;

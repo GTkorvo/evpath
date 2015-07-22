@@ -271,7 +271,7 @@ be_test_child(int argc, char **argv)
     }
     EVfree_source(src);
     if (die_early) {
-	CMsleep(cm, 45);
+	CMsleep(cm, 15);
 	if (!quiet) printf("Node %s exiting early\n", argv[1]);
 	exit(0);
     } else {
