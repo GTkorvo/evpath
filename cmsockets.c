@@ -153,6 +153,7 @@ CMtrans_services svc;
 {
     socket_conn_data_ptr socket_conn_data =
     svc->malloc_func(sizeof(struct socket_connection_data));
+    memset(socket_conn_data, 0, sizeof(struct socket_connection_data));
     socket_conn_data->remote_host = NULL;
     socket_conn_data->remote_contact_port = -1;
     socket_conn_data->fd = 0;
