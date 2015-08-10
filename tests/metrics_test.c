@@ -171,7 +171,6 @@ main(int argc, char **argv)
 
     if (argc == 1) {
 	attr_list contact_list, listen_list = NULL;
-	char *postfix = NULL;
 	char *string_list;
 	EVstone stone;
 	if (!transport) transport = getenv("CMTransport");
@@ -241,7 +240,7 @@ do_regression_master_test()
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
-    char *string_list, *transport, *postfix;
+    char *string_list, *transport;
     int message_count = 0, i;
     EVstone handle;
 #ifdef HAVE_WINDOWS_H
