@@ -35,7 +35,6 @@
 #include "evpath.h"
 #include "cm_internal.h"
 #include "cod.h"
-#ifndef TARGET_CNL
 #include <fcntl.h>
 
 /*#define CPU_FREQ_SCALING_MAX_FREQ "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq"*/
@@ -995,11 +994,6 @@ add_metrics_routines(stone_type stone, cod_parse_context context)
     cod_parse_for_context(extern_string, context);
 }
 
-#else
-void
-add_metrics_routines(stone_type stone, cod_parse_context context)
-{}
-#endif //End of !TARGET_CNL
 
 /*int main(int argc, char **argv) {
 	//num_cpustates_func();
