@@ -11,9 +11,6 @@
 
 static int status;
 static EVclient test_client;
-static int base=2;
-
-static int node_count = 0;
 
 typedef struct _metrics_rec {
     double    dtimeofday;
@@ -108,7 +105,11 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 	first_event = *event;
 	return 0;
     } else {
-	EVclient_shutdown(test_client, DFG_STATUS_SUCCESS);
+        if (first_event.dtimeofday >= event->dtimeofday) {
+	    EVclient_shutdown(test_client, DFG_STATUS_FAILURE);
+        } else {
+	    EVclient_shutdown(test_client, DFG_STATUS_SUCCESS);
+        }
     }
     (void)cm;
     if (client_data != NULL) {
@@ -226,8 +227,8 @@ extern int
 be_test_child(int argc, char **argv)
 {
     CManager cm;
-    EVclient_sinks sink_capabilities;
-    EVclient_sources source_capabilities;
+    EVclient_sinks sink_capabilities = NULL;
+    EVclient_sources source_capabilities = NULL;
 
     cm = CManager_create();
     if (argc != 3) {
