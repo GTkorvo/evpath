@@ -1739,7 +1739,8 @@ process_events_stone(CManager cm, int s, action_class c)
 		fprintf(cm->CMTrace_file, "next action event %lx on ", (long)event);
 		fprint_stone_identifier(cm->CMTrace_file, evp, s);
 		fprintf(cm->CMTrace_file, " action type is %s, reference_format is %p (%s), stage is %d, requires_decoded is %d\n",
-			action_str[resp->action_type], resp->reference_format, global_name_of_FMFormat(resp->reference_format), 
+			action_str[resp->action_type], resp->reference_format, 
+			resp->reference_format ? global_name_of_FMFormat(resp->reference_format) : "<none>",
 			resp->stage, resp->requires_decoded);
 		fdump_action(cm->CMTrace_file, stone, resp, resp->proto_action_id, "    ");
 	    }
@@ -2245,7 +2246,12 @@ INT_EVassoc_anon_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
     resp->reference_format = anon_target;
     if (CMtrace_on(cm, EVerbose)) {
 	char *tmp;
-	fprintf(cm->CMTrace_file, "\tResponse %d for format \"%s\"(%p)", stone->response_cache_count, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
+	if (resp->reference_format) {
+	    tmp = global_name_of_FMFormat(resp->reference_format);
+	} else {
+	    tmp = strdup("<none>");
+	}
+	fprintf(cm->CMTrace_file, "\tResponse %d for format \"%s\"(%p)", stone->response_cache_count, tmp, resp->reference_format);
 	free(tmp);
     }
     stone->response_cache_count += 1;
@@ -2286,7 +2292,12 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
 	resp->reference_format = reference_formats[i];
 	if (CMtrace_on(cm, EVerbose)) {
 	    char *tmp;
-	    fprintf(cm->CMTrace_file, "\tResponse %d for format \"%s\"(%p)\n", stone->response_cache_count+i, tmp = global_name_of_FMFormat(resp->reference_format), resp->reference_format);
+	    if (resp->reference_format) {
+		tmp = global_name_of_FMFormat(resp->reference_format);
+	    } else {
+		tmp = strdup("<none>");
+	    }
+	    fprintf(cm->CMTrace_file, "\tResponse %d for format \"%s\"(%p)\n", stone->response_cache_count+i, tmp, resp->reference_format);
 	    free(tmp);
 	}
     }
