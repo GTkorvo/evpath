@@ -2239,6 +2239,7 @@ verify_multityped_code(CManager cm, struct response_spec *mrd, stone_type stone,
     }
 
     add_standard_routines(stone, parse_context);
+    add_metrics_routines(stone, parse_context);
     add_queued_routines(parse_context, formats);
     add_queued_constants(parse_context, formats);
     if (cm->evp->extern_structs) {
@@ -2286,6 +2287,7 @@ generate_multityped_code(CManager cm, struct response_spec *mrd, stone_type ston
     }
 
     add_standard_routines(stone, parse_context);
+    add_metrics_routines(stone, parse_context);
     add_queued_routines(parse_context, formats);
     add_queued_constants(parse_context, formats);
     if (cm->evp->extern_structs) {
