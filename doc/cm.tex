@@ -393,22 +393,24 @@ This program should be run with its first argument being the contact list
 string printed out by the example in Section~\ref{hello}.  
 
 \subsection{Linking and Running}
-CM is built with `libtool', a tool which hides the complexity of building
-and using shared libraries behind a consistent, portable interface. On
-platforms where it is possible, the  library will be built as both a
-traditional static library (.a file) and a shared library (.so file). 
-CM extensively uses libtool's support for dynamically loading code modules
-at runtime.  
+CM is built with some custom CMake macros that 1) build both a static
+library and a DLL (shared object for dynamic linking), and 2) create a .la
+for use with `libtool'.  libtool is closely associated with the
+autoconf/automake toolset and was designed to hide the complexity of building
+and using shared libraries behind a consistent, portable interface. At one
+point CM used libtool extensively, but we have now switched to CMake as a
+configuration tool, so libtool support is largely deprecated.
 
-CM applications can also be built with libtool. How this is done is best
-explained by the libtool documentation, available from
+If you want to build a CM application with libtool, how this is done is best
+explained by the libtool documentation available from
 http://www.gnu.org/software/libtool/libtool.html.  If libtool is utilized,
 using CM involves adding ``-levpath'' to the link  line, preceeded if necessary
 by an appropriate ``-Llibdirectory'' flag.  Libtool will locate any other
 libraries required by libtool.  
 
-It is also possible to link CM applications without libtool. If this is
-done, the libraries that CM depends upon must be specified explicitly. A
+At this point, it is more common to link CM applications without
+libtool. Depending upon the platform, it {\it may} be necessary to specify
+the transitive closure of all libraries that CM depends upon. A
 typical library spec might be ``-levpath -latl -lffs'', again preceeded by an
 appropriate ``-Llibdirectory'' flag.  (Some platforms, such as ancient
 Solaris, may also need ``-lnsl -lsocket''.)
@@ -419,7 +421,7 @@ and .so file are available in ``libdirectory'', the .so form will be used
 with implications describe in the next subsection.
 
 \subsubsection{Using the shared library version}
-On some platforms (such as linux), the -L flag is not the only flag that
+On many linux-flavored platforms, the -L flag is not the only flag that
 controls where shared libraries might be found. In particular, -L only
 controls the {\it link time} search path for shared libraries. Other flags,
 typically -R or -rpath, control the search path that will be used at {\it run time}.
@@ -716,35 +718,13 @@ various control styles are possible, CM does need to know some basics, such
 as what thread library in use.  Given that, it can infer other information,
 such as which thread is responsible for handling network traffic.
 
-\subsection{Threads Interface}
+\subsection{Thread Safety}
 
-In order to avoid the need to build a different version of the CM library
-for every available thread package, CM does not contain embedded calls to
-any particular thread package.  Instead, invokes thread locking through
-function pointers provided by a package called {\it gen\_thread}.
-Gen\_thread is distributed with CM and essentially, it provides a generic
-wrapper mechanism that captures common functionality of thread packages.  CM
-and gen\_thread are organized such that it is only necessary to link with
-the gen\_thread library if a thread package is in use.  Gen\_thread comes
-with interfaces to three threads libraries, Georgia Tech Cthreads, generic
-POSIX threads, and native Windows threads, but interfaces to additional
-libraries are easily constructed.\footnote{Information on constructing new
-interfaces can be found in the {\tt README} file in the gen\_thread
-distribution.}  To a great extent, the impact upon the application caused by
-CM using thread functions should be minimal.  Except where discussed in the
-next section, CM only uses mutex locks to protect critical data structures
-from simultaneous access.  When locks are used, CM attempts to lock at the
-smallest granularity possible to maximize the potential for concurrent
-execution.  In general, read operations do not interfere with write
-operations, and operations on a single CMConnection lock only that port.
-Blocking operations, such as connection writes, hold the appropriate lock
-for the duration of the operation.  To avoid broad long-term locks, the
-polling operations are an exception to this rule.  They acquire locks just
-before data is read from ready ports.  Many miscellaneous informational and
-housekeeping operations (such as format and handler registration, etc.) also
-momentarily acquire locks on CM-level data structures.  However these
-operations are not generally blocking, so short-term locking involved is
-unlikely to significantly affect application behavior.
+CM/EVPath is a threaded and thread-safe environment.  Generally CM protects
+itself and its own data structures with locking as appropriate.  Currently
+CM builds with Pthread-based locking on all supported platforms.
+Depending upon the nature of CM/EVpath use, applications may need to protect
+their own data structures from concurrent access in handlers, etc.  
 
 \subsection{Common Control Structures for CM Programs}
 
@@ -849,8 +829,10 @@ main() {
     /*
      * register formats and handlers
      */
-    thr_fork(worker_task, data);  /* fork worker threads */
-    thr_fork(worker_task2, data2);  /* fork worker threads */
+
+                /* fork worker threads */
+    (void) pthread_create(&worker_thread, NULL, worker_task, (void *)data); 
+    (void) pthread_create(&worker_thread2, NULL, worker_task2, (void *)data2); 
     CMrun_network(cm);  /* service network until shutdown */
     CManager_close(cm);
 }
@@ -866,10 +848,11 @@ main() {
      * register formats and handlers
      */
     CMfork_comm_thread(cm);   /* fork network handler thread */
-    work_thread = thr_fork(worker_task, data);  /* fork worker threads */
-    work_thread2 = thr_fork(worker_task2, data2);  /* fork worker threads */
-    thr_thread_join(work_thread);
-    thr_thread_join(work_thread2);  /* wait for threads to exit */
+                /* fork worker threads */
+    (void) pthread_create(&worker_thread, NULL, worker_task, (void *)data); 
+    (void) pthread_create(&worker_thread2, NULL, worker_task2, (void *)data2); 
+    pthread_join(work_thread, &status);
+    pthread_join(work_thread2, &status);  /* wait for threads to exit */
     CManager_close(cm);
 }
 \end{BVerbatim}
