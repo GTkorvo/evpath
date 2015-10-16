@@ -99,6 +99,7 @@ be_test_master(int argc, char **argv)
 	EVdfg_assign_node(tmp, nodes[i]);
 	last = tmp;
     }
+    free(filter);
     sink = EVdfg_create_sink_stone(test_dfg, "simple_handler");
     EVdfg_link_dest(last, sink);
     EVdfg_assign_node(sink, nodes[node_count-1]);

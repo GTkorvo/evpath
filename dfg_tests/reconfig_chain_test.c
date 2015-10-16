@@ -103,6 +103,7 @@ join_handler(EVmaster master, char *identifier, void* available_sources, void *a
 	    char *filter;
 	    filter = create_filter_action_spec(NULL, filter_func);
 	    tmp = EVdfg_create_stone(dfg, filter);
+	    free(filter);
 	    EVdfg_link_port(last, 0, tmp);
 	    sprintf(str, "client%d", i);
 	    EVdfg_assign_node(tmp, str);
@@ -127,6 +128,7 @@ join_handler(EVmaster master, char *identifier, void* available_sources, void *a
 	middle_stone = EVdfg_create_stone(dfg, filter);
 	EVdfg_assign_node(middle_stone, canon_name);
 		
+	free(filter);
 	free(canon_name);
 	EVdfg_unlink_port(src, 0);
 	EVdfg_link_port(src, 0, middle_stone);

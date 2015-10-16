@@ -135,7 +135,7 @@ be_test_master(int argc, char **argv)
 	char *action_spec = create_transform_action_spec(NULL,simple_format_list,COD_generate);
 	for(i=0; i < node_count; i++) {
 	    EVdfg_stone autos;
-	    autos = EVdfg_create_stone(test_dfg, strdup(action_spec));
+	    autos = EVdfg_create_stone(test_dfg, action_spec);
 	    EVdfg_assign_node(autos, nodes[i]);
 	    EVdfg_enable_auto_stone(autos, 1, 0);
 	    EVdfg_link_dest(autos, sink); 

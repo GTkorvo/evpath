@@ -169,10 +169,13 @@ handle_queued_messages_lock(CManager cm, void* vmaster)
 EVdfg_stone
 INT_EVdfg_create_source_stone(EVdfg dfg, char *source_name)
 {
+    EVdfg_stone tmp;
     int len = strlen(source_name) + strlen("source:");
     char *act = malloc(len + 1);
     strcpy(stpcpy(&act[0], "source:"), source_name);
-    return INT_EVdfg_create_stone(dfg, &act[0]);
+    tmp = INT_EVdfg_create_stone(dfg, &act[0]);
+    free(act);
+    return tmp;
 }
 
 extern void 
@@ -182,15 +185,19 @@ INT_EVdfg_add_sink_action(EVdfg_stone stone, char *sink_name)
     char *act = malloc(len + 1);
     strcpy(stpcpy(&act[0], "sink:"), sink_name);
     INT_EVdfg_add_action(stone, &act[0]);
+    free(act);
 }
 
 EVdfg_stone
 INT_EVdfg_create_sink_stone(EVdfg dfg, char *sink_name)
 {
+    EVdfg_stone tmp;
     int len = strlen(sink_name) + strlen("sink:");
     char *act = malloc(len + 1);
     strcpy(stpcpy(&act[0], "sink:"), sink_name);
-    return INT_EVdfg_create_stone(dfg, &act[0]);
+    tmp = INT_EVdfg_create_stone(dfg, &act[0]);
+    free(act);
+    return tmp;
 }
 
 static int
@@ -229,7 +236,7 @@ INT_EVdfg_add_action(EVdfg_stone stone, char *action)
     EVdfg_config_action act;
     act.type = ACT_add_action;
     act.stone_id = stone->stone_id;
-    act.u.create.action = action;
+    act.u.create.action = action ? strdup(action) : NULL;
     EVdfg_perform_act_on_state(stone->dfg->working_state, act, 1 /* add to queue */);
 }
 
@@ -242,7 +249,7 @@ INT_EVdfg_create_stone(EVdfg dfg, char *action)
     stone->stone_id = 0x80000000 | dfg->stone_count++;
     act.type = ACT_create;
     act.stone_id = stone->stone_id;
-    act.u.create.action = action;
+    act.u.create.action = action ? strdup(action) : NULL;
     dfg->stones = realloc(dfg->stones, sizeof(dfg->stones[0]) * dfg->stone_count);
     dfg->stones[dfg->stone_count-1] = stone;
     EVdfg_perform_act_on_state(dfg->working_state, act, 1 /* add to queue */);

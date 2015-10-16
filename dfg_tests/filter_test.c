@@ -77,6 +77,7 @@ be_test_master(int argc, char **argv)
 
     filter_action_spec = create_filter_action_spec(filter_format_list, "{int ret = input.long_field % 2;return ret;}\0\0");
     filter = EVdfg_create_stone(test_dfg, filter_action_spec);
+    free(filter_action_spec);
     EVdfg_link_dest(src, filter);
     sink = EVdfg_create_sink_stone(test_dfg, "simple_handler");
     EVdfg_link_dest(filter, sink);

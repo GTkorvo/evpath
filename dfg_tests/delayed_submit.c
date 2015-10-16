@@ -153,6 +153,7 @@ char *COD_multi = "{\n\
 
     M1_action_spec = create_multityped_action_spec(queue_list, COD_multi);
     M1 = EVdfg_create_stone(test_dfg, M1_action_spec);
+    free(M1_action_spec);
     EVdfg_assign_node(S1, "b");
     EVdfg_assign_node(T1, "a");
     EVdfg_assign_node(M1, "a");

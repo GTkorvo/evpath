@@ -92,7 +92,7 @@ be_test_master(int argc, char **argv)
     last = src;
 
     for (i=1; i < node_count -1; i++) {
-        tmp = EVdfg_create_stone(test_dfg, strdup(filter));
+        tmp = EVdfg_create_stone(test_dfg, filter);
 	EVdfg_link_dest(last, tmp);
 	EVdfg_assign_node(tmp, nodes[i]);
 	last = tmp;

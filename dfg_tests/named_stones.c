@@ -160,6 +160,7 @@ char *COD_monitor = "{\n\
 
     A1_action_spec = create_transform_action_spec(NULL, result_format_list, COD_monitor);
     A1 = EVdfg_create_stone(test_dfg, A1_action_spec);
+    free(A1_action_spec);
     EVdfg_assign_node(S1, "b");
     EVdfg_assign_node(T1, "a");
     EVdfg_assign_node(A1, "a");

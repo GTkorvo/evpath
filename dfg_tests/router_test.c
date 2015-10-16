@@ -99,6 +99,7 @@ be_test_master(int argc, char **argv)
     EVdfg_assign_node(source, nodes[0]);
 
     router = EVdfg_create_stone(test_dfg, router_action);
+    free(router_action);
     EVdfg_assign_node(router, nodes[0]);
 
     EVdfg_link_dest(source, router);

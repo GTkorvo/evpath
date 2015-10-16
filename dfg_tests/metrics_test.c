@@ -188,6 +188,7 @@ be_test_master(int argc, char **argv)
     
     auto_action_spec = create_transform_action_spec(NULL, metrics_format_list, ECL_generate);
     src = EVdfg_create_stone(test_dfg, auto_action_spec);
+    free(auto_action_spec);
 
     EVdfg_assign_node(src, "a");
     EVdfg_enable_auto_stone(src, 1, 0);

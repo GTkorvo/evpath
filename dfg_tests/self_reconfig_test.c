@@ -128,6 +128,7 @@ reconfig_handler(EVdfg dfg)
     }
     filter = create_filter_action_spec(NULL, new_filter_func);
     middle_stone = EVdfg_create_stone(dfg, filter);
+    free(filter);
     EVdfg_assign_node(middle_stone, nodes[node_count/2-1]);
     if (!quiet)
 	printf("new stone deployed to node %s\n", nodes[node_count/2]);
@@ -211,6 +212,7 @@ be_test_master(int argc, char **argv)
 	}
 	last = tmp;
     }
+    free(filter);
     sink = EVdfg_create_sink_stone(test_dfg, "simple_handler");
     stones[node_count-1] = sink;
     EVdfg_link_dest(last, sink);
