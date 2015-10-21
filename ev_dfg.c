@@ -2052,6 +2052,10 @@ build_deploy_msg_for_node_stones(EVdfg_configuration config, int act_num, EVmast
 	    break;
 	}
     }
+    if (!master->nodes[node].needs_ready) {
+	master->nodes[node].needs_ready = 1;
+	master->dfg->deploy_ack_count--;
+    }
     if (master->nodes[node].conn) {
 	INT_CMwrite(master->nodes[node].conn, deploy_msg, &msg);
     } else {
@@ -2286,8 +2290,13 @@ handle_deploy_ack(EVmaster master, EVmaster_msg_ptr mmsg)
 	CMtrace_out(cm, EVdfgVerbose, "EVDFG  -  master DFG state set to %s\n", str_state[master->state]);
     } else {
       if (master->state == DFG_Reconfiguring) {
-	master->state = DFG_Running;
-	CMtrace_out(cm, EVdfgVerbose, "EVDFG after reconfiguration -  master DFG state set to %s\n", str_state[master->state]);
+	  if (master->dfg->deploy_ack_count == dfg->master->node_count) {
+	      master->state = DFG_Running;
+	      CMtrace_out(cm, EVdfgVerbose, "EVDFG after reconfiguration -  master DFG state set to %s\n", str_state[master->state]);
+	  } else {
+	      CMtrace_out(cm, EVdfgVerbose, "EVDFG reconfiguration in progress.  Deploy ack count %d, -  master DFG state set remains %s\n", master->dfg->deploy_ack_count, 
+			  str_state[master->state]);
+	  }
       }
     }
     CMtrace_out(cm, EVdfgVerbose, "EVDFG exit deploy ack handler -  master DFG state is %s\n", str_state[master->state]);
