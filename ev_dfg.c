@@ -2591,6 +2591,59 @@ copy_dfg_state(EVdfg_configuration state)
 }
 
 static void
+fdump_dfg_gml(FILE* out, EVdfg_configuration state)
+{
+    int i;
+    char *prefix = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
+<!-- This file was written by the JAVA GraphML Library.-->\n\
+<graphml\n\
+ xmlns=\"http://graphml.graphdrawing.org/xmlns\"\n\
+ xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n\
+ xmlns:y=\"http://www.yworks.com/xml/graphml\"\n\
+ xmlns:yed=\"http://www.yworks.com/xml/yed/3\"\n\
+ xsi:schemaLocation=\"http://graphml.graphdrawing.org/xmlns http://www.yworks.com/xml/schema/graphml/1.1/ygraphml.xsd\">\n\
+  <key id=\"d0\" for=\"node\" attr.name=\"color\" attr.type=\"string\">\n\
+    <default>yellow</default>\n\
+  </key>\n\
+  <key for=\"node\" id=\"d1\" yfiles.type=\"nodegraphics\"/>\n\
+  <graph id=\"G\" edgedefault=\"directed\">\n";
+
+    fprintf(out, "%s", prefix);
+    for (i=0; i < state->stone_count; i++) {
+	int j;
+	fprintf(out, "<node id=\"n%d\" name=\"stone%d\">\n", i, i);
+	for (j=0; j< state->stones[i]->out_count; j++) {
+	    fprintf(out, "<port name=\"P%d\"/>\n", j);
+	}
+	fprintf(out, "      <data key=\"d1\">\n        <y:ShapeNode>\n            <y:NodeLabel>S%d</y:NodeLabel>                    <!-- label text -->\n        </y:ShapeNode>\n      </data>\n", i);
+	fprintf(out, "</node>\n"); 
+	for (j=0; j< state->stones[i]->out_count; j++) {
+	    fprintf(out, "<edge id=\"n%de%d\" source=\"n%d\" sourceport=\"P%d\" target=\"n%d\">\n", i, ~0x80000000 & state->stones[i]->out_links[j], i,  j, ~0x80000000 & state->stones[i]->out_links[j]);
+	    fprintf(out, "</edge>\n");
+	}
+    }
+    fprintf(out, "</graph>\n</graphml>\n");
+}
+
+static void
+dump_dfg_gml(EVdfg_configuration state)
+{
+    fdump_dfg_gml(stdout, state);
+}
+
+void
+INT_EVdfg_dump_graph(EVdfg_state_type which, EVdfg dfg)
+{
+    switch(which) {
+    case EVdfgWorking:
+	fdump_dfg_gml(stdout, dfg->working_state);
+	break;
+    case EVdfgDeployed:
+	fdump_dfg_gml(stdout, dfg->deployed_state);
+	break;
+    }
+}
+static void
 check_all_nodes_registered(EVmaster master)
 {
     int i;

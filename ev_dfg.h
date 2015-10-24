@@ -745,6 +745,32 @@ extern int EVclient_wait_for_shutdown(EVclient client);
  */
 extern int EVclient_test_for_shutdown(EVclient client);
 
+typedef enum _EVdfg_state_type {
+    EVdfgWorking,
+    EVdfgDeployed
+} EVdfg_state_type;
+
+/*!
+ *  Dump a graphml version of the stone graph
+ *
+ * As a means of discerning whether the programmer has created the stone
+ * graph that is intended, this call provides a mechanism to print (to
+ * stdout) a GraphML representation of the stones and links as graph
+ * vertices and directed edges.  At present, the output is best viewed in
+ * the yEd graph editor.  Copy the output from the screen, paste to a file,
+ * open in yEd and choose a layout scheme (try auto-layout).
+ *
+ * Currently we set a node label (specific to yEd) that is just S%d based on
+ * the stone id.  Links also have the appropriate output port property set,
+ * though this does not affect their graphical display.
+ *
+ * \param which Set to EVdfgDeployed to display a realized graph, or
+ * EVdfgWorking to display an unrealized or in progress reconfiguration
+ * \param dfg The dfg to display
+ */
+extern void
+EVdfg_dump_graph(EVdfg_state_type which, EVdfg dfg);
+
 #ifdef	__cplusplus
 }
 #endif
