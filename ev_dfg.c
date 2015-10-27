@@ -2636,10 +2636,10 @@ INT_EVdfg_dump_graph(EVdfg_state_type which, EVdfg dfg)
 {
     switch(which) {
     case EVdfgWorking:
-	fdump_dfg_gml(stdout, dfg->working_state);
+	dump_dfg_gml(dfg->working_state);
 	break;
     case EVdfgDeployed:
-	fdump_dfg_gml(stdout, dfg->deployed_state);
+	dump_dfg_gml(dfg->deployed_state);
 	break;
     }
 }
