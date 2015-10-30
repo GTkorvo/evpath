@@ -234,7 +234,7 @@ typedef struct _ev_handler_activation_rec {
 typedef struct _event_path_data {
     int stone_count;
     int stone_base_num;
-    stone_type stone_map;
+    stone_type *stone_map;
     int stone_lookup_table_size;
     lookup_table_elem *stone_lookup_table;
     int sink_handler_count;

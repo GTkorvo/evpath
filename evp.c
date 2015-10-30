@@ -140,11 +140,12 @@ stone_struct(event_path_data evp, int stone_num)
 	printf("EVPATH: Invalid stone ID %x\n", stone_num);
         return NULL;
     }
-    if (was_global && (evp->stone_map[stone_num - evp->stone_base_num].local_id == -1)) {
+    if (was_global && ((evp->stone_map[stone_num - evp->stone_base_num] == NULL) ||
+		       (evp->stone_map[stone_num - evp->stone_base_num]->local_id == -1))) {
 	printf("EVPATH: Invalid stone ID %d (local ID -1)\n", stone_num);
         return NULL;
     }
-    return &evp->stone_map[stone_num - evp->stone_base_num];
+    return evp->stone_map[stone_num - evp->stone_base_num];
 }
 
 void
@@ -162,7 +163,8 @@ INT_EValloc_stone(CManager cm)
 
     evp->stone_map = realloc(evp->stone_map, 
 			     (evp->stone_count + 1) * sizeof(evp->stone_map[0]));
-    stone = &evp->stone_map[stone_num];
+    evp->stone_map[stone_num] = malloc(sizeof(*stone));
+    stone = evp->stone_map[stone_num];
     stone_num += evp->stone_base_num;
     memset(stone, 0, sizeof(*stone));
     stone->local_id = stone_num;
@@ -280,6 +282,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
     int i;
 
     stone = stone_struct(evp, stone_num);
+    if (stone == NULL) return;
     if (stone->local_id == -1) return;
     if (stone->periodic_handle != NULL) {
 	INT_CMremove_task(stone->periodic_handle);
@@ -341,7 +344,6 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
       
     /* XXX unsquelch senders */
     stone->queue = NULL;
-    stone->local_id = -1;
     stone->proto_action_count = 0;
     stone->proto_actions = NULL;
     if (stone->stone_attrs != NULL) {
@@ -350,6 +352,9 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
     }
     free(stone->output_stone_ids);
     remove_stone_from_lookup(evp, stone_num);
+    evp->stone_map[stone->local_id] = NULL;
+    stone->local_id = -1;
+    free(stone);
 }
 
 EVaction
@@ -1947,6 +1952,7 @@ process_local_actions(CManager cm)
 	/* check all stones */
 	for (s = evp->stone_base_num; s < evp->stone_count + evp->stone_base_num; s++) {
 	    stone_type stone = stone_struct(evp, s);
+	    if (!stone) continue;
 	    if (stone->local_id == -1) continue;
 	    if (stone->is_draining == 2) continue;
 	    if (stone->is_frozen == 1) continue;
@@ -1965,6 +1971,7 @@ process_local_actions(CManager cm)
 	/* check all stones */
 	for (s = evp->stone_base_num; s < evp->stone_count + evp->stone_base_num; s++) {
 	    stone_type stone = stone_struct(evp, s);
+	    if (!stone) continue;
 	    if (stone->local_id == -1) continue;
 	    if (stone->is_frozen == 1) continue;
 	    CMtrace_out(cm, EVerbose, "3 - in-play %d\n", as->events_in_play);
@@ -1982,6 +1989,7 @@ INT_EVforget_connection(CManager cm, CMConnection conn)
     int s;
     for (s = evp->stone_base_num; s < evp->stone_count + evp->stone_base_num; ++s)  {
 	stone_type stone = stone_struct(evp, s);
+	if (!stone) continue;
         if (stone->last_remote_source == conn) {
             stone->last_remote_source = NULL;
             stone->squelch_depth = 0;
@@ -2003,6 +2011,12 @@ stone_close_handler(CManager cm, CMConnection conn, void *client_data)
     EVStoneCloseHandlerFunc handler = NULL;
     CManager_lock(cm);
     stone = stone_struct(evp, s);
+    if (!stone) {
+	CMtrace_out(cm, EVerbose, "Got a close for connection %p on already free'd stone %x, shutting down\n",
+		    conn, s);
+	CManager_unlock(cm);
+	return;
+    }
     CMtrace_out(cm, EVerbose, "Got a close for connection %p on stone %x, shutting down\n",
 		conn, s);
     for (a=0 ; a < stone->proto_action_count; a++) {
@@ -2706,6 +2720,7 @@ foreach_source_inner(CManager cm, EVstone to_stone, char *seen,
         EVaction cur_action;
         stone_type stone = stone_struct(evp, cur_stone);
         if (seen[cur_stone - evp->stone_base_num]) continue;
+	if (!stone) continue;
         if (stone->local_id == -1) continue;
         if (cur_stone == to_stone) {
             if (stone->last_remote_source != NULL) {
