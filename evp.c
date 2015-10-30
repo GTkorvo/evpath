@@ -352,7 +352,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
     }
     free(stone->output_stone_ids);
     remove_stone_from_lookup(evp, stone_num);
-    evp->stone_map[stone->local_id] = NULL;
+    evp->stone_map[stone->local_id - evp->stone_base_num] = NULL;
     stone->local_id = -1;
     free(stone);
 }
