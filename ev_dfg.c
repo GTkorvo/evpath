@@ -2059,8 +2059,11 @@ build_deploy_msg_for_node_stones(EVdfg_configuration config, int act_num, EVmast
     if (master->nodes[node].conn) {
 	INT_CMwrite(master->nodes[node].conn, deploy_msg, &msg);
     } else {
+	EVmaster_msg mmsg;
 	CManager_unlock(master->cm);
+	mmsg.u.deploy_ack.node_id = "master";
 	dfg_deploy_handler(master->cm, NULL, &msg, master->client, NULL);
+	handle_deploy_ack(master, &mmsg);
 	CManager_lock(master->cm);
     }
     for(i=0 ; i < msg.stone_count; i++) {
@@ -2106,8 +2109,11 @@ deploy_to_node(EVdfg dfg, int node, EVdfg_configuration config)
     if (dfg->master->nodes[node].conn) {
 	INT_CMwrite(dfg->master->nodes[node].conn, deploy_msg, &msg);
     } else {
+	EVmaster_msg mmsg;
 	CManager_unlock(dfg->master->cm);
 	dfg_deploy_handler(dfg->master->cm, NULL, &msg, dfg->master->client, NULL);
+	mmsg.u.deploy_ack.node_id = "master";
+	handle_deploy_ack(dfg->master, &mmsg);
 	CManager_lock(dfg->master->cm);
     }
     for(i=0 ; i < msg.stone_count; i++) {
@@ -2332,11 +2338,7 @@ perform_deployment(EVdfg dfg)
 	master->state = DFG_Starting;
 	CMtrace_out(master->cm, EVdfgVerbose, "EVDFG check all nodes registered -  master DFG state is %s\n", str_state[master->state]);
 	add_bridge_stones(dfg, dfg->working_state);
-	if (dfg->master->client) {
-	    dfg->deploy_ack_count = 1;  /* we are number 1 */
-	} else {
-	    dfg->deploy_ack_count = 0;
-	}
+	dfg->deploy_ack_count = 0;
 	if (dfg->deploy_ack_condition == -1) {
 	    dfg->deploy_ack_condition = INT_CMCondition_get(master->cm, NULL);
 	}
