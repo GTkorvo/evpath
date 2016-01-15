@@ -40,7 +40,7 @@ static int ipv4_is_loopback(int addr)
 static int
 get_self_ip_addr(CMTransport_trace trace_func, void* trace_data)
 {
-    struct hostent *host;
+    struct hostent *host = NULL;
     char hostname_buf[256];
     char **p;
 #ifdef HAVE_GETIFADDRS
@@ -98,7 +98,10 @@ get_self_ip_addr(CMTransport_trace trace_func, void* trace_data)
 	}
 	    
 	gethostname(hostname_buf, sizeof(hostname_buf));
-	host = gethostbyname(hostname_buf);
+	if (index(hostname_buf, '.') != NULL) {
+	    /* don't even check for host if not fully qualified */
+	    host = gethostbyname(hostname_buf);
+	}
 	if (host != NULL) {
 	    for (p = host->h_addr_list; *p != 0; p++) {
 		struct in_addr *in = *(struct in_addr **) p;
@@ -132,7 +135,10 @@ get_self_ip_addr(CMTransport_trace trace_func, void* trace_data)
     }
 #endif	
     gethostname(hostname_buf, sizeof(hostname_buf));
-    host = gethostbyname(hostname_buf);
+    if (index(hostname_buf, '.') != NULL) {
+	/* don't even check for host if not fully qualified */
+	host = gethostbyname(hostname_buf);
+    }
     if (host != NULL) {
 	for (p = host->h_addr_list; *p != 0; p++) {
 	    struct in_addr *in = *(struct in_addr **) p;
