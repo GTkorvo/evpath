@@ -431,6 +431,8 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	stone->period_usecs = -1;
 	stone->out_count = 0;
 	stone->out_links = NULL;
+	stone->in_count = 0;
+	stone->in_links = NULL;
 	stone->action_count = 1;
 	stone->extra_actions = NULL;
 	stone->condition = EVstone_Undeployed;
@@ -494,6 +496,8 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
     }
     case ACT_link_port: {
 	EVdfg_stone_state src = find_stone_state(act.stone_id, config);
+	EVdfg_stone_state dst = find_stone_state(act.u.link.dest_id, config);
+	int i, in_link_found;
 	if (!src) {
 	    return 0;
 	}
@@ -504,11 +508,28 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	} else if (src->out_count < act.u.link.port + 1) {
 	    src->out_links = realloc(src->out_links,
 				     sizeof(src->out_links[0]) * (act.u.link.port+1));
-	    memset(&src->out_links[src->out_count], 0, sizeof(src->out_links[0]) * (act.u.link.port+1-src->out_count));
+	    memset(&src->out_links[src->out_count], -1, sizeof(src->out_links[0]) * (act.u.link.port+1-src->out_count));
 	    src->out_count = act.u.link.port + 1;
 	}
+	in_link_found =  0;
+	for (i=0; i < dst->in_count; i++) {
+	    if (dst->in_links[i] == act.stone_id) in_link_found = 1;
+	}
+	if (in_link_found == 0) {
+	    if (dst->in_count == 0) {
+		dst->in_links = malloc(sizeof(dst->in_links[0]));
+		memset(dst->in_links, 0, sizeof(dst->in_links[0]));
+		dst->in_count = 1;
+	    } else {
+		dst->in_links = realloc(dst->in_links,
+					sizeof(dst->in_links[0]) * (dst->in_count+1));
+		memset(&dst->in_links[dst->in_count], 0, sizeof(dst->in_links[0]) * (dst->in_count+1-dst->in_count));
+		dst->in_count++;
+	    }
+	    dst->in_links[dst->in_count - 1] = act.stone_id;
+	}
 	if (build_queue) {
-	    if (src->out_links[act.u.link.port] != 0) {
+	    if (src->out_links[act.u.link.port] != -1) {
 		EVdfg_config_action dact;
 		dact.type = ACT_unlink_port;
 		dact.node_for_action = src->node;
@@ -533,6 +554,14 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
     }
     case ACT_link_dest: {
 	EVdfg_stone_state src = find_stone_state(act.stone_id, config);
+	EVdfg_stone_state dst = find_stone_state(act.u.link.dest_id, config);
+	int i, in_link_found, out_link_found =  0;
+	for (i=0; i < src->out_count; i++) {
+	    if (src->out_links[i] == act.u.link.dest_id) out_link_found = 1;
+	}
+	if (out_link_found) {
+	    return 0;
+	}
 	if (!src) {
 	    return 0;
 	}
@@ -546,6 +575,23 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	    src->out_count++;
 	}
 	src->out_links[src->out_count-1] = act.u.link.dest_id;
+	in_link_found = 0;
+	for (i=0; i < dst->in_count; i++) {
+	    if (dst->in_links[i] == act.stone_id) in_link_found = 1;
+	}
+	if (in_link_found == 0) {
+	    if (dst->in_count == 0) {
+		dst->in_links = malloc(sizeof(dst->in_links[0]));
+		memset(dst->in_links, 0, sizeof(dst->in_links[0]));
+		dst->in_count = 1;
+	    } else {
+		dst->in_links = realloc(dst->in_links,
+					sizeof(dst->in_links[0]) * (dst->in_count+1));
+		memset(&dst->in_links[dst->in_count], 0, sizeof(dst->in_links[0]) * (dst->in_count+1-dst->in_count));
+		dst->in_count++;
+	    }
+	    dst->in_links[dst->in_count - 1] = act.stone_id;
+	}
 	if (build_queue) {
 	    EVdfg_add_act_to_queue(config, act);
 	}
@@ -2546,6 +2592,7 @@ free_dfg_state(EVdfg_configuration state)
     int i;
     for (i=0; i < state->stone_count; i++) {
     	if (state->stones[i]->out_links) free(state->stones[i]->out_links);
+    	if (state->stones[i]->in_links) free(state->stones[i]->in_links);
     	if (state->stones[i]->action) free(state->stones[i]->action);
     	if (state->stones[i]->extra_actions) {
     	    int j;
@@ -2577,6 +2624,11 @@ copy_dfg_state(EVdfg_configuration state)
 	    ret->stones[i]->out_links = malloc(sizeof(ret->stones[i]->out_links[0]) * state->stones[i]->out_count);
 	    memcpy(ret->stones[i]->out_links, state->stones[i]->out_links,
 		   sizeof(ret->stones[i]->out_links[0]) * ret->stones[i]->out_count);
+	}
+    	if (state->stones[i]->in_links) {
+	    ret->stones[i]->in_links = malloc(sizeof(ret->stones[i]->in_links[0]) * state->stones[i]->in_count);
+	    memcpy(ret->stones[i]->in_links, state->stones[i]->in_links,
+		   sizeof(ret->stones[i]->in_links[0]) * ret->stones[i]->in_count);
 	}
     	if (state->stones[i]->action) ret->stones[i]->action = strdup(state->stones[i]->action);
     	if (state->stones[i]->extra_actions) {
