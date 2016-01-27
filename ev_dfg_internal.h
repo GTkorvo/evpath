@@ -163,6 +163,8 @@ typedef struct _EVdfg_stone_state {
     int period_usecs;
     int out_count;
     int *out_links;
+    int in_count;
+    int *in_links;
     int action_count;
     char *action;
     char **extra_actions;
