@@ -160,10 +160,15 @@ raw_handler(CManager cm, void *vevent, int len, void *client_data,
     simple_rec incoming;
     (void)len;
     if (c == NULL) {
-	c = create_FFSContext();
+	FMContext fmc = CMget_FMcontext(cm);
+	c = create_FFSContext_FM(fmc);
     }
     
     f = FFSTypeHandle_from_encode(c, vevent);
+    if (!f) {
+	printf("FFS format handling has failed to produce format information in the handler\n");
+	exit(1);
+    }
     if (!FFShas_conversion(f)) {
 	establish_conversion(c, f, simple_format_list);
     }
