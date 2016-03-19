@@ -9,6 +9,9 @@
 /* Define to 1 if you have the IB header and libraries */
 #cmakedefine IB_FOUND 
 
+/* Define to 1 if you have the LIBFABRIC header and libraries */
+#cmakedefine LIBFABRIC_FOUND 
+
 /* Define to 1 if you have the df_shm header and libraries */
 #cmakedefine DF_SHM_FOUND
 
