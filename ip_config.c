@@ -32,13 +32,17 @@
 #  pragma warning (disable: 2259)
 #endif
 
+static int atom_init = 0;
+static int CM_IP_INTERFACE = 0;
+static int CM_IP_PORT = 0;
+
 static int ipv4_is_loopback(int addr)
 {
   return (htonl(addr) & htonl(0xff000000)) == htonl(0x7f000000);
 }
 
 static int
-get_self_ip_addr(CMTransport_trace trace_func, void* trace_data)
+get_self_ip_iface(CMTransport_trace trace_func, void* trace_data, char *interface)
 {
     struct hostent *host = NULL;
     char hostname_buf[256];
@@ -62,7 +66,6 @@ get_self_ip_addr(CMTransport_trace trace_func, void* trace_data)
     int rv = 0;
 #ifdef HAVE_GETIFADDRS
     if (getifaddrs(&if_addrs) == 0) {    
-        char *interface;
 	// Print possible addresses
 	for (if_addr = if_addrs; if_addr != NULL; if_addr = if_addr->ifa_next) {
 	    int family;
@@ -80,13 +83,15 @@ get_self_ip_addr(CMTransport_trace trace_func, void* trace_data)
 		       if_addr->ifa_name,
 		       inet_ntop(family, tmp, buf, sizeof(buf)));
 	}
-	if ((interface = getenv("CM_INTERFACE")) != NULL) {
+	if (!interface) interface = getenv("CM_INTERFACE");
+	if (interface != NULL) {
+	    trace_func(trace_data, "CM<IP_CONFIG> searching for interface %s\n", interface);
 	    for (if_addr = if_addrs; if_addr != NULL; if_addr = if_addr->ifa_next) {
 	        int family;
 	        if (!if_addr->ifa_addr) continue;
 		family = if_addr->ifa_addr->sa_family;
 		if (family != AF_INET) continue;  /* currently not looking for ipv6 */
-		if (strcmp(if_addr->ifa_name, interface) != 0) continue;
+		if (strncmp(if_addr->ifa_name, interface, strlen(interface)) != 0) continue;
 		tmp = &((struct sockaddr_in *)if_addr->ifa_addr)->sin_addr;
 		trace_func(trace_data, "CM<IP_CONFIG> Interface specified, returning ->%s : %s",
 			   if_addr->ifa_name,
@@ -234,6 +239,12 @@ get_self_ip_addr(CMTransport_trace trace_func, void* trace_data)
 }
 
 static int
+get_self_ip_addr(CMTransport_trace trace_func, void* trace_data)
+{
+    return get_self_ip_iface(trace_func, trace_data, NULL);
+}
+
+static int
 is_private_IP(int IP)
 {
     if ((IP & 0xffff0000) == 0xC0A80000) return 1;	/* equal 192.168.x.x */
@@ -324,7 +335,12 @@ get_qual_hostname(char *buf, int len, attr_list attrs,
 	/* bloody hell, what do you have to do? */
 	struct in_addr IP;
 	extern int h_errno;
-	IP.s_addr = htonl(get_self_ip_addr(trace_func, trace_data));
+	char *iface;
+	if (get_string_attr(attrs, CM_IP_INTERFACE, &iface)){
+	    IP.s_addr = htonl(get_self_ip_iface(trace_func, trace_data, iface));
+	} else {
+	    IP.s_addr = htonl(get_self_ip_addr(trace_func, trace_data));
+	}
 	trace_func(trace_data, "CM<IP_CONFIG> - No hostname yet, trying gethostbyaddr on IP %lx", IP);
 	if (!is_private_IP(ntohl(IP.s_addr))) {
 	    host = gethostbyaddr((char *) &IP, sizeof(IP), AF_INET);
@@ -401,9 +417,16 @@ get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int
     static int determined_IP = -1;
     static int port_range_low = 26000, port_range_high = 26100;
     static int use_hostname = 0;
+    char hostname_to_use[HOST_NAME_MAX+1];
+    int IP_to_use;
+    char *interface = NULL;
+
     if (first_call) {
 	char *preferred_hostname = getenv("CM_HOSTNAME");
 	char *port_range = getenv("CM_PORT_RANGE");
+	CM_IP_INTERFACE = attr_atom_from_string("IP_INTERFACE");
+	CM_IP_PORT = attr_atom_from_string("IP_PORT");
+	atom_init++;
 	first_call = 0;
 	determined_hostname[0] = 0;
 	
@@ -430,7 +453,7 @@ get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int
 		}
 	    }
 	} else {
-	    get_qual_hostname(determined_hostname, sizeof(determined_hostname), attrs, NULL, trace_func, trace_data);
+	    get_qual_hostname(determined_hostname, sizeof(determined_hostname), NULL /* attrs */, NULL, trace_func, trace_data);
 	}
 	if (determined_IP == -1) {
 	    /* I.E. the specified hostname didn't determine what IP we should use */
@@ -449,11 +472,19 @@ get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int
 	}
     }
 
+    if (get_string_attr(attrs, CM_IP_INTERFACE, &interface)){
+	/* don't use predetermined stuff ! */
+	get_qual_hostname(hostname_to_use, sizeof(hostname_to_use), attrs, NULL, trace_func, trace_data);
+	IP_to_use = get_self_ip_iface(trace_func, trace_data, interface);
+    } else {
+	strcpy(hostname_to_use, determined_hostname);
+	IP_to_use = determined_IP;
+    }
     if (hostname_buf && (len > strlen(determined_hostname))) {
-	strcpy(hostname_buf, determined_hostname);
+	strcpy(hostname_buf, hostname_to_use);
     }
     if (IP_p && (determined_IP != -1)) {
-	*IP_p = determined_IP;
+	*IP_p = IP_to_use;
     }
     
     if (port_range_low_p) {
@@ -467,8 +498,8 @@ get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int
     }
     {
 	char buf[256];
-	int net_byte_order = htonl(determined_IP);
+	int net_byte_order = htonl(IP_to_use);
 	trace_func(trace_data, "CM<IP_CONFIG> returning hostname \"%s\", IP %s, use_hostname = %d, port range %d:%d",
-		   determined_hostname, inet_ntop(AF_INET, &net_byte_order, &buf[0], 256), use_hostname, port_range_low, port_range_high);
+		   hostname_to_use, inet_ntop(AF_INET, &net_byte_order, &buf[0], 256), use_hostname, port_range_low, port_range_high);
     }
 }
