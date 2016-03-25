@@ -306,9 +306,11 @@ typedef struct remote_info
 typedef struct fabric_connection_data {
     fabric_client_data_ptr fabd;
     struct fid_cq *rcq, *scq;
-    struct fid_mr *mr;
+    struct fid_mr *read_mr;
+    struct fid_mr *send_mr;
     struct fid_ep *conn_ep;
     size_t buffer_size;
+    void *mapped_recv_buf;
     char *send_buf;
     CMbuffer read_buf;
     int max_credits;
@@ -381,6 +383,7 @@ static atom_t CM_NETWORK_POSTFIX = -1;
 static atom_t CM_IP_PORT = -1;
 static atom_t CM_IP_HOSTNAME = -1;
 static atom_t CM_IP_ADDR = -1;
+static atom_t CM_IP_INTERFACE = -1;
 static atom_t CM_TRANSPORT = -1;
 
 static double getlocaltime()
@@ -506,7 +509,7 @@ static int internal_write_piggyback(CMtrans_services svc,
 	memcpy(fcd->send_buf, msg, msg->u.pb.total_length);
 	int ret;
 	
-	ret = fi_send(fcd->conn_ep, fcd->send_buf, msg->u.pb.total_length, fi_mr_desc(fcd->mr), 0, fcd->send_buf);
+	ret = fi_send(fcd->conn_ep, fcd->send_buf, msg->u.pb.total_length, fi_mr_desc(fcd->send_mr), 0, fcd->send_buf);
 	if (ret) {
 	    FT_PRINTERR("fi_send", ret);
 	    return ret;
@@ -518,6 +521,7 @@ static int internal_write_piggyback(CMtrans_services svc,
 	    ret = fi_cq_read(fcd->scq, &comp, 1);
 	    if (ret < 0 && ret != -FI_EAGAIN) {
 		FT_PRINTERR("fi_cq_read", ret);
+		cq_readerr(fcd->scq, " in internal write piggyback");
 		return ret;
 	    }
 	} while (ret == -FI_EAGAIN);
@@ -554,7 +558,7 @@ static int internal_write_response(CMtrans_services svc,
 	memcpy(fcd->send_buf, &msg, sizeof(msg));
 	int ret;
 	
-	ret = fi_send(fcd->conn_ep, fcd->send_buf, sizeof(msg), fi_mr_desc(fcd->mr), 0, fcd->send_buf);
+	ret = fi_send(fcd->conn_ep, fcd->send_buf, sizeof(msg), fi_mr_desc(fcd->send_mr), 0, fcd->send_buf);
 	if (ret) {
 	    FT_PRINTERR("fi_send", ret);
 	    return ret;
@@ -563,9 +567,11 @@ static int internal_write_response(CMtrans_services svc,
 	/* Read send queue */
 	do {
 	    struct fi_cq_entry comp;
+
 	    ret = fi_cq_read(fcd->scq, &comp, 1);
 	    if (ret < 0 && ret != -FI_EAGAIN) {
 		FT_PRINTERR("fi_cq_read", ret);
+		cq_readerr(fcd->scq, " in internal write response");
 		return ret;
 	    }
 	} while (ret == -FI_EAGAIN);
@@ -590,7 +596,7 @@ static int internal_write_request(CMtrans_services svc,
 
 	memcpy(fcd->send_buf, &msg, sizeof(msg));
 	
-	ret = fi_send(fcd->conn_ep, fcd->send_buf, sizeof(msg), fi_mr_desc(fcd->mr), 0, fcd->send_buf);
+	ret = fi_send(fcd->conn_ep, fcd->send_buf, sizeof(msg), fi_mr_desc(fcd->send_mr), 0, fcd->send_buf);
 	if (ret) {
 	    FT_PRINTERR("fi_send", ret);
 	    return ret;
@@ -602,6 +608,7 @@ static int internal_write_request(CMtrans_services svc,
 	    ret = fi_cq_read(fcd->scq, &comp, 1);
 	    if (ret < 0 && ret != -FI_EAGAIN) {
 		FT_PRINTERR("fi_cq_read", ret);
+		cq_readerr(fcd->scq, " in internal write request");
 		return ret;
 	    }
 	} while (ret == -FI_EAGAIN);
@@ -749,23 +756,35 @@ void cq_readerr(struct fid_cq *cq, char *cq_str)
 void
 CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 {    
-	int iget;
 	fabric_client_data_ptr sd = (fabric_client_data_ptr) trans->trans_data;
 	CMtrans_services svc = sd->svc;
 	struct control_message *msg;
 	double start =0;
 	fabric_conn_data_ptr fcd;
 	int ret;
+	struct fid **fids = malloc(sizeof(fids[0]));
+	fcd = (fabric_conn_data_ptr) svc->get_transport_data(conn);
+	fids[0] = &fcd->rcq->fid;
     
 	da_t = getlocaltime();
     
-	fcd = (fabric_conn_data_ptr) svc->get_transport_data(conn);
-
 	start = getlocaltime();    
 
-	do {
-	    struct fi_cq_entry comp;
+	/* ret = fi_trywait(fcd->fabd->fab, fids, 1); */
+	/* switch (ret) { */
+	/* case FI_SUCCESS: */
+	/*     printf("Try wait on rcq returned FI_SUCCESS\n"); */
+	/*     break; */
+	/* case -FI_EAGAIN: */
+	/*     printf("Try wait on rcq returned FI_EAGAIN\n"); */
+	/*     break; */
+	/* default: */
+	/*     printf("Try wait on rcq returned %d\n", ret); */
+	/* } */
+	{
+	    struct fi_cq_data_entry comp;
 		ret = fi_cq_read(fcd->rcq, &comp, 1);
+		if (ret == -FI_EAGAIN) return;
 		if (ret < 0 && ret != -FI_EAGAIN) {
 			if (ret == -FI_EAVAIL) {
 				cq_readerr(fcd->rcq, "rcq");
@@ -773,25 +792,35 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 				FT_PRINTERR("fi_cq_read", ret);
 				return;
 			}
+			return;
+		} else if (ret > 0) {
+//		    printf("Successful read, Completion size is %ld, data %p\n", comp.len, comp.buf);
 		}
-	} while (ret == -FI_EAGAIN);
+	}
 
 	fcd = (fabric_conn_data_ptr) svc->get_transport_data(conn);
-	msg = (struct control_message *) fcd->read_buf->buffer;
+	msg = (struct control_message *) fcd->mapped_recv_buf;
 	svc->trace_out(fcd->fabd->cm, "CMFABRIC data available type = %s(%d)", 
 		       msg_string[msg->type], msg->type);
 
 	switch(msg->type) {
-	case msg_piggyback:
-		iget = handle_piggyback(svc, fcd, msg);
-		if(iget == 0)
+	case msg_piggyback: {
+	    	int offset = msg_offset();
+		fcd->read_buffer_len = msg->u.pb.total_length - offset;
+		svc->trace_out(fcd->fabd->cm, "CMFABRIC received piggyback msg of length %d, added to read_buffer", 
+			       fcd->read_buffer_len);
+		
+		fcd->read_buf = fcd->fabd->svc->get_data_buffer(trans->cm, fcd->read_buffer_len);
+		memcpy(fcd->read_buf->buffer, &msg->u.pb.body[0], fcd->read_buffer_len);
+		fcd->read_buffer = fcd->read_buf;
+		fcd->read_offset = 0;
 		{
 		    CMbuffer tmp = fcd->read_buf;
 		    trans->data_available(trans, conn);
 		    svc->return_data_buffer(trans->cm, tmp);
-		    fcd->read_buf = fcd->fabd->svc->get_data_buffer(trans->cm, MAX(fcd->buffer_size, sizeof(uint64_t)));
 		}
 		break;
+	}
 	case msg_response:
 		handle_response(svc, fcd, msg);
 		break;
@@ -811,10 +840,36 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 	}
 
 	//returning control to CM
-	ret = fi_recv(fcd->conn_ep, fcd->read_buf->buffer, fcd->buffer_size, fi_mr_desc(fcd->mr), 0, fcd->read_buf->buffer);
+	/* printf("Before recv - "); */
+	/* ret = fi_trywait(fcd->fabd->fab, fids, 1); */
+	/* switch (ret) { */
+	/* case FI_SUCCESS: */
+	/*     printf("Try wait on rcq returned FI_SUCCESS\n"); */
+	/*     break; */
+	/* case -FI_EAGAIN: */
+	/*     printf("Try wait on rcq returned FI_EAGAIN\n"); */
+	/*     break; */
+	/* default: */
+	/*     printf("Try wait on rcq returned %d\n", ret); */
+	/* } */
+	/* printf("Doing recv on buffer %p\n", fcd->mapped_recv_buf); */
+	ret = fi_recv(fcd->conn_ep, fcd->mapped_recv_buf, fcd->buffer_size, fi_mr_desc(fcd->read_mr), 0, fcd->mapped_recv_buf);
 	if (ret)
 		FT_PRINTERR("fi_recv", ret);
 
+	/* printf("Before recv - "); */
+	/* ret = fi_trywait(fcd->fabd->fab, fids, 1); */
+	/* free(fids); */
+	/* switch (ret) { */
+	/* case FI_SUCCESS: */
+	/*     printf("Try wait on rcq returned FI_SUCCESS\n"); */
+	/*     break; */
+	/* case -FI_EAGAIN: */
+	/*     printf("Try wait on rcq returned FI_EAGAIN\n"); */
+	/*     break; */
+	/* default: */
+	/*     printf("Try wait on rcq returned %d\n", ret); */
+	/* } */
 	svc->trace_out(fcd->fabd->cm, "CMFABRIC data_available returning");
 }
 
@@ -928,7 +983,8 @@ fabric_service_incoming(void *void_trans, void *void_eq)
     if (event == FI_CONNREQ) {
 	fabric_accept_conn(void_trans, void_eq);
     } else {
-	printf("Unexpected event %d\n", event);
+	rd = fi_eq_sread(fabd->cmeq, &event, &entry, sizeof entry, -1, 0);
+	printf("Unexpected event in service incoming,%s %d\n", fi_tostr(&event, FI_TYPE_EQ_EVENT), event);
     }
 }
 
@@ -955,19 +1011,44 @@ static int client_connect(CManager cm, CMtrans_services svc, transport_entry tra
     struct fi_info *fi;
     ssize_t rd;
     int ret, int_port_num;
+    struct in_addr dest_ip;
+    char *host_name, *host_rep;
+    int i;
 
     /* Get fabric info */
     fabd->opts.dst_addr = "localhost";
-    if (!query_attr(attrs, CM_IP_PORT, /* type pointer */ NULL,
-		    /* value pointer */ (attr_value *)(long) & int_port_num)) {
+    if (!get_int_attr(attrs, CM_IP_ADDR,(int*) & dest_ip.s_addr)) {
+	svc->trace_out(cm, "CMFABRIC transport found no IP_ADDR attribute");
+    } else {
+	fabd->opts.dst_addr = malloc(16);
+	dest_ip.s_addr = htonl(dest_ip.s_addr);
+	sprintf(fabd->opts.dst_addr, "%s", inet_ntoa(dest_ip));
+
+    }
+    if (!get_int_attr(attrs, CM_IP_PORT, (int*) & int_port_num)) {
 	svc->trace_out(cm, "CMFABRIC transport found no IP_PORT attribute");
     } else {
 	fabd->opts.dst_port = malloc(10);
 	sprintf(fabd->opts.dst_port, "%d", int_port_num);
     }
-//    printf("Connecting to addr, %s, port %s\n", fabd->opts.dst_addr, fabd->opts.dst_port);
+    svc->trace_out(fabd->cm, "Connecting to addr, %s, port %s\n", fabd->opts.dst_addr, fabd->opts.dst_port);
+    if (!get_string_attr(attrs, CM_IP_HOSTNAME, &host_name)) {
+	svc->trace_out(cm, "CMFABRIC transport found no IP_HOSTNAME attribute");
+    } else {
+      host_rep = malloc(strlen(host_name));
+      for (i = 0; i < (strlen(host_name)/2); i++) {
+	sscanf(&host_name[i*2], "%2hhx", &host_rep[i]);
+      }
+      /* printf("name len is %d\n", (int)strlen(host_name)/2); */
+      /* for(i = 0; i < strlen(host_name)/2; i++) { */
+      /* 	printf("%02x", (unsigned char) host_rep[i]); */
+      /* } */
+      /* printf(" done\n"); */
+      fabd->opts.dst_addr = host_rep;
+    }
     ret = fi_getinfo(FT_FIVERSION, fabd->opts.dst_addr, fabd->opts.dst_port, 0, fabd->hints, &fi);
     if (ret) {
+	printf("Get info on remote port failed\n");
 	FT_PRINTERR("fi_getinfo", ret);
 	goto err0;
     }
@@ -1008,8 +1089,18 @@ static int client_connect(CManager cm, CMtrans_services svc, transport_entry tra
     /* Wait for the connection to be established */
     rd = fi_eq_sread(fabd->cmeq, &event, &entry, sizeof entry, -1, 0);
     if (rd != sizeof entry) {
-	FT_PRINTERR("fi_eq_sread", rd);
-	return (int) rd;
+	if (ret == -FI_EAVAIL) {
+	    struct fi_eq_err_entry error = {0};
+	    int rc = fi_eq_readerr(fabd->cmeq, &error, 0);
+	    if (rc) {
+		char buf[1024];
+		fprintf(stderr, "error event: %s\n", fi_eq_strerror(fabd->cmeq, error.prov_errno,
+      error.err_data, buf, 1024));
+	    }
+	} else {
+	    FT_PRINTERR("fi_eq_sread", rd);
+	}
+	goto err6;
     }
 
     if (event != FI_CONNECTED || entry.fid != &fcd->conn_ep->fid) {
@@ -1334,7 +1425,8 @@ static int alloc_cm_res(fabric_client_data_ptr fd)
 static void free_ep_res(fabric_conn_data_ptr fcd)
 {
 	fi_close(&fcd->conn_ep->fid);
-	fi_close(&fcd->mr->fid);
+	fi_close(&fcd->send_mr->fid);
+	fi_close(&fcd->read_mr->fid);
 	fi_close(&fcd->rcq->fid);
 	fi_close(&fcd->scq->fid);
 	free(fcd->read_buf);
@@ -1355,15 +1447,10 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 		perror("malloc");
 		return -1;
 	}
-	fcd->send_buf = malloc(MAX(fcd->buffer_size, sizeof(uint64_t)));
-	if (!fcd->send_buf) {
-		perror("malloc");
-		return -1;
-	}
 	fcd->max_credits = 512;
 	memset(&cq_attr, 0, sizeof cq_attr);
 	cq_attr.format = FI_CQ_FORMAT_DATA;
-	cq_attr.wait_obj = FI_WAIT_NONE;
+	cq_attr.wait_obj = FI_WAIT_FD;
 	cq_attr.size = fcd->max_credits << 1;
 	ret = fi_cq_open(fabd->dom, &cq_attr, &fcd->scq, NULL);
 	if (ret) {
@@ -1371,6 +1458,9 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 		goto err1;
 	}
 
+	struct fi_cq_attr attrs;
+	memset(&attrs, 0, sizeof(attrs));
+	attrs.format = FI_CQ_FORMAT_DATA;
 	ret = fi_cq_open(fabd->dom, &cq_attr, &fcd->rcq, NULL);
 	if (ret) {
 		FT_PRINTERR("fi_cq_open", ret);
@@ -1379,7 +1469,7 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 	
 //	switch (op_type) {
 //	case FT_RMA_READ:
-		access_mode = FI_REMOTE_READ;
+	access_mode = FI_REMOTE_READ;
 //		break;
 //	case FT_RMA_WRITE:
 //	case FT_RMA_WRITEDATA:
@@ -1390,8 +1480,24 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 //		ret = -FI_EINVAL;
 //		goto err3;
 //	}
-	ret = fi_mr_reg(fabd->dom, fcd->read_buf, MAX(fcd->buffer_size, sizeof(uint64_t)), 
-			access_mode, 0, 0, 0, &fcd->mr, NULL);
+	access_mode |= FI_RECV;
+	fcd->send_buf = malloc(MAX(fcd->buffer_size, sizeof(uint64_t)));
+	fcd->mapped_recv_buf = malloc(MAX(fcd->buffer_size, sizeof(uint64_t)));
+	if (!fcd->send_buf) {
+		perror("malloc");
+		return -1;
+	}
+	ret = fi_mr_reg(fabd->dom, fcd->mapped_recv_buf, MAX(fcd->buffer_size, sizeof(uint64_t)), 
+			access_mode, 0, 0, 0, &fcd->read_mr, NULL);
+	access_mode = FI_REMOTE_WRITE | FI_WRITE;
+	if (ret) {
+		FT_PRINTERR("fi_mr_reg", ret);
+		goto err3;
+	}
+
+
+	ret = fi_mr_reg(fabd->dom, fcd->send_buf, MAX(fcd->buffer_size, sizeof(uint64_t)), 
+			access_mode, 0, 0, 0, &fcd->send_mr, NULL);
 	if (ret) {
 		FT_PRINTERR("fi_mr_reg", ret);
 		goto err3;
@@ -1412,7 +1518,8 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 	return 0;
 
 err4:
-	fi_close(&fcd->mr->fid);
+	fi_close(&fcd->read_mr->fid);
+	fi_close(&fcd->send_mr->fid);
 err3:
 	fi_close(&fcd->rcq->fid);
 err2:
@@ -1452,7 +1559,7 @@ static int bind_ep_res(fabric_conn_data_ptr fcd)
 	}
 	
 	/* Post the first recv buffer */
-	ret = fi_recv(fcd->conn_ep, fcd->read_buf->buffer, fcd->buffer_size, fi_mr_desc(fcd->mr), 0, fcd->read_buf->buffer);
+	ret = fi_recv(fcd->conn_ep, fcd->mapped_recv_buf, fcd->buffer_size, fi_mr_desc(fcd->read_mr), 0, fcd->mapped_recv_buf);
 	if (ret)
 		FT_PRINTERR("fi_recv", ret);
 
@@ -1492,6 +1599,7 @@ static int server_listen(fabric_client_data_ptr fd)
 		FT_PRINTERR("fi_pep_bind", ret);
 		goto err3;
 	}
+
 
 	ret = fi_listen(fd->listen_ep);
 	if (ret) {
@@ -1604,7 +1712,7 @@ libcmfabric_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport
     int IP, ret;
     char host_name[256];
     size_t addrlen;
-    char *local_addr = NULL;
+    struct sockaddr_in local_addr;
 
     if (cm) {
 	/* assert CM is locked */
@@ -1625,9 +1733,18 @@ libcmfabric_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport
 	port_num = attr_port_num;
     }
 
+    if (listen_info) {
+	listen_info = attr_copy_list(listen_info);
+    } else {
+	listen_info = create_attr_list();
+    }
+    set_string_attr(listen_info, CM_IP_INTERFACE, strdup("ib"));
+
     svc->trace_out(cm, "CMFabric begin listen, requested port %d", attr_port_num);
     get_IP_config(host_name, sizeof(host_name), &IP, &port_range_low, &port_range_high, 
 		  &use_hostname, listen_info, svc->trace_out, (void *)cm);
+    fd->opts.src_addr = strdup(host_name);
+    free_attr_list(listen_info);
 
     if (port_num != 0) {
 	char *port_str = malloc(10);
@@ -1665,33 +1782,22 @@ libcmfabric_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport
 	}
     }
 
-    addrlen = 0;
-    ret = fi_getname(&fd->listen_ep->fid, local_addr, &addrlen);
-    if (ret != -FI_ETOOSMALL) {
-	FT_PRINTERR("fi_getname", ret);
-	return NULL;
-    }
-
-    local_addr = malloc(addrlen);
-    ret = fi_getname(&fd->listen_ep->fid, local_addr, &addrlen);
+    addrlen = sizeof(local_addr);
+    ret = fi_getname(&fd->listen_ep->fid, (void*)&local_addr, &addrlen);
+    IP = ntohl(local_addr.sin_addr.s_addr);
     if (ret) {
 	FT_PRINTERR("fi_getname", ret);
 	return NULL;
     }
-
-//    printf("name len is %d\n", (int)addrlen);
-//    for(ret = 0; ret < addrlen; ret++) {
-//	printf("%02x", (unsigned char) local_addr[ret]);
-//    }
 
     ret = fi_control (&fd->cmeq->fid, FI_GETWAIT, (void *) &wait_sock);
     if (ret) {
 	FT_PRINTERR("fi_control(FI_GETWAIT)", ret);
+    } else {
+	svc->trace_out(cm, "Cmfabric Adding fabric_service_incoming as action on fd %d", wait_sock);
+	svc->fd_add_select(cm, wait_sock, fabric_service_incoming,
+			   (void *) trans, (void *) fd->listen_ep);
     }
-
-    svc->trace_out(cm, "Cmfabric Adding fabric_service_incoming as action on fd %d", wait_sock);
-    svc->fd_add_select(cm, wait_sock, fabric_service_incoming,
-		       (void *) trans, (void *) fd->listen_ep);
     {
 	attr_list ret_list;
 	
@@ -1703,13 +1809,16 @@ libcmfabric_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport
 	fd->listen_port = port_num;
 	add_attr(ret_list, CM_TRANSPORT, Attr_String,
 		 (attr_value) strdup("fabric"));
-	if ((cercs_getenv("CMFabricUseHostname") != NULL) || 
+	if (use_hostname ||
+	    (cercs_getenv("CMFabricUseHostname") != NULL) || 
 	    (cercs_getenv("CM_NETWORK") != NULL)) {
 	    add_attr(ret_list, CM_IP_HOSTNAME, Attr_String,
 		     (attr_value) strdup(host_name));
 	} else if (IP == 0) {
 	    add_attr(ret_list, CM_IP_ADDR, Attr_Int4, 
 		     (attr_value)INADDR_LOOPBACK);
+	} else {
+	    add_int_attr(ret_list, CM_IP_ADDR, (int)IP);
 	}
 	add_attr(ret_list, CM_IP_PORT, Attr_Int4,
 		 (attr_value) (long)port_num);
@@ -1877,6 +1986,7 @@ libcmfabric_LTX_initialize(CManager cm, CMtrans_services svc)
 		CM_IP_HOSTNAME = attr_atom_from_string("IP_HOST");
 		CM_IP_PORT = attr_atom_from_string("IP_PORT");
 		CM_IP_ADDR = attr_atom_from_string("IP_ADDR");
+		CM_IP_INTERFACE = attr_atom_from_string("IP_INTERFACE");
 		CM_FD = attr_atom_from_string("CONNECTION_FILE_DESCRIPTOR");
 		CM_THIS_CONN_PORT = attr_atom_from_string("THIS_CONN_PORT");
 		CM_PEER_CONN_PORT = attr_atom_from_string("PEER_CONN_PORT");
@@ -1905,6 +2015,13 @@ libcmfabric_LTX_initialize(CManager cm, CMtrans_services svc)
 	fabd->hints->caps		= FI_MSG;
 	fabd->hints->mode		= FI_LOCAL_MR;
 	fabd->hints->addr_format	= FI_SOCKADDR;
+
+	struct fi_domain_attr *domain_attr = malloc(sizeof(struct fi_domain_attr));
+	memset(domain_attr, 0, sizeof(struct fi_domain_attr));
+	domain_attr->threading        =  FI_THREAD_ENDPOINT;
+	domain_attr->control_progress =  FI_PROGRESS_AUTO;
+	domain_attr->data_progress    =  FI_PROGRESS_AUTO;
+	fabd->hints->domain_attr            = domain_attr;
 
 	svc->add_shutdown_task(cm, free_fabric_data, (void *) fabd, FREE_TASK);
 
