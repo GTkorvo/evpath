@@ -6,11 +6,6 @@
 #include <getopt.h>
 
 
-#ifdef HAVE_WINDOWS_H
-#include <windows.h>
-#include <winsock.h>
-#define getpid()    _getpid()
-#else
 #include <time.h>
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -42,7 +37,6 @@
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
 #endif
-#endif
 #include <stdio.h>
 #include <fcntl.h>
 #ifndef HAVE_WINDOWS_H
@@ -68,6 +62,7 @@
 #include <rdma/fi_rma.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_errno.h>
+#include <rdma/fi_eq.h>
 
 #include <atl.h>
 #include <cercs_env.h>
@@ -82,7 +77,6 @@
 #define SOCKET_ERROR -1
 #endif
 
-#define LISTSIZE 1024
 #define _WITH_IB_
 #define PIGGYBACK 1025*100
 
@@ -100,88 +94,23 @@
 
 
 //   BEGIN from shared.h in fabtests
-#include <rdma/fi_eq.h>
 
-/* all tests should work with 1.0 API */
-#define FT_FIVERSION FI_VERSION(1,0)
-
-struct test_size_param {
-	int size;
-	int option;
-};
-
-enum precision {
-	NANO = 1,
-	MICRO = 1000,
-	MILLI = 1000000,
-};
-
-/* client-server common options and option parsing */
+/* haven't tested with earlier than version 1.2 */
+#define FT_FIVERSION FI_VERSION(1,2)
 
 struct cs_opts {
-	int iterations;
-	int transfer_size;
 	char *src_port;
 	char *dst_port;
 	char *src_addr;
 	char *dst_addr;
-	int size_option;
-	int user_options;
-	int machr;
-	int argc;
-	char **argv;
 };
 
-enum {
-	FT_OPT_ITER = 1 << 0,
-	FT_OPT_SIZE = 1 << 1
-};
-
-void ft_parseinfo(int op, char *optarg, struct fi_info *hints);
-void ft_parse_addr_opts(int op, char *optarg, struct cs_opts *opts);
-void ft_parsecsopts(int op, char *optarg, struct cs_opts *opts);
-void ft_usage(char *name, char *desc);
-void ft_csusage(char *name, char *desc);
-void ft_fill_buf(void *buf, int size);
-int ft_check_buf(void *buf, int size);
-#define ADDR_OPTS "b:p:s:"
-#define INFO_OPTS "n:f:"
-#define CS_OPTS ADDR_OPTS "I:S:m"
-
-#define INIT_OPTS (struct cs_opts) { .iterations = 1000, \
-				     .transfer_size = 1024, \
-				     .src_port = "9228", \
-				     .dst_port = "9228", \
-				     .argc = argc, .argv = argv }
-
-extern struct test_size_param test_size[];
-const unsigned int test_cnt;
-#define TEST_CNT test_cnt
-#define FT_STR_LEN 32
-
-int ft_getsrcaddr(char *node, char *service, struct fi_info *hints);
-int ft_getdestaddr(char *node, char *service, struct fi_info *hints);
-int ft_read_addr_opts(char **node, char **service, struct fi_info *hints, 
-		uint64_t *flags, struct cs_opts *opts);
-char *size_str(char str[FT_STR_LEN], long long size);
-char *cnt_str(char str[FT_STR_LEN], long long cnt);
-int size_to_count(int size);
-
-void init_test(struct cs_opts *opts, char *test_name, size_t test_name_len);
-int ft_finalize(struct fid_ep *tx_ep, struct fid_cq *scq, struct fid_cq *rcq,
-		fi_addr_t addr);
+#define INIT_OPTS (struct cs_opts) { .src_port = "9228", \
+				     .dst_port = "9228" }
 
 
-int wait_for_data_completion(struct fid_cq *cq, int num_completions);
-int wait_for_completion(struct fid_cq *cq, int num_completions);
 void cq_readerr(struct fid_cq *cq, char *cq_str);
 
-int64_t get_elapsed(const struct timespec *b, const struct timespec *a, 
-		enum precision p);
-void show_perf(char *name, int tsize, int iters, struct timespec *start, 
-		struct timespec *end, int xfers_per_iter);
-void show_perf_mr(int tsize, int iters, struct timespec *start, 
-		struct timespec *end, int xfers_per_iter, int argc, char *argv[]);
 
 #define FT_PRINTERR(call, retv) \
 	do { fprintf(stderr, call "(): %d, %d (%s)\n", __LINE__, (int) retv, fi_strerror((int) -retv)); } while (0)
@@ -189,19 +118,8 @@ void show_perf_mr(int tsize, int iters, struct timespec *start,
 #define FT_ERR(fmt, ...) \
 	do { fprintf(stderr, "%s:%d: " fmt, __FILE__, __LINE__, ##__VA_ARGS__); } while (0)
 
-#define FT_PRINT_OPTS_USAGE(opt, desc) fprintf(stderr, " %-20s %s\n", opt, desc)
-
-#define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
-#define ARRAY_SIZE(A) (sizeof(A)/sizeof(*A))
 
-/* for RMA tests --- we want to be able to select fi_writedata, but there is no
- * constant in libfabric for this */
-enum ft_rma_opcodes {
-	FT_RMA_READ = 1,
-	FT_RMA_WRITE,
-	FT_RMA_WRITEDATA,
-};
 //   END from shared.h in fabtests
 
 
@@ -1159,8 +1077,6 @@ int no_more_redirect;
 	} else {
 		svc->trace_out(cm, "CMFABRIC transport connect to host_IP %lx", host_ip);
 	}
-	/* if ((host_name == NULL) && (host_ip == 0)) */
-	/* 	return -1; */
 
 	if (!query_attr(attrs, CM_IP_PORT, /* type pointer */ NULL,
 	                /* value pointer */ (attr_value *)(long) & int_port_num)) {
@@ -1171,54 +1087,6 @@ int no_more_redirect;
 	}
 
 	client_connect(cm, svc, trans, attrs, fcd);
-/* 	/\* INET socket connection, host_name is the machine name *\/ */
-/* 	char *network_string; */
-/* 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR) { */
-/* 	    svc->trace_out(cm, " CMFABRIC connect FAILURE --> Couldn't create socket"); */
-/* 	    return -1; */
-/* 	} */
-/* 	sock_addr.s.sa_family = AF_INET; */
-/* 	if (host_name != NULL) { */
-/* 	    if (check_host(host_name, (void *) &sock_addr.s_I4.sin_addr) == 0) { */
-/* 		if (host_ip == 0) { */
-/* 		    svc->trace_out(cm, "CMFABRIC connect FAILURE --> Host not found \"%s\", no IP addr supplied in contact list", host_name); */
-/* 		} else { */
-/* 		    svc->trace_out(cm, "CMFABRIC --> Host not found \"%s\", Using supplied IP addr %x", */
-/* 				   host_name == NULL ? "(unknown)" : host_name, */
-/* 				   host_ip); */
-/* 		    ((struct sockaddr_in *) &sock_addr)->sin_addr.s_addr = ntohl(host_ip); */
-/* 		} */
-/* 	    } */
-/* 	} else { */
-/* 	    sock_addr.s_I4.sin_addr.s_addr = ntohl(host_ip); */
-/* 	} */
-/* 	sock_addr.s_I4.sin_port = htons(port_num); */
-/* 	remote_IP = ntohl(sock_addr.s_I4.sin_addr.s_addr); */
-/* 	if (is_private_192(remote_IP)) { */
-/* 	    svc->trace_out(cm, "Target IP is on a private 192.168.x.x network"); */
-/* 	} */
-/* 	if (is_private_182(remote_IP)) { */
-/* 	    svc->trace_out(cm, "Target IP is on a private 182.16.x.x network"); */
-/* 	} */
-/* 	if (is_private_10(remote_IP)) { */
-/* 	    svc->trace_out(cm, "Target IP is on a private 10.x.x.x network"); */
-/* 	} */
-/* 	svc->trace_out(cm, "Attempting CMFABRIC socket connection, host=\"%s\", IP = %s, port %d", */
-/* 		       host_name == 0 ? "(unknown)" : host_name,  */
-/* 		       inet_ntoa(sock_addr.s_I4.sin_addr), */
-/* 		       int_port_num); */
-/* 	if (connect(sock, (struct sockaddr *) &sock_addr, */
-/* 		    sizeof sock_addr) == SOCKET_ERROR) { */
-/* #ifdef WSAEWOULDBLOCK */
-/* 	    int err = WSAGetLastError(); */
-/* 	    if (err != WSAEWOULDBLOCK || err != WSAEINPROGRESS) { */
-/* #endif */
-/* 		svc->trace_out(cm, "CMFABRIC connect FAILURE --> Connect() to IP %s failed", inet_ntoa(sock_addr.s_I4.sin_addr)); */
-/* 		close(sock); */
-/* #ifdef WSAEWOULDBLOCK */
-/* 	    } */
-/* #endif */
-/* 	} */
 
 
 //here we write out the connection port to the other side. 
@@ -1298,7 +1166,6 @@ attr_list attrs;
     svc->fd_add_select(cm, fd, (select_list_func) CMFABRIC_data_available,
 		       (void *) trans, (void *) conn);
 
-/* dump_sockinfo("initiate ", sock); */
     return conn;
 }
 
@@ -1439,8 +1306,7 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 	uint64_t access_mode;
 	int ret;
 
-	fcd->buffer_size = fabd->opts.user_options & FT_OPT_SIZE ?
-	    fabd->opts.transfer_size : PIGGYBACK;
+	fcd->buffer_size = PIGGYBACK;
 	
 	fcd->read_buf = fabd->svc->get_data_buffer(fabd->cm, MAX(fcd->buffer_size, sizeof(uint64_t)));
 	if (!fcd->read_buf) {
@@ -1467,19 +1333,7 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 		goto err2;
 	}
 	
-//	switch (op_type) {
-//	case FT_RMA_READ:
 	access_mode = FI_REMOTE_READ;
-//		break;
-//	case FT_RMA_WRITE:
-//	case FT_RMA_WRITEDATA:
-//		access_mode = FI_REMOTE_WRITE;
-//		break;
-//	default:
-//		assert(0);
-//		ret = -FI_EINVAL;
-//		goto err3;
-//	}
 	access_mode |= FI_RECV;
 	fcd->send_buf = malloc(MAX(fcd->buffer_size, sizeof(uint64_t)));
 	fcd->mapped_recv_buf = malloc(MAX(fcd->buffer_size, sizeof(uint64_t)));
@@ -1489,13 +1343,12 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 	}
 	ret = fi_mr_reg(fabd->dom, fcd->mapped_recv_buf, MAX(fcd->buffer_size, sizeof(uint64_t)), 
 			access_mode, 0, 0, 0, &fcd->read_mr, NULL);
-	access_mode = FI_REMOTE_WRITE | FI_WRITE;
 	if (ret) {
 		FT_PRINTERR("fi_mr_reg", ret);
 		goto err3;
 	}
 
-
+	access_mode = FI_REMOTE_WRITE | FI_WRITE;
 	ret = fi_mr_reg(fabd->dom, fcd->send_buf, MAX(fcd->buffer_size, sizeof(uint64_t)), 
 			access_mode, 0, 0, 0, &fcd->send_mr, NULL);
 	if (ret) {
