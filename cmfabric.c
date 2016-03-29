@@ -679,7 +679,8 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 	struct control_message *msg;
 	double start =0;
 	fabric_conn_data_ptr fcd;
-	int ret;
+	int ret, call_data_available;
+	CMbuffer CMbuffer_to_return = NULL;
 	struct fid **fids = malloc(sizeof(fids[0]));
 	fcd = (fabric_conn_data_ptr) svc->get_transport_data(conn);
 	fids[0] = &fcd->rcq->fid;
@@ -688,6 +689,7 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
     
 	start = getlocaltime();    
 
+	/* printf("At the beginning of CMFabric_data_available: "); */
 	/* ret = fi_trywait(fcd->fabd->fab, fids, 1); */
 	/* switch (ret) { */
 	/* case FI_SUCCESS: */
@@ -721,6 +723,8 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 	svc->trace_out(fcd->fabd->cm, "CMFABRIC data available type = %s(%d)", 
 		       msg_string[msg->type], msg->type);
 
+	call_data_available = 0;
+	CMbuffer_to_return = NULL;
 	switch(msg->type) {
 	case msg_piggyback: {
 	    	int offset = msg_offset();
@@ -732,11 +736,8 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 		memcpy(fcd->read_buf->buffer, &msg->u.pb.body[0], fcd->read_buffer_len);
 		fcd->read_buffer = fcd->read_buf;
 		fcd->read_offset = 0;
-		{
-		    CMbuffer tmp = fcd->read_buf;
-		    trans->data_available(trans, conn);
-		    svc->return_data_buffer(trans->cm, tmp);
-		}
+		CMbuffer_to_return = fcd->read_buf;		    
+		call_data_available = 1;
 		break;
 	}
 	case msg_response:
@@ -744,19 +745,26 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 		break;
 	case msg_request:
 		handle_request(svc, fcd, msg);
-		if(fcd->isDone.done == 0)
-		{
-			trans->data_available(trans, conn);
-		}
-		else
-		{
-			svc->trace_out(fcd->fabd->cm, "Cmfabric data available error in the protocol");
+		if(fcd->isDone.done == 0) {
+		    call_data_available = 1;
+		} else {
+		    svc->trace_out(fcd->fabd->cm, "Cmfabric data available error in the protocol");
 		}
 		break;
 	default:
 		printf("Bad message type %d\n", msg->type);
 	}
+	/* post the next receive before relinquishing control */
+	ret = fi_recv(fcd->conn_ep, fcd->mapped_recv_buf, fcd->buffer_size, fi_mr_desc(fcd->read_mr), 0, fcd->mapped_recv_buf);
+	if (ret)
+		FT_PRINTERR("fi_recv", ret);
 
+	if (call_data_available) {
+	    trans->data_available(trans, conn);
+	}
+	if (CMbuffer_to_return) {
+	    svc->return_data_buffer(trans->cm, CMbuffer_to_return);
+	}
 	//returning control to CM
 	/* printf("Before recv - "); */
 	/* ret = fi_trywait(fcd->fabd->fab, fids, 1); */
@@ -771,10 +779,6 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 	/*     printf("Try wait on rcq returned %d\n", ret); */
 	/* } */
 	/* printf("Doing recv on buffer %p\n", fcd->mapped_recv_buf); */
-	ret = fi_recv(fcd->conn_ep, fcd->mapped_recv_buf, fcd->buffer_size, fi_mr_desc(fcd->read_mr), 0, fcd->mapped_recv_buf);
-	if (ret)
-		FT_PRINTERR("fi_recv", ret);
-
 	/* printf("Before recv - "); */
 	/* ret = fi_trywait(fcd->fabd->fab, fids, 1); */
 	/* free(fids); */
@@ -893,16 +897,30 @@ fabric_service_incoming(void *void_trans, void *void_eq)
 
     rd = fi_eq_sread(fabd->cmeq, &event, &entry, sizeof entry, -1, FI_PEEK);
     if (rd != sizeof entry) {
-	FT_PRINTERR("fi_eq_sread", rd);
+	if (rd == -FI_EAVAIL) {
+	    struct fi_eq_err_entry error = {0};
+	    int rc = fi_eq_readerr(fabd->cmeq, &error, 0);
+	    if (rc) {
+		char buf[1024];
+		fprintf(stderr, "error event: %s\n", fi_eq_strerror(fabd->cmeq, error.prov_errno,
+      error.err_data, buf, 1024));
+	    }
+	} else {
+	    FT_PRINTERR("fi_eq_sread", rd);
+	}
 	return;
     }
     
-    info = entry.info;
     if (event == FI_CONNREQ) {
 	fabric_accept_conn(void_trans, void_eq);
     } else {
 	rd = fi_eq_sread(fabd->cmeq, &event, &entry, sizeof entry, -1, 0);
-	printf("Unexpected event in service incoming,%s %d\n", fi_tostr(&event, FI_TYPE_EQ_EVENT), event);
+	info = entry.info;
+	if (event == FI_SHUTDOWN){
+	    svc->trace_out(fcd->fabd->cm, "CMFABRIC got a shutdown event for some conn, who knows which one?\n");
+	} else {
+	    printf("Unexpected event in service incoming,%s %d\n", fi_tostr(&event, FI_TYPE_EQ_EVENT), event);
+	}
     }
 }
 
@@ -1166,6 +1184,7 @@ attr_list attrs;
     svc->fd_add_select(cm, fd, (select_list_func) CMFABRIC_data_available,
 		       (void *) trans, (void *) conn);
 
+    fcd->fd = fd;
     return conn;
 }
 
@@ -1487,8 +1506,18 @@ static int server_connect(fabric_conn_data_ptr fcd)
 
 	rd = fi_eq_sread(fabd->cmeq, &event, &entry, sizeof entry, -1, 0);
 	if (rd != sizeof entry) {
+	    if (rd == -FI_EAVAIL) {
+		struct fi_eq_err_entry error = {0};
+		int rc = fi_eq_readerr(fabd->cmeq, &error, 0);
+		if (rc) {
+		    char buf[1024];
+		    fprintf(stderr, "error event: %s\n", fi_eq_strerror(fabd->cmeq, error.prov_errno,
+									error.err_data, buf, 1024));
+		}
+	    } else {
 		FT_PRINTERR("fi_eq_sread", rd);
-		return (int) rd;
+	    }
+	    return (int) rd;
 	}
 
 	info = entry.info;
@@ -1528,8 +1557,18 @@ static int server_connect(fabric_conn_data_ptr fcd)
 
 	rd = fi_eq_sread(fabd->cmeq, &event, &entry, sizeof entry, -1, 0);
  	if (rd != sizeof entry) {
+	    if (ret == -FI_EAVAIL) {
+		struct fi_eq_err_entry error = {0};
+		int rc = fi_eq_readerr(fabd->cmeq, &error, 0);
+		if (rc) {
+		    char buf[1024];
+		    fprintf(stderr, "error event: %s\n", fi_eq_strerror(fabd->cmeq, error.prov_errno,
+									error.err_data, buf, 1024));
+		}
+	    } else {
 		FT_PRINTERR("fi_eq_sread", rd);
-		goto err3;
+	    }
+	    goto err3;
  	}
 
 	if (event != FI_CONNECTED || entry.fid != &fcd->conn_ep->fid) {
