@@ -917,7 +917,7 @@ fabric_service_incoming(void *void_trans, void *void_eq)
 	rd = fi_eq_sread(fabd->cmeq, &event, &entry, sizeof entry, -1, 0);
 	info = entry.info;
 	if (event == FI_SHUTDOWN){
-	    svc->trace_out(fcd->fabd->cm, "CMFABRIC got a shutdown event for some conn, who knows which one?\n");
+	    fabd->svc->trace_out(fabd->cm, "CMFABRIC got a shutdown event for some conn, who knows which one?\n");
 	} else {
 	    printf("Unexpected event in service incoming,%s %d\n", fi_tostr(&event, FI_TYPE_EQ_EVENT), event);
 	}
