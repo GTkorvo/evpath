@@ -170,9 +170,6 @@ struct ibparam
 	/*anything else? */
 };
 
-int page_size = 0;
-
-
 #define ptr_from_int64(p) (void *)(unsigned long)(p)
 #define int64_from_ptr(p) (u_int64_t)(unsigned long)(p)
 
@@ -265,16 +262,6 @@ typedef struct tbuffer_
 LIST_HEAD(tblist, tbuffer_) memlist;
 LIST_HEAD(inuselist, tbuffer_) uselist;
 
-
-char *ibv_wc_opcode_str[] = {
-	"IBV_WC_SEND",
-	"IBV_WC_RDMA_WRITE",
-	"IBV_WC_RDMA_READ",
-	"IBV_WC_COMP_SWAP",
-	"IBV_WC_FETCH_ADD",
-	"IBV_WC_BIND_MW",
-	"IBV_WC_RECV_RDMA_WITH_IMM"
-};
 
 static int waitoncq(fabric_conn_data_ptr fcd,
                     fabric_client_data_ptr sd,
@@ -638,24 +625,6 @@ wait_on_q:
 	svc->trace_out(fcd->fabd->cm, "CMFABRIC handle_request completed");    
 	svc->wake_any_pending_write(fcd->conn);
 }
-
-int handle_piggyback(CMtrans_services svc,
-                      fabric_conn_data_ptr fcd,
-                      struct control_message *msg)
-{
-	// read rest and deliver up
-	int offset = msg_offset();
-	
-	fcd->read_buffer_len = msg->u.pb.total_length - offset;
-	svc->trace_out(fcd->fabd->cm, "CMFABRIC received piggyback msg of length %d, added to read_buffer", 
-		       fcd->read_buffer_len);
-
-	fcd->read_buffer = fcd->read_buf;
-	fcd->read_offset = offset;
-	return 0;
-   
-}
-
 
 void cq_readerr(struct fid_cq *cq, char *cq_str)
 { 
