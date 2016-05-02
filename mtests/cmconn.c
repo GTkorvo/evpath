@@ -1,3 +1,17 @@
+/*
+ *   CM connection test plan of action: 
+ *
+ *     We want to test to ensure that a passively-opened connection is not
+ *     closed until the far side explicitly drops all references to it.
+ *
+ *  1. Child will initiate a connection with parent, sending it's context
+ *   list in a message.
+ *  2. Child then waits for message receipt.
+ *  3. Master receives message, initiates a connection using the contact list (should be same connection), sends a message, and closes the connection.
+ *  4. Child should receive the message, wait 5 seconds to give time for master to close, then send a 2nd message and close the connection (after brief pause).
+ *  5. the master must receive the 2nd message for success.
+ */
+
 #include "config.h"
 
 #include <stdio.h>
@@ -10,151 +24,105 @@
 #include <signal.h>
 #include <arpa/inet.h>
 #include "evpath.h"
-#ifdef HAVE_WINDOWS_H
-#include <windows.h>
-#define drand48() (((double)rand())/((double)RAND_MAX))
-#define lrand48() rand()
-#define srand48(x)
-#else
 #include <sys/wait.h>
-#endif
 
-typedef struct _complex_rec {
-    double r;
-    double i;
-} complex, *complex_ptr;
+typedef struct _msg_rec {
+    char *contact_list;
+    int message_id;
+} msgrec, *msg_rec_ptr;
 
-typedef struct _nested_rec {
-    complex item;
-} nested, *nested_ptr;
-
-static FMField nested_field_list[] =
+static FMField msg_field_list[] =
 {
-    {"item", "complex", sizeof(complex), FMOffset(nested_ptr, item)},
+    {"contact_list", "string",
+     sizeof(char*), FMOffset(msg_rec_ptr, contact_list)},
+    {"message_id", "integer",
+     sizeof(int), FMOffset(msg_rec_ptr, message_id)},
     {NULL, NULL, 0, 0}
-};
-
-static FMField complex_field_list[] =
-{
-    {"r", "double", sizeof(double), FMOffset(complex_ptr, r)},
-    {"i", "double", sizeof(double), FMOffset(complex_ptr, i)},
-    {NULL, NULL, 0, 0}
-};
-
-typedef struct _simple_rec {
-    int integer_field;
-    short short_field;
-    long long_field;
-    nested nested_field;
-    double double_field;
-    char char_field;
-    int scan_sum;
-} simple_rec, *simple_rec_ptr;
-
-static FMField simple_field_list[] =
-{
-    {"integer_field", "integer",
-     sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
-    {"short_field", "integer",
-     sizeof(short), FMOffset(simple_rec_ptr, short_field)},
-    {"long_field", "integer",
-     sizeof(long), FMOffset(simple_rec_ptr, long_field)},
-    {"nested_field", "nested",
-     sizeof(nested), FMOffset(simple_rec_ptr, nested_field)},
-    {"double_field", "float",
-     sizeof(double), FMOffset(simple_rec_ptr, double_field)},
-    {"char_field", "char",
-     sizeof(char), FMOffset(simple_rec_ptr, char_field)},
-    {"scan_sum", "integer",
-     sizeof(int), FMOffset(simple_rec_ptr, scan_sum)},
-    {NULL, NULL, 0, 0}
-};
-
-static FMStructDescRec simple_format_list[] =
-{
-    {"simple", simple_field_list, sizeof(simple_rec), NULL},
-    {"complex", complex_field_list, sizeof(complex), NULL},
-    {"nested", nested_field_list, sizeof(nested), NULL},
-    {NULL, NULL}
 };
 
 int quiet = 1;
+int im_the_master = 0;
+char *client_contact_list = NULL;
+int master_success = 0;
+CMFormat msg_format = NULL;
+CMConnection conn_to_master = NULL;
 
 static
 void
-simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
+msg_handler(CManager cm, CMConnection conn, void *vmsg, void *client_data,
 	       attr_list attrs)
 {
-    simple_rec_ptr event = vevent;
-    long sum = 0, scan_sum = 0;
+    msg_rec_ptr msg = vmsg;
+    msgrec reply;
     (void)cm;
-    sum += event->integer_field % 100;
-    sum += event->short_field % 100;
-    sum += event->long_field % 100;
-    sum += ((int) (event->nested_field.item.r * 100.0)) % 100;
-    sum += ((int) (event->nested_field.item.i * 100.0)) % 100;
-    sum += ((int) (event->double_field * 100.0)) % 100;
-    sum += event->char_field;
-    sum = sum % 100;
-    scan_sum = event->scan_sum;
-    if (sum != scan_sum) {
-	printf("Received record checksum does not match. expected %d, got %d\n",
-	       (int) sum, (int) scan_sum);
-    }
-    if ((quiet <= 0) || (sum != scan_sum)) {
-	printf("In the handler, connection is %lx, event data is :\n", (long)conn);
-	printf("	integer_field = %d\n", event->integer_field);
-	printf("	short_field = %d\n", event->short_field);
-	printf("	long_field = %ld\n", event->long_field);
-	printf("	double_field = %g\n", event->double_field);
-	printf("	char_field = %c\n", event->char_field);
-	printf("Data was received with attributes : \n");
-	dump_attr_list(attrs);
-    }
-    if (client_data != NULL) {
-	int tmp = *((int *) client_data);
-	*((int *) client_data) = tmp + 1;
+    switch(msg->message_id) {
+    case 0:   /* first message from client to master */
+	reply.message_id = 1;
+	attr_list client_contact_list = attr_list_from_string(msg->contact_list);
+	CMConnection conn_to_client = CMinitiate_conn(cm, client_contact_list);
+	if (conn != conn_to_client) printf("CONN_EQ MAY BE BROKEN\n");
+	CMwrite(conn_to_client, msg_format, &reply);
+	CMusleep(cm, 5000);
+	CMConnection_close(conn_to_client);
+	break;
+    case 1:   /* message from master to client */
+	CMsleep(cm, 5);   /* waiting for master to close his connection */
+	reply.message_id = 2;
+	CMwrite(conn_to_master, msg_format, &reply);
+	CMusleep(cm, 5000);
+	break;
+    case 2:   /* last message from client to master */
+	master_success = 1;
+	break;
     }
 }
 
 static int do_regression_master_test();
 static int regression = 1;
+
 static atom_t CM_TRANSPORT;
-static atom_t CM_NETWORK_POSTFIX;
-static atom_t CM_MCAST_ADDR;
-static atom_t CM_MCAST_PORT;
-static atom_t CM_BW_MEASURE_INTERVAL;
+
+char *transport = NULL;
+#include "support.c"
+
+void
+do_master_stuff(CManager cm)
+{
+	attr_list contact_list, listen_list = NULL;
+	char *string_list;
+	if ((transport = getenv("CMTransport")) != NULL) {
+	    if (listen_list == NULL) listen_list = create_attr_list();
+	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
+		     (attr_value) strdup(transport));
+	}
+	CMlisten(cm);
+	CMlisten_specific(cm, listen_list);
+	contact_list = CMget_specific_contact_list(cm, listen_list);
+	if (transport != NULL) {
+	    char *actual_transport = NULL;
+	    get_string_attr(contact_list, CM_TRANSPORT, &actual_transport);
+	    if (!actual_transport || (strncmp(actual_transport, transport, strlen(actual_transport)) != 0)) {
+		printf("Failed to load transport \"%s\"\n", transport);
+		exit(1);
+	    }
+	}
+	string_list = attr_list_to_string(contact_list);
+	printf("Contact list \"%s\"\n", string_list);
+	msg_format = CMregister_simple_format(cm, "conn_msg", msg_field_list, sizeof(msgrec));
+	CMregister_handler(msg_format, msg_handler, NULL);
+	CMsleep(cm, 120);
+}
 
 int
 main(int argc, char **argv)
 {
     CManager cm;
-    CMConnection conn = NULL;
-    CMFormat format;
     int regression_master = 1;
 
-    while (argv[1] && (argv[1][0] == '-')) {
-	if (argv[1][1] == 'c') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 's') {
-	    regression_master = 0;
-	} else if (argv[1][1] == 'q') {
-	    quiet++;
-	} else if (argv[1][1] == 'v') {
-	    quiet--;
-	} else if (argv[1][1] == 'n') {
-	    regression = 0;
-	    quiet = -1;
-	}
-	argv++;
-	argc--;
-    }
+    PARSE_ARGS();
+
     srand48(getpid());
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
-    CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
-    CM_MCAST_PORT = attr_atom_from_string("MCAST_PORT");
-    CM_MCAST_ADDR = attr_atom_from_string("MCAST_ADDR");
-    CM_BW_MEASURE_INTERVAL = attr_atom_from_string("CM_BW_MEASURE_INTERVAL");
 
     if (regression && regression_master) {
 	return do_regression_master_test();
@@ -163,67 +131,30 @@ main(int argc, char **argv)
     (void) CMfork_comm_thread(cm);
 
     if (argc == 1) {
-	attr_list contact_list, listen_list = NULL;
-	char *transport = NULL;
-	char *postfix = NULL;
-	char *string_list;
-	if ((transport = getenv("CMTransport")) != NULL) {
-	    if (listen_list == NULL) listen_list = create_attr_list();
-	    add_attr(listen_list, CM_TRANSPORT, Attr_String,
-		     (attr_value) strdup(transport));
-	}
-	if ((postfix = getenv("CMNetworkPostfix")) != NULL) {
-	    if (listen_list == NULL) listen_list = create_attr_list();
-	    add_attr(listen_list, CM_NETWORK_POSTFIX, Attr_String,
-		     (attr_value) strdup(postfix));
-	}
-	CMlisten_specific(cm, listen_list);
-	contact_list = CMget_contact_list(cm);
-	if (contact_list) {
-	    string_list = attr_list_to_string(contact_list);
-	} else {
-	    /* must be multicast, hardcode a contact list */
-#define HELLO_PORT 12345
-#define HELLO_GROUP "225.0.0.37"
-	    int addr;
-	    (void) inet_aton(HELLO_GROUP, (struct in_addr *)&addr);
-	    contact_list = create_attr_list();
-	    add_attr(contact_list, CM_MCAST_ADDR, Attr_Int4,
-		     (attr_value) (long)addr);
-	    add_attr(contact_list, CM_MCAST_PORT, Attr_Int4,
-		     (attr_value) HELLO_PORT);
-	    add_attr(contact_list, CM_TRANSPORT, Attr_String,
-		     (attr_value) "multicast");
-	    conn = CMinitiate_conn(cm, contact_list);
-	    string_list = attr_list_to_string(contact_list);
-	    free_attr_list(contact_list);
-	}	
-	printf("Contact list \"%s\"\n", string_list);
-	format = CMregister_format(cm, simple_format_list);
-	CMregister_handler(format, simple_handler, NULL);
-	CMsleep(cm, 1200);
+	do_master_stuff(cm);
     } else {
-	attr_list attrs;
+	msgrec msg;
 	if (argc == 2) {
 	    attr_list contact_list;
 	    contact_list = attr_list_from_string(argv[1]);
-	    conn = CMinitiate_conn(cm, contact_list);
-	    if (conn == NULL) {
+	    conn_to_master = CMinitiate_conn(cm, contact_list);
+	    if (conn_to_master == NULL) {
 		printf("No connection, attr list was :");
 		dump_attr_list(contact_list);
 		printf("\n");
 		exit(1);
 	    }
+	    free_attr_list(contact_list);
 	}
-	attrs = create_attr_list();
-	add_attr(attrs, CM_BW_MEASURE_INTERVAL, Attr_Int4, (attr_value)30);
-	CMConnection_set_character(conn, attrs);
-	free_attr_list(attrs);
-	while(1) {
-	    CMsleep(cm, 10);
-	    printf("Conn attr list is :  ");
-	    dump_attr_list(CMConnection_get_attrs(conn));
-	}
+	msg_format = CMregister_simple_format(cm, "conn_msg", msg_field_list, sizeof(msgrec));
+	memset(&msg, 0, sizeof(msg));
+	msg.message_id = 0;
+	msg.contact_list = attr_list_to_string(CMget_contact_list(cm));
+	CMwrite(conn_to_master, msg_format, &msg);
+	CMsleep(cm, 20);
+    }
+    if (conn_to_master) {
+	CMConnection_close(conn_to_master);
     }
     CManager_close(cm);
     return 0;
@@ -242,39 +173,16 @@ fail_and_die(int signal)
     exit(1);
 }
 
-static
-pid_t
-run_subprocess(char **args)
-{
-#ifdef HAVE_WINDOWS_H
-    int child;
-    child = _spawnv(_P_NOWAIT, "./cmtest.exe", args);
-    if (child == -1) {
-	printf("failed for cmtest\n");
-	perror("spawnv");
-    }
-    return child;
-#else
-    pid_t child = fork();
-    if (child == 0) {
-	/* I'm the child */
-	execv("./cmtest", args);
-    }
-    return child;
-#endif
-}
-
 static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"cmtest", "-c", NULL, NULL};
+    char *args[] = {argv0, "-c", NULL, NULL};
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
-    char *string_list, *transport, *postfix;
-    CMFormat format;
-    int message_count = 0;
+    char *string_list;
+    int message_count = 0, i;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
 #else
@@ -293,33 +201,19 @@ do_regression_master_test()
 	add_attr(listen_list, CM_TRANSPORT, Attr_String,
 		 (attr_value) strdup(transport));
     }
-    if ((postfix = getenv("CMNetworkPostfix")) != NULL) {
-	if (listen_list == NULL) listen_list = create_attr_list();
-	add_attr(listen_list, CM_NETWORK_POSTFIX, Attr_String,
-		 (attr_value) strdup(postfix));
-    }
     CMlisten_specific(cm, listen_list);
     contact_list = CMget_contact_list(cm);
-    if (contact_list) {
-	string_list = attr_list_to_string(contact_list);
-	free_attr_list(contact_list);
-    } else {
-	/* must be multicast, hardcode a contact list */
-#define HELLO_PORT 12345
-#define HELLO_GROUP "225.0.0.37"
-	int addr;
-	(void) inet_aton(HELLO_GROUP, (struct in_addr *)&addr);
-	contact_list = create_attr_list();
-	add_attr(contact_list, CM_MCAST_ADDR, Attr_Int4,
-		 (attr_value) (long)addr);
-	add_attr(contact_list, CM_MCAST_PORT, Attr_Int4,
-		 (attr_value) HELLO_PORT);
-	add_attr(contact_list, CM_TRANSPORT, Attr_String,
-		 (attr_value) "multicast");
-	(void) CMinitiate_conn(cm, contact_list);
-	string_list = attr_list_to_string(contact_list);
-	free_attr_list(contact_list);
-    }	
+    if (transport != NULL) {
+      char *actual_transport = NULL;
+      get_string_attr(contact_list, CM_TRANSPORT, &actual_transport);
+      if (!actual_transport || (strncmp(actual_transport, transport, strlen(actual_transport)) != 0)) {
+	printf("Failed to load transport \"%s\"\n", transport);
+	exit(1);
+      }
+    }
+    string_list = attr_list_to_string(contact_list);
+    free_attr_list(contact_list);
+
     args[2] = string_list;
 
     if (quiet <= 0) {
@@ -331,12 +225,15 @@ do_regression_master_test()
     }
     srand48(1);
 
-    format = CMregister_format(cm, simple_format_list);
-    CMregister_handler(format, simple_handler, &message_count);
+    msg_format = CMregister_simple_format(cm, "conn_msg", msg_field_list, sizeof(msgrec));
+    CMregister_handler(msg_format, msg_handler, &message_count);
     subproc_proc = run_subprocess(args);
 
     /* give him time to start */
-    CMsleep(cm, 10);
+    for (i=0; i< 10; i++) {
+	if (message_count == 1) break;
+	CMsleep(cm, 1);
+    }
 /* stuff */
     if (quiet <= 0) {
 	printf("Waiting for remote....\n");
