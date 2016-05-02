@@ -138,6 +138,7 @@ run_subprocess(char **args)
 	while(run_args[i]) {
 	    printf("%s ", run_args[i++]);
 	}
+	printf("\n");
     }
     if (no_fork) {
 	child = -1;
