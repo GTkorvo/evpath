@@ -57,6 +57,8 @@ msg_handler(CManager cm, CMConnection conn, void *vmsg, void *client_data,
     (void)cm;
     switch(msg->message_id) {
     case 0:   /* first message from client to master */
+	if (!quiet)
+	    printf("Master received incoming message from client:\n  Initiating a new conn to him, writing a message and closing it.\n");
 	reply.message_id = 1;
 	attr_list client_contact_list = attr_list_from_string(msg->contact_list);
 	CMConnection conn_to_client = CMinitiate_conn(cm, client_contact_list);
@@ -66,12 +68,18 @@ msg_handler(CManager cm, CMConnection conn, void *vmsg, void *client_data,
 	CMConnection_close(conn_to_client);
 	break;
     case 1:   /* message from master to client */
+	if (!quiet)
+	    printf("Client received incoming message from the master  - waiting\n");
 	CMsleep(cm, 5);   /* waiting for master to close his connection */
 	reply.message_id = 2;
+	if (!quiet)
+	    printf("Client sending message to the master, he has to get this\n");
 	CMwrite(conn_to_master, msg_format, &reply);
 	CMusleep(cm, 5000);
 	break;
     case 2:   /* last message from client to master */
+	if (!quiet)
+	    printf("Master got success message... \n");
 	master_success = 1;
 	break;
     }
@@ -147,9 +155,13 @@ main(int argc, char **argv)
 	    free_attr_list(contact_list);
 	}
 	msg_format = CMregister_simple_format(cm, "conn_msg", msg_field_list, sizeof(msgrec));
+	CMregister_handler(msg_format, msg_handler, NULL);
 	memset(&msg, 0, sizeof(msg));
 	msg.message_id = 0;
+	CMlisten(cm);
 	msg.contact_list = attr_list_to_string(CMget_contact_list(cm));
+	if (!quiet)
+	    printf("Contact list sent to client is \"%s\"\n", msg.contact_list);
 	CMwrite(conn_to_master, msg_format, &msg);
 	CMsleep(cm, 20);
     }
@@ -182,7 +194,7 @@ do_regression_master_test()
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
     char *string_list;
-    int message_count = 0, i;
+    int i;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
 #else
@@ -226,12 +238,12 @@ do_regression_master_test()
     srand48(1);
 
     msg_format = CMregister_simple_format(cm, "conn_msg", msg_field_list, sizeof(msgrec));
-    CMregister_handler(msg_format, msg_handler, &message_count);
+    CMregister_handler(msg_format, msg_handler, NULL);
     subproc_proc = run_subprocess(args);
 
     /* give him time to start */
     for (i=0; i< 10; i++) {
-	if (message_count == 1) break;
+	if (master_success == 1) break;
 	CMsleep(cm, 1);
     }
 /* stuff */
@@ -268,6 +280,6 @@ do_regression_master_test()
 #endif
     free(string_list);
     CManager_close(cm);
-    if (message_count != 1) printf("Message count == %d\n", message_count);
-    return !(message_count == 1);
+    if (master_success != 1) printf("Master_success == %d\n", master_success);
+    return !(master_success == 1);
 }
