@@ -145,7 +145,6 @@ char *ECL_generate = "{\n\
     return count == 1;\n\
 }";
 
-static int dont_fork = 0;
 typedef struct {
     char *contact;
 } alive_msg_t;
@@ -327,7 +326,7 @@ do_regression_master_test()
 	if (message_count == 1) break;
 	CMsleep(cm, 1);
     }
-    if (dont_fork) {
+    if (no_fork) {
 	CMsleep(cm, 300);
     } else {
 	if (quiet <= 0) {
