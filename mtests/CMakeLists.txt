@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-set (TESTS cmtest cmping bulktest take_test)
+set (TESTS cmtest cmping cmconn bulktest take_test)
 
 if(MPI_C_INCLUDE_PATH)
 include_directories(${MPI_C_INCLUDE_PATH})
