@@ -53,7 +53,7 @@ msg_handler(CManager cm, CMConnection conn, void *vmsg, void *client_data,
 	       attr_list attrs)
 {
     msg_rec_ptr msg = vmsg;
-    msgrec reply;
+    msgrec reply = {NULL, 0};
     (void)cm;
     switch(msg->message_id) {
     case 0:   /* first message from client to master */
