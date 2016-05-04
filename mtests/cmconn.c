@@ -42,7 +42,6 @@ static FMField msg_field_list[] =
 
 int quiet = 1;
 int im_the_master = 0;
-char *client_contact_list = NULL;
 int master_success = 0;
 CMFormat msg_format = NULL;
 CMConnection conn_to_master = NULL;
@@ -56,17 +55,20 @@ msg_handler(CManager cm, CMConnection conn, void *vmsg, void *client_data,
     msgrec reply = {NULL, 0};
     (void)cm;
     switch(msg->message_id) {
-    case 0:   /* first message from client to master */
+    case 0:  { /* first message from client to master */
+        CMConnection conn_to_client;
+	attr_list client_contact_list;
 	if (!quiet)
 	    printf("Master received incoming message from client:\n  Initiating a new conn to him, writing a message and closing it.\n");
 	reply.message_id = 1;
-	attr_list client_contact_list = attr_list_from_string(msg->contact_list);
-	CMConnection conn_to_client = CMinitiate_conn(cm, client_contact_list);
+	client_contact_list = attr_list_from_string(msg->contact_list);
+	conn_to_client = CMinitiate_conn(cm, client_contact_list);
 	if (conn != conn_to_client) printf("CONN_EQ MAY BE BROKEN\n");
 	CMwrite(conn_to_client, msg_format, &reply);
 	CMusleep(cm, 5000);
 	CMConnection_close(conn_to_client);
 	break;
+    }
     case 1:   /* message from master to client */
 	if (!quiet)
 	    printf("Client received incoming message from the master  - waiting\n");
