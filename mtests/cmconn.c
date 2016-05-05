@@ -64,6 +64,7 @@ msg_handler(CManager cm, CMConnection conn, void *vmsg, void *client_data,
 	client_contact_list = attr_list_from_string(msg->contact_list);
 	conn_to_client = CMinitiate_conn(cm, client_contact_list);
 	if (conn != conn_to_client) printf("CONN_EQ MAY BE BROKEN\n");
+	free_attr_list(client_contact_list);
 	CMwrite(conn_to_client, msg_format, &reply);
 	CMusleep(cm, 5000);
 	CMConnection_close(conn_to_client);
@@ -118,6 +119,7 @@ do_master_stuff(CManager cm)
 	}
 	string_list = attr_list_to_string(contact_list);
 	printf("Contact list \"%s\"\n", string_list);
+	free(string_list);
 	msg_format = CMregister_simple_format(cm, "conn_msg", msg_field_list, sizeof(msgrec));
 	CMregister_handler(msg_format, msg_handler, NULL);
 	CMsleep(cm, 120);
@@ -144,6 +146,7 @@ main(int argc, char **argv)
 	do_master_stuff(cm);
     } else {
 	msgrec msg;
+	attr_list tmp;
 	if (argc == 2) {
 	    attr_list contact_list;
 	    contact_list = attr_list_from_string(argv[1]);
@@ -161,10 +164,12 @@ main(int argc, char **argv)
 	memset(&msg, 0, sizeof(msg));
 	msg.message_id = 0;
 	CMlisten(cm);
-	msg.contact_list = attr_list_to_string(CMget_contact_list(cm));
+	msg.contact_list = attr_list_to_string(tmp = CMget_contact_list(cm));
+	free_attr_list(tmp);
 	if (!quiet)
 	    printf("Contact list sent to client is \"%s\"\n", msg.contact_list);
 	CMwrite(conn_to_master, msg_format, &msg);
+	free(msg.contact_list);
 	CMsleep(cm, 20);
     }
     if (conn_to_master) {
