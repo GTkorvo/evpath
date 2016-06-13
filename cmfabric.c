@@ -119,6 +119,7 @@ void cq_readerr(struct fid_cq *cq, char *cq_str);
 	do { fprintf(stderr, "%s:%d: " fmt, __FILE__, __LINE__, ##__VA_ARGS__); } while (0)
 
 #define MAX(a,b) (((a)>(b))?(a):(b))
+#define MIN(a,b) (((a)<(b))?(a):(b))
 
 //   END from shared.h in fabtests
 
@@ -127,19 +128,27 @@ void cq_readerr(struct fid_cq *cq, char *cq_str);
 static char *msg_string[] = {"Request", "Response", "Piggyback"};
 enum {msg_request = 0, msg_response = 1, msg_piggyback = 2} msg_type;
 
+struct remote_entry {
+    uint64_t remote_addr;
+    uint32_t length;
+    uint64_t rkey;
+};
+
 struct request
 {
-    int magic;    
-    uint32_t length;    
+    uint64_t length;
+    uint32_t iovcnt;
+    uint32_t piggyback_length;
     uint64_t request_ID;
+    struct remote_entry  read_list[1];
 };
 
 
 struct response
 {
     uint64_t remote_addr;
-    uint32_t rkey;
-    uint32_t max_length;    
+    uint64_t rkey;
+    uint64_t max_length;    
     uint64_t request_ID;
 };
 
@@ -209,10 +218,10 @@ typedef struct notification
 
 typedef struct remote_info
 {
-    int mrlen;
+    int iovcnt;
     notify isDone;
-    struct ibv_mr **mrlist;
-    struct ibv_send_wr *wr; 
+    struct fid_mr **mrlist;
+    struct iovec *iov;
     CMcompletion_notify_func notify_func;
     void *notify_client_data;
 }rinfo;
@@ -242,14 +251,14 @@ typedef struct fabric_connection_data {
 	struct ibv_qp *dataqp;    
 	notify isDone;
 	int infocount;
-	rinfo infolist[10];
+    	rinfo last_write;
 	int max_imm_data;   
 } *fabric_conn_data_ptr;
 
 typedef struct tbuffer_
 {
 	CMbuffer buf;
-	struct ibv_mr *mr;
+	struct fid_mr *mr;
 	fabric_conn_data_ptr fcd;
 	uint64_t size;
 	uint64_t offset;
@@ -414,6 +423,7 @@ static int internal_write_piggyback(CMtrans_services svc,
 	memcpy(fcd->send_buf, msg, msg->u.pb.total_length);
 	int ret;
 	
+	svc->trace_out(fcd->fabd->cm, "fi_send on conn_ep\n");
 	ret = fi_send(fcd->conn_ep, fcd->send_buf, msg->u.pb.total_length, fi_mr_desc(fcd->send_mr), 0, fcd->send_buf);
 	if (ret) {
 	    FT_PRINTERR("fi_send", ret);
@@ -423,6 +433,7 @@ static int internal_write_piggyback(CMtrans_services svc,
 	/* Read send queue */
 	do {
 	    struct fi_cq_entry comp;
+	    svc->trace_out(fcd->fabd->cm, "fi_cq_read for send completion\n");
 	    ret = fi_cq_read(fcd->scq, &comp, 1);
 	    if (ret < 0 && ret != -FI_EAGAIN) {
 		FT_PRINTERR("fi_cq_read", ret);
@@ -463,6 +474,7 @@ static int internal_write_response(CMtrans_services svc,
 	memcpy(fcd->send_buf, &msg, sizeof(msg));
 	int ret;
 	
+	svc->trace_out(fcd->fabd->cm, "fi_send for write response\n");
 	ret = fi_send(fcd->conn_ep, fcd->send_buf, sizeof(msg), fi_mr_desc(fcd->send_mr), 0, fcd->send_buf);
 	if (ret) {
 	    FT_PRINTERR("fi_send", ret);
@@ -473,6 +485,7 @@ static int internal_write_response(CMtrans_services svc,
 	do {
 	    struct fi_cq_entry comp;
 
+	    svc->trace_out(fcd->fabd->cm, "fi_cq_read for send completion\n");
 	    ret = fi_cq_read(fcd->scq, &comp, 1);
 	    if (ret < 0 && ret != -FI_EAGAIN) {
 		FT_PRINTERR("fi_cq_read", ret);
@@ -487,21 +500,56 @@ static int internal_write_response(CMtrans_services svc,
 static int internal_write_request(CMtrans_services svc,
                                   fabric_conn_data_ptr fcd,
                                   int length,
-    				  void *request_ID)
+    				  rinfo *request_info)
 {
-	struct control_message msg;
-	int ret;
+	struct control_message *msg;
+	int ret, i, piggyback_prefix_vectors;
+	int size = sizeof(*msg) + request_info->iovcnt * sizeof(struct remote_entry);
+	msg = malloc(size);
 
-	msg.type = msg_request;
-	msg.u.req.magic = 0xdeadbeef;
-	msg.u.req.length = length;
-	msg.u.req.request_ID = int64_from_ptr(request_ID);
+	msg->type = msg_request;
+	msg->u.req.length = length;
+	msg->u.req.iovcnt = request_info->iovcnt;
+	msg->u.req.request_ID = int64_from_ptr(request_info);
+	msg->u.req.piggyback_length = 0;
 
-	svc->trace_out(fcd->fabd->cm, "Doing internal write request, writing %d bytes", sizeof(struct control_message));
+	piggyback_prefix_vectors = 0;
+	for (i=0; i < request_info->iovcnt; i++) {
+	    if (size + request_info->iov[i].iov_len < PIGGYBACK) {
+		size += request_info->iov[i].iov_len;
+		piggyback_prefix_vectors++;
+	    } else {
+		break;
+	    }
+	}
+	msg->u.req.iovcnt -= piggyback_prefix_vectors;
+	/* redo size */
+	size = sizeof(*msg) + (request_info->iovcnt-piggyback_prefix_vectors) 
+	    * sizeof(struct remote_entry);
 
-	memcpy(fcd->send_buf, &msg, sizeof(msg));
+	for (i=0; i < piggyback_prefix_vectors; i++) {
+	    msg = realloc(msg, size + request_info->iov[i].iov_len);
+	    memcpy(((char*)msg) + size, request_info->iov[i].iov_base, 
+		   request_info->iov[i].iov_len);
+	    size += request_info->iov[i].iov_len;
+	    msg->u.req.piggyback_length += request_info->iov[i].iov_len;
+	}
+	/* handle remaining */
+	for (; i < request_info->iovcnt; i++) {
+	    int j = i - piggyback_prefix_vectors;
+	    msg->u.req.read_list[j].remote_addr = int64_from_ptr(request_info->iov[i].iov_base);
+	    msg->u.req.read_list[j].length = request_info->iov[i].iov_len;
+	    msg->u.req.read_list[j].rkey = fi_mr_key(request_info->mrlist[i]);
+	    svc->trace_out(fcd->fabd->cm, "Adding source buffer[%d] %lx, len %d, key %lx\n",
+		   i, msg->u.req.read_list[j].remote_addr, msg->u.req.read_list[j].length,
+		   msg->u.req.read_list[j].rkey);
+	}
+
+	svc->trace_out(fcd->fabd->cm, "Doing internal write request, writing %d bytes", size);
+
+	memcpy(fcd->send_buf, msg, size);
 	
-	ret = fi_send(fcd->conn_ep, fcd->send_buf, sizeof(msg), fi_mr_desc(fcd->send_mr), 0, fcd->send_buf);
+	ret = fi_send(fcd->conn_ep, fcd->send_buf, size, fi_mr_desc(fcd->send_mr), 0, fcd->send_buf);
 	if (ret) {
 	    FT_PRINTERR("fi_send", ret);
 	    return ret;
@@ -550,80 +598,105 @@ static int handle_response(CMtrans_services svc,
     
 }
 
+static void free_func(void *cbd)
+{
+    printf("Called free_func\n");
+}
+	
 static void handle_request(CMtrans_services svc,
                            fabric_conn_data_ptr fcd,
                            struct control_message *msg)
 {
-	//handling the request message
+    int count;
+    //handling the request message
 
-	//first read the request message from the socket
-	struct ibv_mr *mr;
-	tbuffer *tb;
-	int retval = 0;
-	struct request *req;
+    tbuffer *tb;
+    int ret = 0, i, header_size;
+    struct request *req;
+    void *buffer;
+    char *ptr;
 
-	req = &msg->u.req;
+    req = &msg->u.req;
 	
-	tb = NULL;
-	if(tb == NULL)
-	{
-		svc->trace_out(fcd->fabd->cm, "Failed to get memory\n");
-		internal_write_response(svc, fcd, NULL, 0, 0);
-		goto wait_on_q; 
+    tb = (tbuffer*)malloc(sizeof(tbuffer));
+
+    buffer = malloc(req->length);
+    CMbuffer cb = svc->create_data_and_link_buffer(fcd->fabd->cm, buffer, req->length);
+    tb->buf = cb;
+    tb->fcd = fcd;
+    tb->size = req->length;
+    tb->inuse = 1;
+    tb->offset = 0;
+    cb->return_callback = free_func;
+    cb->return_callback_data = (void*)tb;
+    tb->childcount = 0;
+    tb->parent = NULL;  
+	
+    svc->trace_out(fcd->fabd->cm, "In handle request, len is %ld, iovcnt %d, request_ID %lx, piggyback_length = %d\n",
+	   req->length, req->iovcnt, req->request_ID, req->piggyback_length);
+    svc->trace_out(fcd->fabd->cm, "fi_mr_reg, buff %p, size %ld with attrs REMOTE_READ,REMOTE_WRITE, SEND, RECV\n", buffer, req->length+1000);
+    ret = fi_mr_reg(fcd->fabd->dom, buffer, req->length+1000,
+		    FI_REMOTE_READ | FI_REMOTE_WRITE | FI_SEND | FI_RECV,
+		    0, 0, 0, &tb->mr, NULL);
+    if(ret) {
+	FT_PRINTERR("fi_mr_reg", ret);
+	svc->trace_out(fcd->fabd->cm, "Failed to get memory\n");
+	internal_write_response(svc, fcd, NULL, 0, 0);
+	return;
+    }
+
+    fcd->tb = tb;
+
+    header_size = sizeof(*msg) + req->iovcnt * sizeof(struct remote_entry);
+    memcpy(buffer, (char*)msg + header_size, req->piggyback_length);
+
+    svc->set_pending_write(fcd->conn);
+    ptr = buffer + req->piggyback_length;
+    count = req->iovcnt;
+    for (i=0; i < req->iovcnt; i++) {
+    	struct fi_cq_data_entry comp;
+	svc->trace_out(fcd->fabd->cm, "fi_read, buffer %p, len %d, (keys.rkey %lx, keys.addr %lx)\n", ptr, req->read_list[i].length, req->read_list[i].rkey, req->read_list[i].remote_addr);
+	ssize_t ret = fi_read(fcd->conn_ep, ptr, req->read_list[i].length, fi_mr_desc(tb->mr),
+			      0, req->read_list[i].remote_addr, req->read_list[i].rkey, NULL);
+	do {
+	    /* Read send queue */
+	    ret = fi_cq_read(fcd->scq, &comp, 1);
+	    if (ret < 0 && ret != -FI_EAGAIN) {
+		FT_PRINTERR("fi_cq_read", ret);
+		cq_readerr(fcd->scq, "scq");
+	    }
+	} while (ret == -FI_EAGAIN);
+    	if (comp.flags & FI_READ) {
+    	    count--;
+    	}
+    }
+
+
+    while (count != 0) {
+    	struct fi_cq_data_entry comp;
+	ret = fi_cq_read(fcd->scq, &comp, 1);
+	if (ret == -FI_EAGAIN) {printf("Eagain\n"); continue;}
+	if (ret < 0 && ret != -FI_EAGAIN) {
+	    if (ret == -FI_EAVAIL) {
+		cq_readerr(fcd->scq, "scq");
+	    } else {
+		FT_PRINTERR("fi_cq_read", ret);
+	    }
+	    continue;
+	} else if (ret > 0) {
+	    printf("Successful remote read, Completion size is %ld, data %p\n", comp.len, comp.buf);
 	}
 
-	fcd->tb = tb;
-	mr = tb->mr;
+    	if (comp.flags & FI_READ) {
+    	    count--;
+    	}
+    }
 
-	svc->set_pending_write(fcd->conn);
-	internal_write_response(svc, fcd, tb, req->length, req->request_ID);
-
-wait_on_q:
-	//now the sender will start the data transfer. When it finishes he will 
-	//issue a notification after which the data is in memory
-	retval = waitoncq(fcd, fcd->fabd, svc, fcd->fabd->recv_cq);    
-	if(retval)
-	{
-		svc->trace_out(fcd->fabd->cm, "Error while waiting\n");
-		return;     
-	}
-
-	//now we start polling the cq
-
-	do
-	{
-		svc->trace_out(fcd->fabd->cm, "CMFABRIC poll cq -start");    
-		/* retval = ibv_poll_cq(fcd->fabdrecv_cq, 1, &wc); */
-		/* svc->trace_out(fcd->fabd->cm, "CMFABRIC poll cq -end");     */
-		/* if(retval > 0 && wc.status == IBV_WC_SUCCESS && wc.opcode == IBV_WC_RECV) */
-		/* { */
-		/* 	//cool beans - send completed we can go on with our life */
-        
-		/* 	//issue a reccieve so we don't run out */
-		/* 	retval = ibv_post_recv(fcd->dataqp, &fcd->isDone.rwr,  */
-		/* 	                       &fcd->isDone.badrwr); */
-		/* 	if(retval) */
-		/* 	{ */
-		/* 		fcd->fabdsvc->trace_out(fcd->fabd->cm, "Cmfabric unable to post recv %d\n", retval); */
-		/* 	} */
-    
-		/* 	break;       */
-		/* } */
-		/* else */
-		/* { */
-		/* 	svc->trace_out(fcd->fabd->cm, "Error polling for write completion\n"); */
-		/* 	break;       */
-		/* } */
-
-		/* svc->trace_out(fcd->fabd->cm, "CMFABRIC poll cq looping");     */
-    
-	}while(1);
-
-	fcd->read_buffer = tb->buf;
-	svc->trace_out(fcd->fabd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", req->length, ((unsigned char*)tb->buf->buffer)[0], ((unsigned char*)tb->buf->buffer)[1], ((unsigned char*)tb->buf->buffer)[2], ((unsigned char*)tb->buf->buffer)[3], ((unsigned char*)tb->buf->buffer)[4], ((unsigned char*)tb->buf->buffer)[5], ((unsigned char*)tb->buf->buffer)[6], ((unsigned char*)tb->buf->buffer)[7], ((unsigned char*)tb->buf->buffer)[8], ((unsigned char*)tb->buf->buffer)[9], ((unsigned char*)tb->buf->buffer)[10], ((unsigned char*)tb->buf->buffer)[11], ((unsigned char*)tb->buf->buffer)[12], ((unsigned char*)tb->buf->buffer)[13], ((unsigned char*)tb->buf->buffer)[14], ((unsigned char*)tb->buf->buffer)[15]);
-	fcd->read_buffer_len = req->length;
-	svc->trace_out(fcd->fabd->cm, "CMFABRIC handle_request completed");    
-	svc->wake_any_pending_write(fcd->conn);
+    fcd->read_buffer = tb->buf;
+    svc->trace_out(fcd->fabd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", req->length, ((unsigned char*)tb->buf->buffer)[0], ((unsigned char*)tb->buf->buffer)[1], ((unsigned char*)tb->buf->buffer)[2], ((unsigned char*)tb->buf->buffer)[3], ((unsigned char*)tb->buf->buffer)[4], ((unsigned char*)tb->buf->buffer)[5], ((unsigned char*)tb->buf->buffer)[6], ((unsigned char*)tb->buf->buffer)[7], ((unsigned char*)tb->buf->buffer)[8], ((unsigned char*)tb->buf->buffer)[9], ((unsigned char*)tb->buf->buffer)[10], ((unsigned char*)tb->buf->buffer)[11], ((unsigned char*)tb->buf->buffer)[12], ((unsigned char*)tb->buf->buffer)[13], ((unsigned char*)tb->buf->buffer)[14], ((unsigned char*)tb->buf->buffer)[15]);
+    fcd->read_buffer_len = req->length;
+    svc->trace_out(fcd->fabd->cm, "CMFABRIC handle_request completed");    
+    svc->wake_any_pending_write(fcd->conn);
 }
 
 void cq_readerr(struct fid_cq *cq, char *cq_str)
@@ -643,8 +716,8 @@ void cq_readerr(struct fid_cq *cq, char *cq_str)
 void
 CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 {    
-	fabric_client_data_ptr sd = (fabric_client_data_ptr) trans->trans_data;
-	CMtrans_services svc = sd->svc;
+	fabric_client_data_ptr fabd = (fabric_client_data_ptr) trans->trans_data;
+	CMtrans_services svc = fabd->svc;
 	struct control_message *msg;
 	double start =0;
 	fabric_conn_data_ptr fcd;
@@ -658,18 +731,18 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
     
 	start = getlocaltime();    
 
-	/* printf("At the beginning of CMFabric_data_available: "); */
-	/* ret = fi_trywait(fcd->fabd->fab, fids, 1); */
-	/* switch (ret) { */
-	/* case FI_SUCCESS: */
-	/*     printf("Try wait on rcq returned FI_SUCCESS\n"); */
-	/*     break; */
-	/* case -FI_EAGAIN: */
-	/*     printf("Try wait on rcq returned FI_EAGAIN\n"); */
-	/*     break; */
-	/* default: */
-	/*     printf("Try wait on rcq returned %d\n", ret); */
-	/* } */
+	svc->trace_out(fabd->cm, "At the beginning of CMFabric_data_available: ");
+	ret = fi_trywait(fcd->fabd->fab, fids, 1);
+	switch (ret) {
+	case FI_SUCCESS:
+	    svc->trace_out(fabd->cm, "Try wait on rcq returned FI_SUCCESS");
+	    break;
+	case -FI_EAGAIN:
+	    svc->trace_out(fabd->cm, "Try wait on rcq returned FI_EAGAIN, read cq events");
+	    break;
+	default:
+	    svc->trace_out(fabd->cm, "Try wait on rcq returned %d", ret);
+	}
 	{
 	    struct fi_cq_data_entry comp;
 		ret = fi_cq_read(fcd->rcq, &comp, 1);
@@ -683,7 +756,7 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 			}
 			return;
 		} else if (ret > 0) {
-//		    printf("Successful read, Completion size is %ld, data %p\n", comp.len, comp.buf);
+		    //
 		}
 	}
 
@@ -849,6 +922,7 @@ fabric_accept_conn(void *void_trans, void *void_conn_sock)
 
     svc->trace_out(fabd->cm, "Falling out of accept conn\n");
     free_attr_list(conn_attr_list);
+    fcd->fd = fd;
 }
 
 /* 
@@ -952,8 +1026,8 @@ static int client_connect(CManager cm, CMtrans_services svc, transport_entry tra
       fabd->opts.dst_addr = host_rep;
     }
     ret = fi_getinfo(FT_FIVERSION, fabd->opts.dst_addr, fabd->opts.dst_port, 0, fabd->hints, &fi);
+    svc->trace_out(cm, "%s return value fi is %s\n", "client", fi_tostr(fi, FI_TYPE_INFO));
     if (ret) {
-	printf("Get info on remote port failed\n");
 	FT_PRINTERR("fi_getinfo", ret);
 	goto err0;
     }
@@ -1087,8 +1161,7 @@ int no_more_redirect;
 	fcd->fd = 0;
 	fcd->fabd = fabd;
 
-	//fixed sized right now, but we will change it to a list/table
-	memset(fcd->infolist, 0, sizeof(rinfo)*10);
+	memset(&fcd->last_write, 0, sizeof(rinfo));
 	fcd->infocount = 0;
 
     
@@ -1315,6 +1388,8 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 	struct fi_cq_attr attrs;
 	memset(&attrs, 0, sizeof(attrs));
 	attrs.format = FI_CQ_FORMAT_DATA;
+	attrs.wait_obj = FI_WAIT_FD;
+	attrs.size = fcd->max_credits << 1;
 	ret = fi_cq_open(fabd->dom, &cq_attr, &fcd->rcq, NULL);
 	if (ret) {
 		FT_PRINTERR("fi_cq_open", ret);
@@ -1322,7 +1397,7 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 	}
 	
 	access_mode = FI_REMOTE_READ;
-	access_mode |= FI_RECV;
+	access_mode |= FI_RECV | FI_READ | FI_WRITE | FI_REMOTE_WRITE;
 	fcd->send_buf = malloc(MAX(fcd->buffer_size, sizeof(uint64_t)));
 	fcd->mapped_recv_buf = malloc(MAX(fcd->buffer_size, sizeof(uint64_t)));
 	if (!fcd->send_buf) {
@@ -1407,13 +1482,118 @@ static int bind_ep_res(fabric_conn_data_ptr fcd)
 	return ret;
 }
 
+
+typedef struct {
+    /* OFI objects */
+    /* int avtid; */
+    /* struct fid_domain *domain; */
+    /* struct fid_fabric *fabric; */
+    /* struct fid_av     *av; */
+    /* struct fid_ep     *ep; */
+    /* struct fid_cq     *p2p_cq; */
+    /* struct fid_cntr   *rma_ctr; */
+
+    /* Queryable limits */
+    uint64_t        max_buffered_send;
+    uint64_t        max_buffered_write;
+    uint64_t        max_send;
+    uint64_t        max_write;
+    uint64_t        max_short_send;
+    uint64_t        max_mr_key_size;
+    int             max_windows_bits;
+    int             max_huge_rma_bits;
+    int             max_huge_rmas;
+    int             huge_rma_shift;
+    int             context_shift;
+    size_t          iov_limit;
+    size_t          rma_iov_limit;
+
+    /* /\* Mutexex and endpoints *\/ */
+    /* MPIDI_OFI_cacheline_mutex_t mutexes[4]; */
+    /* MPIDI_OFI_context_t         ctx[MPIDI_OFI_MAX_ENDPOINTS]; */
+
+    /* /\* Window/RMA Globals *\/ */
+    /* void                             *win_map; */
+    /* uint64_t                          cntr; */
+    /* MPIDI_OFI_atomic_valid_t  win_op_table[MPIDI_OFI_DT_SIZES][MPIDI_OFI_OP_SIZES]; */
+
+    /* Active Message Globals */
+    /* struct iovec                           am_iov[MPIDI_OFI_NUM_AM_BUFFERS]; */
+    /* struct fi_msg                          am_msg[MPIDI_OFI_NUM_AM_BUFFERS]; */
+    /* void                                  *am_bufs[MPIDI_OFI_NUM_AM_BUFFERS]; */
+    /* MPIDI_OFI_am_repost_request_t  am_reqs[MPIDI_OFI_NUM_AM_BUFFERS]; */
+    /* MPIDI_NM_am_target_handler_fn      am_handlers[MPIDI_OFI_MAX_AM_HANDLERS_TOTAL]; */
+    /* MPIDI_NM_am_origin_handler_fn      am_send_cmpl_handlers[MPIDI_OFI_MAX_AM_HANDLERS_TOTAL]; */
+    /* MPIU_buf_pool_t                       *am_buf_pool; */
+    /* OPA_int_t                              am_inflight_inject_emus; */
+    /* OPA_int_t                              am_inflight_rma_send_mrs; */
+
+    /* Completion queue buffering */
+    /* MPIDI_OFI_cq_buff_entry_t cq_buffered[MPIDI_OFI_NUM_CQ_BUFFERED]; */
+    /* struct slist                      cq_buff_list; */
+    /* int                               cq_buff_head; */
+    /* int                               cq_buff_tail; */
+
+    /* Process management and PMI globals */
+    /* int    pname_set; */
+    /* int    pname_len; */
+    /* int    jobid; */
+    /* char   addrname[FI_NAME_MAX]; */
+    /* size_t addrnamelen; */
+    /* char   kvsname[MPIDI_KVSAPPSTRLEN]; */
+    /* char   pname[MPI_MAX_PROCESSOR_NAME]; */
+    /* int    port_name_tag_mask[MPIR_MAX_CONTEXT_MASK]; */
+} MPIDI_OFI_global_t;
+
+MPIDI_OFI_global_t       MPIDI_Global;
+
 static int server_listen(fabric_client_data_ptr fd)
 {
-	struct fi_info *fi;
+    struct fi_info *fi, *prov_use;
 	int ret;
 
 	ret = fi_getinfo(FT_FIVERSION, fd->opts.src_addr, fd->opts.src_port, FI_SOURCE,
 			 fd->hints, &fi);
+
+	prov_use = fi;
+//	svc->trace_out(fd->fabd->cm, "%s return value fi is %s\n", "server", fi_tostr(fi, FI_TYPE_INFO));
+    MPIDI_Global.max_buffered_send  = prov_use->tx_attr->inject_size;
+    MPIDI_Global.max_buffered_write = prov_use->tx_attr->inject_size;
+    MPIDI_Global.max_send           = prov_use->ep_attr->max_msg_size;
+    MPIDI_Global.max_write          = prov_use->ep_attr->max_msg_size;
+    svc->trace_out(fcd->fabd->cm, "Max send is %ld, max write is %ld\n", MPIDI_Global.max_send, MPIDI_Global.max_write);
+    /* MPIDI_Global.iov_limit          = MIN(prov_use->tx_attr->iov_limit,MPIDI_OFI_IOV_MAX); */
+    /* MPIDI_Global.rma_iov_limit      = MIN(prov_use->tx_attr->rma_iov_limit,MPIDI_OFI_IOV_MAX); */
+    MPIDI_Global.max_mr_key_size    = prov_use->domain_attr->mr_key_size;
+
+    /* if(MPIDI_Global.max_mr_key_size >= 8) { */
+    /*     MPIDI_Global.max_windows_bits   = MPIDI_OFI_MAX_WINDOWS_BITS_64; */
+    /*     MPIDI_Global.max_huge_rma_bits  = MPIDI_OFI_MAX_HUGE_RMA_BITS_64; */
+    /*     MPIDI_Global.max_huge_rmas      = MPIDI_OFI_MAX_HUGE_RMAS_64; */
+    /*     MPIDI_Global.huge_rma_shift     = MPIDI_OFI_HUGE_RMA_SHIFT_64; */
+    /*     MPIDI_Global.context_shift      = MPIDI_OFI_CONTEXT_SHIFT_64; */
+    /* } else if(MPIDI_Global.max_mr_key_size >= 4) { */
+    /*     MPIDI_Global.max_windows_bits   = MPIDI_OFI_MAX_WINDOWS_BITS_32; */
+    /*     MPIDI_Global.max_huge_rma_bits  = MPIDI_OFI_MAX_HUGE_RMA_BITS_32; */
+    /*     MPIDI_Global.max_huge_rmas      = MPIDI_OFI_MAX_HUGE_RMAS_32; */
+    /*     MPIDI_Global.huge_rma_shift     = MPIDI_OFI_HUGE_RMA_SHIFT_32; */
+    /*     MPIDI_Global.context_shift      = MPIDI_OFI_CONTEXT_SHIFT_32; */
+    /* } else if(MPIDI_Global.max_mr_key_size >= 2) { */
+    /*     MPIDI_Global.max_windows_bits   = MPIDI_OFI_MAX_WINDOWS_BITS_16; */
+    /*     MPIDI_Global.max_huge_rma_bits  = MPIDI_OFI_MAX_HUGE_RMA_BITS_16; */
+    /*     MPIDI_Global.max_huge_rmas      = MPIDI_OFI_MAX_HUGE_RMAS_16; */
+    /*     MPIDI_Global.huge_rma_shift     = MPIDI_OFI_HUGE_RMA_SHIFT_16; */
+    /*     MPIDI_Global.context_shift      = MPIDI_OFI_CONTEXT_SHIFT_16; */
+    /* } else { */
+    /*     MPIR_ERR_SETFATALANDJUMP4(mpi_errno, */
+    /*                               MPI_ERR_OTHER, */
+    /*                               "**ofid_rma_init", */
+    /*                               "**ofid_rma_init %s %d %s %s", */
+    /*                               __SHORT_FILE__, */
+    /*                               __LINE__, */
+    /*                               FCNAME, */
+    /*                               "Key space too small"); */
+    /* } */
 	if (ret) {
 		FT_PRINTERR("fi_getinfo", ret);
 		return ret;
@@ -1752,7 +1932,10 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 	int left = 0;
 	int iget = 0;
 	int i;
-	struct iovec * iov = (struct iovec*) iovs;
+	int can_reuse_mapping = 0;
+	struct iovec * iov = (struct iovec*) iovs, *tmp_iov;
+	rinfo *last_write_request = &fcd->last_write;
+	struct control_message msg; 
     
 	for (i = 0; i < iovcnt; i++) {
 	    left += iov[i].iov_len;
@@ -1782,28 +1965,91 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 
 	svc->set_pending_write(fcd->conn);
 
-	/* if (notify_func) { */
-	/*     can_reuse_mapping = 1; */
-	/*     /\* OK, we're not going to copy the data *\/ */
-	/*     if (last_write_request->mrlen == iovcnt) { */
-	/* 	int i; */
-	/* 	for(i=0; i < last_write_request->mrlen; i++) { */
-	/* 	    if ((iov[i].iov_len != last_write_request->wr->sg_list[i].length) || */
-	/* 		(int64_from_ptr(iov[i].iov_base) != last_write_request->wr->sg_list[i].addr)) { */
-	/* 		can_reuse_mapping = 0; */
-	/* 		svc->trace_out(fcd->fabd->cm, "CMFABRIC already mapped data, doesn't match write, buf %d, %p vs. %p, %d vs. %d", */
-	/* 			       i, iov[i].iov_base, last_write_request->wr->sg_list[i].addr, iov[i].iov_len, last_write_request->wr->sg_list[i].length); */
-	/* 	    break; */
-	/* 	    } */
-	/* 	} */
-	/*     } else { */
-	/* 	svc->trace_out(fcd->fabd->cm, "CMFABRIC either no already mapped data, or wrong buffer count"); */
-	/* 	can_reuse_mapping = 0; */
-	/*     } */
-	/* } else { */
-	/*     svc->trace_out(fcd->fabd->cm, "CMFABRIC User-owned data with no notify, so no reuse\n"); */
-	/* } */
-	iget = internal_write_request(svc, fcd, left, &fcd->infolist[fcd->infocount]);
+	if (notify_func) {
+	    can_reuse_mapping = 1;
+	    /* OK, we're not going to copy the data */
+	    if (last_write_request->iovcnt == iovcnt) {
+		int i;
+		for(i=0; i < last_write_request->iovcnt; i++) {
+		    if ((iov[i].iov_len != last_write_request->iov[i].iov_len) ||
+			(iov[i].iov_base != last_write_request->iov[i].iov_base)) {
+			can_reuse_mapping = 0;
+			svc->trace_out(fcd->fabd->cm, "CMFABRIC already mapped data, doesn't match write, buf %d, %p vs. %p, %d vs. %d",
+				       i, iov[i].iov_base, last_write_request->iov[i].iov_base, iov[i].iov_len, last_write_request->iov[i].iov_len);
+		    break;
+		    }
+		}
+	    } else {
+		svc->trace_out(fcd->fabd->cm, "CMFABRIC either no already mapped data, or wrong buffer count");
+		can_reuse_mapping = 0;
+	    }
+	} else {
+	    svc->trace_out(fcd->fabd->cm, "CMFABRIC User-owned data with no notify, so no reuse\n");
+	}
+#ifndef DO_DEREG_ON_FINISH
+	if (last_write_request->iovcnt && !(can_reuse_mapping)) {
+	    for(i = 0; i < last_write_request->iovcnt; i ++)
+	    {
+		fi_close(&last_write_request->mrlist[i]->fid);
+		last_write_request->mrlist[i] = NULL;
+	    }
+	    
+	    free(last_write_request->mrlist);
+	    free(last_write_request->iov);
+	    last_write_request->iovcnt = 0;
+	}
+#endif
+	if (notify_func == NULL) {
+	    /* 
+	     * Semantics are that *MUST* be done with the data when we return,
+	     * so, for now, copy all data 
+	     */
+	    tmp_iov = malloc(sizeof(tmp_iov[0]) * iovcnt);
+	    for (i = 0; i < iovcnt; i++) {
+		tmp_iov[i].iov_len = iov[i].iov_len;
+		tmp_iov[i].iov_base = malloc(iov[i].iov_len);
+		memcpy(tmp_iov[i].iov_base, iov[i].iov_base, iov[i].iov_len);
+	    }
+	} else {
+	    /*
+	     *  Cool.  The app doesn't need the data back right away.  
+	     *  We can keep it and tell the upper levels when we're done.
+	     *  Don't copy.  The reply message will trigger the notification.
+	     */
+	    tmp_iov = iov;
+	}
+	memset(&msg, 0, sizeof(msg));
+
+    
+	svc->trace_out(fcd->fabd->cm, "Can reuse mapping is %d\n", can_reuse_mapping);
+	if (!can_reuse_mapping) {
+	    int i;
+	    fcd->last_write.iovcnt = iovcnt;
+	    fcd->last_write.iov = tmp_iov;
+	    fcd->last_write.mrlist = malloc(iovcnt * sizeof(fcd->last_write.mrlist[0]));
+	    for (i=0; i < iovcnt; i++) {
+		int ret;
+		svc->trace_out(fcd->fabd->cm, "fi_mr_reg %d, addr %p, len %ld, with attrs REMOTE_READ,REMOTE_WRITE, SEND, RECV)\n", i, tmp_iov[i].iov_base, tmp_iov[i].iov_len);
+		ret = fi_mr_reg(fcd->fabd->dom, tmp_iov[i].iov_base, tmp_iov[i].iov_len, 
+				FI_REMOTE_READ | FI_REMOTE_WRITE | FI_SEND | FI_RECV, 0, 0, 0, &fcd->last_write.mrlist[i], NULL);
+		if (ret) {
+		    FT_PRINTERR("fi_mr_reg of elements in bulk write", ret);
+		    return -1;
+		}
+
+	    }
+	}
+	fcd->last_write.notify_func = notify_func;
+	fcd->last_write.notify_client_data = notify_client_data;
+    
+	if(fcd->last_write.mrlist == NULL)
+	{
+		svc->trace_out(fcd->fabd->cm, "CMFABRIC writev error in registereing memory");
+		return -1;
+	}
+	
+	svc->trace_out(fcd->fabd->cm, "FIrst 16 bytes of send buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n", left, ((unsigned char*)iov[0].iov_base)[0], ((unsigned char*)iov[0].iov_base)[1], ((unsigned char*)iov[0].iov_base)[2], ((unsigned char*)iov[0].iov_base)[3], ((unsigned char*)iov[0].iov_base)[4], ((unsigned char*)iov[0].iov_base)[5], ((unsigned char*)iov[0].iov_base)[6], ((unsigned char*)iov[0].iov_base)[7], ((unsigned char*)iov[0].iov_base)[8], ((unsigned char*)iov[0].iov_base)[9], ((unsigned char*)iov[0].iov_base)[10], ((unsigned char*)iov[0].iov_base)[11], ((unsigned char*)iov[0].iov_base)[12], ((unsigned char*)iov[0].iov_base)[13], ((unsigned char*)iov[0].iov_base)[14], ((unsigned char*)iov[0].iov_base)[15]);
+	iget = internal_write_request(svc, fcd, left, &fcd->last_write);
 	if(iget < 0)
 	{
 		svc->trace_out(fcd->fabd->cm, "CMFABRIC error in writing request");
@@ -1870,19 +2116,21 @@ libcmfabric_LTX_initialize(CManager cm, CMtrans_services svc)
 	fabd->psn = lrand48()%256;
 
 	fabd->hints = fi_allocinfo();
-	fabd->opts.src_port = "9228",
+	fabd->opts.src_port = "9228";
 
+//	fabd->hints->cap		= FI_CONTEXT;
 	fabd->hints->ep_attr->type	= FI_EP_MSG;
-	fabd->hints->caps		= FI_MSG;
-	fabd->hints->mode		= FI_LOCAL_MR;
+	fabd->hints->caps		= FI_MSG | FI_RMA;
+//	fabd->hints->caps		= FI_MSG;
+	fabd->hints->mode		= FI_CONTEXT | FI_LOCAL_MR | FI_RX_CQ_DATA;
 	fabd->hints->addr_format	= FI_SOCKADDR;
+//	fabd->hints->tx_attr->op_flags  = FI_DELIVERY_COMPLETE | FI_COMPLETION;
+	fabd->hints->tx_attr->op_flags  = FI_COMPLETION;
 
-	struct fi_domain_attr *domain_attr = malloc(sizeof(struct fi_domain_attr));
-	memset(domain_attr, 0, sizeof(struct fi_domain_attr));
-	domain_attr->threading        =  FI_THREAD_ENDPOINT;
-	domain_attr->control_progress =  FI_PROGRESS_AUTO;
-	domain_attr->data_progress    =  FI_PROGRESS_AUTO;
-	fabd->hints->domain_attr            = domain_attr;
+	fabd->hints->domain_attr->mr_mode = FI_MR_BASIC;
+	fabd->hints->domain_attr->threading        =  FI_THREAD_ENDPOINT;
+	fabd->hints->domain_attr->control_progress =  FI_PROGRESS_AUTO;
+	fabd->hints->domain_attr->data_progress    =  FI_PROGRESS_AUTO;
 
 	svc->add_shutdown_task(cm, free_fabric_data, (void *) fabd, FREE_TASK);
 
