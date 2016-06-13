@@ -1550,18 +1550,18 @@ MPIDI_OFI_global_t       MPIDI_Global;
 static int server_listen(fabric_client_data_ptr fd)
 {
     struct fi_info *fi, *prov_use;
-	int ret;
+    CMtrans_services svc = fd->svc;
+    int ret;
 
-	ret = fi_getinfo(FT_FIVERSION, fd->opts.src_addr, fd->opts.src_port, FI_SOURCE,
-			 fd->hints, &fi);
+    ret = fi_getinfo(FT_FIVERSION, fd->opts.src_addr, fd->opts.src_port, FI_SOURCE,
+		     fd->hints, &fi);
 
-	prov_use = fi;
-//	svc->trace_out(fd->fabd->cm, "%s return value fi is %s\n", "server", fi_tostr(fi, FI_TYPE_INFO));
+    prov_use = fi;
     MPIDI_Global.max_buffered_send  = prov_use->tx_attr->inject_size;
     MPIDI_Global.max_buffered_write = prov_use->tx_attr->inject_size;
     MPIDI_Global.max_send           = prov_use->ep_attr->max_msg_size;
     MPIDI_Global.max_write          = prov_use->ep_attr->max_msg_size;
-    svc->trace_out(fcd->fabd->cm, "Max send is %ld, max write is %ld\n", MPIDI_Global.max_send, MPIDI_Global.max_write);
+    svc->trace_out(fd->cm, "Max send is %ld, max write is %ld\n", MPIDI_Global.max_send, MPIDI_Global.max_write);
     /* MPIDI_Global.iov_limit          = MIN(prov_use->tx_attr->iov_limit,MPIDI_OFI_IOV_MAX); */
     /* MPIDI_Global.rma_iov_limit      = MIN(prov_use->tx_attr->rma_iov_limit,MPIDI_OFI_IOV_MAX); */
     MPIDI_Global.max_mr_key_size    = prov_use->domain_attr->mr_key_size;
