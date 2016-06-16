@@ -696,6 +696,7 @@ static void handle_request(CMtrans_services svc,
     svc->trace_out(fcd->fabd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", req->length, ((unsigned char*)tb->buf->buffer)[0], ((unsigned char*)tb->buf->buffer)[1], ((unsigned char*)tb->buf->buffer)[2], ((unsigned char*)tb->buf->buffer)[3], ((unsigned char*)tb->buf->buffer)[4], ((unsigned char*)tb->buf->buffer)[5], ((unsigned char*)tb->buf->buffer)[6], ((unsigned char*)tb->buf->buffer)[7], ((unsigned char*)tb->buf->buffer)[8], ((unsigned char*)tb->buf->buffer)[9], ((unsigned char*)tb->buf->buffer)[10], ((unsigned char*)tb->buf->buffer)[11], ((unsigned char*)tb->buf->buffer)[12], ((unsigned char*)tb->buf->buffer)[13], ((unsigned char*)tb->buf->buffer)[14], ((unsigned char*)tb->buf->buffer)[15]);
     fcd->read_buffer_len = req->length;
     svc->trace_out(fcd->fabd->cm, "CMFABRIC handle_request completed");    
+    internal_write_response(svc, fcd, tb, req->length, req->request_ID);
     svc->wake_any_pending_write(fcd->conn);
 }
 
