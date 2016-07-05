@@ -272,10 +272,6 @@ LIST_HEAD(tblist, tbuffer_) memlist;
 LIST_HEAD(inuselist, tbuffer_) uselist;
 
 
-static int waitoncq(fabric_conn_data_ptr fcd,
-                    fabric_client_data_ptr sd,
-                    CMtrans_services svc, struct ibv_cq *cq);
-
 static inline int msg_offset()
 {
 	return ((int) (((char *) (&(((struct control_message *)NULL)->u.pb.body[0]))) - ((char *) NULL)));
@@ -1746,7 +1742,7 @@ extern attr_list
 libcmfabric_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr_list listen_info)
 {
     fabric_client_data_ptr fd = trans->trans_data;
-    int wait_sock;
+    int wait_sock = -1;
     int attr_port_num = 0;
     u_short port_num = 0;
     int port_range_low, port_range_high;
@@ -2141,18 +2137,6 @@ libcmfabric_LTX_initialize(CManager cm, CMtrans_services svc)
 
 	return (void *) fabd;
 }
-
-
-static int waitoncq(fabric_conn_data_ptr fcd,
-                    fabric_client_data_ptr fabd,
-                    CMtrans_services svc, struct ibv_cq *cq)
-{
-
-
-    
-	return 0;    
-}
-
 
 
 extern transport_entry
