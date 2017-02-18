@@ -1,5 +1,7 @@
 #include "../config.h"
 
+#include "cercs_env.h"
+
 #include <stdio.h>
 #include <atl.h>
 #ifdef HAVE_UNISTD_H
@@ -22,7 +24,7 @@
 #define MSG_COUNT 30
 static int msg_limit = MSG_COUNT;
 static int message_count = 0;
-static int expected_count = MSG_COUNT;
+static int expected_count;
 
 typedef struct _complex_rec {
     double r;
@@ -46,7 +48,14 @@ static FMField complex_field_list[] =
     {NULL, NULL, 0, 0}
 };
 
+typedef struct response_rec {
+    int condition;
+} *response_rec_ptr;
+
 typedef struct _simple_rec {
+    int condition;
+    char *contact_list;
+    int target_stone;
     int integer_field;
     short short_field;
     long long_field;
@@ -66,8 +75,21 @@ FMField event_vec_elem_fields[] =
     {(char *) 0, (char *) 0, 0, 0}
 };
 
+static FMField response_field_list[] =
+{
+    {"condition", "integer",
+     sizeof(int), FMOffset(response_rec_ptr, condition)},
+    {(char *) 0, (char *) 0, 0, 0}
+};
+
 static FMField simple_field_list[] =
 {
+    {"condition", "integer",
+     sizeof(int), FMOffset(simple_rec_ptr, condition)},
+    {"contact_list", "string",
+     sizeof(char*), FMOffset(simple_rec_ptr, contact_list)},
+    {"target_stone", "integer",
+     sizeof(int), FMOffset(simple_rec_ptr, target_stone)},
     {"integer_field", "integer",
      sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
     {"short_field", "integer",
@@ -98,9 +120,17 @@ static FMStructDescRec simple_format_list[] =
     {NULL, NULL, 0, NULL}
 };
 
+static FMStructDescRec response_format_list[] =
+{
+    {"response", response_field_list, sizeof(*((response_rec_ptr) NULL)), NULL},
+    {NULL, NULL, 0, NULL}
+};
+
 static int size = 400;
 static int vecs = 20;
-int quiet = 1;
+static int quiet = 1;
+static int request_response = 0;
+static int print_bandwidth = 0;
 
 static
 void 
@@ -139,8 +169,19 @@ static int msg_count = 0;
 
 static
 int
+response_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
+{
+    printf("Inresponse handler, signalling %d\n", ((response_rec_ptr)vevent)->condition);
+    CMCondition_signal(cm, ((response_rec_ptr)vevent)->condition);
+    return 0;
+}
+
+static
+int
 simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
+    static chr_time bandwidth_start_time;
+    static EVsource response_handle;
     simple_rec_ptr event = vevent;
     long sum = 0, scan_sum = 0;
     (void) cm;
@@ -153,12 +194,23 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     sum += event->char_field;
     sum = sum % 100;
     scan_sum = event->scan_sum;
+    if (msg_count == 0) {
+	if (event->condition != -1) {
+	    /* request_response! */
+	    EVstone response_stone = EValloc_stone(cm);
+	    attr_list contact_list = attr_list_from_string(event->contact_list);
+	    EVassoc_bridge_action(cm, response_stone, contact_list, event->target_stone);
+	    free_attr_list(contact_list);
+	    response_handle = EVcreate_submit_handle(cm, response_stone, response_format_list);
+	}
+	chr_timer_start(&bandwidth_start_time);
+    }
     if (sum != scan_sum) {
 	printf("Received record checksum does not match. expected %d, got %d\n",
 	       (int) sum, (int) scan_sum);
     }
     msg_count++;
-    usleep(10000);
+//    usleep(10000);
     if ( quiet <= 0) {
       printf(".\n");
     }
@@ -175,6 +227,21 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     if (client_data != NULL) {
 	int tmp = *((int *) client_data);
 	*((int *) client_data) = tmp + 1;
+    }
+    if ((msg_count == msg_limit) && print_bandwidth) {
+	chr_timer_stop(&bandwidth_start_time);
+	double secs = chr_time_to_secs(&bandwidth_start_time);
+	long data_size = (msg_limit-1) * size;
+	double megabits = (double)data_size*8 / ((double)1000*1000);
+	double megabits_sec = megabits / secs;
+	printf("Megabits/sec is %g\n", megabits_sec);
+	printf("transport = %s size = %ld, count = %d, secs = %g, Mbps = %g\n",
+		 "default", data_size, msg_count, secs, megabits_sec);
+    }
+    if (event->condition != -1) {
+	struct response_rec response;
+	response.condition = event->condition;
+	EVsubmit(response_handle, &response, NULL);
     }
     return 0;
 }
@@ -209,6 +276,13 @@ main(int argc, char **argv)
 	    if (sscanf(argv[2], "%d", &vecs) != 1) {
 		printf("Unparseable argument to -vecs, %s\n", argv[2]);
 	    }
+	    argv++;
+	    argc--;
+	} else 	if (strcmp(&argv[1][1], "msgs") == 0) {
+	    if (sscanf(argv[2], "%d", &msg_limit) != 1) {
+		printf("Unparseable argument to -msgs, %s\n", argv[2]);
+	    }
+	    expected_count = msg_limit;
 	    argv++;
 	    argc--;
 	} else if (strcmp(&argv[1][1], "ssh") == 0) {
@@ -263,6 +337,10 @@ main(int argc, char **argv)
 	} else if (argv[1][1] == 'n') {
 	    regression = 0;
 	    quiet = -1;
+	} else if (argv[1][1] == 'r') {
+	    request_response = 1;
+	} else if (argv[1][1] == 'b') {
+	    print_bandwidth = 1;
 	} else if (argv[1][1] == 't') {
 	    transport = argv[2];
 	    argv++;
@@ -370,9 +448,27 @@ main(int argc, char **argv)
 	    data->integer_field++;
 	    data->long_field--;
 	    if (quiet <= 0) printf("Submitting %d of %d\n", i, msg_limit);
+	    if (request_response) {
+		data->condition = CMCondition_get(cm, NULL);
+		if (i == 0) {
+		    CMlisten(cm);
+		    attr_list contact_list = CMget_contact_list(cm);
+		    EVstone stone = EValloc_stone(cm);
+		    data->target_stone = stone;
+		    data->contact_list = attr_list_to_string(contact_list);
+		    printf("Creating terminal handler, stone %d, contact list %s\n", stone, data->contact_list);
+		    EVassoc_terminal_action(cm, stone, response_format_list, response_handler, NULL);
+		} else {
+		    data->contact_list = NULL;
+		    data->target_stone = -1;
+		}
+	    } else {
+		data->condition = -1;
+	    }
 	    EVsubmit(source_handle, data, attrs);
+	    if (request_response) CMCondition_wait(cm, data->condition);
 	}
-	if (quiet <= 0) printf("Write %d messages\n", msg_limit);
+	if (quiet <= 0) printf("Wrote %d messages\n", msg_limit);
 	CMsleep(cm, 30);
 	free_attr_list(attrs);
 	for (i=0; i < vecs; i++) {
@@ -407,13 +503,15 @@ static int
 do_regression_master_test()
 {
     CManager cm;
-    char *args[] = {"bulktest", "-c", NULL, NULL, NULL, NULL, NULL, NULL};
+    char *args[20] = {"bulktest", "-c", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+    int last_arg = 2;
     int exit_state;
     int forked = 0;
     attr_list contact_list, listen_list = NULL;
     char *string_list, *postfix;
-    char size_str[4];
-    char vec_str[4];
+    char size_str[40];
+    char vec_str[40];
+    char msg_str[40];
     EVstone handle;
     int done = 0;
 #ifdef HAVE_WINDOWS_H
@@ -470,13 +568,17 @@ do_regression_master_test()
 	string_list = attr_list_to_string(contact_list);
 	free_attr_list(contact_list);
     }	
-    args[2] = "-size";
+    args[last_arg++] = "-size";
     sprintf(&size_str[0], "%d", size);
-    args[3] = size_str;
-    args[4] = "-vecs";
+    args[last_arg++] = size_str;
+    args[last_arg++] = "-vecs";
     sprintf(&vec_str[0], "%d", vecs);
-    args[5] = vec_str;
-    args[6] = malloc(strlen(string_list) + 10);
+    args[last_arg++] = vec_str;
+    args[last_arg++] = "-msgs";
+    sprintf(&msg_str[0], "%d", msg_limit);
+    args[last_arg++] = msg_str;
+    if (request_response) args[last_arg++] = "-r";
+    args[last_arg] = malloc(strlen(string_list) + 10);
 
     if (quiet <= 0) {
 	if (forked) {
@@ -489,7 +591,7 @@ do_regression_master_test()
 
     handle = EValloc_stone(cm);
     EVassoc_terminal_action(cm, handle, simple_format_list, simple_handler, &message_count);
-    sprintf(args[6], "%d:%s", handle, string_list);
+    sprintf(args[last_arg], "%d:%s", handle, string_list);
     subproc_proc = run_subprocess(args);
 
     if (quiet <= 0) {
@@ -543,7 +645,7 @@ do_regression_master_test()
 	    CMsleep(cm, 1);
 	}
     }
-    free(args[6]);
+    free(args[last_arg]);
     free(string_list);
     CManager_close(cm);
     if (message_count != expected_count) {
