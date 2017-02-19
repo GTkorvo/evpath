@@ -171,7 +171,6 @@ static
 int
 response_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
-    printf("Inresponse handler, signalling %d\n", ((response_rec_ptr)vevent)->condition);
     CMCondition_signal(cm, ((response_rec_ptr)vevent)->condition);
     return 0;
 }
@@ -236,7 +235,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 	double megabits_sec = megabits / secs;
 	printf("Megabits/sec is %g\n", megabits_sec);
 	printf("transport = %s size = %ld, count = %d, secs = %g, Mbps = %g\n",
-		 "default", data_size, msg_count, secs, megabits_sec);
+		 "default", size, msg_count, secs, megabits_sec);
     }
     if (event->condition != -1) {
 	struct response_rec response;
@@ -447,6 +446,8 @@ main(int argc, char **argv)
 	for (i=0; i < msg_limit; i++) {
 	    data->integer_field++;
 	    data->long_field--;
+	    data->contact_list = NULL;
+	    data->target_stone = -1;
 	    if (quiet <= 0) printf("Submitting %d of %d\n", i, msg_limit);
 	    if (request_response) {
 		data->condition = CMCondition_get(cm, NULL);
@@ -456,11 +457,7 @@ main(int argc, char **argv)
 		    EVstone stone = EValloc_stone(cm);
 		    data->target_stone = stone;
 		    data->contact_list = attr_list_to_string(contact_list);
-		    printf("Creating terminal handler, stone %d, contact list %s\n", stone, data->contact_list);
 		    EVassoc_terminal_action(cm, stone, response_format_list, response_handler, NULL);
-		} else {
-		    data->contact_list = NULL;
-		    data->target_stone = -1;
 		}
 	    } else {
 		data->condition = -1;
