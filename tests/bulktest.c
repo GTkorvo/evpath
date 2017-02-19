@@ -24,7 +24,7 @@
 #define MSG_COUNT 30
 static int msg_limit = MSG_COUNT;
 static int message_count = 0;
-static int expected_count;
+static int expected_count = MSG_COUNT;
 
 typedef struct _complex_rec {
     double r;
@@ -234,7 +234,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 	double megabits = (double)data_size*8 / ((double)1000*1000);
 	double megabits_sec = megabits / secs;
 	printf("Megabits/sec is %g\n", megabits_sec);
-	printf("transport = %s size = %ld, count = %d, secs = %g, Mbps = %g\n",
+	printf("transport = %s size = %d, count = %d, secs = %g, Mbps = %g\n",
 		 "default", size, msg_count, secs, megabits_sec);
     }
     if (event->condition != -1) {
