@@ -515,7 +515,7 @@ CMinternal_listen(CManager cm, attr_list listen_info, int try_others)
     char *chosen_transport = NULL;
 
     if (listen_info) {
-	listen_info = split_transport_attributes(listen_info);
+	listen_info = split_transport_attributes(attr_copy_list(listen_info));
 	get_string_attr(listen_info, CM_TRANSPORT, &chosen_transport);
     }
     if (chosen_transport != NULL) {
@@ -2096,7 +2096,7 @@ CMdo_handshake(CMConnection conn, int handshake_version, int byte_swap, char *ba
 	    printf("Gaak.  Got a second handshake on connection 0x%p, with a different format server ID %x vs. %x\n",
 		   conn, conn->remote_format_server_ID, remote_format_server_ID);
 	} else {
-	    printf("Less Gaak.  Got a second handhake on connection 0x%p, remote id %x\n",
+	    printf("Less Gaak.  Got a second handshake on connection 0x%p, remote id %x\n",
 		   conn, conn->remote_format_server_ID);
 	}
     } else {
