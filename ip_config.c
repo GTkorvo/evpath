@@ -88,6 +88,7 @@ get_self_ip_iface(CMTransport_trace trace_func, void* trace_data, char *interfac
 	    trace_func(trace_data, "CM<IP_CONFIG> searching for interface %s\n", interface);
 	    for (if_addr = if_addrs; if_addr != NULL; if_addr = if_addr->ifa_next) {
 	        int family;
+		uint32_t IP;
 	        if (!if_addr->ifa_addr) continue;
 		family = if_addr->ifa_addr->sa_family;
 		if (family != AF_INET) continue;  /* currently not looking for ipv6 */
@@ -96,8 +97,9 @@ get_self_ip_iface(CMTransport_trace trace_func, void* trace_data, char *interfac
 		trace_func(trace_data, "CM<IP_CONFIG> Interface specified, returning ->%s : %s",
 			   if_addr->ifa_name,
 			   inet_ntop(family, tmp, buf, sizeof(buf)));
+		IP = ntohl(*(uint32_t*)tmp);
 		free(if_addrs);
-		return (ntohl(*(uint32_t*)tmp));
+		return IP;
 	    }
 	    printf("Warning!  CM_INTERFACE specified as \"%s\", but no active interface by that name found\n", interface);
 	}
