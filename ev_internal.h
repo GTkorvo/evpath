@@ -43,10 +43,10 @@ typedef int (*EVMultiHandlerFunc) (CManager cm, struct _queue *queue,
 typedef struct bridge_action_struct {
     CMConnection conn;
     int remote_stone_id;
-    int remote_path_len;
     char *remote_path;
     int conn_failed;
     void *stone_close_client_value;
+    attr_list remote_contact;
 } bridge_action_vals;
 
 typedef struct thread_bridge_action_struct {
