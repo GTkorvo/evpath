@@ -304,7 +304,7 @@ alive_handler(CManager cm, CMConnection conn, void *alive_v,
 	free(filter);
 	REVaction_set_output(conn, source_stone, action, 0, router_stone);
 
-	REVenable_auto_stone(conn, source_stone, 0, 5000);
+	REVenable_auto_stone(conn, source_stone, 0, 100000);
 	CMsleep(cm, 4);
 	REVfreeze_stone(conn, bridge1);
 	count = REVtransfer_events(conn, bridge1, bridge2);
