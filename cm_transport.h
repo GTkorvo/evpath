@@ -4,6 +4,12 @@
 #if defined(__cplusplus) || defined(c_plusplus)
 extern "C" {
 #endif
+#ifndef _SYS_TIME_H
+#include "sys/time.h"
+#endif
+#ifndef _CM_SCHEDULE_H
+#include "cm_schedule.h"
+#endif
 
 typedef struct _transport_item *transport_entry;
 typedef struct _transport_item *CMTransport;
@@ -127,12 +133,18 @@ typedef int (*CMTransport_connection_eq_func)(CManager cm,
 					      attr_list attrs,
 					      void *conn_data);
 
-typedef int (*CMTransport_set_write_notify_func) 
-   (transport_entry, CMtrans_services svc, void *conn_data, int enable);
+typedef int (*CMTransport_set_write_notify_func) (transport_entry trans, 
+						  CMtrans_services svc, 
+						  void *conn_data, int enable);
 
-typedef attr_list (*CMTransport_get_transport_characteristics) 
-   (transport_entry, CMtrans_services svc, void *conn_data);
-
+typedef attr_list (*CMTransport_get_transport_characteristics) (transport_entry trans, 
+								CMtrans_services svc, 
+								void *conn_data);
+typedef int (*CMTransport_install_pull_schedule)(CMtrans_services svc,
+						 void *transport_data,
+						 struct timeval *base_time, 
+						 struct timeval *period, 
+						 CMavail_period_ptr avail);
 
 typedef void (*DataAvailableCallback)(transport_entry trans, CMConnection conn);
 typedef void (*WritePossibleCallback)(transport_entry trans, CMConnection conn);
@@ -156,6 +168,7 @@ struct _transport_item {
     CMTransport_set_write_notify_func set_write_notify;
     void *trans_data;
     CMTransport_get_transport_characteristics get_transport_characteristics;
+    CMTransport_install_pull_schedule install_pull_schedule_func;
 };
 
 extern void

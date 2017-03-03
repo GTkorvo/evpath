@@ -4,6 +4,12 @@
 #ifndef CERCS_ENV_H
 #include <cercs_env.h>
 #endif
+#ifndef _SYS_TIME_H
+#include "sys/time.h"
+#endif
+#ifndef _CM_SCHEDULE_H
+#include "cm_schedule.h"
+#endif
 
 #include <pthread.h>
 #define thr_mutex_t pthread_mutex_t
@@ -132,6 +138,11 @@ typedef struct _CManager {
 
     struct _event_path_data *evp;
     FILE * CMTrace_file;
+
+    /* pull schedule entries */
+    struct timeval base_time;
+    struct timeval period;
+    CMavail_period_ptr avail;
 } CManager_s;
 
 typedef struct _CMCondition *CMCondition;
@@ -540,3 +551,6 @@ extern attr_list INT_CMtest_transport(CMConnection conn, attr_list how);
 extern void INT_CMConnection_wait_for_pending_write(CMConnection conn);
 extern EVstone INT_EVexecuting_stone(CManager cm);
 extern void wait_for_pending_write(CMConnection conn);
+extern int
+INT_CMinstall_pull_schedule(CManager cm, struct timeval *base_time, 
+			    struct timeval *period, CMavail_period_ptr avail);

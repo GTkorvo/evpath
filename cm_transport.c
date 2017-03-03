@@ -130,6 +130,8 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 	lt_dlsym(handle, "writev_func");  
     transport->writev_complete_notify_func = (CMTransport_writev_complete_notify_func)
 	lt_dlsym(handle, "writev_complete_notify_func");  
+    transport->install_pull_schedule_func = (CMTransport_install_pull_schedule)
+	lt_dlsym(handle, "install_pull_schedule");  
     transport->NBwritev_func = (CMTransport_writev_func)
 	lt_dlsym(handle, "NBwritev_func");  
     transport->set_write_notify = (CMTransport_set_write_notify_func)
@@ -204,6 +206,12 @@ load_transport(CManager cm, const char *trans_name, int quiet)
     }
     global_transports[i] = transport;
     global_transports[i+1] = NULL;
+    if (transport->install_pull_schedule_func && cm->avail) {
+	transport->install_pull_schedule_func(&CMstatic_trans_svcs,
+					      transport, &cm->base_time, 
+					      &cm->period, cm->avail);
+	CMtrace_out(cm, CMTransportVerbose, "CM installed pull schedule to transport %s\n", transport->trans_name);
+    }
 
     return 1;
 }
