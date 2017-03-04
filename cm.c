@@ -104,7 +104,8 @@ struct CMtrans_services_s CMstatic_trans_svcs = {INT_CMmalloc, INT_CMrealloc, IN
 						 cond_wait_CM_lock,
 						 add_buffer_to_pending_queue,
 						 INT_CMConnection_dereference,
-						 INT_CMConnection_add_reference
+						 INT_CMConnection_add_reference,
+						 CMwake_server_thread
 };
 static void INT_CMControlList_close(CMControlList cl, CManager cm);
 static int CMcontrol_list_poll(CMControlList cl);
