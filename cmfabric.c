@@ -182,9 +182,36 @@ struct ibparam
 #define ptr_from_int64(p) (void *)(unsigned long)(p)
 #define int64_from_ptr(p) (u_int64_t)(unsigned long)(p)
 
+
+struct msg_item;
+
+typedef enum pull_status_t {PULL_UNSUBMITTED = 0, PULL_SUBMITTED, PULL_COMPLETED, PULL_ACCOUNTED} pull_status_t;
+
+struct pull_record {
+    struct remote_entry remote;
+    char *dest;
+    pull_status_t status;
+    struct msg_item *parent;
+};
+
+struct fabric_connection_data;
+
+typedef struct msg_item {
+    struct fabric_connection_data *conn_data;
+    char *buffer;
+    long cur_buffer_size;
+    long message_size;
+    uint64_t request_ID;
+    struct fid_mr *mr;
+    int pull_count;
+    struct pull_record *pulls;
+    struct msg_item *next;
+} *msg_item_p;
+
 typedef struct fabric_client_data {
     CManager cm;
     CMtrans_services svc;
+    transport_entry trans;
     struct cs_opts opts;
     struct fi_info *hints;
 
@@ -193,21 +220,36 @@ typedef struct fabric_client_data {
     struct fid_domain *dom;
     struct fid_eq *cmeq;
 
-	char *hostname;
-	int listen_port;
-	int lid;
-	int qpn;
-	int psn;
-	int port;
-	struct ibv_device *ibdev;
-	struct ibv_context *context;
-	struct ibv_comp_channel *send_channel;
-	struct ibv_comp_channel *recv_channel;
-	struct ibv_pd *pd;
-	struct ibv_cq *recv_cq;
-	struct ibv_cq *send_cq;
-	struct ibv_srq *srq;
-	int max_sge;    
+    char *hostname;
+    int listen_port;
+    int lid;
+    int qpn;
+    int psn;
+    int port;
+    struct ibv_device *ibdev;
+    struct ibv_context *context;
+    struct ibv_comp_channel *send_channel;
+    struct ibv_comp_channel *recv_channel;
+    struct ibv_pd *pd;
+    struct ibv_cq *recv_cq;
+    struct ibv_cq *send_cq;
+    struct ibv_srq *srq;
+    int max_sge;    
+
+    struct timeval pull_schedule_base;
+    struct timeval pull_schedule_period;
+    CMavail_period_ptr avail;
+    
+    int thread_init;
+    msg_item_p pull_queue;
+    msg_item_p completed_queue;
+    pthread_mutex_t pull_queue_mutex;
+    int thread_should_run;
+    struct fid_wait *send_waitset;
+    fd_set readset;
+    int nfds;
+    int wake_read_fd;
+    int wake_write_fd;
 } *fabric_client_data_ptr;
 
 
@@ -225,7 +267,6 @@ typedef struct remote_info
     CMcompletion_notify_func notify_func;
     void *notify_client_data;
 }rinfo;
-
 
 typedef struct fabric_connection_data {
     fabric_client_data_ptr fabd;
@@ -253,6 +294,7 @@ typedef struct fabric_connection_data {
 	int infocount;
     	rinfo last_write;
 	int max_imm_data;   
+
 } *fabric_conn_data_ptr;
 
 typedef struct tbuffer_
@@ -260,17 +302,9 @@ typedef struct tbuffer_
 	CMbuffer buf;
 	struct fid_mr *mr;
 	fabric_conn_data_ptr fcd;
-	uint64_t size;
-	uint64_t offset;
-	struct tbuffer_ *parent;
-	int childcount;    
-        int inuse;
+        struct request *req;
 	LIST_ENTRY(tbuffer_) entries;    
 }tbuffer;
-
-LIST_HEAD(tblist, tbuffer_) memlist;
-LIST_HEAD(inuselist, tbuffer_) uselist;
-
 
 static inline int msg_offset()
 {
@@ -281,6 +315,9 @@ static int alloc_cm_res(fabric_client_data_ptr fabd);
 static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi);
 static int bind_ep_res(fabric_conn_data_ptr fcd);
 static void free_ep_res(fabric_conn_data_ptr fcd);
+static void
+hand_to_pull_thread(CMtrans_services svc, fabric_client_data_ptr fabd,
+		    msg_item_p msg);
 
 
 static atom_t CM_FD = -1;
@@ -565,8 +602,6 @@ static int internal_write_request(CMtrans_services svc,
 	return 0;
 }
 	
-static double da_t = 0;
-
 static int handle_response(CMtrans_services svc,
                            fabric_conn_data_ptr fcd,
                            struct control_message *msg)
@@ -599,18 +634,45 @@ static void free_func(void *cbd)
     printf("Called free_func\n");
 }
 	
-static void handle_request(CMtrans_services svc,
-                           fabric_conn_data_ptr fcd,
-                           struct control_message *msg)
-{
-    int count;
-    //handling the request message
 
+static void
+add_to_pull_queue(CMtrans_services svc, fabric_conn_data_ptr fcd, 
+	     struct control_message *msg)
+{
+    int i;
+    struct request *req = &msg->u.req;
+    int header_size = sizeof(*msg) + req->iovcnt * sizeof(struct remote_entry);
+
+
+    msg_item_p msg_pull_item = calloc(1, sizeof(struct msg_item));
+    msg_pull_item->message_size = req->length;
+    msg_pull_item->buffer = malloc(req->piggyback_length);
+    msg_pull_item->cur_buffer_size = req->piggyback_length;
+    /* copy portion of msg that was piggybacked */
+    memcpy(msg_pull_item->buffer, (char*)msg + header_size, req->piggyback_length);
+    msg_pull_item->pull_count = req->iovcnt;
+    msg_pull_item->pulls = calloc(req->iovcnt, sizeof(struct pull_record));
+    msg_pull_item->conn_data = fcd;
+    msg_pull_item->request_ID = req->request_ID;
+    for (i = 0; i < msg_pull_item->pull_count; i++) {
+	msg_pull_item->pulls[i].parent = msg_pull_item;
+	msg_pull_item->pulls[i].remote = req->read_list[i];
+    }
+    hand_to_pull_thread(svc, fcd->fabd, msg_pull_item);
+}
+
+static int
+perform_pull(CMtrans_services svc, fabric_conn_data_ptr fcd, 
+	     struct control_message *msg)
+{
+    int ret;
+    int count;
+    int i;
+    char *ptr;
     tbuffer *tb;
-    int ret = 0, i, header_size;
+    int header_size;
     struct request *req;
     void *buffer;
-    char *ptr;
 
     req = &msg->u.req;
 	
@@ -618,42 +680,39 @@ static void handle_request(CMtrans_services svc,
 
     buffer = malloc(req->length);
     CMbuffer cb = svc->create_data_and_link_buffer(fcd->fabd->cm, buffer, req->length);
-    tb->buf = cb;
-    tb->fcd = fcd;
-    tb->size = req->length;
-    tb->inuse = 1;
-    tb->offset = 0;
     cb->return_callback = free_func;
     cb->return_callback_data = (void*)tb;
-    tb->childcount = 0;
-    tb->parent = NULL;  
-	
+    tb->buf = cb;
+    tb->fcd = fcd;
+    header_size = sizeof(*msg) + req->iovcnt * sizeof(struct remote_entry);
+    tb->req = malloc(header_size);
+    memcpy(tb->req, req, header_size);
+    memcpy(tb->buf->buffer, (char*)msg + header_size, req->piggyback_length);
+
     svc->trace_out(fcd->fabd->cm, "In handle request, len is %ld, iovcnt %d, request_ID %lx, piggyback_length = %d\n",
-	   req->length, req->iovcnt, req->request_ID, req->piggyback_length);
-    svc->trace_out(fcd->fabd->cm, "fi_mr_reg, buff %p, size %ld with attrs REMOTE_READ,REMOTE_WRITE, SEND, RECV\n", buffer, req->length+1000);
-    ret = fi_mr_reg(fcd->fabd->dom, buffer, req->length+1000,
+	   tb->req->length, tb->req->iovcnt, tb->req->request_ID, tb->req->piggyback_length);
+    svc->trace_out(fcd->fabd->cm, "fi_mr_reg, buff %p, size %ld with attrs REMOTE_READ,REMOTE_WRITE, SEND, RECV\n", tb->buf->buffer, tb->req->length+1000);
+    ret = fi_mr_reg(fcd->fabd->dom, tb->buf->buffer, tb->req->length+1000,
 		    FI_REMOTE_READ | FI_REMOTE_WRITE | FI_SEND | FI_RECV,
 		    0, 0, 0, &tb->mr, NULL);
     if(ret) {
 	FT_PRINTERR("fi_mr_reg", ret);
 	svc->trace_out(fcd->fabd->cm, "Failed to get memory\n");
 	internal_write_response(svc, fcd, NULL, 0, 0);
-	return;
+	return ret;
     }
 
     fcd->tb = tb;
 
-    header_size = sizeof(*msg) + req->iovcnt * sizeof(struct remote_entry);
-    memcpy(buffer, (char*)msg + header_size, req->piggyback_length);
-
-    svc->set_pending_write(fcd->conn);
-    ptr = buffer + req->piggyback_length;
-    count = req->iovcnt;
-    for (i=0; i < req->iovcnt; i++) {
+    ptr = tb->buf->buffer + tb->req->piggyback_length;
+    count = tb->req->iovcnt;
+    for (i=0; i < tb->req->iovcnt; i++) {
     	struct fi_cq_data_entry comp;
-	svc->trace_out(fcd->fabd->cm, "fi_read, buffer %p, len %d, (keys.rkey %lx, keys.addr %lx)\n", ptr, req->read_list[i].length, req->read_list[i].rkey, req->read_list[i].remote_addr);
-	ssize_t ret = fi_read(fcd->conn_ep, ptr, req->read_list[i].length, fi_mr_desc(tb->mr),
-			      0, req->read_list[i].remote_addr, req->read_list[i].rkey, NULL);
+	int call_count = 0;
+	svc->trace_out(fcd->fabd->cm, "fi_read, buffer %p, len %d, (keys.rkey %lx, keys.addr %lx)\n", ptr, tb->req->read_list[i].length, tb->req->read_list[i].rkey, tb->req->read_list[i].remote_addr);
+	ssize_t ret = fi_read(fcd->conn_ep, ptr, tb->req->read_list[i].length, fi_mr_desc(tb->mr),
+			      0, tb->req->read_list[i].remote_addr, tb->req->read_list[i].rkey, (void*)0xdeadbeef);
+	ptr += tb->req->read_list[i].length;
 	do {
 	    /* Read send queue */
 	    ret = fi_cq_read(fcd->scq, &comp, 1);
@@ -661,10 +720,12 @@ static void handle_request(CMtrans_services svc,
 		FT_PRINTERR("fi_cq_read", ret);
 		cq_readerr(fcd->scq, "scq");
 	    }
+	    call_count++;
 	} while (ret == -FI_EAGAIN);
+
     	if (comp.flags & FI_READ) {
     	    count--;
-    	}
+	}
     }
 
 
@@ -689,11 +750,286 @@ static void handle_request(CMtrans_services svc,
     }
 
     fcd->read_buffer = tb->buf;
-    svc->trace_out(fcd->fabd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", req->length, ((unsigned char*)tb->buf->buffer)[0], ((unsigned char*)tb->buf->buffer)[1], ((unsigned char*)tb->buf->buffer)[2], ((unsigned char*)tb->buf->buffer)[3], ((unsigned char*)tb->buf->buffer)[4], ((unsigned char*)tb->buf->buffer)[5], ((unsigned char*)tb->buf->buffer)[6], ((unsigned char*)tb->buf->buffer)[7], ((unsigned char*)tb->buf->buffer)[8], ((unsigned char*)tb->buf->buffer)[9], ((unsigned char*)tb->buf->buffer)[10], ((unsigned char*)tb->buf->buffer)[11], ((unsigned char*)tb->buf->buffer)[12], ((unsigned char*)tb->buf->buffer)[13], ((unsigned char*)tb->buf->buffer)[14], ((unsigned char*)tb->buf->buffer)[15]);
-    fcd->read_buffer_len = req->length;
+    svc->trace_out(fcd->fabd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", tb->req->length, ((unsigned char*)tb->buf->buffer)[0], ((unsigned char*)tb->buf->buffer)[1], ((unsigned char*)tb->buf->buffer)[2], ((unsigned char*)tb->buf->buffer)[3], ((unsigned char*)tb->buf->buffer)[4], ((unsigned char*)tb->buf->buffer)[5], ((unsigned char*)tb->buf->buffer)[6], ((unsigned char*)tb->buf->buffer)[7], ((unsigned char*)tb->buf->buffer)[8], ((unsigned char*)tb->buf->buffer)[9], ((unsigned char*)tb->buf->buffer)[10], ((unsigned char*)tb->buf->buffer)[11], ((unsigned char*)tb->buf->buffer)[12], ((unsigned char*)tb->buf->buffer)[13], ((unsigned char*)tb->buf->buffer)[14], ((unsigned char*)tb->buf->buffer)[15]);
+    fcd->read_buffer_len = tb->req->length;
     svc->trace_out(fcd->fabd->cm, "CMFABRIC handle_request completed");    
-    internal_write_response(svc, fcd, tb, req->length, req->request_ID);
-    svc->wake_any_pending_write(fcd->conn);
+    internal_write_response(svc, fcd, tb, tb->req->length, tb->req->request_ID);
+    return 0;
+}
+
+
+static void
+wake_pull_thread(fabric_client_data_ptr fabd) 
+{
+    static char buffer = 'W';  /* doesn't matter what we write */
+    if (!fabd->send_waitset) {
+	if (write(fabd->wake_write_fd, &buffer, 1) != 1) {
+	    if (fabd->thread_should_run)
+		printf("Whoops, wake_pull_thread write failed\n");
+	}
+    } else {
+	/* send a cq wake */
+    }
+}
+
+static void
+hand_to_pull_thread(CMtrans_services svc, fabric_client_data_ptr fabd,
+		    msg_item_p msg)
+{
+    struct msg_item *queue = fabd->pull_queue;
+    msg->next = NULL;
+    pthread_mutex_lock(&fabd->pull_queue_mutex);
+    if (fabd->pull_queue == NULL) {
+	fabd->pull_queue = msg;
+    } else {
+	while (queue->next) queue = queue->next;
+	queue->next = msg;
+    }
+    pthread_mutex_unlock(&fabd->pull_queue_mutex);
+    /* wake the thread if he's sleeping */
+    wake_pull_thread(fabd);
+}
+
+static void
+return_completed_pull(CMtrans_services svc, fabric_client_data_ptr fabd,
+		      msg_item_p msg)
+{
+    pthread_mutex_lock(&fabd->pull_queue_mutex);
+    /* find msg in pull queue and take it out */
+    if (fabd->pull_queue == msg) {
+	fabd->pull_queue = msg->next;
+	msg->next = NULL;
+    } else {
+	struct msg_item *queue = fabd->pull_queue;
+	while (queue->next != msg) queue = queue->next;
+	queue->next = msg->next;
+	msg->next = NULL;
+    }
+
+    /* find add msg to completion queue */
+    if (fabd->completed_queue == NULL) {
+	fabd->completed_queue = msg;
+    } else {
+	struct msg_item *queue = fabd->completed_queue;
+	while (queue->next) queue = queue->next;
+	queue->next = msg;
+    }
+    svc->trace_out(fabd->cm, "Returning completed msg to the CM network thread\n");
+    pthread_mutex_unlock(&fabd->pull_queue_mutex);
+    /* 
+     *  this should wake the CM server thread and we'll check the 
+     *  pull completion queue in our handler 
+     */
+    fabd->svc->wake_comm_thread(fabd->cm);
+
+}
+
+static void
+kill_thread(fabric_client_data_ptr fabd)
+{
+    fabd->thread_should_run = 0;
+    wake_pull_thread(fabd);
+}
+
+static void
+update_period_base(fabric_client_data_ptr fabd, struct timeval *now)
+{
+    
+    struct timeval next;
+    /* add period to base until it's greater than now.  
+     * Return base before the last add so that base is just less than now.
+     */
+    timeradd(&fabd->pull_schedule_base, &fabd->pull_schedule_period, 
+	     &next);
+    while(timercmp(&next, now, <)) {
+	fabd->pull_schedule_base = next;
+	timeradd(&fabd->pull_schedule_base, &fabd->pull_schedule_period, 
+		 &next);
+    }
+}
+	
+static int
+in_pull_period(fabric_client_data_ptr fabd, struct timeval *now)
+{
+    int i = 0;
+    int period_count = 0;
+    struct timeval cur_offset, zero = {0,0};
+    timersub(now, &fabd->pull_schedule_base, &cur_offset);
+    update_period_base(fabd, now);
+    while (timercmp(&fabd->avail[period_count].duration, &zero, !=))  {
+	period_count++;
+    }
+    for (i = 0; i < period_count; i++) {
+	struct timeval end;
+	timeradd(&fabd->avail[i].offset, &fabd->avail[i].duration, &end);
+	if (timercmp(&cur_offset, &end, <) && 
+	    timercmp(&cur_offset, &fabd->avail[i].offset, >)) return 1;
+    }
+    return 0;
+}
+
+static struct timeval
+delay_until_wake(fabric_client_data_ptr fabd, struct timeval *now)
+{
+    /* calculate the delay until the next pull period opens */
+    int i = 0;
+    int period_count = 0;
+    struct timeval cur_offset, zero = {0,0};
+    timersub(now, &fabd->pull_schedule_base, &cur_offset);
+    update_period_base(fabd, now);
+    while (timercmp(&fabd->avail[period_count].duration, &zero, !=))  {
+	period_count++;
+    }
+    /* the one we want is the next start time past now */
+    for (i = 0; i < period_count; i++) {
+	if (timercmp(&fabd->avail[i].offset, &cur_offset, >)) {
+	    struct timeval ret;
+	    timersub(&fabd->avail[i].offset, &cur_offset, &ret);
+	    return ret;
+	}
+    }
+    /* we must have been past the last offset, 
+       return the first offset of the next period */
+    struct timeval ret;
+    timeradd(&fabd->pull_schedule_period, &fabd->avail[0].offset, &ret);
+    timersub(&ret, &cur_offset, &ret);
+    return ret;
+}
+
+static int
+can_do_something(fabric_client_data_ptr fabd)
+{
+    CMtrans_services svc = fabd->svc;
+    int did_something = 0;
+    int i;
+    msg_item_p pull = fabd->pull_queue;
+    while (pull) {
+	msg_item_p next = pull->next;
+	fabric_conn_data_ptr fcd = pull->conn_data;
+	svc->trace_out(fabd->cm, "Got a pull message with buffer count %d, next %p\n",
+		       pull->pull_count, pull->next);
+	if (!pull->mr) {
+	    int ret;
+	    /* try to get a mr */
+	    if (0 /*!can_get_mr(fcd, pull->message_size)*/) {
+		pull = pull->next;
+		continue;
+	    }
+	    if (pull->cur_buffer_size != pull->message_size) {
+		pull->buffer = realloc(pull->buffer, pull->message_size);
+		/* setup local buffers, now that we have memory */
+		char *ptr = pull->buffer + pull->cur_buffer_size;
+		pull->cur_buffer_size = pull->message_size;
+		for ( i = 0; i < pull->pull_count; i++) {
+		    pull->pulls[i].dest = ptr;
+		    ptr += pull->pulls[i].remote.length;
+		}
+	    }
+	    ret = fi_mr_reg(fcd->fabd->dom, pull->buffer, pull->message_size+1000,
+			    FI_REMOTE_READ | FI_REMOTE_WRITE | FI_SEND | FI_RECV,
+			    0, 0, 0, &pull->mr, NULL);
+	    if(ret) {
+		FT_PRINTERR("fi_mr_reg", ret);
+		svc->trace_out(fcd->fabd->cm, "Failed to get memory\n");
+		continue;
+	    }
+	    did_something = 1;
+	}
+	for ( i = 0; i < pull->pull_count; i++) {
+	    if (!pull->pulls[i].status == PULL_SUBMITTED) {
+
+		struct fi_cq_data_entry comp;
+		struct remote_entry *remote = &pull->pulls[i].remote;
+		struct pull_record *this_pull  = &pull->pulls[i];
+		if (0 /* can't do more pulls for some reason */) continue;
+		
+		svc->trace_out(fcd->fabd->cm, "fi_read, buffer %p, len %d, (keys.rkey %lx, keys.addr %lx)\n", this_pull->dest, remote->length, remote->rkey, remote->remote_addr);
+		ssize_t ret = fi_read(fcd->conn_ep, this_pull->dest, 
+				      remote->length, fi_mr_desc(pull->mr),
+				      0, remote->remote_addr, remote->rkey, 
+				      (void*)this_pull);
+		if (ret) continue;
+		this_pull->status = PULL_SUBMITTED;
+		did_something = 1;
+		
+		do {
+		    /* Read send queue */
+		    ret = fi_cq_read(fcd->scq, &comp, 1);
+		    if (ret < 0 && ret != -FI_EAGAIN) {
+			FT_PRINTERR("fi_cq_read", ret);
+			cq_readerr(fcd->scq, "scq");
+		    }
+		} while (ret == -FI_EAGAIN);
+		svc->trace_out(fcd->fabd->cm, "FI_READ Completion op_context is %p, flags %lx, len %ld, buf %p, data %lx\n",
+		       comp.op_context, comp.flags, comp.len, comp.buf, comp.data);
+		this_pull->status = PULL_COMPLETED;
+	    }
+	}
+	if (pull->mr) {
+	    int all_done = 1;
+	    for ( i = 0; i < pull->pull_count; i++) {
+		if (pull->pulls[i].status == PULL_COMPLETED) {
+		    pull->pulls[i].status = PULL_ACCOUNTED;
+		}
+		if (pull->pulls[i].status != PULL_ACCOUNTED) {
+		    all_done = 0;
+		}
+	    }
+	    if (all_done) {
+		return_completed_pull(svc, fcd->fabd, pull);
+	    }
+	}
+	pull = next;
+    }
+    if (!did_something) svc->trace_out(fabd->cm, "PULL_THREAD Nothing to do\n");
+    return did_something;
+}
+
+static void
+pull_thread(fabric_client_data_ptr fabd)
+{
+//    thread_setup();  /* extract wait fd, other? */
+//    CMtrans_services svc = fabd->svc;
+    while(fabd->thread_should_run) {
+	struct timeval now, delay;
+	fd_set readset;
+//	handle_completions();
+	gettimeofday(&now, NULL);
+	if (in_pull_period(fabd, &now)) {
+	    while (can_do_something(fabd));
+        }
+	/* calculate time to next wake */
+	/* sleep until something happens, *or* the next pull period begins */ 
+	delay = delay_until_wake(fabd, &now);
+	readset = fabd->readset;
+	select(fabd->nfds+1, &readset, NULL, NULL, &delay);
+	if (FD_ISSET(fabd->wake_read_fd, &readset)) {
+	    /* read and discard wake byte */
+	    char buffer;
+	    if (read(fabd->wake_read_fd, &buffer, 1) != 1) {
+		perror("wake read failed\n");
+	    }
+	}
+    }
+//    thread_free_resources;
+}
+
+/*
+ * handle a pull request message 
+ */
+static void handle_request(CMtrans_services svc,
+                           fabric_conn_data_ptr fcd,
+                           struct control_message *msg)
+{
+    //handling the request message
+    int ret = 0;
+    if (fcd->fabd->avail) {
+	add_to_pull_queue(svc, fcd, msg);
+	wake_pull_thread(fcd->fabd);
+    } else {
+	/* immediate pull and handle */
+	ret = perform_pull(svc, fcd, msg);
+    }
 }
 
 void cq_readerr(struct fid_cq *cq, char *cq_str)
@@ -723,9 +1059,7 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 	struct fid **fids = malloc(sizeof(fids[0]));
 	fcd = (fabric_conn_data_ptr) svc->get_transport_data(conn);
 	fids[0] = &fcd->rcq->fid;
-    
-	da_t = getlocaltime();
-    
+	fabd->trans = trans;
 	start = getlocaltime();    
 
 	svc->trace_out(fabd->cm, "At the beginning of CMFabric_data_available: ");
@@ -743,7 +1077,9 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 	{
 	    struct fi_cq_data_entry comp;
 		ret = fi_cq_read(fcd->rcq, &comp, 1);
-		if (ret == -FI_EAGAIN) return;
+		if (ret == -FI_EAGAIN) {
+		    return;
+		}
 		if (ret < 0 && ret != -FI_EAGAIN) {
 			if (ret == -FI_EAVAIL) {
 				cq_readerr(fcd->rcq, "rcq");
@@ -755,6 +1091,8 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 		} else if (ret > 0) {
 		    //
 		}
+		svc->trace_out(fabd->cm, "FI_RECV Completion op_context is %p, flags %lx, len %ld, buf %p, data %lx\n",
+		       comp.op_context, comp.flags, comp.len, comp.buf, comp.data);
 	}
 
 	fcd = (fabric_conn_data_ptr) svc->get_transport_data(conn);
@@ -1374,11 +1712,16 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 	fcd->max_credits = 512;
 	memset(&cq_attr, 0, sizeof cq_attr);
 	cq_attr.format = FI_CQ_FORMAT_DATA;
-	cq_attr.wait_obj = FI_WAIT_FD;
 	cq_attr.size = fcd->max_credits << 1;
+	if (fabd->send_waitset) {
+	    cq_attr.wait_obj = FI_WAIT_SET;
+	    cq_attr.wait_set = fabd->send_waitset;
+	} else {
+	    cq_attr.wait_obj = FI_WAIT_FD;
+	}
 	ret = fi_cq_open(fabd->dom, &cq_attr, &fcd->scq, NULL);
 	if (ret) {
-		FT_PRINTERR("fi_cq_open", ret);
+		FT_PRINTERR("fi_cq_open, on fcd->scq", ret);
 		goto err1;
 	}
 
@@ -1597,9 +1940,19 @@ static int server_listen(fabric_client_data_ptr fd)
 	}
 
 	ret = fi_fabric(fi->fabric_attr, &fd->fab, NULL);
+
 	if (ret) {
 		FT_PRINTERR("fi_fabric", ret);
 		goto err0;
+	}
+
+	struct fi_wait_attr attrs;
+	attrs.wait_obj = FI_WAIT_FD;
+	attrs.flags = 0;
+	ret = fi_wait_open(fd->fab, &attrs, &fd->send_waitset);
+	if (ret) {
+	    /* sigh */
+	    fd->send_waitset = NULL;
 	}
 
 	ret = fi_passive_ep(fd->fab, fi, &fd->listen_ep, NULL);
@@ -2071,71 +2424,143 @@ attr_list attrs;
 static void
 free_fabric_data(CManager cm, void *fdv)
 {
-	fabric_client_data_ptr fd = (fabric_client_data_ptr) fdv;
-	CMtrans_services svc = fd->svc;
-	if (fd->hostname != NULL)
-		svc->free_func(fd->hostname);
-	svc->free_func(fd);
+    fabric_client_data_ptr fd = (fabric_client_data_ptr) fdv;
+    CMtrans_services svc = fd->svc;
+    kill_thread(fd);
+    if (fd->hostname != NULL)
+	svc->free_func(fd->hostname);
+    svc->free_func(fd);
+}
+
+static void
+check_completed_pull(CManager cm, fabric_client_data_ptr fabd)
+{
+    msg_item_p msg;
+    fabric_conn_data_ptr fcd;
+    CMtrans_services svc = fabd->svc;
+    if (!fabd->completed_queue) return;
+
+    pthread_mutex_lock(&fabd->pull_queue_mutex);
+    msg = fabd->completed_queue;
+    fabd->completed_queue = msg->next;
+    pthread_mutex_unlock(&fabd->pull_queue_mutex);
+
+    svc->acquire_CM_lock(fabd->cm, __FILE__, __LINE__);
+    /* OK, msg is ours alone */
+    fcd = msg->conn_data;
+    free(msg->pulls);
+    tbuffer *tb;
+    tb = (tbuffer*)malloc(sizeof(tbuffer));
+    CMbuffer cb = svc->create_data_and_link_buffer(fcd->fabd->cm, 
+						   msg->buffer, 
+						   msg->message_size);
+    cb->return_callback = free_func;
+    cb->return_callback_data = (void*)tb;
+    tb->buf = cb;
+    tb->fcd = fcd;
+    fcd->read_buffer = tb->buf;
+    svc->trace_out(fcd->fabd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", msg->message_size, ((unsigned char*)tb->buf->buffer)[0], ((unsigned char*)tb->buf->buffer)[1], ((unsigned char*)tb->buf->buffer)[2], ((unsigned char*)tb->buf->buffer)[3], ((unsigned char*)tb->buf->buffer)[4], ((unsigned char*)tb->buf->buffer)[5], ((unsigned char*)tb->buf->buffer)[6], ((unsigned char*)tb->buf->buffer)[7], ((unsigned char*)tb->buf->buffer)[8], ((unsigned char*)tb->buf->buffer)[9], ((unsigned char*)tb->buf->buffer)[10], ((unsigned char*)tb->buf->buffer)[11], ((unsigned char*)tb->buf->buffer)[12], ((unsigned char*)tb->buf->buffer)[13], ((unsigned char*)tb->buf->buffer)[14], ((unsigned char*)tb->buf->buffer)[15]);
+    fcd->read_buffer_len = msg->message_size;
+    svc->trace_out(fcd->fabd->cm, "CMFABRIC handle_request completed");    
+    internal_write_response(svc, fcd, tb, msg->message_size, msg->request_ID);
+    fabd->trans->data_available(fabd->trans, fcd->conn);
+    svc->drop_CM_lock(fabd->cm, __FILE__, __LINE__);
+
+}
+
+extern
+void libcmfabric_LTX_install_pull_schedule(CMtrans_services svc,
+					   transport_entry trans,
+					   struct timeval *base_time, 
+					   struct timeval *period, 
+					   CMavail_period_ptr avail)
+{
+    fabric_client_data_ptr fabd = trans->trans_data;
+    fabd->pull_schedule_base = *base_time;
+    fabd->pull_schedule_period = *period;
+    CMavail_period_ptr tmp = fabd->avail;
+    fabd->avail = avail;
+    free(tmp);
+    if (!fabd->thread_init) {
+	svc->trace_out(fabd->cm, "Starting pull thread!\n");
+	pthread_mutex_init(&fabd->pull_queue_mutex, NULL);
+	fabd->thread_should_run = 1;
+	pthread_t thr;
+	if (!fabd->send_waitset) {
+	    /* no waitset support */
+	    int filedes[2];
+	    if (pipe(filedes) != 0) {
+		perror("Pipe for wake not created.  Wake mechanism inoperative.");
+		return;
+	    }
+	    fabd->wake_read_fd = filedes[0];
+	    fabd->wake_write_fd = filedes[1];
+	    fabd->nfds = fabd->wake_read_fd;
+	    FD_SET(fabd->wake_read_fd, &fabd->readset);
+	}
+	svc->add_poll(fabd->cm, (CMPollFunc) check_completed_pull, fabd);
+	pthread_create(&thr, NULL, (void*(*)(void*))&pull_thread, fabd);
+	fabd->thread_init = 1;
+    }
 }
 
 extern void *
 libcmfabric_LTX_initialize(CManager cm, CMtrans_services svc)
 {
-	static int atom_init = 0;
+    static int atom_init = 0;
 
-	fabric_client_data_ptr fabd;
-	svc->trace_out(cm, "Initialize CM fabric transport built in %s\n",
-	               EVPATH_LIBRARY_BUILD_DIR);
-	if (atom_init == 0) {
-		CM_IP_HOSTNAME = attr_atom_from_string("IP_HOST");
-		CM_IP_PORT = attr_atom_from_string("IP_PORT");
-		CM_IP_ADDR = attr_atom_from_string("IP_ADDR");
-		CM_IP_INTERFACE = attr_atom_from_string("IP_INTERFACE");
-		CM_FD = attr_atom_from_string("CONNECTION_FILE_DESCRIPTOR");
-		CM_THIS_CONN_PORT = attr_atom_from_string("THIS_CONN_PORT");
-		CM_PEER_CONN_PORT = attr_atom_from_string("PEER_CONN_PORT");
-		CM_PEER_IP = attr_atom_from_string("PEER_IP");
-		CM_PEER_HOSTNAME = attr_atom_from_string("PEER_HOSTNAME");
-		CM_PEER_LISTEN_PORT = attr_atom_from_string("PEER_LISTEN_PORT");
-		CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
-		CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
-		atom_init++;
-	}
-	fabd = svc->malloc_func(sizeof(struct fabric_client_data));
-	fabd->svc = svc;
-	memset(fabd, 0, sizeof(struct fabric_client_data));
-	fabd->cm = cm;
-	fabd->hostname = NULL;
-	fabd->listen_port = -1;
-	fabd->svc = svc;
-	fabd->port = 1; //need to somehow get proper port here
+    fabric_client_data_ptr fabd;
+    svc->trace_out(cm, "Initialize CM fabric transport built in %s\n",
+		   EVPATH_LIBRARY_BUILD_DIR);
+    if (atom_init == 0) {
+	CM_IP_HOSTNAME = attr_atom_from_string("IP_HOST");
+	CM_IP_PORT = attr_atom_from_string("IP_PORT");
+	CM_IP_ADDR = attr_atom_from_string("IP_ADDR");
+	CM_IP_INTERFACE = attr_atom_from_string("IP_INTERFACE");
+	CM_FD = attr_atom_from_string("CONNECTION_FILE_DESCRIPTOR");
+	CM_THIS_CONN_PORT = attr_atom_from_string("THIS_CONN_PORT");
+	CM_PEER_CONN_PORT = attr_atom_from_string("PEER_CONN_PORT");
+	CM_PEER_IP = attr_atom_from_string("PEER_IP");
+	CM_PEER_HOSTNAME = attr_atom_from_string("PEER_HOSTNAME");
+	CM_PEER_LISTEN_PORT = attr_atom_from_string("PEER_LISTEN_PORT");
+	CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
+	CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
+	atom_init++;
+    }
+    fabd = svc->malloc_func(sizeof(struct fabric_client_data));
+    fabd->svc = svc;
+    memset(fabd, 0, sizeof(struct fabric_client_data));
+    fabd->cm = cm;
+    fabd->hostname = NULL;
+    fabd->listen_port = -1;
+    fabd->svc = svc;
+    fabd->port = 1; //need to somehow get proper port here
     
-	fabd->psn = lrand48()%256;
+    fabd->psn = lrand48()%256;
 
-	fabd->hints = fi_allocinfo();
-	fabd->opts.src_port = "9228";
-
+    fabd->hints = fi_allocinfo();
+    fabd->opts.src_port = "9228";
+    
 //	fabd->hints->cap		= FI_CONTEXT;
-	fabd->hints->ep_attr->type	= FI_EP_MSG;
-	fabd->hints->caps		= FI_MSG | FI_RMA;
+    fabd->hints->ep_attr->type	= FI_EP_MSG;
+    fabd->hints->caps		= FI_MSG | FI_RMA;
 //	fabd->hints->caps		= FI_MSG;
-	fabd->hints->mode		= FI_CONTEXT | FI_LOCAL_MR | FI_RX_CQ_DATA;
-	fabd->hints->addr_format	= FI_SOCKADDR;
+    fabd->hints->mode		= FI_CONTEXT | FI_LOCAL_MR | FI_RX_CQ_DATA;
+    fabd->hints->addr_format	= FI_SOCKADDR;
 //	fabd->hints->tx_attr->op_flags  = FI_DELIVERY_COMPLETE | FI_COMPLETION;
-	fabd->hints->tx_attr->op_flags  = FI_COMPLETION;
+    fabd->hints->tx_attr->op_flags  = FI_COMPLETION;
 
-	fabd->hints->domain_attr->mr_mode = FI_MR_BASIC;
-	fabd->hints->domain_attr->threading        =  FI_THREAD_ENDPOINT;
-	fabd->hints->domain_attr->control_progress =  FI_PROGRESS_AUTO;
-	fabd->hints->domain_attr->data_progress    =  FI_PROGRESS_AUTO;
-
-	svc->add_shutdown_task(cm, free_fabric_data, (void *) fabd, FREE_TASK);
-
-	//here we will add the first 4MB memory buffer
-	LIST_INIT(&memlist);
-	LIST_INIT(&uselist);
-
-	return (void *) fabd;
+    fabd->hints->domain_attr->mr_mode = FI_MR_BASIC;
+    fabd->hints->domain_attr->threading        =  FI_THREAD_ENDPOINT;
+    fabd->hints->domain_attr->control_progress =  FI_PROGRESS_AUTO;
+    fabd->hints->domain_attr->data_progress    =  FI_PROGRESS_AUTO;
+    svc->add_shutdown_task(cm, free_fabric_data, (void *) fabd, FREE_TASK);
+    
+    fabd->wake_read_fd = -1;
+    fabd->wake_read_fd = -1;
+    FD_ZERO(&fabd->readset);
+    fabd->nfds = 0;
+    return (void *) fabd;
 }
 
 
@@ -2157,6 +2582,7 @@ cmfabric_add_static_transport(CManager cm, CMtrans_services svc)
     transport->read_to_buffer_func = (CMTransport_read_to_buffer_func)NULL;
     transport->writev_func = (CMTransport_writev_func)libcmfabric_LTX_writev_func;
     transport->writev_complete_notify_func = (CMTransport_writev_complete_notify_func)libcmfabric_LTX_writev_complete_notify_func;
+    transport->install_pull_schedule_func = (CMTransport_install_pull_schedule)libcmfabric_LTX_install_pull_schedule;
     transport->get_transport_characteristics = NULL;
     if (transport->transport_init) {
 	transport->trans_data = transport->transport_init(cm, svc, transport);
