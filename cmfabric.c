@@ -420,6 +420,19 @@ int fd;
 
 #endif
 
+static void
+handle_scq_completion(struct fi_cq_data_entry *comp)
+{
+    if (comp->flags & FI_READ) {
+	struct pull_record *this_pull = 
+	    (struct pull_record *)comp->op_context;
+	this_pull->status = PULL_COMPLETED;
+    }
+    if (comp->flags & FI_SEND) {
+	*(int*)comp->op_context = 1;
+    }
+}
+
 static int internal_write_piggyback(CMtrans_services svc,
                                     fabric_conn_data_ptr fcd,
                                     int length, struct iovec *iov, int iovcnt)
@@ -454,10 +467,10 @@ static int internal_write_piggyback(CMtrans_services svc,
     {
 	
 	memcpy(fcd->send_buf, msg, msg->u.pb.total_length);
-	int ret;
+	int ret, sent = 0;
 	
 	svc->trace_out(fcd->fabd->cm, "fi_send on conn_ep\n");
-	ret = fi_send(fcd->conn_ep, fcd->send_buf, msg->u.pb.total_length, fi_mr_desc(fcd->send_mr), 0, fcd->send_buf);
+	ret = fi_send(fcd->conn_ep, fcd->send_buf, msg->u.pb.total_length, fi_mr_desc(fcd->send_mr), 0, &sent);
 	if (ret) {
 	    FT_PRINTERR("fi_send", ret);
 	    return ret;
@@ -465,7 +478,7 @@ static int internal_write_piggyback(CMtrans_services svc,
 	
 	/* Read send queue */
 	do {
-	    struct fi_cq_entry comp;
+	    struct fi_cq_data_entry comp;
 	    svc->trace_out(fcd->fabd->cm, "fi_cq_read for send completion\n");
 	    ret = fi_cq_read(fcd->scq, &comp, 1);
 	    if (ret < 0 && ret != -FI_EAGAIN) {
@@ -473,7 +486,8 @@ static int internal_write_piggyback(CMtrans_services svc,
 		cq_readerr(fcd->scq, " in internal write piggyback");
 		return ret;
 	    }
-	} while (ret == -FI_EAGAIN);
+	    if (ret == 1) handle_scq_completion(&comp);
+	} while (!sent);
     }
     
     free(msg);
@@ -505,10 +519,10 @@ static int internal_write_response(CMtrans_services svc,
 	}
 
 	memcpy(fcd->send_buf, &msg, sizeof(msg));
-	int ret;
+	int ret, sent = 0;
 	
 	svc->trace_out(fcd->fabd->cm, "fi_send for write response\n");
-	ret = fi_send(fcd->conn_ep, fcd->send_buf, sizeof(msg), fi_mr_desc(fcd->send_mr), 0, fcd->send_buf);
+	ret = fi_send(fcd->conn_ep, fcd->send_buf, sizeof(msg), fi_mr_desc(fcd->send_mr), 0, &sent);
 	if (ret) {
 	    FT_PRINTERR("fi_send", ret);
 	    return ret;
@@ -516,7 +530,7 @@ static int internal_write_response(CMtrans_services svc,
 	
 	/* Read send queue */
 	do {
-	    struct fi_cq_entry comp;
+	    struct fi_cq_data_entry comp;
 
 	    svc->trace_out(fcd->fabd->cm, "fi_cq_read for send completion\n");
 	    ret = fi_cq_read(fcd->scq, &comp, 1);
@@ -525,7 +539,8 @@ static int internal_write_response(CMtrans_services svc,
 		cq_readerr(fcd->scq, " in internal write response");
 		return ret;
 	    }
-	} while (ret == -FI_EAGAIN);
+	    if (ret == 1) handle_scq_completion(&comp);
+	} while (!sent);
 
 	return 0;
 }
@@ -581,8 +596,8 @@ static int internal_write_request(CMtrans_services svc,
 	svc->trace_out(fcd->fabd->cm, "Doing internal write request, writing %d bytes", size);
 
 	memcpy(fcd->send_buf, msg, size);
-	
-	ret = fi_send(fcd->conn_ep, fcd->send_buf, size, fi_mr_desc(fcd->send_mr), 0, fcd->send_buf);
+	int sent = 0;
+	ret = fi_send(fcd->conn_ep, fcd->send_buf, size, fi_mr_desc(fcd->send_mr), 0, &sent);
 	if (ret) {
 	    FT_PRINTERR("fi_send", ret);
 	    return ret;
@@ -590,15 +605,15 @@ static int internal_write_request(CMtrans_services svc,
 	
 	/* Read send queue */
 	do {
-	    struct fi_cq_entry comp;
+	    struct fi_cq_data_entry comp;
 	    ret = fi_cq_read(fcd->scq, &comp, 1);
 	    if (ret < 0 && ret != -FI_EAGAIN) {
 		FT_PRINTERR("fi_cq_read", ret);
 		cq_readerr(fcd->scq, " in internal write request");
 		return ret;
 	    }
-	} while (ret == -FI_EAGAIN);
-
+	    if (ret == 1) handle_scq_completion(&comp);
+	} while (!sent);
 	return 0;
 }
 	
@@ -708,10 +723,12 @@ perform_pull(CMtrans_services svc, fabric_conn_data_ptr fcd,
     count = tb->req->iovcnt;
     for (i=0; i < tb->req->iovcnt; i++) {
     	struct fi_cq_data_entry comp;
+	struct pull_record this_pull;
+	this_pull.status = PULL_SUBMITTED;
 	int call_count = 0;
 	svc->trace_out(fcd->fabd->cm, "fi_read, buffer %p, len %d, (keys.rkey %lx, keys.addr %lx)\n", ptr, tb->req->read_list[i].length, tb->req->read_list[i].rkey, tb->req->read_list[i].remote_addr);
 	ssize_t ret = fi_read(fcd->conn_ep, ptr, tb->req->read_list[i].length, fi_mr_desc(tb->mr),
-			      0, tb->req->read_list[i].remote_addr, tb->req->read_list[i].rkey, (void*)0xdeadbeef);
+			      0, tb->req->read_list[i].remote_addr, tb->req->read_list[i].rkey, (void*)&this_pull);
 	ptr += tb->req->read_list[i].length;
 	do {
 	    /* Read send queue */
@@ -721,7 +738,8 @@ perform_pull(CMtrans_services svc, fabric_conn_data_ptr fcd,
 		cq_readerr(fcd->scq, "scq");
 	    }
 	    call_count++;
-	} while (ret == -FI_EAGAIN);
+	    if (ret == 1) handle_scq_completion(&comp);
+	} while (this_pull.status != PULL_COMPLETED);
 
     	if (comp.flags & FI_READ) {
     	    count--;
@@ -743,6 +761,7 @@ perform_pull(CMtrans_services svc, fabric_conn_data_ptr fcd,
 	} else if (ret > 0) {
 	    printf("Successful remote read, Completion size is %ld, data %p\n", comp.len, comp.buf);
 	}
+	if (ret == 1) handle_scq_completion(&comp);
 
     	if (comp.flags & FI_READ) {
     	    count--;
@@ -962,7 +981,7 @@ can_do_something(fabric_client_data_ptr fabd)
 		} while (ret == -FI_EAGAIN);
 		svc->trace_out(fcd->fabd->cm, "FI_READ Completion op_context is %p, flags %lx, len %ld, buf %p, data %lx\n",
 		       comp.op_context, comp.flags, comp.len, comp.buf, comp.data);
-		this_pull->status = PULL_COMPLETED;
+		if (ret == 1) handle_scq_completion(&comp);
 	    }
 	}
 	if (pull->mr) {
