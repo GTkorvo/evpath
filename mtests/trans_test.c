@@ -49,6 +49,7 @@ static attr_list global_test_result = NULL;
 static int use_mpi = 0;
 static int np = 2;
 static int me = 0;
+static int install_schedule = 0;
 typedef struct _buf_list {
     int checksum;
     long length;
@@ -380,6 +381,8 @@ main(argc, argv)
 	    }
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
 	    argv++; argc--;
+	} else if (strcmp(&argv[1][1], "install_schedule") == 0) {
+	    install_schedule++;
 	} else if (strcmp(&argv[1][1], "take_receive_buffer") == 0) {
 	    if (!argv[2] || (sscanf(argv[2], "%d", &take) != 1)) {
 		printf("Bad -take_receive_buffer argument \"%s\"\n", argv[2]);
@@ -477,6 +480,20 @@ main(argc, argv)
 	subproc_args[cur_subproc_arg++] = attr_list_to_string(contact_list);
 	subproc_args[cur_subproc_arg] = NULL;
 	global_exit_condition = CMCondition_get(cm, NULL);
+	if (install_schedule) {
+	    struct timeval now, period = {10,0};
+	    struct _avail_period openings[3];
+	    printf("Installing schedule\n");
+	    openings[0].offset.tv_sec = 2; openings[0].offset.tv_usec = 0;
+	    openings[0].duration.tv_sec = 2; openings[0].duration.tv_usec = 0;
+	    openings[1].offset.tv_sec = 5; openings[1].offset.tv_usec = 0;
+	    openings[1].duration.tv_sec = 4; openings[1].duration.tv_usec = 0;
+	    openings[2].offset.tv_sec = 0; openings[2].offset.tv_usec = 0;
+	    openings[2].duration.tv_sec = 0; openings[2].duration.tv_usec = 0;
+	    gettimeofday(&now, NULL);
+	    now.tv_sec--;
+	    CMinstall_pull_schedule(cm, &now, &period, &openings[0]);
+	}
 	if (use_mpi) start_subprocess = 0;
 	if (start_subprocess) {
 	    subproc_proc = run_subprocess(&subproc_args[start_subproc_arg_count]);
