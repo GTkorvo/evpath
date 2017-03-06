@@ -70,7 +70,6 @@
 #include "cm_transport.h"
 #include "cm_internal.h"
 
-#include <sys/queue.h>
 #include <stdlib.h>
 
 #ifndef SOCKET_ERROR
@@ -146,8 +145,6 @@ struct request
 
 struct response
 {
-    uint64_t remote_addr;
-    uint64_t rkey;
     uint64_t max_length;    
     uint64_t request_ID;
 };
@@ -194,6 +191,7 @@ struct pull_record {
     struct msg_item *parent;
 };
 
+struct mr_list_item;
 struct fabric_connection_data;
 
 typedef struct msg_item {
@@ -205,8 +203,20 @@ typedef struct msg_item {
     struct fid_mr *mr;
     int pull_count;
     struct pull_record *pulls;
+    struct mr_list_item *mr_rec;
     struct msg_item *next;
 } *msg_item_p;
+
+struct fabric_client_data;
+
+typedef struct mr_list_item {
+    struct fabric_client_data *fabd;
+    long buffer_length;
+    void *buffer;
+    struct fid_mr *mr;
+    int in_use;
+    struct mr_list_item *next;
+} *mr_list;
 
 typedef struct fabric_client_data {
     CManager cm;
@@ -239,6 +249,8 @@ typedef struct fabric_client_data {
     struct timeval pull_schedule_base;
     struct timeval pull_schedule_period;
     CMavail_period_ptr avail;
+
+    mr_list existing_mr_list;
     
     int thread_init;
     msg_item_p pull_queue;
@@ -250,18 +262,13 @@ typedef struct fabric_client_data {
     int nfds;
     int wake_read_fd;
     int wake_write_fd;
+    struct fabric_connection_data **fcd_array_by_sfd;
 } *fabric_client_data_ptr;
 
-
-typedef struct notification
-{
-	int done;
-}notify;
 
 typedef struct remote_info
 {
     int iovcnt;
-    notify isDone;
     struct fid_mr **mrlist;
     struct iovec *iov;
     CMcompletion_notify_func notify_func;
@@ -279,32 +286,20 @@ typedef struct fabric_connection_data {
     char *send_buf;
     CMbuffer read_buf;
     int max_credits;
-    void *read_buffer;
     int read_buffer_len;
     int read_offset;
 
-	char *remote_host;
-	int remote_IP;
-	int remote_contact_port;
-	int fd;
-	struct tbuffer_ *tb;    
-	CMConnection conn;
-	struct ibv_qp *dataqp;    
-	notify isDone;
-	int infocount;
-    	rinfo last_write;
-	int max_imm_data;   
-
+    char *remote_host;
+    int remote_IP;
+    int remote_contact_port;
+    int fd;
+    int sfd;   /* fd for the scq */
+    CMConnection conn;
+    struct ibv_qp *dataqp;    
+    int infocount;
+    rinfo last_write;
+    int max_imm_data;   
 } *fabric_conn_data_ptr;
-
-typedef struct tbuffer_
-{
-	CMbuffer buf;
-	struct fid_mr *mr;
-	fabric_conn_data_ptr fcd;
-        struct request *req;
-	LIST_ENTRY(tbuffer_) entries;    
-}tbuffer;
 
 static inline int msg_offset()
 {
@@ -374,7 +369,7 @@ create_fabric_conn_data(CMtrans_services svc)
     fabric_conn_data->remote_host = NULL;
     fabric_conn_data->remote_contact_port = -1;
     fabric_conn_data->fd = 0;
-    fabric_conn_data->read_buffer = NULL;
+    fabric_conn_data->read_buf = NULL;
     fabric_conn_data->read_buffer_len = 0;
     
     return fabric_conn_data;
@@ -426,6 +421,7 @@ handle_scq_completion(struct fi_cq_data_entry *comp)
     if (comp->flags & FI_READ) {
 	struct pull_record *this_pull = 
 	    (struct pull_record *)comp->op_context;
+//	printf("Got an FI_READ completion\n");
 	this_pull->status = PULL_COMPLETED;
     }
     if (comp->flags & FI_SEND) {
@@ -497,52 +493,40 @@ static int internal_write_piggyback(CMtrans_services svc,
 
 static int internal_write_response(CMtrans_services svc,
                                    fabric_conn_data_ptr fcd,
-                                   tbuffer *tb,
                                    int length,
 				   int64_t request_ID)
 {
-	struct control_message msg;
+    struct control_message msg;
 
-	msg.type = msg_response;
-	if(tb != NULL)
-	{
-		msg.u.resp.remote_addr = int64_from_ptr(tb->buf->buffer);
-		msg.u.resp.max_length = length;
-		msg.u.resp.request_ID = request_ID;
-	}
-	else
-	{
-		msg.u.resp.remote_addr = 0;
-		msg.u.resp.rkey = 0;
-		msg.u.resp.max_length = 0;
-		msg.u.resp.request_ID = request_ID;
-	}
+    msg.type = msg_response;
+    msg.u.resp.max_length = length;
+    msg.u.resp.request_ID = request_ID;
 
-	memcpy(fcd->send_buf, &msg, sizeof(msg));
-	int ret, sent = 0;
+    memcpy(fcd->send_buf, &msg, sizeof(msg));
+    int ret, sent = 0;
 	
-	svc->trace_out(fcd->fabd->cm, "fi_send for write response\n");
-	ret = fi_send(fcd->conn_ep, fcd->send_buf, sizeof(msg), fi_mr_desc(fcd->send_mr), 0, &sent);
-	if (ret) {
-	    FT_PRINTERR("fi_send", ret);
+    svc->trace_out(fcd->fabd->cm, "fi_send for write response\n");
+    ret = fi_send(fcd->conn_ep, fcd->send_buf, sizeof(msg), fi_mr_desc(fcd->send_mr), 0, &sent);
+    if (ret) {
+	FT_PRINTERR("fi_send", ret);
+	return ret;
+    }
+	
+    /* Read send queue */
+    do {
+	struct fi_cq_data_entry comp;
+
+	svc->trace_out(fcd->fabd->cm, "fi_cq_read for send completion\n");
+	ret = fi_cq_read(fcd->scq, &comp, 1);
+	if (ret < 0 && ret != -FI_EAGAIN) {
+	    FT_PRINTERR("fi_cq_read", ret);
+	    cq_readerr(fcd->scq, " in internal write response");
 	    return ret;
 	}
-	
-	/* Read send queue */
-	do {
-	    struct fi_cq_data_entry comp;
+	if (ret == 1) handle_scq_completion(&comp);
+    } while (!sent);
 
-	    svc->trace_out(fcd->fabd->cm, "fi_cq_read for send completion\n");
-	    ret = fi_cq_read(fcd->scq, &comp, 1);
-	    if (ret < 0 && ret != -FI_EAGAIN) {
-		FT_PRINTERR("fi_cq_read", ret);
-		cq_readerr(fcd->scq, " in internal write response");
-		return ret;
-	    }
-	    if (ret == 1) handle_scq_completion(&comp);
-	} while (!sent);
-
-	return 0;
+    return 0;
 }
 
 static int internal_write_request(CMtrans_services svc,
@@ -631,9 +615,9 @@ static int handle_response(CMtrans_services svc,
     write_request = ptr_from_int64(rep->request_ID);
     
     free_data_elements = (write_request->notify_func == NULL);
-    if (write_request == NULL) {
-	fprintf(stderr, "Failed to get work request - aborting write\n");
-	return -0x01000;
+    if (rep->max_length == -1) {
+	fprintf(stderr, "WRITE FAILED, request %p\n", write_request);
+	return -1;
     }
 
     if (write_request->notify_func) {
@@ -644,9 +628,53 @@ static int handle_response(CMtrans_services svc,
     
 }
 
-static void free_func(void *cbd)
+static mr_list
+get_free_mr(fabric_client_data_ptr fabd, long length)
 {
-    printf("Called free_func\n");
+    mr_list list, return_item = NULL;
+    pthread_mutex_lock(&fabd->pull_queue_mutex);
+    list = fabd->existing_mr_list;
+    while (list != NULL) {
+	if ((!list->in_use) && (list->buffer_length >= length)) {
+	    list->in_use = 1;
+	    return_item = list;
+	    break;
+	}
+	list = list->next;
+    }
+    pthread_mutex_unlock(&fabd->pull_queue_mutex);
+    return return_item;
+}
+
+static void
+add_mr_to_list(fabric_client_data_ptr fabd, mr_list mr_rec)
+{
+    pthread_mutex_lock(&fabd->pull_queue_mutex);
+    mr_rec->fabd = fabd;
+    mr_rec->next = fabd->existing_mr_list;
+    fabd->existing_mr_list = mr_rec;
+    pthread_mutex_unlock(&fabd->pull_queue_mutex);
+}
+
+static void 
+free_func(void *mr_item_v)
+{
+    fabric_client_data_ptr fabd;
+    mr_list list, mr_item = mr_item_v;
+    fabd = mr_item->fabd;
+    pthread_mutex_lock(&fabd->pull_queue_mutex);
+    list = fabd->existing_mr_list;
+    while (list != NULL) {
+	if (list ==  mr_item_v) {
+	    list->in_use = 0;
+	    break;
+	}
+	list = list->next;
+    }
+    if (list == NULL) {
+	fprintf(stderr, "libfabric MR list inconsistency in free_func\n");
+    }
+    pthread_mutex_unlock(&fabd->pull_queue_mutex);
 }
 	
 
@@ -684,52 +712,60 @@ perform_pull(CMtrans_services svc, fabric_conn_data_ptr fcd,
     int count;
     int i;
     char *ptr;
-    tbuffer *tb;
     int header_size;
     struct request *req;
     void *buffer;
-
+    struct fid_mr *mr;
+    struct mr_list_item *mr_rec;
+    CMbuffer cb;
     req = &msg->u.req;
-	
-    tb = (tbuffer*)malloc(sizeof(tbuffer));
-
-    buffer = malloc(req->length);
-    CMbuffer cb = svc->create_data_and_link_buffer(fcd->fabd->cm, buffer, req->length);
-    cb->return_callback = free_func;
-    cb->return_callback_data = (void*)tb;
-    tb->buf = cb;
-    tb->fcd = fcd;
-    header_size = sizeof(*msg) + req->iovcnt * sizeof(struct remote_entry);
-    tb->req = malloc(header_size);
-    memcpy(tb->req, req, header_size);
-    memcpy(tb->buf->buffer, (char*)msg + header_size, req->piggyback_length);
-
+    
     svc->trace_out(fcd->fabd->cm, "In handle request, len is %ld, iovcnt %d, request_ID %lx, piggyback_length = %d\n",
-	   tb->req->length, tb->req->iovcnt, tb->req->request_ID, tb->req->piggyback_length);
-    svc->trace_out(fcd->fabd->cm, "fi_mr_reg, buff %p, size %ld with attrs REMOTE_READ,REMOTE_WRITE, SEND, RECV\n", tb->buf->buffer, tb->req->length+1000);
-    ret = fi_mr_reg(fcd->fabd->dom, tb->buf->buffer, tb->req->length+1000,
-		    FI_REMOTE_READ | FI_REMOTE_WRITE | FI_SEND | FI_RECV,
-		    0, 0, 0, &tb->mr, NULL);
-    if(ret) {
-	FT_PRINTERR("fi_mr_reg", ret);
-	svc->trace_out(fcd->fabd->cm, "Failed to get memory\n");
-	internal_write_response(svc, fcd, NULL, 0, 0);
-	return ret;
+	   req->length, req->iovcnt, req->request_ID, req->piggyback_length);
+    mr_rec = get_free_mr(fcd->fabd, req->length);
+    if (mr_rec == NULL) {
+	mr_rec = calloc(1, sizeof(*mr_rec));
+	buffer = malloc(req->length);
+	mr_rec->buffer_length = req->length;
+	mr_rec->buffer = buffer;
+	mr_rec->in_use = 1;
+	mr_rec->next = NULL;
+	svc->trace_out(fcd->fabd->cm, "fi_mr_reg, buff %p, size %ld with attrs REMOTE_READ,REMOTE_WRITE, SEND, RECV\n", buffer, req->length);
+	ret = fi_mr_reg(fcd->fabd->dom, buffer, req->length,
+			FI_REMOTE_READ | FI_REMOTE_WRITE | FI_SEND | FI_RECV,
+			0, 0, 0, &mr, NULL);
+	if(ret) {
+	    FT_PRINTERR("fi_mr_reg", ret);
+	    svc->trace_out(fcd->fabd->cm, "Failed to get memory\n");
+	    internal_write_response(svc, fcd, -1, req->request_ID);
+	    return ret;
+	}
+
+	mr_rec->mr = mr;
+	add_mr_to_list(fcd->fabd, mr_rec);
+    } else {
+	svc->trace_out(fcd->fabd->cm, "Reusing exiting MR buff %p, size %ld\n", mr_rec->buffer, mr_rec->buffer_length);
+	buffer = mr_rec->buffer;
+	mr = mr_rec->mr;
+	mr_rec->in_use = 1;
     }
+    cb = svc->create_data_and_link_buffer(fcd->fabd->cm, buffer, req->length);
+    cb->return_callback = free_func;
+    cb->return_callback_data = (void*)mr_rec;
+    header_size = sizeof(*msg) + req->iovcnt * sizeof(struct remote_entry);
+    memcpy(cb->buffer, (char*)msg + header_size, req->piggyback_length);
 
-    fcd->tb = tb;
-
-    ptr = tb->buf->buffer + tb->req->piggyback_length;
-    count = tb->req->iovcnt;
-    for (i=0; i < tb->req->iovcnt; i++) {
+    ptr = cb->buffer + req->piggyback_length;
+    count = req->iovcnt;
+    for (i=0; i < req->iovcnt; i++) {
     	struct fi_cq_data_entry comp;
 	struct pull_record this_pull;
 	this_pull.status = PULL_SUBMITTED;
 	int call_count = 0;
-	svc->trace_out(fcd->fabd->cm, "fi_read, buffer %p, len %d, (keys.rkey %lx, keys.addr %lx)\n", ptr, tb->req->read_list[i].length, tb->req->read_list[i].rkey, tb->req->read_list[i].remote_addr);
-	ssize_t ret = fi_read(fcd->conn_ep, ptr, tb->req->read_list[i].length, fi_mr_desc(tb->mr),
-			      0, tb->req->read_list[i].remote_addr, tb->req->read_list[i].rkey, (void*)&this_pull);
-	ptr += tb->req->read_list[i].length;
+	svc->trace_out(fcd->fabd->cm, "fi_read, buffer %p, len %d, (keys.rkey %lx, keys.addr %lx)\n", ptr, req->read_list[i].length, req->read_list[i].rkey, req->read_list[i].remote_addr);
+	ssize_t ret = fi_read(fcd->conn_ep, ptr, req->read_list[i].length, fi_mr_desc(mr),
+			      0, req->read_list[i].remote_addr, req->read_list[i].rkey, (void*)&this_pull);
+	ptr += req->read_list[i].length;
 	do {
 	    /* Read send queue */
 	    ret = fi_cq_read(fcd->scq, &comp, 1);
@@ -768,11 +804,11 @@ perform_pull(CMtrans_services svc, fabric_conn_data_ptr fcd,
     	}
     }
 
-    fcd->read_buffer = tb->buf;
-    svc->trace_out(fcd->fabd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", tb->req->length, ((unsigned char*)tb->buf->buffer)[0], ((unsigned char*)tb->buf->buffer)[1], ((unsigned char*)tb->buf->buffer)[2], ((unsigned char*)tb->buf->buffer)[3], ((unsigned char*)tb->buf->buffer)[4], ((unsigned char*)tb->buf->buffer)[5], ((unsigned char*)tb->buf->buffer)[6], ((unsigned char*)tb->buf->buffer)[7], ((unsigned char*)tb->buf->buffer)[8], ((unsigned char*)tb->buf->buffer)[9], ((unsigned char*)tb->buf->buffer)[10], ((unsigned char*)tb->buf->buffer)[11], ((unsigned char*)tb->buf->buffer)[12], ((unsigned char*)tb->buf->buffer)[13], ((unsigned char*)tb->buf->buffer)[14], ((unsigned char*)tb->buf->buffer)[15]);
-    fcd->read_buffer_len = tb->req->length;
+    fcd->read_buf = cb;
+    svc->trace_out(fcd->fabd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", req->length, ((unsigned char*)cb->buffer)[0], ((unsigned char*)cb->buffer)[1], ((unsigned char*)cb->buffer)[2], ((unsigned char*)cb->buffer)[3], ((unsigned char*)cb->buffer)[4], ((unsigned char*)cb->buffer)[5], ((unsigned char*)cb->buffer)[6], ((unsigned char*)cb->buffer)[7], ((unsigned char*)cb->buffer)[8], ((unsigned char*)cb->buffer)[9], ((unsigned char*)cb->buffer)[10], ((unsigned char*)cb->buffer)[11], ((unsigned char*)cb->buffer)[12], ((unsigned char*)cb->buffer)[13], ((unsigned char*)cb->buffer)[14], ((unsigned char*)cb->buffer)[15]);
+    fcd->read_buffer_len = req->length;
     svc->trace_out(fcd->fabd->cm, "CMFABRIC handle_request completed");    
-    internal_write_response(svc, fcd, tb, tb->req->length, tb->req->request_ID);
+    internal_write_response(svc, fcd, req->length, req->request_ID);
     return 0;
 }
 
@@ -915,6 +951,28 @@ delay_until_wake(fabric_client_data_ptr fabd, struct timeval *now)
     return ret;
 }
 
+static void
+add_completion_fd(fabric_client_data_ptr fabd, fabric_conn_data_ptr fcd)
+{
+    if (fcd->sfd > fabd->nfds) {
+	fabd->fcd_array_by_sfd = realloc(fabd->fcd_array_by_sfd,
+					 sizeof(fabd->fcd_array_by_sfd[0]) * fcd->sfd+1);
+	fabd->nfds = fcd->sfd;
+    }
+    fabd->fcd_array_by_sfd[fcd->sfd] = fcd;
+//    FD_SET(fcd->sfd, &fabd->readset);
+//    printf("Added completion fd %d\n", fcd->sfd);
+}
+
+
+static void
+remove_completion_fd(fabric_client_data_ptr fabd, fabric_conn_data_ptr fcd)
+{
+    FD_CLR(fcd->sfd, &fabd->readset);
+}
+
+#include <poll.h>
+
 static int
 can_do_something(fabric_client_data_ptr fabd)
 {
@@ -927,35 +985,59 @@ can_do_something(fabric_client_data_ptr fabd)
 	fabric_conn_data_ptr fcd = pull->conn_data;
 	svc->trace_out(fabd->cm, "Got a pull message with buffer count %d, next %p\n",
 		       pull->pull_count, pull->next);
-	if (!pull->mr) {
+	if (!pull->mr_rec) {
 	    int ret;
 	    /* try to get a mr */
-	    if (0 /*!can_get_mr(fcd, pull->message_size)*/) {
-		pull = pull->next;
-		continue;
-	    }
-	    if (pull->cur_buffer_size != pull->message_size) {
-		pull->buffer = realloc(pull->buffer, pull->message_size);
-		/* setup local buffers, now that we have memory */
-		char *ptr = pull->buffer + pull->cur_buffer_size;
-		pull->cur_buffer_size = pull->message_size;
-		for ( i = 0; i < pull->pull_count; i++) {
-		    pull->pulls[i].dest = ptr;
-		    ptr += pull->pulls[i].remote.length;
+	    mr_list mr_rec = get_free_mr(fcd->fabd, pull->message_size);
+	    char *buffer = NULL;
+	    if (mr_rec == NULL) {
+		if (0 /*!allow_register_new_mr(fcd, pull->message_size)*/) {
+		    pull = pull->next;
+		    continue;
 		}
+		mr_rec = calloc(1, sizeof(*mr_rec));
+		buffer = malloc(pull->message_size);
+		mr_rec->buffer_length = pull->message_size;
+		mr_rec->buffer = buffer;
+		mr_rec->in_use = 1;
+		mr_rec->next = NULL;
+		svc->trace_out(fcd->fabd->cm, "fi_mr_reg, buff %p, size %ld with attrs REMOTE_READ,REMOTE_WRITE, SEND, RECV\n", buffer, pull->message_size);
+		ret = fi_mr_reg(fcd->fabd->dom, buffer, pull->message_size,
+				FI_REMOTE_READ | FI_REMOTE_WRITE | FI_SEND | FI_RECV,
+				0, 0, 0, &mr_rec->mr, NULL);
+		if(ret) {
+		    FT_PRINTERR("fi_mr_reg", ret);
+		    svc->trace_out(fcd->fabd->cm, "Failed to get memory\n");
+		    internal_write_response(svc, fcd, -1, pull->request_ID);
+		    return ret;
+		}
+		pull->mr = mr_rec->mr;
+		pull->mr_rec = mr_rec;
+		add_mr_to_list(fcd->fabd, mr_rec);
+	    } else {
+		svc->trace_out(fcd->fabd->cm, "Reusing exiting MR buff %p, size %ld\n", mr_rec->buffer, mr_rec->buffer_length);
+		mr_rec->in_use = 1;
+		pull->mr_rec = mr_rec;
+		buffer = mr_rec->buffer;
+		pull->mr = mr_rec->mr;
 	    }
-	    ret = fi_mr_reg(fcd->fabd->dom, pull->buffer, pull->message_size+1000,
-			    FI_REMOTE_READ | FI_REMOTE_WRITE | FI_SEND | FI_RECV,
-			    0, 0, 0, &pull->mr, NULL);
-	    if(ret) {
-		FT_PRINTERR("fi_mr_reg", ret);
-		svc->trace_out(fcd->fabd->cm, "Failed to get memory\n");
-		continue;
+	    /* piggyback part of msg is in old pull->buffer */
+	    memcpy(buffer, pull->buffer, pull->cur_buffer_size);
+	    free(pull->buffer);
+	    pull->buffer = buffer;
+
+	    /* setup local buffers, now that we have memory */
+	    char *ptr = pull->buffer + pull->cur_buffer_size;
+	    pull->cur_buffer_size = pull->message_size;
+	    for ( i = 0; i < pull->pull_count; i++) {
+		pull->pulls[i].dest = ptr;
+		ptr += pull->pulls[i].remote.length;
 	    }
+	    pull->cur_buffer_size = mr_rec->buffer_length;
 	    did_something = 1;
 	}
 	for ( i = 0; i < pull->pull_count; i++) {
-	    if (!pull->pulls[i].status == PULL_SUBMITTED) {
+	    if (pull->pulls[i].status == PULL_UNSUBMITTED) {
 
 		struct fi_cq_data_entry comp;
 		struct remote_entry *remote = &pull->pulls[i].remote;
@@ -963,6 +1045,11 @@ can_do_something(fabric_client_data_ptr fabd)
 		if (0 /* can't do more pulls for some reason */) continue;
 		
 		svc->trace_out(fcd->fabd->cm, "fi_read, buffer %p, len %d, (keys.rkey %lx, keys.addr %lx)\n", this_pull->dest, remote->length, remote->rkey, remote->remote_addr);
+		struct pollfd poll_list[1];
+		poll_list[0].fd = fcd->sfd;
+		poll_list[0].events = POLLIN|POLLPRI;
+//		int pret = poll(&poll_list[0], (unsigned long)1, 0);
+//		printf("Before read poll list ret %d, revents = %x\n", pret, poll_list[0].revents);
 		ssize_t ret = fi_read(fcd->conn_ep, this_pull->dest, 
 				      remote->length, fi_mr_desc(pull->mr),
 				      0, remote->remote_addr, remote->rkey, 
@@ -971,6 +1058,7 @@ can_do_something(fabric_client_data_ptr fabd)
 		this_pull->status = PULL_SUBMITTED;
 		did_something = 1;
 		
+		add_completion_fd(fabd, fcd);
 		do {
 		    /* Read send queue */
 		    ret = fi_cq_read(fcd->scq, &comp, 1);
@@ -978,10 +1066,15 @@ can_do_something(fabric_client_data_ptr fabd)
 			FT_PRINTERR("fi_cq_read", ret);
 			cq_readerr(fcd->scq, "scq");
 		    }
+//		    pret = poll(&poll_list[0], (unsigned long)1, 0);
+//		    printf("AFTER read poll list ret %d, revents = %x\n", pret, poll_list[0].revents);
 		} while (ret == -FI_EAGAIN);
 		svc->trace_out(fcd->fabd->cm, "FI_READ Completion op_context is %p, flags %lx, len %ld, buf %p, data %lx\n",
 		       comp.op_context, comp.flags, comp.len, comp.buf, comp.data);
-		if (ret == 1) handle_scq_completion(&comp);
+		    if (ret == 1) {
+//			printf("Immediate completion\n");
+			handle_scq_completion(&comp);
+		    }
 	    }
 	}
 	if (pull->mr) {
@@ -995,6 +1088,7 @@ can_do_something(fabric_client_data_ptr fabd)
 		}
 	    }
 	    if (all_done) {
+		remove_completion_fd(fabd, fcd);
 		return_completed_pull(svc, fcd->fabd, pull);
 	    }
 	}
@@ -1005,6 +1099,33 @@ can_do_something(fabric_client_data_ptr fabd)
 }
 
 static void
+handle_completions(fabric_client_data_ptr fabd, fd_set *readset)
+{
+    /* everything left should be scq completions */
+    int i;
+    for (i=0; i < fabd->nfds; i++) {
+	if (FD_ISSET(i, readset)) {
+	    int ret;
+	    struct fi_cq_data_entry comp;
+	    /* Read send queue */
+	    fabric_conn_data_ptr fcd = fabd->fcd_array_by_sfd[i];
+	    ret = fi_cq_read(fcd->scq, &comp, 1);
+	    if (ret < 0 && ret != -FI_EAGAIN) {
+		FT_PRINTERR("fi_cq_read", ret);
+		cq_readerr(fcd->scq, "scq");
+	    }
+	    if (ret == 1) {
+		printf("Async completion \n");
+		handle_scq_completion(&comp);
+	    } else {
+		printf("False async?\n");
+	    }
+	}
+    }
+}
+		
+
+static void
 pull_thread(fabric_client_data_ptr fabd)
 {
 //    thread_setup();  /* extract wait fd, other? */
@@ -1012,7 +1133,6 @@ pull_thread(fabric_client_data_ptr fabd)
     while(fabd->thread_should_run) {
 	struct timeval now, delay;
 	fd_set readset;
-//	handle_completions();
 	gettimeofday(&now, NULL);
 	if (in_pull_period(fabd, &now)) {
 	    while (can_do_something(fabd));
@@ -1021,14 +1141,18 @@ pull_thread(fabric_client_data_ptr fabd)
 	/* sleep until something happens, *or* the next pull period begins */ 
 	delay = delay_until_wake(fabd, &now);
 	readset = fabd->readset;
+//	printf("dropping into select, set is %lx\n", *(long*)&readset);
 	select(fabd->nfds+1, &readset, NULL, NULL, &delay);
+//	printf("Fell out of select, set is %lx\n", *(long*)&readset);
 	if (FD_ISSET(fabd->wake_read_fd, &readset)) {
 	    /* read and discard wake byte */
 	    char buffer;
 	    if (read(fabd->wake_read_fd, &buffer, 1) != 1) {
 		perror("wake read failed\n");
 	    }
+	    FD_CLR(fabd->wake_read_fd, &readset);
 	}
+	handle_completions(fabd, &readset);
     }
 //    thread_free_resources;
 }
@@ -1130,9 +1254,9 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 		
 		fcd->read_buf = fcd->fabd->svc->get_data_buffer(trans->cm, fcd->read_buffer_len);
 		memcpy(fcd->read_buf->buffer, &msg->u.pb.body[0], fcd->read_buffer_len);
-		fcd->read_buffer = fcd->read_buf;
 		fcd->read_offset = 0;
-		CMbuffer_to_return = fcd->read_buf;		    
+
+		CMbuffer_to_return = fcd->read_buf;
 		call_data_available = 1;
 		break;
 	}
@@ -1141,11 +1265,8 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 		break;
 	case msg_request:
 		handle_request(svc, fcd, msg);
-		if(fcd->isDone.done == 0) {
-		    call_data_available = 1;
-		} else {
-		    svc->trace_out(fcd->fabd->cm, "Cmfabric data available error in the protocol");
-		}
+		call_data_available = 1;
+		CMbuffer_to_return = fcd->read_buf;
 		break;
 	default:
 		printf("Bad message type %d\n", msg->type);
@@ -1161,33 +1282,6 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 	if (CMbuffer_to_return) {
 	    svc->return_data_buffer(trans->cm, CMbuffer_to_return);
 	}
-	//returning control to CM
-	/* printf("Before recv - "); */
-	/* ret = fi_trywait(fcd->fabd->fab, fids, 1); */
-	/* switch (ret) { */
-	/* case FI_SUCCESS: */
-	/*     printf("Try wait on rcq returned FI_SUCCESS\n"); */
-	/*     break; */
-	/* case -FI_EAGAIN: */
-	/*     printf("Try wait on rcq returned FI_EAGAIN\n"); */
-	/*     break; */
-	/* default: */
-	/*     printf("Try wait on rcq returned %d\n", ret); */
-	/* } */
-	/* printf("Doing recv on buffer %p\n", fcd->mapped_recv_buf); */
-	/* printf("Before recv - "); */
-	/* ret = fi_trywait(fcd->fabd->fab, fids, 1); */
-	/* free(fids); */
-	/* switch (ret) { */
-	/* case FI_SUCCESS: */
-	/*     printf("Try wait on rcq returned FI_SUCCESS\n"); */
-	/*     break; */
-	/* case -FI_EAGAIN: */
-	/*     printf("Try wait on rcq returned FI_EAGAIN\n"); */
-	/*     break; */
-	/* default: */
-	/*     printf("Try wait on rcq returned %d\n", ret); */
-	/* } */
 	svc->trace_out(fcd->fabd->cm, "CMFABRIC data_available returning");
 }
 
@@ -1277,6 +1371,9 @@ fabric_accept_conn(void *void_trans, void *void_conn_sock)
     svc->trace_out(fabd->cm, "Falling out of accept conn\n");
     free_attr_list(conn_attr_list);
     fcd->fd = fd;
+    if ((ret = fi_control (&fcd->scq->fid, FI_GETWAIT, (void *) &fcd->sfd))) {
+	FT_PRINTERR("fi_control(FI_GETWAIT)", ret);
+    }
 }
 
 /* 
@@ -1581,6 +1678,9 @@ attr_list attrs;
 		       (void *) trans, (void *) conn);
 
     fcd->fd = fd;
+    if ((ret = fi_control (&fcd->scq->fid, FI_GETWAIT, (void *) &fcd->sfd))) {
+	FT_PRINTERR("fi_control(FI_GETWAIT)", ret);
+    }
     return conn;
 }
 
@@ -1711,7 +1811,6 @@ static void free_ep_res(fabric_conn_data_ptr fcd)
 	fi_close(&fcd->read_mr->fid);
 	fi_close(&fcd->rcq->fid);
 	fi_close(&fcd->scq->fid);
-	free(fcd->read_buf);
 }
 
 static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
@@ -1800,7 +1899,6 @@ err3:
 err2:
 	fi_close(&fcd->scq->fid);
 err1:
-	free(fcd->read_buf);
 	free(fcd->send_buf);
 	return ret;
 }
@@ -2270,15 +2368,13 @@ extern CMbuffer
 libcmfabric_LTX_read_block_func(CMtrans_services svc, fabric_conn_data_ptr fcd, int *len_ptr, int *offset_ptr)
 {
     *len_ptr = fcd->read_buffer_len;
-    if (fcd->read_buffer) {
-	CMbuffer tmp = fcd->read_buffer;
-	fcd->read_buffer = NULL;
+    if (fcd->read_buf) {
+	CMbuffer tmp = fcd->read_buf;
+	fcd->read_buf = NULL;
 	fcd->read_buffer_len = 0;
 	if (offset_ptr) *offset_ptr = fcd->read_offset;
 	return tmp;
     }
-    if(fcd->tb)
-	return fcd->tb->buf;
     return NULL;  
 }
 
@@ -2365,6 +2461,8 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 	    
 	    free(last_write_request->mrlist);
 	    free(last_write_request->iov);
+	    last_write_request->iov = NULL;
+	    last_write_request->mrlist = NULL;
 	    last_write_request->iovcnt = 0;
 	}
 #endif
@@ -2468,21 +2566,18 @@ check_completed_pull(CManager cm, fabric_client_data_ptr fabd)
     /* OK, msg is ours alone */
     fcd = msg->conn_data;
     free(msg->pulls);
-    tbuffer *tb;
-    tb = (tbuffer*)malloc(sizeof(tbuffer));
     CMbuffer cb = svc->create_data_and_link_buffer(fcd->fabd->cm, 
 						   msg->buffer, 
 						   msg->message_size);
     cb->return_callback = free_func;
-    cb->return_callback_data = (void*)tb;
-    tb->buf = cb;
-    tb->fcd = fcd;
-    fcd->read_buffer = tb->buf;
-    svc->trace_out(fcd->fabd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", msg->message_size, ((unsigned char*)tb->buf->buffer)[0], ((unsigned char*)tb->buf->buffer)[1], ((unsigned char*)tb->buf->buffer)[2], ((unsigned char*)tb->buf->buffer)[3], ((unsigned char*)tb->buf->buffer)[4], ((unsigned char*)tb->buf->buffer)[5], ((unsigned char*)tb->buf->buffer)[6], ((unsigned char*)tb->buf->buffer)[7], ((unsigned char*)tb->buf->buffer)[8], ((unsigned char*)tb->buf->buffer)[9], ((unsigned char*)tb->buf->buffer)[10], ((unsigned char*)tb->buf->buffer)[11], ((unsigned char*)tb->buf->buffer)[12], ((unsigned char*)tb->buf->buffer)[13], ((unsigned char*)tb->buf->buffer)[14], ((unsigned char*)tb->buf->buffer)[15]);
+    cb->return_callback_data = (void*)msg->mr_rec;
+    fcd->read_buf = cb;
+    svc->trace_out(fcd->fabd->cm, "FIrst 16 bytes of receive buffer (len %d) are %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n", msg->message_size, ((unsigned char*)cb->buffer)[0], ((unsigned char*)cb->buffer)[1], ((unsigned char*)cb->buffer)[2], ((unsigned char*)cb->buffer)[3], ((unsigned char*)cb->buffer)[4], ((unsigned char*)cb->buffer)[5], ((unsigned char*)cb->buffer)[6], ((unsigned char*)cb->buffer)[7], ((unsigned char*)cb->buffer)[8], ((unsigned char*)cb->buffer)[9], ((unsigned char*)cb->buffer)[10], ((unsigned char*)cb->buffer)[11], ((unsigned char*)cb->buffer)[12], ((unsigned char*)cb->buffer)[13], ((unsigned char*)cb->buffer)[14], ((unsigned char*)cb->buffer)[15]);
     fcd->read_buffer_len = msg->message_size;
     svc->trace_out(fcd->fabd->cm, "CMFABRIC handle_request completed");    
-    internal_write_response(svc, fcd, tb, msg->message_size, msg->request_ID);
+    internal_write_response(svc, fcd, msg->message_size, msg->request_ID);
     fabd->trans->data_available(fabd->trans, fcd->conn);
+    svc->return_data_buffer(fabd->trans->cm, cb);
     svc->drop_CM_lock(fabd->cm, __FILE__, __LINE__);
 
 }
@@ -2516,6 +2611,7 @@ void libcmfabric_LTX_install_pull_schedule(CMtrans_services svc,
 	    fabd->wake_write_fd = filedes[1];
 	    fabd->nfds = fabd->wake_read_fd;
 	    FD_SET(fabd->wake_read_fd, &fabd->readset);
+	    fabd->fcd_array_by_sfd = malloc(sizeof(char*));
 	}
 	svc->add_poll(fabd->cm, (CMPollFunc) check_completed_pull, fabd);
 	pthread_create(&thr, NULL, (void*(*)(void*))&pull_thread, fabd);
@@ -2570,7 +2666,7 @@ libcmfabric_LTX_initialize(CManager cm, CMtrans_services svc)
     fabd->hints->tx_attr->op_flags  = FI_COMPLETION;
 
     fabd->hints->domain_attr->mr_mode = FI_MR_BASIC;
-    fabd->hints->domain_attr->threading        =  FI_THREAD_ENDPOINT;
+    fabd->hints->domain_attr->threading        =  FI_THREAD_SAFE;
     fabd->hints->domain_attr->control_progress =  FI_PROGRESS_AUTO;
     fabd->hints->domain_attr->data_progress    =  FI_PROGRESS_AUTO;
     svc->add_shutdown_task(cm, free_fabric_data, (void *) fabd, FREE_TASK);
