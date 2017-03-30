@@ -333,7 +333,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 		       inet_ntoa(sin_addr),
 		       int_port_num);
     } else {
-	address.host = host_ip;
+	address.host = ntohl(host_ip);
 	svc->trace_out(cm, "Attempting ENET RUDP connection, USING IP = %s, port %d",
 		       inet_ntoa(sin_addr),
 		       int_port_num);
@@ -493,6 +493,7 @@ libcmenet_LTX_connection_eq(CManager cm, CMtrans_services svc,
     }
     if (requested_IP == -1) {
 	check_host(host_name, (void *) &requested_IP);
+	requested_IP = ntohl(requested_IP);
 	svc->trace_out(cm, "IP translation for hostname %s is %x", host_name,
 		       requested_IP);
     }
@@ -530,14 +531,14 @@ build_listen_attrs(CManager cm, CMtrans_services svc, enet_client_data_ptr sd,
     }
     if ((IP != 0) && !use_hostname) {
 	add_attr(ret_list, CM_ENET_ADDR, Attr_Int4,
-		 (attr_value) (long)htonl(IP));
+		 (attr_value) (long)IP);
     }
     if ((cercs_getenv("CMEnetsUseHostname") != NULL) || 
 	use_hostname) {
 	add_attr(ret_list, CM_ENET_HOSTNAME, Attr_String,
 		 (attr_value) strdup(host_name));
     } else if (IP == 0) {
-        add_int_attr(ret_list, CM_ENET_ADDR, htonl(INADDR_LOOPBACK));
+        add_int_attr(ret_list, CM_ENET_ADDR, INADDR_LOOPBACK);
     }
     add_attr(ret_list, CM_ENET_PORT, Attr_Int4,
 	     (attr_value) (long)int_port_num);
