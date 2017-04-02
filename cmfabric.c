@@ -97,17 +97,6 @@
 /* haven't tested with earlier than version 1.2 */
 #define FT_FIVERSION FI_VERSION(1,2)
 
-struct cs_opts {
-	char *src_port;
-	char *dst_port;
-	char *src_addr;
-	char *dst_addr;
-};
-
-#define INIT_OPTS (struct cs_opts) { .src_port = "9228", \
-				     .dst_port = "9228" }
-
-
 void cq_readerr(struct fid_cq *cq, char *cq_str);
 
 
@@ -167,15 +156,6 @@ struct control_message
     } u;
 };
 
-struct ibparam
-{
-	int lid;
-	int psn;
-	int qpn;
-	int port;
-	/*anything else? */
-};
-
 #define ptr_from_int64(p) (void *)(unsigned long)(p)
 #define int64_from_ptr(p) (u_int64_t)(unsigned long)(p)
 
@@ -222,7 +202,6 @@ typedef struct fabric_client_data {
     CManager cm;
     CMtrans_services svc;
     transport_entry trans;
-    struct cs_opts opts;
     struct fi_info *hints;
 
     struct fid_fabric *fab;
@@ -263,6 +242,8 @@ typedef struct fabric_client_data {
     int wake_read_fd;
     int wake_write_fd;
     struct fabric_connection_data **fcd_array_by_sfd;
+    int ncqs;
+    struct fid **cq_array;
 } *fabric_client_data_ptr;
 
 
@@ -375,45 +356,6 @@ create_fabric_conn_data(CMtrans_services svc)
     return fabric_conn_data;
 }
 
-#ifdef NOTDEF
-static
-void 
-dump_sockaddr(who, sa)
-	char *who;
-struct sockaddr_in *sa;
-{
-	unsigned char *addr;
-
-	addr = (unsigned char *) &(sa->sin_addr.s_addr);
-
-	printf("%s: family=%d port=%d addr=%d.%d.%d.%d\n",
-	       who,
-	       ntohs(sa->sin_family),
-	       ntohs(sa->sin_port),
-	       addr[0], addr[1], addr[2], addr[3]);
-}
-
-static
-void 
-dump_sockinfo(msg, fd)
-	char *msg;
-int fd;
-{
-	int nl;
-	struct sockaddr_in peer, me;
-
-	printf("Dumping sockinfo for fd=%d: %s\n", fd, msg);
-
-	nl = sizeof(me);
-	getsockname(fd, (struct sockaddr *) &me, &nl);
-	dump_sockaddr("Me", &me);
-
-	nl = sizeof(peer);
-	getpeername(fd, (struct sockaddr *) &peer, &nl);
-	dump_sockaddr("Peer", &peer);
-}
-
-#endif
 
 static void
 handle_scq_completion(struct fi_cq_data_entry *comp)
@@ -960,14 +902,25 @@ add_completion_fd(fabric_client_data_ptr fabd, fabric_conn_data_ptr fcd)
 	fabd->nfds = fcd->sfd;
     }
     fabd->fcd_array_by_sfd[fcd->sfd] = fcd;
-//    FD_SET(fcd->sfd, &fabd->readset);
-//    printf("Added completion fd %d\n", fcd->sfd);
+    fabd->cq_array = realloc(fabd->cq_array, 
+			     sizeof(fabd->cq_array[0]) * (fabd->ncqs+1));
+    fabd->cq_array[fabd->ncqs] = &fcd->scq->fid;
+    fabd->ncqs++;
+    FD_SET(fcd->sfd, &fabd->readset);
 }
 
 
 static void
 remove_completion_fd(fabric_client_data_ptr fabd, fabric_conn_data_ptr fcd)
 {
+    int i;
+    for (i = 0; i < fabd->ncqs; i++) {
+	if (fabd->cq_array[i] == &fcd->scq->fid) {
+	    memcpy(&fabd->cq_array[i+1], &fabd->cq_array[i], 
+		   sizeof(fabd->cq_array[0]) * (fabd->ncqs - i - 1));
+	}
+    }
+    fabd->ncqs--;
     FD_CLR(fcd->sfd, &fabd->readset);
 }
 
@@ -1036,13 +989,16 @@ can_do_something(fabric_client_data_ptr fabd)
 	    pull->cur_buffer_size = mr_rec->buffer_length;
 	    did_something = 1;
 	}
+	/* at this point we should have an MR and mr_rec */
 	for ( i = 0; i < pull->pull_count; i++) {
 	    if (pull->pulls[i].status == PULL_UNSUBMITTED) {
 
-		struct fi_cq_data_entry comp;
+//		struct fi_cq_data_entry comp;
 		struct remote_entry *remote = &pull->pulls[i].remote;
 		struct pull_record *this_pull  = &pull->pulls[i];
-		if (0 /* can't do more pulls for some reason */) continue;
+		if (0 /* can't do more pulls for some reason */) {
+		    continue;
+		}
 		
 		svc->trace_out(fcd->fabd->cm, "fi_read, buffer %p, len %d, (keys.rkey %lx, keys.addr %lx)\n", this_pull->dest, remote->length, remote->rkey, remote->remote_addr);
 		struct pollfd poll_list[1];
@@ -1059,25 +1015,26 @@ can_do_something(fabric_client_data_ptr fabd)
 		did_something = 1;
 		
 		add_completion_fd(fabd, fcd);
-		do {
-		    /* Read send queue */
-		    ret = fi_cq_read(fcd->scq, &comp, 1);
-		    if (ret < 0 && ret != -FI_EAGAIN) {
-			FT_PRINTERR("fi_cq_read", ret);
-			cq_readerr(fcd->scq, "scq");
-		    }
-//		    pret = poll(&poll_list[0], (unsigned long)1, 0);
-//		    printf("AFTER read poll list ret %d, revents = %x\n", pret, poll_list[0].revents);
-		} while (ret == -FI_EAGAIN);
-		svc->trace_out(fcd->fabd->cm, "FI_READ Completion op_context is %p, flags %lx, len %ld, buf %p, data %lx\n",
-		       comp.op_context, comp.flags, comp.len, comp.buf, comp.data);
-		    if (ret == 1) {
-//			printf("Immediate completion\n");
-			handle_scq_completion(&comp);
-		    }
+/* 		do { */
+/* 		    /\* Read send queue *\/ */
+/* 		    ret = fi_cq_read(fcd->scq, &comp, 1); */
+/* 		    if (ret < 0 && ret != -FI_EAGAIN) { */
+/* 			FT_PRINTERR("fi_cq_read", ret); */
+/* 			cq_readerr(fcd->scq, "scq"); */
+/* 		    } */
+/* //		    pret = poll(&poll_list[0], (unsigned long)1, 0); */
+/* //		    printf("AFTER read poll list ret %d, revents = %x\n", pret, poll_list[0].revents); */
+/* 		} while (ret == -FI_EAGAIN); */
+/* 		svc->trace_out(fcd->fabd->cm, "FI_READ Completion op_context is %p, flags %lx, len %ld, buf %p, data %lx\n", */
+/* 		       comp.op_context, comp.flags, comp.len, comp.buf, comp.data); */
+/* 		if (ret == 1) { */
+/* 		    printf("Immediate completion\n"); */
+/* 		    handle_scq_completion(&comp); */
+/* 		} */
 	    }
 	}
-	if (pull->mr) {
+	/* if we get to this point, all pulls must have been submitted. */
+	if (pull->mr_rec) {
 	    int all_done = 1;
 	    for ( i = 0; i < pull->pull_count; i++) {
 		if (pull->pulls[i].status == PULL_COMPLETED) {
@@ -1103,22 +1060,35 @@ handle_completions(fabric_client_data_ptr fabd, fd_set *readset)
 {
     /* everything left should be scq completions */
     int i;
-    for (i=0; i < fabd->nfds; i++) {
-	if (FD_ISSET(i, readset)) {
+    if (readset) {
+	for (i=0; i < fabd->nfds; i++) {
+	    if (FD_ISSET(i, readset)) {
+		int ret;
+		struct fi_cq_data_entry comp;
+		/* Read send queue */
+		fabric_conn_data_ptr fcd = fabd->fcd_array_by_sfd[i];
+		ret = fi_cq_read(fcd->scq, &comp, 1);
+		if (ret < 0 && ret != -FI_EAGAIN) {
+		    FT_PRINTERR("fi_cq_read", ret);
+		    cq_readerr(fcd->scq, "scq");
+		}
+		if (ret == 1) {
+		    handle_scq_completion(&comp);
+		}
+	    }
+	}
+    } else {
+	for (i=0; i < fabd->ncqs; i++) {
 	    int ret;
 	    struct fi_cq_data_entry comp;
 	    /* Read send queue */
-	    fabric_conn_data_ptr fcd = fabd->fcd_array_by_sfd[i];
-	    ret = fi_cq_read(fcd->scq, &comp, 1);
+	    ret = fi_cq_read((struct fid_cq *) fabd->cq_array[i], &comp, 1);
 	    if (ret < 0 && ret != -FI_EAGAIN) {
 		FT_PRINTERR("fi_cq_read", ret);
-		cq_readerr(fcd->scq, "scq");
+		cq_readerr((struct fid_cq *)fabd->cq_array[i], "scq");
 	    }
 	    if (ret == 1) {
-		printf("Async completion \n");
 		handle_scq_completion(&comp);
-	    } else {
-		printf("False async?\n");
 	    }
 	}
     }
@@ -1141,18 +1111,24 @@ pull_thread(fabric_client_data_ptr fabd)
 	/* sleep until something happens, *or* the next pull period begins */ 
 	delay = delay_until_wake(fabd, &now);
 	readset = fabd->readset;
-//	printf("dropping into select, set is %lx\n", *(long*)&readset);
-	select(fabd->nfds+1, &readset, NULL, NULL, &delay);
-//	printf("Fell out of select, set is %lx\n", *(long*)&readset);
-	if (FD_ISSET(fabd->wake_read_fd, &readset)) {
-	    /* read and discard wake byte */
-	    char buffer;
-	    if (read(fabd->wake_read_fd, &buffer, 1) != 1) {
-		perror("wake read failed\n");
+	if (fabd->ncqs == 0) {
+	    /* we're just waiting on wake fd */
+	    select(fabd->nfds+1, &readset, NULL, NULL, &delay);
+	} else if (fi_trywait(fabd->fab, &fabd->cq_array[0], fabd->ncqs) == FI_SUCCESS) {
+	    select(fabd->nfds+1, &readset, NULL, NULL, &delay);
+	    if (FD_ISSET(fabd->wake_read_fd, &readset)) {
+		/* read and discard wake byte */
+		char buffer;
+		if (read(fabd->wake_read_fd, &buffer, 1) != 1) {
+		    perror("wake read failed\n");
+		}
+		FD_CLR(fabd->wake_read_fd, &readset);
 	    }
-	    FD_CLR(fabd->wake_read_fd, &readset);
+	    handle_completions(fabd, &readset);
+	} else {
+	    /* test all CQs */
+	    handle_completions(fabd, NULL);
 	}
-	handle_completions(fabd, &readset);
     }
 //    thread_free_resources;
 }
@@ -1303,7 +1279,6 @@ fabric_accept_conn(void *void_trans, void *void_conn_sock)
 
     CMConnection conn;
     attr_list conn_attr_list = NULL;
-    struct ibparam param;
 
     //ib stuff
     fcd = create_fabric_conn_data(svc);
@@ -1351,12 +1326,6 @@ fabric_accept_conn(void *void_trans, void *void_conn_sock)
 	svc->trace_out(fabd->cm, "Accepted CMFABRIC socket connection from UNKNOWN host");
     }
 
-    //here we read the incoming remote contact port number. 
-    //in IB we'll extend this to include ib connection parameters
-    param.lid  = fabd->lid;
-    param.port = fabd->port;
-    param.psn  = fabd->psn;
-    
     
     if ((ret = fi_control (&fcd->rcq->fid, FI_GETWAIT, (void *) &fd))) {
 	FT_PRINTERR("fi_control(FI_GETWAIT)", ret);
@@ -1443,25 +1412,25 @@ static int client_connect(CManager cm, CMtrans_services svc, transport_entry tra
     int ret, int_port_num;
     struct in_addr dest_ip;
     char *host_name, *host_rep;
+    char *dst_port = NULL;
     int i;
 
     /* Get fabric info */
-    fabd->opts.dst_addr = "localhost";
     if (!get_int_attr(attrs, CM_IP_ADDR,(int*) & dest_ip.s_addr)) {
 	svc->trace_out(cm, "CMFABRIC transport found no IP_ADDR attribute");
     } else {
-	fabd->opts.dst_addr = malloc(16);
+	host_rep = malloc(16);
 	dest_ip.s_addr = htonl(dest_ip.s_addr);
-	sprintf(fabd->opts.dst_addr, "%s", inet_ntoa(dest_ip));
+	sprintf(host_rep, "%s", inet_ntoa(dest_ip));
 
     }
     if (!get_int_attr(attrs, CM_IP_PORT, (int*) & int_port_num)) {
 	svc->trace_out(cm, "CMFABRIC transport found no IP_PORT attribute");
     } else {
-	fabd->opts.dst_port = malloc(10);
-	sprintf(fabd->opts.dst_port, "%d", int_port_num);
+	dst_port = malloc(10);
+	sprintf(dst_port, "%d", int_port_num);
     }
-    svc->trace_out(fabd->cm, "Connecting to addr, %s, port %s\n", fabd->opts.dst_addr, fabd->opts.dst_port);
+    svc->trace_out(fabd->cm, "Connecting to addr, %s, port %s\n", host_rep, dst_port);
     if (!get_string_attr(attrs, CM_IP_HOSTNAME, &host_name)) {
 	svc->trace_out(cm, "CMFABRIC transport found no IP_HOSTNAME attribute");
     } else {
@@ -1474,9 +1443,8 @@ static int client_connect(CManager cm, CMtrans_services svc, transport_entry tra
       /* 	printf("%02x", (unsigned char) host_rep[i]); */
       /* } */
       /* printf(" done\n"); */
-      fabd->opts.dst_addr = host_rep;
     }
-    ret = fi_getinfo(FT_FIVERSION, fabd->opts.dst_addr, fabd->opts.dst_port, 0, fabd->hints, &fi);
+    ret = fi_getinfo(FT_FIVERSION, host_rep, dst_port, 0, fabd->hints, &fi);
     svc->trace_out(cm, "%s return value fi is %s\n", "client", fi_tostr(fi, FI_TYPE_INFO));
     if (ret) {
 	FT_PRINTERR("fi_getinfo", ret);
@@ -2004,15 +1972,53 @@ typedef struct {
 
 MPIDI_OFI_global_t       MPIDI_Global;
 
-static int server_listen(fabric_client_data_ptr fd)
+static int server_listen(fabric_client_data_ptr fd, attr_list listen_info)
 {
     struct fi_info *fi, *prov_use;
     CMtrans_services svc = fd->svc;
     int ret;
+    int port_num, attr_port_num;
+    char *port_str = NULL;
 
-    ret = fi_getinfo(FT_FIVERSION, fd->opts.src_addr, fd->opts.src_port, FI_SOURCE,
-		     fd->hints, &fi);
+//    ret = fi_getinfo(FT_FIVERSION, fd->opts.src_addr, fd->opts.src_port, FI_SOURCE,
+//		     fd->hints, &fi);
+    if (listen_info != NULL
+	&& !get_int_attr(listen_info, CM_IP_PORT, &attr_port_num)) {
+	port_num = 0;
+    } else {
+	if (attr_port_num > USHRT_MAX || attr_port_num < 0) {
+	    fprintf(stderr, "Requested port number %d is invalid\n", attr_port_num);
+	    return 1;
+	}
+	port_str = malloc(10);
+	sprintf(port_str, "%d", attr_port_num);
+    }
 
+    ret = fi_getinfo(FT_FIVERSION, NULL, port_str, FI_SOURCE, fd->hints, &fi);
+
+    if (((struct sockaddr_in *)fi->src_addr)->sin_addr.s_addr == htonl(INADDR_LOOPBACK) &&
+	(strcmp(fi->fabric_attr->prov_name, "verbs") == 0)) {
+	char host_name[256];
+	fi_freeinfo(fi);
+	
+	if (listen_info) {
+	    listen_info = attr_copy_list(listen_info);
+	} else {
+	    listen_info = create_attr_list();
+	}
+	set_string_attr(listen_info, CM_IP_INTERFACE, strdup("ib"));
+	
+	svc->trace_out(fd->cm, "CMFabric begin listen, requested port %d", attr_port_num);
+	get_IP_config(host_name, sizeof(host_name), NULL, NULL, NULL, 
+		      NULL, listen_info, svc->trace_out, (void *)fd->cm);
+	ret = fi_getinfo(FT_FIVERSION, host_name, port_str, FI_SOURCE, fd->hints, &fi);
+	svc->trace_out(fd->cm, "%s return value fi is %s\n", "server", fi_tostr(fi, FI_TYPE_INFO));
+	fd->hostname = strdup(host_name);
+    } else {
+	svc->trace_out(fd->cm, "%s return value fi is %s\n", "server", fi_tostr(fi, FI_TYPE_INFO));
+    }
+    free_attr_list(listen_info);
+	    
     prov_use = fi;
     MPIDI_Global.max_buffered_send  = prov_use->tx_attr->inject_size;
     MPIDI_Global.max_buffered_write = prov_use->tx_attr->inject_size;
@@ -2213,12 +2219,7 @@ libcmfabric_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport
 {
     fabric_client_data_ptr fd = trans->trans_data;
     int wait_sock = -1;
-    int attr_port_num = 0;
-    u_short port_num = 0;
-    int port_range_low, port_range_high;
-    int use_hostname = 0;
-    int IP, ret;
-    char host_name[256];
+    int ret, IP, port_num;
     size_t addrlen;
     struct sockaddr_in local_addr;
 
@@ -2226,73 +2227,16 @@ libcmfabric_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport
 	/* assert CM is locked */
 	assert(CM_LOCKED(svc, cm));
     }
-    /* 
-     *  Check to see if a bind to a specific port was requested
-     */
-    if (listen_info != NULL
-	&& !query_attr(listen_info, CM_IP_PORT,
-		       NULL, (attr_value *)(long) & attr_port_num)) {
-	port_num = 0;
-    } else {
-	if (attr_port_num > USHRT_MAX || attr_port_num < 0) {
-	    fprintf(stderr, "Requested port number %d is invalid\n", attr_port_num);
-	    return NULL;
-	}
-	port_num = attr_port_num;
-    }
-
-    if (listen_info) {
-	listen_info = attr_copy_list(listen_info);
-    } else {
-	listen_info = create_attr_list();
-    }
-    set_string_attr(listen_info, CM_IP_INTERFACE, strdup("ib"));
-
-    svc->trace_out(cm, "CMFabric begin listen, requested port %d", attr_port_num);
-    get_IP_config(host_name, sizeof(host_name), &IP, &port_range_low, &port_range_high, 
-		  &use_hostname, listen_info, svc->trace_out, (void *)cm);
-    fd->opts.src_addr = strdup(host_name);
-    free_attr_list(listen_info);
-
-    if (port_num != 0) {
-	char *port_str = malloc(10);
-	sprintf(port_str, "%d", port_num);
-	fd->opts.src_port = port_str;
-
-	/* specific port requested */
-	if (server_listen(fd) != 0) {
-	    free(port_str);
-	    fprintf(stderr, "Cannot bind INET socket\n");
-	    return NULL;
-	}
-    } else {
-	/* port num is free.  Constrain to range 26000 : 26100 */
-	int low_bound = 26000;
-	int high_bound = 26100;
-	int size = high_bound - low_bound;
-	int tries = 10;
-	int result = SOCKET_ERROR;
-	srand48(time(NULL)+getpid());
-	while (tries > 0) {
-	    int target = low_bound + size * drand48();
-	    char *port_str = malloc(10);
-	    sprintf(port_str, "%d", target);
-	    fd->opts.src_port = port_str;
-	    port_num = target;
-	    svc->trace_out(cm, "CMFABRIC trying to bind port %d", target);
-	    result = server_listen(fd);
-	    tries--;
-	    if (result == 0) tries = 0;
-	}
-	if (result != 0) {
-	    fprintf(stderr, "Cannot bind INET socket\n");
-	    return NULL;
-	}
+    int result = server_listen(fd, listen_info);
+    if (result != 0) {
+	fprintf(stderr, "Cannot bind INET socket\n");
+	return NULL;
     }
 
     addrlen = sizeof(local_addr);
     ret = fi_getname(&fd->listen_ep->fid, (void*)&local_addr, &addrlen);
     IP = ntohl(local_addr.sin_addr.s_addr);
+    port_num = ntohs(local_addr.sin_port);
     if (ret) {
 	FT_PRINTERR("fi_getname", ret);
 	return NULL;
@@ -2313,15 +2257,13 @@ libcmfabric_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport
 		       port_num, wait_sock);
 	ret_list = create_attr_list();
 	
-	fd->hostname = strdup(host_name);
 	fd->listen_port = port_num;
 	add_attr(ret_list, CM_TRANSPORT, Attr_String,
 		 (attr_value) strdup("fabric"));
-	if (use_hostname ||
-	    (cercs_getenv("CMFabricUseHostname") != NULL) || 
+	if ((cercs_getenv("CMFabricUseHostname") != NULL) || 
 	    (cercs_getenv("CM_NETWORK") != NULL)) {
 	    add_attr(ret_list, CM_IP_HOSTNAME, Attr_String,
-		     (attr_value) strdup(host_name));
+		     (attr_value) strdup(fd->hostname));
 	} else if (IP == 0) {
 	    add_attr(ret_list, CM_IP_ADDR, Attr_Int4, 
 		     (attr_value)INADDR_LOOPBACK);
@@ -2612,6 +2554,7 @@ void libcmfabric_LTX_install_pull_schedule(CMtrans_services svc,
 	    fabd->nfds = fabd->wake_read_fd;
 	    FD_SET(fabd->wake_read_fd, &fabd->readset);
 	    fabd->fcd_array_by_sfd = malloc(sizeof(char*));
+	    fabd->cq_array = malloc(sizeof(char*));
 	}
 	svc->add_poll(fabd->cm, (CMPollFunc) check_completed_pull, fabd);
 	pthread_create(&thr, NULL, (void*(*)(void*))&pull_thread, fabd);
@@ -2654,7 +2597,6 @@ libcmfabric_LTX_initialize(CManager cm, CMtrans_services svc)
     fabd->psn = lrand48()%256;
 
     fabd->hints = fi_allocinfo();
-    fabd->opts.src_port = "9228";
     
 //	fabd->hints->cap		= FI_CONTEXT;
     fabd->hints->ep_attr->type	= FI_EP_MSG;
@@ -2671,7 +2613,6 @@ libcmfabric_LTX_initialize(CManager cm, CMtrans_services svc)
     fabd->hints->domain_attr->data_progress    =  FI_PROGRESS_AUTO;
     svc->add_shutdown_task(cm, free_fabric_data, (void *) fabd, FREE_TASK);
     
-    fabd->wake_read_fd = -1;
     fabd->wake_read_fd = -1;
     FD_ZERO(&fabd->readset);
     fabd->nfds = 0;
