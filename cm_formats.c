@@ -24,7 +24,7 @@
 #include "evpath.h"
 #include "cm_internal.h"
 
-static CMFormat add_format_to_cm ARGS((CManager cm, CMFormat format));
+static CMFormat add_format_to_cm(CManager cm, CMFormat format);
 
 CMFormat
 INT_CMlookup_format(CManager cm, FMStructDescList format_list)

@@ -79,8 +79,8 @@ struct_size_field_list(FMFieldList list, int pointer_size)
 }
 
 extern CMFormat
-old_CMregister_format ARGS((CManager cm, char *format_name,
-			    FMFieldList field_list, CMFormatList subformat_list))
+old_CMregister_format(CManager cm, char *format_name,
+		      FMFieldList field_list, CMFormatList subformat_list)
 {
     FMStructDescList structs;
     int sub_count = 0, i;

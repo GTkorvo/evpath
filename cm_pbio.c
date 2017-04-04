@@ -124,10 +124,10 @@ inet_ntoa(struct in_addr ina)
  */
 
 static int
-CMpbio_send_format_request ARGS((char *format_ID, int format_ID_length,
-				 CMConnection conn, int cond));
-static int CM_pbio_query ARGS((CMConnection conn, CMTransport trans,
-			       char *buffer, long length));
+CMpbio_send_format_request(char *format_ID, int format_ID_length,
+			   CMConnection conn, int cond);
+static int CM_pbio_query(CMConnection conn, CMTransport trans,
+			 char *buffer, long length);
 
 static int
 request_in_pending(CManager cm, void *format_ID, int format_id_length)
