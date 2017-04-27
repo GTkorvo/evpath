@@ -94,7 +94,6 @@ typedef struct socket_client_data {
 typedef enum {Block, Non_Block} socket_block_state;
 
 typedef struct socket_connection_data {
-    char *remote_host;
     int remote_IP;
     int remote_contact_port;
     int fd;
@@ -154,7 +153,6 @@ CMtrans_services svc;
     socket_conn_data_ptr socket_conn_data =
     svc->malloc_func(sizeof(struct socket_connection_data));
     memset(socket_conn_data, 0, sizeof(struct socket_connection_data));
-    socket_conn_data->remote_host = NULL;
     socket_conn_data->remote_contact_port = -1;
     socket_conn_data->fd = 0;
     socket_conn_data->block_state = Block;
@@ -278,24 +276,9 @@ void *void_conn_sock;
 	socket_conn_data->remote_IP = ntohl(((struct sockaddr_in *) &sock_addr)->sin_addr.s_addr);
 	add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
 		 (attr_value) (long)socket_conn_data->remote_IP);
-	if (sock_addr.sa_family == AF_INET) {
-	    struct hostent *host;
-	    struct sockaddr_in *in_sock = (struct sockaddr_in *) &sock_addr;
-	    host = gethostbyaddr((char *) &in_sock->sin_addr,
-				 sizeof(struct in_addr), AF_INET);
-	    if (host != NULL) {
-		socket_conn_data->remote_host = strdup(host->h_name);
-		add_attr(conn_attr_list, CM_PEER_HOSTNAME, Attr_String,
-			 (attr_value) strdup(host->h_name));
-	    }
-	}
     }
-    if (socket_conn_data->remote_host != NULL) {
-	svc->trace_out(sd->cm, "Accepted TCP/IP socket connection from host \"%s\"",
-		       socket_conn_data->remote_host);
-    } else {
-	svc->trace_out(sd->cm, "Accepted TCP/IP socket connection from UNKNOWN host");
-    }
+    svc->trace_out(sd->cm, "Accepted TCP/IP socket connection from host at IP %s", 
+		   inet_ntoa(((struct sockaddr_in *) &sock_addr)->sin_addr));
     if (read(sock, (char *) &socket_conn_data->remote_contact_port, 4) != 4) {
 	svc->trace_out(sd->cm, "Remote host dropped connection without data");
 	return;
@@ -325,7 +308,6 @@ socket_conn_data_ptr scd;
     svc->connection_deref(scd->conn);
     svc->fd_remove_select(scd->sd->cm, scd->fd);
     close(scd->fd);
-    free(scd->remote_host);
     free(scd);
 }
 
@@ -497,7 +479,6 @@ attr_list conn_attr_list;
 	}
     }
     svc->trace_out(cm, "--> Connection established");
-    socket_conn_data->remote_host = host_name == NULL ? NULL : strdup(host_name);
     socket_conn_data->remote_IP = remote_IP;
     socket_conn_data->remote_contact_port = int_port_num;
     socket_conn_data->fd = sock;
@@ -512,22 +493,6 @@ attr_list conn_attr_list;
 	     (attr_value) (long)int_port_num);
     add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
 	     (attr_value) (long)socket_conn_data->remote_IP);
-    if (getpeername(sock, &sock_addr.s, &sock_len) == 0) {
-	int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
-	add_attr(conn_attr_list, CM_PEER_CONN_PORT, Attr_Int4,
-		 (attr_value) (long)int_port_num);
-	if (sock_addr.s.sa_family == AF_INET) {
-	    struct hostent *host;
-	    struct sockaddr_in *in_sock = (struct sockaddr_in *) &sock_addr;
-	    host = gethostbyaddr((char *) &in_sock->sin_addr,
-				 sizeof(struct in_addr), AF_INET);
-	    if (host != NULL) {
-		socket_conn_data->remote_host = strdup(host->h_name);
-		add_attr(conn_attr_list, CM_PEER_HOSTNAME, Attr_String,
-			 (attr_value) strdup(host->h_name));
-	    }
-	}
-    }
     return sock;
 }
 
