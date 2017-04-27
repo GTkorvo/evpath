@@ -1520,9 +1520,17 @@ CManager_free(CManager cm)
  INT_CMinitiate_conn(CManager cm, attr_list attrs)
  {
      CMConnection conn;
+     struct timeval t0,t1,diff;
      if (!cm->initialized) CMinitialize(cm);
+     if (CMtrace_on(cm, CMConnectionVerbose)) {
+	 gettimeofday(&t0, NULL);
+	 fprintf(cm->CMTrace_file,"Doing CMinitiate_conn\n");
+     }
      conn = CMinternal_initiate_conn(cm, attrs);
      if (CMtrace_on(cm, CMConnectionVerbose)) {
+	 gettimeofday(&t1, NULL);
+	 timersub(&t1, &t0, &diff);
+	 fprintf(cm->CMTrace_file, "In CMinitiate_conn, connection took <%ld.%06d> secs\n", diff.tv_sec, diff.tv_usec);
 	 fprintf(cm->CMTrace_file, "CMinitiate_conn returning ");
 	 if (conn != NULL) {
 	     fdump_CMConnection(cm->CMTrace_file, conn);
@@ -1554,20 +1562,33 @@ CManager_free(CManager cm)
      }
      for (i=0; i<cm->connection_count; i++) {
 	 CMConnection tmp = cm->connections[i];
+	 fprintf(stderr, "In CMinternal_get_conn, comparing to");
+	 if (attrs) fdump_attr_list(stderr, attrs); else fprintf(stderr, "\n");
 	 if (tmp->closed || tmp->failed) continue;
 	 if (tmp->trans->connection_eq(cm, &CMstatic_trans_svcs,
 					tmp->trans, attrs,
 					tmp->transport_data)) {
 
+	     fprintf(stderr, "Match!\n");
 	     CMtrace_out(tmp->cm, CMFreeVerbose, "internal_get_conn found conn=%p ref count will be %d\n", 
 			 tmp, tmp->conn_ref_count +1);
 	     tmp->conn_ref_count++;
 	     conn = tmp;
 	     break;
 	 }
+	     fprintf(stderr, "NO Match!\n");
      }
      if (conn == NULL) {
+	 if (CMtrace_on(cm, CMConnectionVerbose)) {
+	     fprintf(cm->CMTrace_file, "In CMinternal_get_conn, no existing connection found, initiating\n");
+	 }
+	 struct timeval t0,t1,diff; gettimeofday(&t0, NULL);
 	 conn = CMinternal_initiate_conn(cm, attrs);
+	 if (CMtrace_on(cm, CMConnectionVerbose)) {
+	     gettimeofday(&t1, NULL);
+	     timersub(&t1, &t0, &diff);
+	     fprintf(cm->CMTrace_file, "In CMinternal_get_conn, connection complete took <%ld.%06d> secs\n", diff.tv_sec, diff.tv_usec);
+	 }
 	 if (conn) {
 	     CMtrace_out(conn->cm, CMFreeVerbose, "internal_get_conn initiated connection %p ref count now %d\n", 
 			 conn, conn->conn_ref_count);
@@ -3738,7 +3759,7 @@ INT_CMinstall_pull_schedule(CManager cm, struct timeval *base_time,
     cm->avail = sorted;
     transport_entry *trans_list;
     trans_list = cm->transports;
-    CMtrace_out(cm, CMTransportVerbose, "CM installed pull schedule with period %ld secs, %ld usecs\n", period->tv_sec, period->tv_usec);
+    CMtrace_out(cm, CMTransportVerbose, "CM installed pull schedule with period %ld secs, %ld usecs\n", period->tv_sec, (long) period->tv_usec);
     while ((trans_list != NULL) && (*trans_list != NULL)) {
 	if ((*trans_list)->install_pull_schedule_func) {
 	    (*trans_list)->install_pull_schedule_func(&CMstatic_trans_svcs,
