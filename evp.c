@@ -2405,6 +2405,7 @@ INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list
     event_path_data evp = cm->evp;
     stone_type stone;
     int action_num;
+    CMConnection conn = NULL;
 
     stone = stone_struct(evp, stone_num);
     if (!stone) return -1;
@@ -2416,6 +2417,24 @@ INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list
 	fprint_stone_identifier(cm->CMTrace_file, evp, stone_num);
 	fprintf(cm->CMTrace_file, " remote stone target is %x\n", remote_stone);
     }
+    if (getenv("NoLazyBridge")) {
+        conn = INT_CMget_conn(cm, contact_list);
+        if (conn == NULL) {
+            if (CMtrace_on(cm, EVWarning)) {
+                fprintf(cm->CMTrace_file, "EVassoc_bridge_action - failed to contact host at contact point \n\t");
+                if (contact_list != NULL) {
+                    fdump_attr_list(cm->CMTrace_file, contact_list);
+                } else {
+                    fprintf(cm->CMTrace_file, "NULL\n");
+                }
+                fprintf(cm->CMTrace_file, "Bridge action association failed for stone %x, outputting to remote stone %x\n",
+                        stone_num, remote_stone);
+            }
+            return -1;
+        }
+        INT_CMconn_register_close_handler(conn, stone_close_handler, 
+                                          (void*)(long)stone_num);
+    }
     stone->proto_actions = realloc(stone->proto_actions, 
 				   (action_num + 1) * 
 				   sizeof(stone->proto_actions[0]));
@@ -2424,6 +2443,7 @@ INT_EVassoc_bridge_action(CManager cm, EVstone stone_num, attr_list contact_list
     stone->proto_actions[action_num].action_type = Action_Bridge;
     stone->proto_actions[action_num].o.bri.remote_stone_id = remote_stone;
     stone->proto_actions[action_num].o.bri.remote_contact = contact_list;
+    stone->proto_actions[action_num].o.bri.conn = conn;
     stone->default_action = action_num;
     stone->proto_action_count++;
     clear_response_cache(stone);
