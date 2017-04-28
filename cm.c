@@ -1562,21 +1562,19 @@ CManager_free(CManager cm)
      }
      for (i=0; i<cm->connection_count; i++) {
 	 CMConnection tmp = cm->connections[i];
-	 fprintf(stderr, "In CMinternal_get_conn, comparing to");
-	 if (attrs) fdump_attr_list(stderr, attrs); else fprintf(stderr, "\n");
 	 if (tmp->closed || tmp->failed) continue;
 	 if (tmp->trans->connection_eq(cm, &CMstatic_trans_svcs,
 					tmp->trans, attrs,
 					tmp->transport_data)) {
 
-	     fprintf(stderr, "Match!\n");
 	     CMtrace_out(tmp->cm, CMFreeVerbose, "internal_get_conn found conn=%p ref count will be %d\n", 
+			 tmp, tmp->conn_ref_count +1);
+	     CMtrace_out(tmp->cm, CMConnectionVerbose, "internal_get_conn found conn=%p ref count will be %d\n", 
 			 tmp, tmp->conn_ref_count +1);
 	     tmp->conn_ref_count++;
 	     conn = tmp;
 	     break;
 	 }
-	     fprintf(stderr, "NO Match!\n");
      }
      if (conn == NULL) {
 	 if (CMtrace_on(cm, CMConnectionVerbose)) {
