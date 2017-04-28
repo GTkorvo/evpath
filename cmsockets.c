@@ -122,8 +122,9 @@ static atom_t CM_IP_PORT = -1;
 static atom_t CM_IP_HOSTNAME = -1;
 static atom_t CM_IP_ADDR = -1;
 
+static int do_timing = 0;
 #define TIMING_GUARD_START {     struct timeval t0,t1,diff; gettimeofday(&t0, NULL);
-#define TIMING_GUARD_STOP gettimeofday(&t1, NULL);    timersub(&t1, &t0, &diff); if (diff.tv_sec > 0) if(getenv("TIMING"))fprintf(stderr, "TIME GUARD at %s:%d exceeded, time was was <%ld.%06d> secs\n", __FILE__, __LINE__, diff.tv_sec, diff.tv_usec);}
+#define TIMING_GUARD_STOP gettimeofday(&t1, NULL);    timersub(&t1, &t0, &diff); if (diff.tv_sec > 0) if(do_timing)fprintf(stderr, "TIME GUARD at %s:%d exceeded, time was was <%ld.%06d> secs\n", __FILE__, __LINE__, diff.tv_sec, diff.tv_usec);}
 
 static int
 check_host(hostname, sin_addr)
@@ -544,6 +545,7 @@ attr_list attrs;
     int sock;
     socket_client_data_ptr sd = trans->trans_data;
 
+    if (getenv("TIMING")) do_timing = 1;
     if (sd->cm) {
 	/* assert CM is locked */
 	assert(CM_LOCKED(svc, sd->cm));
@@ -1021,14 +1023,19 @@ attr_list attrs;
     int left = 0;
     int iget = 0;
     int iovleft, i;
+    struct timeval start, stop, diff;
     iovleft = iovcnt;
     struct iovec * iov = (struct iovec*) iovs;
     /* sum lengths */
+    int orig_len;
     for (i = 0; i < iovcnt; i++)
 	left += iov[i].iov_len;
 
+    orig_len = left;
     svc->trace_out(scd->sd->cm, "CMSocket writev of %d bytes on fd %d",
 		   left, fd);
+
+    if (do_timing) gettimeofday(&start, NULL);
     while (left > 0) {
 	int write_count = iovleft;
 	if (write_count > IOV_MAX)
@@ -1050,6 +1057,28 @@ attr_list attrs;
 	    }
 	}
 	if (iget == left) {
+	    if (do_timing) {
+		gettimeofday(&stop, NULL);
+		timersub(&stop, &start, &diff);
+		if (diff.tv_sec > 0) {
+		    time_t nowtime;
+		    struct tm *nowtm;
+		    char tmbuf[64], start_buf[64], stop_buf[64];
+
+		    nowtime = start.tv_sec;
+		    nowtm = localtime(&nowtime);
+		    strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", nowtm);
+		    snprintf(start_buf, sizeof(start_buf), "%s.%06ld", tmbuf, (long)start.tv_usec);
+
+		    nowtime = stop.tv_sec;
+		    nowtm = localtime(&nowtime);
+		    strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", nowtm);
+		    snprintf(stop_buf, sizeof(stop_buf), "%s.%06ld", tmbuf, (long)stop.tv_usec);
+
+		    fprintf(stderr, "TIME GUARD in writev() at %s:%d exceeded, time was was <%ld.%06d> secs\n", __FILE__, __LINE__, diff.tv_sec, diff.tv_usec);
+		    fprintf(stderr, "Original write length was %d bytes, start time was %s, end was %s\n", orig_len, start_buf, stop_buf);
+		}
+	    }
 	    return iovcnt;
 	}
 	svc->trace_out(scd->sd->cm, "	writev partial success, %d bytes written", iget);
