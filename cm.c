@@ -1530,7 +1530,7 @@ CManager_free(CManager cm)
      if (CMtrace_on(cm, CMConnectionVerbose)) {
 	 gettimeofday(&t1, NULL);
 	 timersub(&t1, &t0, &diff);
-	 fprintf(cm->CMTrace_file, "In CMinitiate_conn, connection took <%ld.%06d> secs\n", diff.tv_sec, diff.tv_usec);
+	 fprintf(cm->CMTrace_file, "In CMinitiate_conn, connection took <%ld.%06ld> secs\n", (long)diff.tv_sec, (long)diff.tv_usec);
 	 fprintf(cm->CMTrace_file, "CMinitiate_conn returning ");
 	 if (conn != NULL) {
 	     fdump_CMConnection(cm->CMTrace_file, conn);
@@ -1585,7 +1585,7 @@ CManager_free(CManager cm)
 	 if (CMtrace_on(cm, CMConnectionVerbose)) {
 	     gettimeofday(&t1, NULL);
 	     timersub(&t1, &t0, &diff);
-	     fprintf(cm->CMTrace_file, "In CMinternal_get_conn, connection complete took <%ld.%06d> secs\n", diff.tv_sec, diff.tv_usec);
+	     fprintf(cm->CMTrace_file, "In CMinternal_get_conn, connection complete took <%ld.%06ld> secs\n", (long)diff.tv_sec, (long)diff.tv_usec);
 	 }
 	 if (conn) {
 	     CMtrace_out(conn->cm, CMFreeVerbose, "internal_get_conn initiated connection %p ref count now %d\n", 
