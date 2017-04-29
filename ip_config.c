@@ -425,6 +425,7 @@ get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int
 
     if (first_call) {
 	char *preferred_hostname = getenv("CM_HOSTNAME");
+	char *preferred_IP = getenv("CM_IP");
 	char *port_range = getenv("CM_PORT_RANGE");
 	CM_IP_INTERFACE = attr_atom_from_string("IP_INTERFACE");
 	CM_IP_PORT = attr_atom_from_string("IP_PORT");
@@ -432,7 +433,16 @@ get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int
 	first_call = 0;
 	determined_hostname[0] = 0;
 	
-	if (preferred_hostname != NULL) {
+	if (preferred_IP != NULL) {
+	    struct in_addr addr;
+	    if (preferred_hostname) printf("Warning, CM_HOSTNAME and CM_IP are both set, preferring CM_IP\n");
+	    if (inet_aton(preferred_IP, &addr) == 0) {
+		fprintf(stderr, "Invalid address %s specified for CM_IP\n", preferred_IP);
+	    } else {
+		trace_func(trace_data, "CM IP_CONFIG Using IP specified in CM_IP, %s", preferred_IP);
+		determined_IP =  (ntohl(addr.s_addr));
+	    }
+	} else if (preferred_hostname != NULL) {
 	    struct hostent *host;
 	    use_hostname = 1;
 	    trace_func(trace_data, "CM<IP_CONFIG> CM_HOSTNAME set to \"%s\", running with that.", preferred_hostname);
