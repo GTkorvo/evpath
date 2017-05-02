@@ -291,8 +291,13 @@ TIMING_GUARD_START
 		 (attr_value) (long)socket_conn_data->remote_IP);
     }
 TIMING_GUARD_STOP
-    svc->trace_out(sd->cm, "Accepted TCP/IP socket connection from host at IP %s", 
-		   inet_ntoa(((struct sockaddr_in *) &sock_addr)->sin_addr));
+    {
+        char str[INET_ADDRSTRLEN];
+
+	inet_ntop(AF_INET, &(sock_addr.sa_data), str, INET_ADDRSTRLEN);
+	svc->trace_out(sd->cm, "Accepted TCP/IP socket connection from host at IP %s", 
+		       str);
+    }
 TIMING_GUARD_START
     if (read(sock, (char *) &socket_conn_data->remote_contact_port, 4) != 4) {
 	svc->trace_out(sd->cm, "Remote host dropped connection without data");
