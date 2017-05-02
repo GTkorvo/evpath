@@ -294,7 +294,7 @@ TIMING_GUARD_STOP
     {
         char str[INET_ADDRSTRLEN];
 
-	inet_ntop(AF_INET, &(sock_addr.sa_data), str, INET_ADDRSTRLEN);
+        inet_ntop(AF_INET, &((struct sockaddr_in *) &sock_addr)->sin_addr, str, INET_ADDRSTRLEN);
 	svc->trace_out(sd->cm, "Accepted TCP/IP socket connection from host at IP %s", 
 		       str);
     }
@@ -434,6 +434,8 @@ TIMING_GUARD_STOP
 #endif
     } else {
 	/* INET socket connection, host_name is the machine name */
+        char ip_str[INET_ADDRSTRLEN];
+
 TIMING_GUARD_START
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR) {
 	    svc->trace_out(cm, " CMSocket connect FAILURE --> Couldn't create socket");
@@ -468,9 +470,9 @@ TIMING_GUARD_STOP
 	if (is_private_10(remote_IP)) {
 	    svc->trace_out(cm, "Target IP is on a private 10.x.x.x network");
 	}
+        inet_ntop(AF_INET, &sock_addr.s_I4.sin_addr, ip_str, INET_ADDRSTRLEN);
 	svc->trace_out(cm, "Attempting TCP/IP socket connection, host=\"%s\", IP = %s, port %d",
-		       host_name == 0 ? "(unknown)" : host_name, 
-		       inet_ntoa(sock_addr.s_I4.sin_addr),
+		       host_name == 0 ? "(unknown)" : host_name, ip_str,
 		       ntohs(sock_addr.s_I4.sin_port));
 TIMING_GUARD_START
 	if (connect(sock, (struct sockaddr *) &sock_addr,
@@ -480,7 +482,7 @@ TIMING_GUARD_START
 	    if (err != WSAEWOULDBLOCK || err != WSAEINPROGRESS) {
 #endif
 		printf("Errno was %d\n", errno);
-		svc->trace_out(cm, "CMSocket connect FAILURE --> Connect() to IP %s failed", inet_ntoa(sock_addr.s_I4.sin_addr));
+		svc->trace_out(cm, "CMSocket connect FAILURE --> Connect() to IP %s failed", ip_str);
 		close(sock);
 #ifdef WSAEWOULDBLOCK
 	    }

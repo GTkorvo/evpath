@@ -113,11 +113,10 @@ get_self_ip_iface(CMTransport_trace trace_func, void* trace_data, char *interfac
 	    for (p = host->h_addr_list; *p != 0; p++) {
 		struct in_addr *in = *(struct in_addr **) p;
 		if (!ipv4_is_loopback(ntohl(in->s_addr))) {
-		    trace_func(trace_data, "CM<IP_CONFIG> Prefer IP associated with hostname net -> %d.%d.%d.%d",
-			       *((unsigned char *) &in->s_addr),
-			       *(((unsigned char *) &in->s_addr) + 1),
-			       *(((unsigned char *) &in->s_addr) + 2),
-			       *(((unsigned char *) &in->s_addr) + 3));
+		    char str[INET_ADDRSTRLEN];
+					      
+		    inet_ntop(AF_INET, &(in->s_addr), str, sizeof(str));
+		    trace_func(trace_data, "CM<IP_CONFIG> Prefer IP associated with hostname net -> %s", str);
 		    free(if_addrs);
 		    return (ntohl(in->s_addr));
 		}
@@ -150,12 +149,11 @@ get_self_ip_iface(CMTransport_trace trace_func, void* trace_data, char *interfac
 	for (p = host->h_addr_list; *p != 0; p++) {
 	    struct in_addr *in = *(struct in_addr **) p;
 	    if (!ipv4_is_loopback(ntohl(in->s_addr))) {
-		trace_func(trace_data, "CM<IP_CONFIG> - Get self IP addr %lx, net %d.%d.%d.%d",
-			   ntohl(in->s_addr),
-			   *((unsigned char *) &in->s_addr),
-			   *(((unsigned char *) &in->s_addr) + 1),
-			   *(((unsigned char *) &in->s_addr) + 2),
-				   *(((unsigned char *) &in->s_addr) + 3));
+	        char str[INET_ADDRSTRLEN];
+					      
+		inet_ntop(AF_INET, &(in->s_addr), str, sizeof(str));
+		trace_func(trace_data, "CM<IP_CONFIG> - Get self IP addr %lx, net %s",
+			   ntohl(in->s_addr), str);
 		return (ntohl(in->s_addr));
 	    }
 	}
@@ -177,6 +175,7 @@ get_self_ip_iface(CMTransport_trace trace_func, void* trace_data, char *interfac
 	ifr = ifaces.ifc_req;
 	ifrn = ifaces.ifc_len / sizeof(struct ifreq);
 	for (; ifrn--; ifr++) {
+	    char str[INET_ADDRSTRLEN];
 	    /*
 	     * Basically we'll take the first interface satisfying 
 	     * the following: 
@@ -209,12 +208,10 @@ get_self_ip_iface(CMTransport_trace trace_func, void* trace_data, char *interfac
 	    if (sai->sin_addr.s_addr == INADDR_LOOPBACK)
 		continue;
 	    rv = ntohl(sai->sin_addr.s_addr);
-	    trace_func(trace_data, "CM<IP_CONFIG> - Get self IP addr DHCP %lx, net %d.%d.%d.%d",
-		       ntohl(sai->sin_addr.s_addr),
-		       *((unsigned char *) &sai->sin_addr.s_addr),
-		       *(((unsigned char *) &sai->sin_addr.s_addr) + 1),
-		       *(((unsigned char *) &sai->sin_addr.s_addr) + 2),
-		       *(((unsigned char *) &sai->sin_addr.s_addr) + 3));
+					      
+	    inet_ntop(AF_INET, &(sai->sin_addr.s_addr), str, sizeof(str));
+	    trace_func(trace_data, "CM<IP_CONFIG> - Get self IP addr DHCP %lx, net %s",
+		       ntohl(sai->sin_addr.s_addr), str);
 	    break;
 	}
     }
@@ -316,13 +313,12 @@ get_qual_hostname(char *buf, int len, attr_list attrs,
 	for (p = host->h_addr_list; *p != 0; p++) {
 	    struct in_addr *in = *(struct in_addr **) p;
 	    if (!ipv4_is_loopback(ntohl(in->s_addr))) {
+	        char str[INET_ADDRSTRLEN];
 		good_addr++;
-		trace_func(trace_data, "CM<IP_CONFIG> - Hostname gets good addr %lx, %d.%d.%d.%d",
-			   ntohl(in->s_addr),
-			   *((unsigned char *) &in->s_addr),
-			   *(((unsigned char *) &in->s_addr) + 1),
-			   *(((unsigned char *) &in->s_addr) + 2),
-			   *(((unsigned char *) &in->s_addr) + 3));
+					      
+		inet_ntop(AF_INET, &(in->s_addr), str, sizeof(str));
+		trace_func(trace_data, "CM<IP_CONFIG> - Hostname gets good addr %lx, %s",
+			   ntohl(in->s_addr), str);
 	    }
 	}
 	if (good_addr == 0) {
@@ -391,10 +387,10 @@ get_qual_hostname(char *buf, int len, attr_list attrs,
 	IP.s_addr = htonl(get_self_ip_addr(trace_func, trace_data));
 	if (IP.s_addr != 0) {
 	    struct in_addr ip;
-	    char *tmp;
 	    ip.s_addr = htonl(get_self_ip_addr(trace_func, trace_data));
-	    tmp = inet_ntoa(ip);
-	    strncpy(buf, tmp, len);
+	    if (!inet_ntop(AF_INET, &(ip.s_addr), buf, len)) {
+	        trace_func(trace_data, "inet_ntop failed\n");
+	    }
 	} else {
 	    static int warn_once = 0;
 	    if (warn_once == 0) {
@@ -455,11 +451,10 @@ get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int
 		for (p = host->h_addr_list; *p != 0; p++) {
 		    struct in_addr *in = *(struct in_addr **) p;
 		    if (!ipv4_is_loopback(ntohl(in->s_addr))) {
-			trace_func(trace_data, "CM IP_CONFIG Prefer IP associated with hostname net -> %d.%d.%d.%d",
-				   *((unsigned char *) &in->s_addr),
-				   *(((unsigned char *) &in->s_addr) + 1),
-				   *(((unsigned char *) &in->s_addr) + 2),
-				   *(((unsigned char *) &in->s_addr) + 3));
+		        char str[INET_ADDRSTRLEN];
+					      
+			inet_ntop(AF_INET, &(in->s_addr), str, sizeof(str));
+			trace_func(trace_data, "CM IP_CONFIG Prefer IP associated with hostname net -> %s", str);
 			determined_IP  = (ntohl(in->s_addr));
 		    }
 		}
