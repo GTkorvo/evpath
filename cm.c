@@ -517,7 +517,7 @@ CMinternal_listen(CManager cm, attr_list listen_info, int try_others)
     char *chosen_transport = NULL;
 
     if (listen_info) {
-	listen_info = split_transport_attributes(attr_copy_list(listen_info));
+        listen_info = split_transport_attributes(listen_info);
 	get_string_attr(listen_info, CM_TRANSPORT, &chosen_transport);
     }
     if (chosen_transport != NULL) {
