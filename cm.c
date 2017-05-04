@@ -505,6 +505,7 @@ split_transport_attributes(attr_list list)
 	    params = next_param;
 	}
 	free(old_transport);  /* not free'd by replace */
+	free_attr_list(list);
 	list = new_list;
     }
     return list;
@@ -517,7 +518,7 @@ CMinternal_listen(CManager cm, attr_list listen_info, int try_others)
     char *chosen_transport = NULL;
 
     if (listen_info) {
-        listen_info = split_transport_attributes(listen_info);
+        listen_info = split_transport_attributes(attr_copy_list(listen_info));
 	get_string_attr(listen_info, CM_TRANSPORT, &chosen_transport);
     }
     if (chosen_transport != NULL) {
@@ -531,7 +532,10 @@ CMinternal_listen(CManager cm, attr_list listen_info, int try_others)
 	    CMtrace_out(cm, CMTransportVerbose,
 			"Failed to load transport \"%s\".  Revert to default.\n",
 			chosen_transport);
-	    if (!try_others) return success;
+	    if (!try_others) {
+		if (listen_info) free_attr_list(listen_info);
+		return success;
+	    }
 	    chosen_transport = NULL;
 	}
     }
@@ -554,6 +558,7 @@ CMinternal_listen(CManager cm, attr_list listen_info, int try_others)
 	}
 	trans_list++;
     }
+    if (listen_info) free_attr_list(listen_info);
     return success;
 }
 
@@ -1454,7 +1459,7 @@ CManager_free(CManager cm)
      assert(CManager_locked(cm));
 
      if (attrs) {
-	 attrs = split_transport_attributes(attrs);
+	 attrs = split_transport_attributes(attr_copy_list(attrs));
 	 get_string_attr(attrs, CM_TRANSPORT, &chosen_transport);
      }
      if (chosen_transport != NULL) {
@@ -1473,7 +1478,10 @@ CManager_free(CManager cm)
 	 while ((trans_list != NULL) && (*trans_list != NULL)) {
 	     CMConnection conn;
 	     conn = try_conn_init(cm, *trans_list, attrs);
-	     if (conn != NULL) return conn;
+	     if (conn != NULL) {
+		 if (attrs) free_attr_list(attrs);
+		 return conn;
+	     }
 	     trans_list++;
 	 }
      } else {
@@ -1482,16 +1490,20 @@ CManager_free(CManager cm)
 		     chosen_transport);
 	 while ((trans_list != NULL) && (*trans_list != NULL)) {
 	     if (strcmp((*trans_list)->trans_name, chosen_transport) == 0) {
-		 return try_conn_init(cm, *trans_list, attrs);
+		 CMConnection conn = try_conn_init(cm, *trans_list, attrs);
+		 if (attrs) free_attr_list(attrs);
+		 return conn;
 	     }
 	     trans_list++;
 	 }
 	 CMtrace_out(cm, CMConnectionVerbose,
 		     "INT_CMinitiate_conn transport \"%s\" not found - no connection\n", 
 		     chosen_transport);
+	 if (attrs) free_attr_list(attrs);
 	 return NULL;
      }
 
+     if (attrs) free_attr_list(attrs);
      return NULL;
  }
 
