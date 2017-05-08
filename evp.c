@@ -282,6 +282,7 @@ INT_EVfree_stone(CManager cm, EVstone stone_num)
     int i;
 
     stone = stone_struct(evp, stone_num);
+    CMtrace_out(cm, CMFreeVerbose, "Freeing stone %d\n", stone_num);
     if (stone == NULL) return;
     if (stone->local_id == -1) return;
     if (stone->periodic_handle != NULL) {
@@ -2090,6 +2091,7 @@ do_bridge_action(CManager cm, int s)
     if ((act->o.bri.conn == NULL) && !act->o.bri.conn_failed) {
         attr_list contact_list = act->o.bri.remote_contact;
         CMConnection conn = INT_CMget_conn(cm, contact_list);
+        CMtrace_out(cm, CMFreeVerbose, "Getting connection %p for stone %d\n", conn, s);
         if (conn == NULL) {
             if (CMtrace_on(cm, EVWarning)) {
                 fprintf(cm->CMTrace_file, "EVassoc_bridge_action - failed to contact host at contact point \n\t");

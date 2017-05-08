@@ -1206,6 +1206,7 @@ CManager_free(CManager cm)
 	 CMtrace_out(conn->cm, CMFreeVerbose, "Calling connection failed with no dereference %p\n", conn);
 	 CMConnection_failed(conn);
      }
+     CMtrace_out(conn->cm, CMFreeVerbose, "CM - Dereference connection %p FREEING\n", (void*)conn);
      if (conn->write_callbacks) INT_CMfree(conn->write_callbacks);
      INT_CMfree(conn->preloaded_formats);
      INT_CMfree_attr_list(conn->cm, conn->attrs);
@@ -1557,9 +1558,7 @@ CManager_free(CManager cm)
  INT_CMConnection_add_reference(CMConnection conn)
  {
      conn->conn_ref_count++;
-     if (CMtrace_val[CMFreeVerbose]) {
-	 printf("Add reference to connection %p, value is now %d\n", conn, conn->conn_ref_count);
-     }
+     CMtrace_out(conn->cm, CMFreeVerbose, "Add reference to connection %p, value is now %d\n", conn, conn->conn_ref_count);
  }
 
  CMConnection
