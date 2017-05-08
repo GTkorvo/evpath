@@ -2088,10 +2088,25 @@ do_bridge_action(CManager cm, int s)
 	    act = &stone->proto_actions[a];
 	}
     }
-    if ((act->o.bri.conn == NULL) && !act->o.bri.conn_failed) {
+    if (act->o.bri.conn_failed) return 0;
+    if (act->o.bri.conn == NULL) {
         attr_list contact_list = act->o.bri.remote_contact;
         CMConnection conn = INT_CMget_conn(cm, contact_list);
-        CMtrace_out(cm, CMFreeVerbose, "Getting connection %p for stone %d\n", conn, s);
+	if (act->o.bri.conn != NULL) {
+	    /*
+	     *  INT_CMget_conn() isn't synchronous.  
+	     *  Someone else might do the same CMget_conn() too.  That isn't 
+	     *  a problem, *unless* that someone else is this routine and 
+	     *  they have done this and stored the result since we checked 
+	     *  for o.bri.conn was NULL.  If they have, and it's now not NULL,
+	     *  don't overwrite that value, just use it, but kill the extra 
+	     *  reference count.  
+	     */
+	    INT_CMConnection_dereference(conn);
+	    conn = act->o.bri.conn;
+	} else {
+	    act->o.bri.conn = conn;
+	}
         if (conn == NULL) {
             if (CMtrace_on(cm, EVWarning)) {
                 fprintf(cm->CMTrace_file, "EVassoc_bridge_action - failed to contact host at contact point \n\t");
@@ -2108,7 +2123,6 @@ do_bridge_action(CManager cm, int s)
         }
         INT_CMconn_register_close_handler(conn, stone_close_handler, 
                                           (void*)(long)s);
-        act->o.bri.conn = conn;
     }
     while (stone->queue->queue_head != NULL) {
 	int ret = 1;
