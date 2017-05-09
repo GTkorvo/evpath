@@ -2193,6 +2193,7 @@ do_bridge_action(CManager cm, int s)
 	    }
 	    if (act->o.bri.conn != NULL)  {
 		CMtrace_out(cm, CMFreeVerbose, "Closing and dereferencing conn after write failure %p\n", act->o.bri.conn);
+                INT_CMConnection_failed(act->o.bri.conn);
 		INT_CMConnection_close(act->o.bri.conn);
 	    }
 	    act->o.bri.conn_failed = 1;

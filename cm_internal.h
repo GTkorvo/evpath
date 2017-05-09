@@ -545,6 +545,8 @@ INT_CMwrite_raw_notify(CMConnection conn, FFSEncodeVector full_vec, FFSEncodeVec
 		       CMcompletion_notify_func notify_func, void *notify_client_data);
 extern void
 INT_CMConnection_dereference(CMConnection conn);
+extern void INT_CMConnection_failed (CMConnection conn);
+
 extern FMContext INT_CMget_FMcontext(CManager cm);
 extern void INT_CMinstall_perf_upcall(CManager cm, CMperf_upcall upcall);
 extern attr_list INT_CMtest_transport(CMConnection conn, attr_list how);
