@@ -1931,7 +1931,7 @@ CManager_free(CManager cm)
 	 conn->buffer_data_end = 0;
      }
   start_read:
-     if (conn->closed) {
+     if (conn->failed) {
 	 return;
      }
      if (buffer_full_point == 0) {
@@ -2338,7 +2338,6 @@ CManager_free(CManager cm)
      base = buffer + header_len;
      if (handshake) {
 	 CMdo_handshake(conn, handshake_version, byte_swap, base);
-	 conn->cm->abort_read_ahead = 1;
 	 return 0;
      }
      if (checksum != 0) {
