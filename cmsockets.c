@@ -132,9 +132,7 @@ char *hostname;
 void *sin_addr;
 {
     struct hostent *host_addr;
-TIMING_GUARD_START
     host_addr = gethostbyname(hostname);
-TIMING_GUARD_STOP
     if (host_addr == NULL) {
 	struct in_addr addr;
 	if (inet_aton(hostname, &addr) == 0) {
@@ -238,16 +236,13 @@ void *void_conn_sock;
     svc->trace_out(sd->cm, "Trying to accept something, socket %d\n", conn_sock);
     linger_val.l_onoff = 1;
     linger_val.l_linger = 60;
-TIMING_GUARD_START
     if ((sock = accept(conn_sock, (struct sockaddr *) 0, (unsigned int *) 0)) == SOCKET_ERROR) {
 	perror("Cannot accept socket connection");
 	svc->fd_remove_select(sd->cm, conn_sock);
 	fprintf(stderr, "failure in CMsockets  removing socket connection\n");
 	return;
     }
-TIMING_GUARD_STOP
     sock_opt_val = 1;
-TIMING_GUARD_START
     setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &sock_opt_val,
 	       sizeof(sock_opt_val));
     if (setsockopt(sock, SOL_SOCKET, SO_LINGER, (char *) &linger_val,
@@ -259,7 +254,6 @@ TIMING_GUARD_START
     setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &delay_value,
 	       sizeof(delay_value));
 #endif
-TIMING_GUARD_STOP
     socket_conn_data = create_socket_conn_data(svc);
     socket_conn_data->sd = sd;
     socket_conn_data->fd = sock;
@@ -272,16 +266,13 @@ TIMING_GUARD_STOP
 
     sock_len = sizeof(sock_addr);
     memset(&sock_addr, 0, sock_len);
-TIMING_GUARD_START
     getsockname(sock, (struct sockaddr *) &sock_addr, &sock_len);
-TIMING_GUARD_STOP
     int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
     add_attr(conn_attr_list, CM_THIS_CONN_PORT, Attr_Int4,
 	     (attr_value) (long)int_port_num);
 
     memset(&sock_addr, 0, sizeof(sock_addr));
     sock_len = sizeof(sock_addr);
-TIMING_GUARD_START
     if (getpeername(sock, &sock_addr, &sock_len) == 0) {
 	int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
 	add_attr(conn_attr_list, CM_PEER_CONN_PORT, Attr_Int4,
@@ -290,7 +281,6 @@ TIMING_GUARD_START
 	add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
 		 (attr_value) (long)socket_conn_data->remote_IP);
     }
-TIMING_GUARD_STOP
     {
         char str[INET_ADDRSTRLEN];
 
@@ -298,12 +288,10 @@ TIMING_GUARD_STOP
 	svc->trace_out(sd->cm, "Accepted TCP/IP socket connection from host at IP %s", 
 		       str);
     }
-TIMING_GUARD_START
     if (read(sock, (char *) &socket_conn_data->remote_contact_port, 4) != 4) {
 	svc->trace_out(sd->cm, "Remote host dropped connection without data");
 	return;
     }
-TIMING_GUARD_STOP
     socket_conn_data->remote_contact_port =
 	ntohs(socket_conn_data->remote_contact_port);
     add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
@@ -422,12 +410,10 @@ attr_list conn_attr_list;
 	}
 	sock_addru.sun_family = AF_UNIX;
 	strcpy(sock_addru.sun_path, host_name);
-TIMING_GUARD_START
 	if (connect(sock, (struct sockaddr *) &sock_addru,
 		    sizeof sock_addru) < 0) {
 	    return -1;
 	}
-TIMING_GUARD_STOP
 #else
 	fprintf(stderr, "socket initiate_conn port_num parameter == -1 and unix sockets not available.\n");
 	return -1;
@@ -436,14 +422,11 @@ TIMING_GUARD_STOP
 	/* INET socket connection, host_name is the machine name */
         char ip_str[INET_ADDRSTRLEN];
 
-TIMING_GUARD_START
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR) {
 	    svc->trace_out(cm, " CMSocket connect FAILURE --> Couldn't create socket");
 	    return -1;
 	}
-TIMING_GUARD_STOP
 	((struct sockaddr_in *) &sock_addr)->sin_family = AF_INET;
-TIMING_GUARD_START
 	if (host_name != NULL) {
 	    if (check_host(host_name, (void *) &sock_addr.s_I4.sin_addr) == 0) {
 		if (host_ip == 0) {
@@ -458,7 +441,6 @@ TIMING_GUARD_START
 	} else {
 	    sock_addr.s_I4.sin_addr.s_addr = ntohl(host_ip);
 	}
-TIMING_GUARD_STOP
 	sock_addr.s_I4.sin_port = htons(port_num);
 	remote_IP = ntohl(sock_addr.s_I4.sin_addr.s_addr);
 	if (is_private_192(remote_IP)) {
@@ -474,7 +456,6 @@ TIMING_GUARD_STOP
 	svc->trace_out(cm, "Attempting TCP/IP socket connection, host=\"%s\", IP = %s, port %d",
 		       host_name == 0 ? "(unknown)" : host_name, ip_str,
 		       ntohs(sock_addr.s_I4.sin_port));
-TIMING_GUARD_START
 	if (connect(sock, (struct sockaddr *) &sock_addr,
 		    sizeof(sock_addr.s_I4)) == SOCKET_ERROR) {
 #ifdef WSAEWOULDBLOCK
@@ -488,10 +469,8 @@ TIMING_GUARD_START
 	    }
 #endif
 	}
-TIMING_GUARD_STOP
     }
 
-TIMING_GUARD_START
     sock_opt_val = 1;
     setsockopt(sock, SOL_SOCKET, SO_KEEPALIVE, (char *) &sock_opt_val,
 	       sizeof(sock_opt_val));
@@ -503,8 +482,6 @@ TIMING_GUARD_START
 	       sizeof(delay_value));
 #endif
 
-TIMING_GUARD_STOP
-TIMING_GUARD_START
     {
 	int local_listen_port = htons(sd->listen_port);
 	if (write(sock, &local_listen_port, 4) != 4) {
@@ -512,7 +489,6 @@ TIMING_GUARD_START
 	    return -1;
 	}
     }
-TIMING_GUARD_STOP
     svc->trace_out(cm, "--> Connection established");
     socket_conn_data->remote_IP = remote_IP;
     socket_conn_data->remote_contact_port = int_port_num;
@@ -522,10 +498,8 @@ TIMING_GUARD_STOP
     add_attr(conn_attr_list, CM_FD, Attr_Int4,
 	     (attr_value) (long)sock);
     sock_len = sizeof(sock_addr);
-TIMING_GUARD_START
     getsockname(sock, (struct sockaddr *) &sock_addr, &sock_len);
     int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
-TIMING_GUARD_STOP
     add_attr(conn_attr_list, CM_THIS_CONN_PORT, Attr_Int4,
 	     (attr_value) (long)int_port_num);
     add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
@@ -552,7 +526,6 @@ attr_list attrs;
     int sock;
     socket_client_data_ptr sd = trans->trans_data;
 
-    if (getenv("TIMING")) do_timing = 1;
     if (sd->cm) {
 	/* assert CM is locked */
 	assert(CM_LOCKED(svc, sd->cm));
@@ -599,10 +572,8 @@ attr_list attrs;
     char my_host_name[256];
     static int IP = 0;
 
-TIMING_GUARD_START
     get_IP_config(my_host_name, sizeof(host_name), &IP, NULL, NULL, NULL,
 		  NULL, svc->trace_out, (void *)cm);
-TIMING_GUARD_STOP
 
     if (IP == 0) {
 	if (IP == 0) IP = INADDR_LOOPBACK;
@@ -742,7 +713,6 @@ attr_list listen_info;
 	fprintf(stderr, "Failed to set 1REUSEADDR on INET socket\n");
 	return NULL;
     }
-TIMING_GUARD_START
     if (sock_addr.sin_port != 0) {
 	/* specific port requested */
 	svc->trace_out(cm, "CMSocket trying to bind selected port %d", port_num);
@@ -784,8 +754,6 @@ TIMING_GUARD_START
 	    return NULL;
 	}
     }
-TIMING_GUARD_STOP
-TIMING_GUARD_START
     sock_opt_val = 1;
     if (setsockopt(conn_sock, SOL_SOCKET, SO_REUSEADDR, (char *) &sock_opt_val,
 		   sizeof(sock_opt_val)) != 0) {
@@ -804,7 +772,6 @@ TIMING_GUARD_START
     }
     /* set the port num as one we can be contacted at */
 
-TIMING_GUARD_STOP
     svc->trace_out(cm, "CMSockets Adding socket_accept_conn as action on fd %d", conn_sock);
     svc->fd_add_select(cm, conn_sock, socket_accept_conn,
 		       (void *) trans, (void *) (long)conn_sock);
@@ -1030,19 +997,14 @@ attr_list attrs;
     int left = 0;
     int iget = 0;
     int iovleft, i;
-    struct timeval start, stop, diff;
     iovleft = iovcnt;
     struct iovec * iov = (struct iovec*) iovs;
     /* sum lengths */
-    int orig_len;
     for (i = 0; i < iovcnt; i++)
 	left += iov[i].iov_len;
 
-    orig_len = left;
     svc->trace_out(scd->sd->cm, "CMSocket writev of %d bytes on fd %d",
 		   left, fd);
-
-    if (do_timing) gettimeofday(&start, NULL);
     while (left > 0) {
 	int write_count = iovleft;
 	if (write_count > IOV_MAX)
@@ -1064,28 +1026,6 @@ attr_list attrs;
 	    }
 	}
 	if (iget == left) {
-	    if (do_timing) {
-		gettimeofday(&stop, NULL);
-		timersub(&stop, &start, &diff);
-		if (diff.tv_sec > 0) {
-		    time_t nowtime;
-		    struct tm *nowtm;
-		    char tmbuf[64], start_buf[64], stop_buf[64];
-
-		    nowtime = start.tv_sec;
-		    nowtm = localtime(&nowtime);
-		    strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", nowtm);
-		    snprintf(start_buf, sizeof(start_buf), "%s.%06ld", tmbuf, (long)start.tv_usec);
-
-		    nowtime = stop.tv_sec;
-		    nowtm = localtime(&nowtime);
-		    strftime(tmbuf, sizeof tmbuf, "%Y-%m-%d %H:%M:%S", nowtm);
-		    snprintf(stop_buf, sizeof(stop_buf), "%s.%06ld", tmbuf, (long)stop.tv_usec);
-
-		    fprintf(stderr, "TIME GUARD in writev() at %s:%d exceeded, time was was <%ld.%06ld> secs\n", __FILE__, __LINE__, (long)diff.tv_sec, (long)diff.tv_usec);
-		    fprintf(stderr, "Original write length was %d bytes, start time was %s, end was %s\n", orig_len, start_buf, stop_buf);
-		}
-	    }
 	    return iovcnt;
 	}
 	svc->trace_out(scd->sd->cm, "	writev partial success, %d bytes written", iget);
