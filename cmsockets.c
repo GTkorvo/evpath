@@ -122,9 +122,8 @@ static atom_t CM_IP_PORT = -1;
 static atom_t CM_IP_HOSTNAME = -1;
 static atom_t CM_IP_ADDR = -1;
 
-static int do_timing = 0;
 #define TIMING_GUARD_START {     struct timeval t0,t1,diff; gettimeofday(&t0, NULL);
-#define TIMING_GUARD_STOP gettimeofday(&t1, NULL);    timersub(&t1, &t0, &diff); if (diff.tv_sec > 0) if(do_timing)fprintf(stderr, "TIME GUARD at %s:%d exceeded, time was was <%ld.%06ld> secs\n", __FILE__, __LINE__, (long)diff.tv_sec, (long)diff.tv_usec);}
+#define TIMING_GUARD_STOP gettimeofday(&t1, NULL);    timersub(&t1, &t0, &diff); if (diff.tv_sec > 0) fprintf(stderr, "TIME GUARD at %s:%d exceeded, time was was <%ld.%06ld> secs\n", __FILE__, __LINE__, (long)diff.tv_sec, (long)diff.tv_usec);}
 
 static int
 check_host(hostname, sin_addr)

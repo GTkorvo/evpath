@@ -1411,7 +1411,7 @@ static int client_connect(CManager cm, CMtrans_services svc, transport_entry tra
     ssize_t rd;
     int ret, int_port_num;
     struct in_addr dest_ip;
-    char *host_name, *host_rep;
+    char *host_name, *host_rep = NULL;
     char *dst_port = NULL;
     int i;
 
