@@ -707,13 +707,22 @@ attr_list listen_info;
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_addr.s_addr = INADDR_ANY;
     sock_addr.sin_port = htons(port_num);
-    if (setsockopt(conn_sock, SOL_SOCKET, SO_REUSEADDR, (char *) &sock_opt_val,
-		   sizeof(sock_opt_val)) != 0) {
-	fprintf(stderr, "Failed to set 1REUSEADDR on INET socket\n");
-	return NULL;
-    }
     if (sock_addr.sin_port != 0) {
-	/* specific port requested */
+	/* specific port requested. set REUSEADDR, REUSEPORT because previous server might have died badly */
+	if (setsockopt(conn_sock, SOL_SOCKET, SO_REUSEADDR, (char *) &sock_opt_val,
+		       sizeof(sock_opt_val)) != 0) {
+	    fprintf(stderr, "Failed to set REUSEADDR on INET socket before bind\n");
+	    perror("setsockopt(SO_REUSEADDR) failed");
+	    return NULL;
+	}
+#ifdef SO_REUSEPORT
+	sock_opt_val = 1;
+	if (setsockopt(conn_sock, SOL_SOCKET, SO_REUSEPORT, (const char*)&sock_opt_val, sizeof(sock_opt_val)) != 0) {
+	    fprintf(stderr, "Failed to set REUSEADDR on INET socket before bind\n");
+	    perror("setsockopt(SO_REUSEPORT) failed");
+	    return NULL;
+	}
+#endif
 	svc->trace_out(cm, "CMSocket trying to bind selected port %d", port_num);
 	if (bind(conn_sock, (struct sockaddr *) &sock_addr,
 		 sizeof sock_addr) == SOCKET_ERROR) {
@@ -752,12 +761,6 @@ attr_list listen_info;
 	    fprintf(stderr, "Cannot bind INET socket\n");
 	    return NULL;
 	}
-    }
-    sock_opt_val = 1;
-    if (setsockopt(conn_sock, SOL_SOCKET, SO_REUSEADDR, (char *) &sock_opt_val,
-		   sizeof(sock_opt_val)) != 0) {
-	perror("Failed to set 2REUSEADDR on INET socket");
-	return NULL;
     }
     length = sizeof sock_addr;
     if (getsockname(conn_sock, (struct sockaddr *) &sock_addr, &length) < 0) {
