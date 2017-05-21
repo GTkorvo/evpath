@@ -2335,7 +2335,7 @@ handle_deploy_ack(EVmaster master, EVmaster_msg_ptr mmsg)
     if ((master->dfg->deploy_ack_count == dfg->master->node_count) && (dfg->deploy_ack_condition != -1)) {
 	CMtrace_out(cm, EVdfgVerbose, "That was the last one, Signalling %d\n", dfg->deploy_ack_condition);
 	CMtrace_out(cm, EVdfgVerbose, "EVDFG exit deploy ack handler -  master DFG state is %s\n", str_state[master->state]);
-	INT_CMCondition_signal(cm, master->dfg->deploy_ack_condition);
+	CMCondition_signal(cm, master->dfg->deploy_ack_condition);
 	master->dfg->deploy_ack_condition = -1;
 	assert(master->state == DFG_Starting);
 	master->state = DFG_Running;
