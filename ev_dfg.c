@@ -65,6 +65,7 @@ static void handle_conn_shutdown(EVmaster master, EVmaster_msg_ptr msg);
 static void handle_node_join(EVmaster master, EVmaster_msg_ptr msg);
 static void handle_flush_reconfig(EVmaster master, EVmaster_msg_ptr);
 static void handle_deploy_ack(EVmaster master, EVmaster_msg_ptr);
+static void handle_deploy_ack_wrapper(EVmaster master, EVmaster_msg_ptr);
 static void handle_shutdown_contrib(EVmaster master, EVmaster_msg_ptr);
 
 static void
@@ -103,7 +104,7 @@ char action_model[DFG_Last_State][DFGlast_msg] = {
 };
 
 typedef void (*master_msg_handler_func) (EVmaster master, EVmaster_msg_ptr msg);
-static master_msg_handler_func master_msg_handler[DFGlast_msg] = {handle_node_join, handle_deploy_ack, handle_shutdown_contrib, handle_conn_shutdown, handle_flush_reconfig};
+static master_msg_handler_func master_msg_handler[DFGlast_msg] = {handle_node_join, handle_deploy_ack_wrapper, handle_shutdown_contrib, handle_conn_shutdown, handle_flush_reconfig};
 static void dfg_master_msg_handler(CManager cm, CMConnection conn, void *vmsg, 
 				   void *client_data, attr_list attrs);
 
@@ -2322,6 +2323,15 @@ dfg_master_msg_handler(CManager cm, CMConnection conn, void *vmsg,
     EVmaster_msg_type msg_type = ((uintptr_t)client_data & 0x7);
     queue_master_msg(master, vmsg, msg_type, conn, /*copy*/1);
     /* we'll handle this in the poll handler */
+}
+
+static void
+handle_deploy_ack_wrapper(EVmaster master, EVmaster_msg_ptr mmsg)
+{
+    CManager cm = master->cm;
+    CManager_unlock(cm);
+    handle_deploy_ack(master, mmsg);
+    CManager_lock(cm);
 }
 
 static void
