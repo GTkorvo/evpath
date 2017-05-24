@@ -93,6 +93,18 @@ remove_stone_from_lookup(event_path_data evp, int stone_num)
 }
 
 extern void
+INT_CMadd_stone_to_global_lookup(CManager cm, int stone_num, int global_stone_num)
+{
+    event_path_data evp = cm->evp;
+    if ((stone_num & 0x80000000) != 0x80000000) {
+        fprintf(stderr, "Global stone num must have 32nd bit set.  Value provided was %x\n", global_stone_num);
+        fprintf(stderr, "Ignoring call to CMadd_stone_to_global_lookup for stone %d\n", stone_num);
+        return;
+    }
+    add_stone_to_lookup(evp, stone_num, global_stone_num);
+}
+
+extern void
 add_stone_to_lookup(event_path_data evp, int stone_num, int global_stone_num)
 {
     int base = evp->stone_lookup_table_size;

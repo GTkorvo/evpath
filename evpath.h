@@ -2327,6 +2327,20 @@ typedef attr_list (*CMperf_upcall)(CManager cm, void *buffer, long length, int t
 extern void
 CMinstall_perf_upcall(CManager cm, CMperf_upcall upcall);
 
+/*!
+ * Add a global stone ID to EVpath's internal lookup table
+ *
+ * CMadd_stone_to_global_lookup() inserts a "translation" of a global stone
+ * ID (which must have the high bit set in it's 32-bit value) to a local
+ * stone ID.  The mechanism for cleanly allocating global stone IDs is not
+ * provided here, so this is an incomplete interface.  Exported for limited
+ * use.
+ * \param cm The CManager in which to register the translation.
+ * \param stone_num the actual stone ID
+ * \param global_stone_num the 32-bit ID with high bit set that will be used as a "well known" ID
+ */
+extern void
+CMadd_stone_to_global_lookup(CManager cm, int stone_num, int global_stone_num);
 /* @}*/
 
 #ifdef	__cplusplus
