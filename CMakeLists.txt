@@ -137,6 +137,8 @@ if (NOT NO_TRANSPORT_MODULES)
   TARGET_LINK_LIBRARIES(cmudp ${BASE_LIBS})
   TARGET_LINK_LIBRARIES(cmmulticast ${BASE_LIBS})
   list (APPEND TARGETS evpath cmselect cmsockets cmudp cmmulticast)
+else  (NOT NO_TRANSPORT_MODULES)
+  list (APPEND TARGETS evpath)
 endif (NOT NO_TRANSPORT_MODULES)
 
 FIND_CERCS_PROJECT (enet LIBRARY enet INCLUDES enet/enet.h ${CERCS_FIND_OPTIONS})
