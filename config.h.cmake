@@ -138,9 +138,6 @@
 /* Define to 1 if you have the ANSI C header files. */
 #cmakedefine STDC_HEADERS
 
-/* The target platform is Cray Compute Node Linux (CNL). */
-#cmakedefine TARGET_CNL
-
 /* Define this if Pthreads should be used for running tests */
 #cmakedefine USE_PTHREADS
 
