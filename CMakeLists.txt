@@ -83,15 +83,24 @@ IF (NOT DEFINED CM_SELF_FORMATS)
   SET( CM_SELF_FORMATS 1)
 ENDIF (NOT DEFINED CM_SELF_FORMATS)
 
-IF (TARGET_CNL)   # This should be set to true if compiling for compute note linux
+if (DEFINED BUILD_SHARED_STATIC)   # if build_shared_static is static, default building in transport modules
+  string(TOUPPER ${BUILD_SHARED_STATIC} BUILD_SHARED_STATIC) 
+  if (${BUILD_SHARED_STATIC} STREQUAL "STATIC")
+    if (NOT DEFINED TRANSPORT_MODULES)
+      SET (TARGET_CNL 1)
+    endif (NOT DEFINED TRANSPORT_MODULES)
+  endif (${BUILD_SHARED_STATIC} STREQUAL "STATIC")
+endif (DEFINED BUILD_SHARED_STATIC)
+
+IF (DEFINED TARGET_CNL) 
   set (NO_DYNAMIC_LINKING 1)   # dummy dyn linking in cm.c and cm_transport.c
   list (APPEND EVPATH_SRC_LIST cmsockets.c cmudp.c cmselect.c)  # link sockets and select mechanisms in main lib
   list (APPEND CERCS_FIND_OPTIONS "STATIC")
   set (NO_TRANSPORT_MODULES TRUE)
   set (BUILD_SHARED_STATIC STATIC)
-ELSE (TARGET_CNL)
+ELSE (DEFINED TARGET_CNL)
   find_package(DL)
-ENDIF (TARGET_CNL)
+ENDIF (DEFINED TARGET_CNL)
 
 if (DEFINED CERCS_USE_INSTALLED) 
    set (CERCS_USE_INSTALLED)
@@ -110,6 +119,18 @@ list (APPEND DEPLIBS "-L${CERCS_ENV_LIB_DIR}" "${CERCS_ENV_LIB_DIR}/libcercs_env
 list (APPEND DEPLIBS "-L${ATL_LIB_DIR}" "${ATL_LIB_DIR}/libatl.la")
 list (APPEND DEPLIBS "-L${FFS_LIB_DIR}" "${FFS_LIB_DIR}/libffs.la")
 list (APPEND DEPLIBS "-L${DILL_LIB_DIR}" "${DILL_LIB_DIR}/libdill.la")
+if (EXISTS "${CERCS_ENV_LIB_DIR}/libcercs_env.a")
+  set (CERCS_ENV_STATIC_LIB "${CERCS_ENV_LIB_DIR}/libcercs_env.a")
+endif()
+if (EXISTS "${ATL_LIB_DIR}/libatl.a")
+  set (ATL_STATIC_LIB "${ATL_LIB_DIR}/libatl.a")
+endif()
+if (EXISTS "${FFS_LIB_DIR}/libffs.a")
+  set (FFS_STATIC_LIB "${FFS_LIB_DIR}/libffs.a")
+endif()
+if (EXISTS "${DILL_LIB_DIR}/libdill.a")
+  set (DILL_STATIC_LIB "${DILL_LIB_DIR}/libdill.a")
+endif()
 
 if (NVML_FOUND)
   list (APPEND INC_DIRS ${NVML_INCLUDE_DIR})
@@ -166,6 +187,10 @@ IF (ENET_FOUND)
       list (APPEND EVPATH_SRC_LIST cmenet.c)  # link enet in main lib
       list (APPEND EVPATH_TRANSPORT_DEP_LIBS ${ENET_LIBRARIES} ${BASE_LIBS})
       list (APPEND DEPLIBS ${ENET_LIBRARIES})
+      list (APPEND EVPATH_TRANSPORT_FULL_DEP "-L${ENET_LIB_DIR}" "${ENET_LIBRARIES}")
+      if (EXISTS "${ENET_LIB_DIR}/libenet.a") 
+	list (APPEND EVPATH_TRANSPORT_STATIC_DEPS "${ENET_LIB_DIR}/libenet.a") 
+      endif ()
    ENDIF (NOT NO_TRANSPORT_MODULES)
 ENDIF (ENET_FOUND)
 
@@ -182,6 +207,10 @@ IF (LIBFABRIC_FOUND)
    else (NOT NO_TRANSPORT_MODULES)
       list (APPEND EVPATH_SRC_LIST cmfabric.c)  # link ib in main lib
       list (APPEND EVPATH_TRANSPORT_DEP_LIBS fabric dl ${BASE_LIBS})
+      list (APPEND EVPATH_TRANSPORT_FULL_DEP "-L${LIBFABRIC_LIB_DIR}" "-lfabric" "-ldl")
+      if (EXISTS "${ENET_LIB_DIR}/libfabric.a") 
+	list (APPEND EVPATH_TRANSPORT_STATIC_DEPS "${ENET_LIB_DIR}/libfabric.a") 
+      endif ()
       list (APPEND DEPLIBS fabric dl)
    endif (NOT NO_TRANSPORT_MODULES)
 ENDIF(LIBFABRIC_FOUND)
@@ -206,7 +235,9 @@ IF (HAVE_IBVERBS)
    else (NOT NO_TRANSPORT_MODULES)
       list (APPEND EVPATH_SRC_LIST cmib.c)  # link ib in main lib
       list (APPEND EVPATH_TRANSPORT_DEP_LIBS ibverbs ${BASE_LIBS})
+      list (APPEND EVPATH_TRANSPORT_FULL_DEP "-libverbs")
       list (APPEND DEPLIBS ibverbs)
+      list (APPEND EVPATH_TRANSPORT_STATIC_DEPS "-libverbs") 
    endif (NOT NO_TRANSPORT_MODULES)
    set (IB_FOUND 1)
 ENDIF (HAVE_IBVERBS)
@@ -242,6 +273,10 @@ IF (HAVE_IBVERBS OR HAVE_UGNI)
 	   endif ("${CercsArch}" STREQUAL "titan")
 	   
 	   list (APPEND EVPATH_TRANSPORT_DEP_LIBS ${NNTI_LIBRARIES} ${ENET_LIBRARIES})
+	   list (APPEND EVPATH_TRANSPORT_FULL_DEP "-L${NNTI_LIB_DIR}" "${NNTI_LIBRARIES}" "-L${ENET_LIB_DIR}" "${ENET_LIBRARIES}")
+	   if (EXISTS "${NNTI__LIB_DIR}/libtrios_nnti.a") 
+	     list (APPEND EVPATH_TRANSPORT_STATIC_DEPS "${NNTI_LIB_DIR}/libtrios_nnti.a" "${NNTI_LIB_DIR}/libtrios_support.a") 
+	   endif ()
 	   list (APPEND DEPLIBS ${NNTI_LIBRARIES})
         ENDIF (NOT NO_TRANSPORT_MODULES)
     ENDIF (NNTI_FOUND)
@@ -309,6 +344,9 @@ if (TARGET_CNL)
 endif (TARGET_CNL)
 
 CHECK_BROKEN_TITAN_COMPILER(${DEP_STRING})
+
+string(REPLACE ";" " " EVPATH_TRANSPORT_FULL_DEP_STR "${EVPATH_TRANSPORT_FULL_DEP}")
+string(REPLACE ";" " " EVPATH_TRANSPORT_STATIC_DEP_STR "${EVPATH_TRANSPORT_STATIC_DEPS}")
 
 add_libtool_library(NAME evpath SRC_LIST ${EVPATH_SRC_LIST} DEP_LIBS "${DEP_STRING}" LINK_LIBS  ${DL_LIBRARIES} ${BASE_LIBS} ${EVPATH_TRANSPORT_DEP_LIBS})
 
@@ -401,6 +439,12 @@ file(RELATIVE_PATH relInstallDir ${CMAKE_INSTALL_PREFIX}/${CMAKECONFIG_INSTALL_D
 # automatically. We configure that file so that we can put any information we want in it,
 # e.g. version numbers, include directories, etc.
 configure_file(EVPathConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/EVPathConfig.cmake @ONLY )
+
+# Create a EVPathConfig.cmake file. <name>Config.cmake files are searched by find_package()
+# automatically. We configure that file so that we can put any information we want in it,
+# e.g. version numbers, include directories, etc.
+configure_file(evpath_config.in ${CMAKE_CURRENT_BINARY_DIR}/evpath_config @ONLY )
+install(PROGRAMS ${CMAKE_BINARY_DIR}/evpath_config DESTINATION bin)
 
 # Additionally, when cmake has found a EVPathConfig.cmake, it can check for a EVPathConfigVersion.cmake
 # in the same directory when figuring out the version of the package when a version
