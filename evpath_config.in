@@ -82,7 +82,7 @@ if [ "$PRINT_CFLAGS" == "yes" ]; then
 fi
 
 if [ "$PRINT_LDFLAGS" == "yes" ]; then
-    LDFLAGS="-L@CMAKE_INSTALL_PREFIX@/lib -levpath @FFS_LIBRARIES@ @ATL_LIBRARIES@ @DILL_LIBRARIES@ @CERCS_ENV_LIBRARIES@ @EVPATH_TRANSPORT_FULL_DEP_STR@"
+    LDFLAGS="-L@CMAKE_INSTALL_PREFIX@/lib -levpath -L@FFS_LIB_DIR@ -lffs -L@ATL_LIB_DIR@ -latl -L@DILL_LIB_DIR@ -ldill -L@CERCS_ENV_LIB_DIR@ -lcercs_env @EVPATH_TRANSPORT_FULL_DEP_STR@"
     if [ $NFLAGS_ASKED -gt 1 ]; then
         echo -n "LDFLAGS="
     fi
