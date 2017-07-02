@@ -1446,13 +1446,16 @@ extern char *INT_EVmaster_get_contact_list(EVmaster master)
 {
     attr_list listen_list, contact_list = NULL;
     atom_t CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
+    atom_t CM_ENET_CONN_TIMEOUT = attr_atom_from_string("CM_ENET_CONN_TIMEOUT");
     CManager cm = master->cm;
     char *tmp;
 
     /* use enet transport if available */
     listen_list = create_attr_list();
     add_string_attr(listen_list, CM_TRANSPORT, strdup("enet"));
+    /* and kick up the connection timeout value.  We can wait 60 secs */
     contact_list = INT_CMget_specific_contact_list(cm, listen_list);
+    add_int_attr(contact_list, CM_ENET_CONN_TIMEOUT, 60000);
 
     free_attr_list(listen_list);
     if (contact_list == NULL) {
