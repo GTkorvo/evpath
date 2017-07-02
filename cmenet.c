@@ -59,6 +59,7 @@ static atom_t CM_NETWORK_POSTFIX = -1;
 static atom_t CM_ENET_PORT = -1;
 static atom_t CM_ENET_HOSTNAME = -1;
 static atom_t CM_ENET_ADDR = -1;
+static atom_t CM_ENET_CONN_TIMEOUT = -1;
 static atom_t CM_TRANSPORT = -1;
 
 extern attr_list
@@ -287,9 +288,10 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
     int int_port_num;
     enet_client_data_ptr sd = (enet_client_data_ptr) trans->trans_data;
     char *host_name;
-    static int host_ip = 0;
+    int host_ip = 0;
     struct in_addr sin_addr;
     (void)conn_attr_list;
+    int timeout = 5000;   /* connection time out default 5 seconds */
 
     if (!query_attr(attrs, CM_ENET_HOSTNAME, /* type pointer */ NULL,
     /* value pointer */ (attr_value *)(long) & host_name)) {
@@ -317,6 +319,13 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 	return 0;
     } else {
         svc->trace_out(cm, "CMEnet transport connect to port %d", int_port_num);
+    }
+
+    if (!query_attr(attrs, CM_ENET_CONN_TIMEOUT, /* type pointer */ NULL,
+    /* value pointer */ (attr_value *)(long) & timeout)) {
+	svc->trace_out(cm, "CMEnet transport found no CM_ENET_CONN_TIMEOUT attribute");
+    } else {
+        svc->trace_out(cm, "CMEnet transport connection timeout set to %d msecs", timeout);
     }
 
     /* ENET connection, host_name is the machine name */
@@ -355,15 +364,11 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
        exit (EXIT_FAILURE);
     }
     
-    /* Wait up to 5 seconds for the connection attempt to succeed. */
-    if (enet_host_service (sd->server, & event, 5000) > 0 &&
-        event.type == ENET_EVENT_TYPE_CONNECT)
-    {
+    /* Wait up to 'timeout' milliseconds for the connection attempt to succeed. */
+    if ((enet_host_service (sd->server, & event, timeout) > 0) &&
+        (event.type == ENET_EVENT_TYPE_CONNECT)) {
 	svc->trace_out(cm, "Connection to %s:%d succeeded.\n", inet_ntoa(sin_addr), address.port);
-
-    }
-    else
-    {
+    } else {
         /* Either the 5 seconds are up or a disconnect event was */
         /* received. Reset the peer in the event the 5 seconds   */
         /* had run out without any significant event.            */
@@ -813,6 +818,7 @@ libcmenet_LTX_initialize(CManager cm, CMtrans_services svc,
 	CM_PEER_IP = attr_atom_from_string("PEER_IP");
 	CM_PEER_LISTEN_PORT = attr_atom_from_string("PEER_LISTEN_PORT");
 	CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
+	CM_ENET_CONN_TIMEOUT = attr_atom_from_string("CM_ENET_CONN_TIMEOUT");
 	atom_init++;
     }
     enet_data = svc->malloc_func(sizeof(struct enet_client_data));
