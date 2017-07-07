@@ -2076,11 +2076,18 @@ static struct ibv_qp * initqp(ib_conn_data_ptr ib_conn_data,
 //    qp_init_attr.sq_sig_all = 1;
 
     
+ try_again:
 	dataqp = ibv_create_qp(sd->pd, &qp_init_attr);
-	if(dataqp == NULL)
-	{
+	if(dataqp == NULL) {
+	    if (qp_init_attr.cap.max_send_sge > 1) {
+	        sd->svc->trace_out(sd->cm, "CMIB ibv_create_qp failed with max_send_sge = %d, trying smaller", qp_init_attr.cap.max_send_sge);
+		qp_init_attr.cap.max_send_sge >>= 1;
+		goto try_again;
+	    } else {
+	        perror("ibv_create_qp");
 		sd->svc->trace_out(sd->cm, "CMIB can't create qp\n");
-		return NULL;    
+		return NULL;
+	    }
 	}
 
 	memset(&qp_attr, 0, sizeof(qp_attr));
