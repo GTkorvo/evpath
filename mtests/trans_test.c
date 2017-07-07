@@ -550,11 +550,12 @@ main(argc, argv)
 	    exit(1);
 	}
 	conn = CMinitiate_conn(cm, contact_list);
-	free_attr_list(contact_list);
 	if (conn == NULL) {
-	    printf("No connection using contact list %s\n", argv[1]);
+	    printf("No connection using contact list :");
+	    dump_attr_list(contact_list);
 	    exit(1);
 	}
+	free_attr_list(contact_list);
 
 
 	test_list = create_attr_list();	    
