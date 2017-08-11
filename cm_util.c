@@ -27,6 +27,8 @@ extern void EVfprint_version(FILE* out);
 extern void CMset_dlopen_verbose(int verbose);
 
 int CMtrace_val[CMLastTraceType] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+int CMtrace_timing = 0;
+int CMtrace_PID = 0;
 
 static int CMTrace_file_num = -1;
 
@@ -52,6 +54,8 @@ extern int CMtrace_init(CManager cm, CMTraceType trace_type)
     CMtrace_val[EVerbose] = (cercs_getenv("EVerbose") != NULL);
     CMtrace_val[CMIBTransportVerbose] = (cercs_getenv("CMIBTransportVerbose") != NULL);    
     CMtrace_val[EVdfgVerbose] = (cercs_getenv("EVdfgVerbose") != NULL);
+    CMtrace_timing = (cercs_getenv("CMTraceTiming") != NULL);
+    CMtrace_PID = (cercs_getenv("CMTracePID") != NULL);
     if ((str = cercs_getenv("EVWarning")) != NULL) {
 	sscanf(str, "%d", &CMtrace_val[EVWarning]);
     }
@@ -152,6 +156,14 @@ CMtransport_trace(CManager cm, char *format, ...)
 #ifndef MODULE
     va_list ap;
     if (CMtrace_on(cm, CMTransportVerbose)) {
+        if (CMtrace_PID) {
+            fprintf(cm->CMTrace_file, "P%lxT%lx - ", (long) getpid(), (long)thr_thread_self());
+        }
+        if (CMtrace_timing) {
+            struct timespec ts;
+            clock_gettime(CLOCK_MONOTONIC, &ts);
+            printf("%lld.%.9ld - ", (long long)ts.tv_sec, ts.tv_nsec);
+        }
 #ifdef STDC_HEADERS
 	va_start(ap, format);
 #else

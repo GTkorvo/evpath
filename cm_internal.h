@@ -530,10 +530,12 @@ extern void INT_EVadd_standard_structs(CManager cm, FMStructDescList *lists);
 extern void INT_EVregister_close_handler(CManager cm, EVStoneCloseHandlerFunc handler, void *client_data );
 extern void CMwake_server_thread(CManager cm);
 extern int CMtrace_val[];
+extern int CMtrace_timing;
+extern int CMtrace_PID;
 extern int CMtrace_init(CManager cm, CMTraceType t);
 extern void INT_CMTrace_file_id(int ID);
 #define CMtrace_on(cm, trace_type)  ((cm->CMTrace_file == NULL) ? CMtrace_init(cm, trace_type) : CMtrace_val[trace_type])
-#define CMtrace_out(cm, trace_type, ...) {(CMtrace_on(cm,trace_type) ? (CMtrace_on(cm,CMLowLevelVerbose) ? fprintf(cm->CMTrace_file, "P%lxT%lx - ", (long) getpid(), (long)thr_thread_self()) : 0) , fprintf(cm->CMTrace_file, __VA_ARGS__) : 0);fflush(cm->CMTrace_file);}
+#define CMtrace_out(cm, trace_type, ...) {struct timespec ts ; (CMtrace_on(cm,trace_type) ? (CMtrace_PID ? fprintf(cm->CMTrace_file, "P%lxT%lx - ", (long) getpid(), (long)thr_thread_self()) : 0) , CMtrace_timing? clock_gettime(CLOCK_MONOTONIC, &ts),fprintf(cm->CMTrace_file, "%lld.%.9ld - ", (long long)ts.tv_sec, ts.tv_nsec):0, fprintf(cm->CMTrace_file, __VA_ARGS__) : 0);fflush(cm->CMTrace_file);}
 extern void CMdo_performance_response(CMConnection conn, long length, int func,
 				      int byte_swap, char *buffer);
 extern int
