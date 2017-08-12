@@ -253,7 +253,7 @@ enet_accept_conn(enet_client_data_ptr sd, transport_entry trans,
     enet_conn_data->conn = conn;
 
     add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4, (void*)(long)address->host);
-    enet_conn_data->remote_IP = address->host;
+    enet_conn_data->remote_IP = ntohl(address->host);
     enet_conn_data->remote_contact_port = address->port;
 
     if (enet_conn_data->remote_host != NULL) {
@@ -336,7 +336,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 
     if (host_name) {
 	enet_address_set_host (& address, host_name);
-	sin_addr.s_addr = address.host;
+	sin_addr.s_addr = ntohl(address.host);
 	svc->trace_out(cm, "Attempting ENET RUDP connection, USING host=\"%s\", IP = %s, port %d",
 		       host_name == 0 ? "(unknown)" : host_name, 
 		       inet_ntoa(sin_addr),
@@ -369,13 +369,19 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
         (event.type == ENET_EVENT_TYPE_CONNECT)) {
 	svc->trace_out(cm, "Connection to %s:%d succeeded.\n", inet_ntoa(sin_addr), address.port);
     } else {
-        /* Either the 5 seconds are up or a disconnect event was */
-        /* received. Reset the peer in the event the 5 seconds   */
-        /* had run out without any significant event.            */
-        enet_peer_reset (peer);
+        if (event.type == ENET_EVENT_TYPE_DISCONNECT) {
+            /* Either the 5 seconds are up or a disconnect event was */
+            /* received. Reset the peer in the event the 5 seconds   */
+            /* had run out without any significant event.            */
+            enet_peer_reset (peer);
 
-        printf ("Connection to %s:%d failed   type was %d.\n", inet_ntoa(sin_addr), address.port, event.type);
-	return 0;
+            printf ("Connection to %s:%d failed   type was %d.\n", inet_ntoa(sin_addr), address.port, event.type);
+            return 0;
+
+        } else if (event.type == ENET_EVENT_TYPE_RECEIVE) {
+            printf ("Connection to %s:%d disrupted by data arrival, possible data loss.\n", inet_ntoa(sin_addr), address.port);
+        }
+            
     }
 
     svc->trace_out(cm, "--> Connection established");
