@@ -436,7 +436,6 @@ retry:
                 }
                 last->next = entry;
             }
-            printf ("Connection to %s:%d disrupted by data arrival, queueing data.\n", inet_ntoa(sin_addr), address.port);
             goto retry;
         }
             
