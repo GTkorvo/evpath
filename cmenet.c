@@ -27,6 +27,12 @@
 #include "cm_transport.h"
 
 
+typedef struct _queued_data {
+    struct _queued_data *next;
+    struct enet_connection_data *econn_d;
+    ENetPacket *packet;
+} *queued_data;
+
 typedef struct func_list_item {
     select_list_func func;
     void *arg1;
@@ -39,6 +45,7 @@ typedef struct enet_client_data {
     int listen_port;
     CMtrans_services svc;
     ENetHost *server;
+    queued_data pending_data;
 } *enet_client_data_ptr;
 
 typedef struct enet_connection_data {
@@ -115,6 +122,26 @@ static void free_func(void *packet)
     enet_packet_destroy ((ENetPacket*)packet);
 }
 
+static void
+handle_packet(CManager cm, CMtrans_services svc, transport_entry trans, enet_conn_data_ptr econn_d, ENetPacket *packet)
+{
+    CMbuffer cb;
+    svc->trace_out(cm, "A packet of length %u was received.\n",
+                   (unsigned int) packet->dataLength);
+    econn_d->read_buffer_len = packet->dataLength;
+    cb = svc->create_data_and_link_buffer(cm, 
+                                          packet->data, 
+                                          econn_d->read_buffer_len);
+    econn_d->read_buffer = cb;
+    cb->return_callback = free_func;
+    cb->return_callback_data = packet;
+    econn_d->packet = packet;
+
+    /* kick this upstairs */
+    trans->data_available(trans, econn_d->conn);
+    svc->return_data_buffer(trans->cm, cb);
+}
+	    
 static
 void
 enet_service_network(CManager cm, void *void_trans)
@@ -129,7 +156,15 @@ enet_service_network(CManager cm, void *void_trans)
 	printf("Enet service network, CManager not locked\n");
     }
 
-    /* Wait up to 1000 milliseconds for an event. */
+    while (ecd->pending_data) {
+        svc->trace_out(cm, "ENET Handling pending data\n");
+        queued_data entry = ecd->pending_data;
+        ecd->pending_data = entry->next;
+        handle_packet(cm, svc, trans, entry->econn_d, entry->packet);
+        free(entry);
+    }
+
+   /* Wait up to 1000 milliseconds for an event. */
     while (ecd->server && (enet_host_service (ecd->server, & event, 1) > 0)) {
         switch (event.type) {
 	case ENET_EVENT_TYPE_NONE:
@@ -137,44 +172,34 @@ enet_service_network(CManager cm, void *void_trans)
         case ENET_EVENT_TYPE_CONNECT: {
 	    void *enet_connection_data;
 	    svc->trace_out(cm, "A new client connected from %x:%u.\n", 
-			   event.peer -> address.host,
-			   event.peer -> address.port);
+			   event.peer->address.host,
+			   event.peer->address.port);
 
 	    enet_connection_data = enet_accept_conn(ecd, trans, &event.peer->address);
 
             /* Store any relevant client information here. */
-            event.peer -> data = enet_connection_data;
+            svc->trace_out(cm, "ENET ========   Assigning peer %p has data %p\n", event.peer, enet_connection_data);
+            event.peer->data = enet_connection_data;
 	    ((enet_conn_data_ptr)enet_connection_data)->peer = event.peer;
 
             break;
 	}
         case ENET_EVENT_TYPE_RECEIVE: {
 	    enet_conn_data_ptr econn_d = event.peer->data;
-	    CMbuffer cb;
-	    svc->trace_out(cm, "A packet of length %u was received on channel %u.\n",
-                    (unsigned int) event.packet -> dataLength,
-                    (unsigned int) event.channelID);
-	    econn_d->read_buffer_len = event.packet -> dataLength;
-	    cb = svc->create_data_and_link_buffer(cm, 
-						  event.packet->data, 
-						  econn_d->read_buffer_len);
-	    econn_d->read_buffer = cb;
-	    cb->return_callback = free_func;
-	    cb->return_callback_data = event.packet;
-	    econn_d->packet = event.packet;
-
-	    /* kick this upstairs */
-	    trans->data_available(trans, econn_d->conn);
-	    svc->return_data_buffer(trans->cm, cb);
-	    
+            if (econn_d) {
+                handle_packet(cm, svc, trans, event.peer->data, event.packet);
+            } else {
+                svc->trace_out(cm, "ENET  ====== virgin peer, address is %x, port %u.\n", event.peer->address.host, event.peer->address.port);
+                svc->trace_out(cm, "ENET  ====== DiSCARDING DATA\n");
+            }
             break;
 	}           
         case ENET_EVENT_TYPE_DISCONNECT: {
-	    enet_conn_data_ptr enet_conn_data = event.peer -> data;
+	    enet_conn_data_ptr enet_conn_data = event.peer->data;
 	    svc->trace_out(cm, "Got a disconnect on connection %p\n",
-		event.peer -> data);
+		event.peer->data);
 
-            enet_conn_data = event.peer -> data;
+            enet_conn_data = event.peer->data;
 	    enet_conn_data->read_buffer_len = -1;
         }
 	}
@@ -356,6 +381,8 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 
     /* Initiate the connection, allocating the two channels 0 and 1. */
     peer = enet_host_connect (sd->server, & address, 1, 0);    
+    peer->data = enet_conn_data;
+    svc->trace_out(cm, "ENET ========   On init Assigning peer %p has data %p\n", peer, enet_conn_data);
     
     if (peer == NULL)
     {
@@ -365,8 +392,23 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
     }
     
     /* Wait up to 'timeout' milliseconds for the connection attempt to succeed. */
+retry:
     if ((enet_host_service (sd->server, & event, timeout) > 0) &&
         (event.type == ENET_EVENT_TYPE_CONNECT)) {
+        if (event.peer != peer) {
+            enet_conn_data_ptr enet_connection_data;
+	    svc->trace_out(cm, "A new client connected from %x:%u.\n", 
+			   event.peer->address.host,
+			   event.peer->address.port);
+
+	    enet_connection_data = enet_accept_conn(sd, trans, &event.peer->address);
+
+            /* Store any relevant client information here. */
+            svc->trace_out(cm, "ENET ========   Assigning peer %p has data %p\n", event.peer, enet_connection_data);
+            event.peer->data = enet_connection_data;
+	    ((enet_conn_data_ptr)enet_connection_data)->peer = event.peer;
+            goto retry;
+        }
 	svc->trace_out(cm, "Connection to %s:%d succeeded.\n", inet_ntoa(sin_addr), address.port);
     } else {
         if (event.type == ENET_EVENT_TYPE_DISCONNECT) {
@@ -379,7 +421,23 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
             return 0;
 
         } else if (event.type == ENET_EVENT_TYPE_RECEIVE) {
-            printf ("Connection to %s:%d disrupted by data arrival, possible data loss.\n", inet_ntoa(sin_addr), address.port);
+	    enet_conn_data_ptr econn_d = event.peer->data;
+            queued_data entry = malloc(sizeof(*entry));
+            entry->next = NULL;
+            entry->econn_d = econn_d;
+            entry->packet = event.packet;
+            /* add at the end */
+            if (econn_d->sd->pending_data == NULL) {
+                econn_d->sd->pending_data = entry;
+            } else {
+                queued_data last = econn_d->sd->pending_data;
+                while (last->next != NULL) {
+                    last = last->next;
+                }
+                last->next = entry;
+            }
+            printf ("Connection to %s:%d disrupted by data arrival, queueing data.\n", inet_ntoa(sin_addr), address.port);
+            goto retry;
         }
             
     }
@@ -481,7 +539,7 @@ libcmenet_LTX_self_check(CManager cm, CMtrans_services svc,
 extern int
 libcmenet_LTX_connection_eq(CManager cm, CMtrans_services svc,
 			    transport_entry trans, attr_list attrs,
-			    enet_conn_data_ptr scd)
+			    enet_conn_data_ptr ecd)
 {
 
     int int_port_num;
@@ -508,11 +566,15 @@ libcmenet_LTX_connection_eq(CManager cm, CMtrans_services svc,
 	svc->trace_out(cm, "IP translation for hostname %s is %x", host_name,
 		       requested_IP);
     }
+    if (ecd->peer->state != ENET_PEER_STATE_CONNECTED) {
+        svc->trace_out(cm, "ENET Conn_eq returning FALSE, peer not connected");
+        return 0;
+    }
     svc->trace_out(cm, "ENET Conn_eq comparing IP/ports %x/%d and %x/%d",
-		   scd->remote_IP, scd->remote_contact_port,
+		   ecd->remote_IP, ecd->remote_contact_port,
 		   requested_IP, int_port_num);
-    if ((scd->remote_IP == requested_IP) &&
-	(scd->remote_contact_port == int_port_num)) {
+    if ((ecd->remote_IP == requested_IP) &&
+	(ecd->remote_contact_port == int_port_num)) {
 	svc->trace_out(cm, "ENET Conn_eq returning TRUE");
 	return 1;
     }
@@ -755,6 +817,7 @@ libcmenet_LTX_writev_func(CMtrans_services svc, enet_conn_data_ptr ecd,
     /* Send the packet to the peer over channel id 0. */
     if (enet_peer_send (ecd->peer, 0, packet) == -1) {
         enet_packet_destroy(packet);
+        svc->trace_out(ecd->sd->cm, "ENET  ======  failed to send a packet to peer %p, state %d\n", ecd->peer, ecd->peer->state);
 	return -1;
     }
     if (last_flush_call == 0) {
@@ -833,6 +896,7 @@ libcmenet_LTX_initialize(CManager cm, CMtrans_services svc,
     enet_data->listen_port = -1;
     enet_data->svc = svc;
     enet_data->server = NULL;
+    enet_data->pending_data = NULL;
 
     svc->add_shutdown_task(cm, shutdown_enet_thread, (void *) enet_data, SHUTDOWN_TASK);
     svc->add_shutdown_task(cm, free_enet_data, (void *) enet_data, FREE_TASK);
