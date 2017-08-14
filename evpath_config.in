@@ -74,7 +74,7 @@ if [ "$PRINT_DIR" == "yes" ]; then
 fi
 
 if [ "$PRINT_CFLAGS" == "yes" ]; then
-    CFLAGS="-I@CMAKE_INSTALL_PREFIX@/include"
+    CFLAGS="-I@CMAKE_INSTALL_PREFIX@/include @CONFIG_INCLUDES@"
     if [ $NFLAGS_ASKED -gt 1 ]; then
         echo -n "CFLAGS="
     fi
