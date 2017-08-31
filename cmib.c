@@ -786,7 +786,6 @@ static void handle_request(CMtrans_services svc,
 	//handling the request message
 
 	//first read the request message from the socket
-	struct ibv_mr *mr;
 	struct ibv_wc wc;
 	tbuffer *tb;
 	int retval = 0;
@@ -803,7 +802,6 @@ static void handle_request(CMtrans_services svc,
 	}
 
 	scd->tb = tb;
-	mr = tb->mr;
 
 	svc->set_pending_write(scd->conn);
 	internal_write_response(svc, scd, tb, req->length, req->request_ID);
@@ -892,14 +890,11 @@ CMIB_data_available(transport_entry trans, CMConnection conn)
 	ib_client_data_ptr sd = (ib_client_data_ptr) trans->trans_data;
 	CMtrans_services svc = sd->svc;
 	struct control_message msg;
-	double start =0;
 	ib_conn_data_ptr scd;
     
 	da_t = getlocaltime();
     
 	scd = (ib_conn_data_ptr) svc->get_transport_data(conn);
-
-	start = getlocaltime();    
 
 	iget = internal_read_stream(svc, scd, sizeof(struct control_message),
 	                            (unsigned char*)&msg);
