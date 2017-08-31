@@ -1488,7 +1488,7 @@ copy_full_buffer_and_send_pull_request(CMtrans_services svc, nnti_conn_data_ptr 
     struct client_message *m;
     CMbuffer write_buffer = NULL;
     NNTI_buffer_t mr;
-    char *data;
+    char *data = NULL;
     char *ptr;
     int i, write_size = 0;
     int err = NNTI_OK;
