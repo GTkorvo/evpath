@@ -162,7 +162,7 @@ CMtransport_trace(CManager cm, char *format, ...)
         if (CMtrace_timing) {
             struct timespec ts;
             clock_gettime(CLOCK_MONOTONIC, &ts);
-            printf("%lld.%.9ld - ", (long long)ts.tv_sec, ts.tv_nsec);
+            fprintf(cm->CMTrace_file, "%lld.%.9ld - ", (long long)ts.tv_sec, ts.tv_nsec);
         }
 #ifdef STDC_HEADERS
 	va_start(ap, format);
