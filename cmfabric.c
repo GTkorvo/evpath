@@ -417,7 +417,6 @@ static int internal_write_piggyback(CMtrans_services svc,
 	/* Read send queue */
 	do {
 	    struct fi_cq_data_entry comp;
-	    svc->trace_out(fcd->fabd->cm, "fi_cq_read for send completion\n");
 	    ret = fi_cq_read(fcd->scq, &comp, 1);
 	    if (ret < 0 && ret != -FI_EAGAIN) {
 		FT_PRINTERR("fi_cq_read", ret);
@@ -457,8 +456,8 @@ static int internal_write_response(CMtrans_services svc,
     /* Read send queue */
     do {
 	struct fi_cq_data_entry comp;
+	svc->trace_out(fcd->fabd->cm, "fi_cq_read for send completion in write response\n");
 
-	svc->trace_out(fcd->fabd->cm, "fi_cq_read for send completion\n");
 	ret = fi_cq_read(fcd->scq, &comp, 1);
 	if (ret < 0 && ret != -FI_EAGAIN) {
 	    FT_PRINTERR("fi_cq_read", ret);
@@ -2014,10 +2013,10 @@ static int server_listen(fabric_client_data_ptr fd, attr_list listen_info)
 	ret = fi_getinfo(FT_FIVERSION, host_name, port_str, FI_SOURCE, fd->hints, &fi);
 	svc->trace_out(fd->cm, "%s return value fi is %s\n", "server", fi_tostr(fi, FI_TYPE_INFO));
 	fd->hostname = strdup(host_name);
+	free_attr_list(listen_info);
     } else {
 	svc->trace_out(fd->cm, "%s return value fi is %s\n", "server", fi_tostr(fi, FI_TYPE_INFO));
     }
-    free_attr_list(listen_info);
 	    
     prov_use = fi;
     MPIDI_Global.max_buffered_send  = prov_use->tx_attr->inject_size;
