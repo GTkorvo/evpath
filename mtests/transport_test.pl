@@ -14,6 +14,7 @@ ARG: while (@ARGV && $ARGV[0] =~ s/^-(?=.)//) {
 			    next ARG; };
          s/^ssh//      && do { $ssh_host = shift(@ARGV);        next ARG; };
          s/^q(.*)//  && do { $quiet = 1 ; next ARG; };
+         s/^mpi//  && do { $mpi = 1 ; next ARG; };
          print("Unknown option: $_");
     }
 }
@@ -94,7 +95,11 @@ while ( my ($transport, $value) = each(%test_set) ) {
 	$_ .= " -ssh $ssh_host";
     }
 
-    $_ = "./trans_test -transport $transport $_ 2> /dev/null";
+    if ($mpi == 1) {
+	$_ = "mpirun -n 2 ./mpi_trans_test -transport $transport $_ 2> /dev/null";
+    } else {
+	$_ = "./trans_test -transport $transport $_ 2> /dev/null";
+    }
     print "Running: $_ \n" unless $quiet;
     my $output = `$_`;
     my $my_exit_code = $?;
