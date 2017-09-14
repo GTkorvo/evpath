@@ -77,7 +77,7 @@
 #endif
 
 #define _WITH_IB_
-#define PIGGYBACK 1025*100
+#define PIGGYBACK 1025*10
 
 #ifdef _WITH_IB_
 
@@ -1397,6 +1397,7 @@ fabric_conn_data_ptr fcd;
 	close(fcd->fd);
 	//free(fcd->remote_host);
 	//free(fcd->read_buffer);
+	if (fcd->last_write.iov) free(fcd->last_write.iov);
 	free(fcd);
 }
 
@@ -2403,6 +2404,7 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 	    free(last_write_request->mrlist);
 	    free(last_write_request->iov);
 	    last_write_request->iov = NULL;
+	    last_write_request->iov = NULL;
 	    last_write_request->mrlist = NULL;
 	    last_write_request->iovcnt = 0;
 	}
@@ -2433,7 +2435,10 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 	if (!can_reuse_mapping) {
 	    int i;
 	    fcd->last_write.iovcnt = iovcnt;
-	    fcd->last_write.iov = tmp_iov;
+	    if (fcd->last_write.iov) free(fcd->last_write.iov);
+	    fcd->last_write.iov = malloc(sizeof(tmp_iov[0]) * iovcnt);
+	    memcpy(fcd->last_write.iov, tmp_iov, sizeof(tmp_iov[0]) * iovcnt);
+
 	    fcd->last_write.mrlist = malloc(iovcnt * sizeof(fcd->last_write.mrlist[0]));
 	    for (i=0; i < iovcnt; i++) {
 		int ret;
