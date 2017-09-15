@@ -280,13 +280,13 @@ main(int argc, char **argv)
 	    attr_list contact_list;
 	    contact_list = attr_list_from_string(argv[1]);
 	    conn = CMinitiate_conn(cm, contact_list);
-	    free_attr_list(contact_list);
 	    if (conn == NULL) {
 		printf("No connection, attr list was :");
 		dump_attr_list(contact_list);
 		printf("\n");
 		exit(1);
 	    }
+	    free_attr_list(contact_list);
 	}
 	data = malloc(sizeof(simple_rec));
 	format = CMregister_format(cm, simple_format_list);
