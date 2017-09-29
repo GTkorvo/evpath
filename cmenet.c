@@ -46,6 +46,8 @@ typedef struct enet_client_data {
     CMtrans_services svc;
     ENetHost *server;
     queued_data pending_data;
+    int wake_write_fd;
+    int wake_read_fd;
 } *enet_client_data_ptr;
 
 typedef struct enet_connection_data {
@@ -164,8 +166,7 @@ enet_service_network(CManager cm, void *void_trans)
         free(entry);
     }
 
-   /* Wait up to 1000 milliseconds for an event. */
-    while (ecd->server && (enet_host_service (ecd->server, & event, 1) > 0)) {
+    while (ecd->server && (enet_host_service (ecd->server, & event, 0) > 0)) {
         switch (event.type) {
 	case ENET_EVENT_TYPE_NONE:
 	    break;
@@ -205,17 +206,27 @@ enet_service_network(CManager cm, void *void_trans)
 	}
     }
 }
+
 static
 void
-enet_service_network_lock(CManager cm, void *void_trans)
+read_wake_fd_and_service(CManager cm, void *void_trans)
 {
     transport_entry trans = (transport_entry) void_trans;
     enet_client_data_ptr ecd = (enet_client_data_ptr) trans->trans_data;
     CMtrans_services svc = ecd->svc;
 
-    ACQUIRE_CM_LOCK(svc, ecd->cm);
+    char buffer;
+    int fd = ecd->wake_read_fd;
+
+#ifdef HAVE_WINDOWS_H
+    recv(fd, &buffer, 1, 0);
+#else
+    if (read(fd, &buffer, 1) != 1) {
+	perror("wake read failed\n");
+    }
+#endif
+
     enet_service_network(cm, void_trans);
-    DROP_CM_LOCK(svc, ecd->cm);
 }
 
 #ifdef NOTDEF
@@ -620,6 +631,21 @@ build_listen_attrs(CManager cm, CMtrans_services svc, enet_client_data_ptr sd,
     return ret_list;
 }
 
+static void
+wake_enet_server_thread(enet_client_data_ptr enet_data)
+{
+    static char buffer = 'W';  /* doesn't matter what we write */
+    if (enet_data->wake_write_fd != -1) {
+#ifdef HAVE_WINDOWS_H
+	send(enet_data->wake_write_fd, &buffer, 1, 0);
+#else
+	if (write(enet_data->wake_write_fd, &buffer, 1) != 1) {
+	    printf("Whoops, wake write failed\n");
+	}
+#endif
+    }
+}
+
 /* 
  * Create an IP socket for connection from other CMs
  */
@@ -627,7 +653,7 @@ extern attr_list
 libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 				  transport_entry trans, attr_list listen_info)
 {
-    enet_client_data_ptr sd = trans->trans_data;
+    enet_client_data_ptr enet_data = trans->trans_data;
     ENetAddress address;
     ENetHost * server;
 
@@ -654,7 +680,7 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 
     address.host = ENET_HOST_ANY;
 
-    if (sd->server != NULL) {
+    if (enet_data->server != NULL) {
 	/* we're already listening */
         if (port_num == 0) {
 	    /* not requesting a specific port, return what we have */
@@ -682,7 +708,7 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 		     "An error occurred while trying to create an ENet server host.\n");
 	    return NULL;
 	}
-	sd->server = server;
+	enet_data->server = server;
     } else {
 	long seedval = time(NULL) + getpid();
 	/* port num is free.  Constrain to range 26000 : 26100 */
@@ -717,11 +743,18 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
 	    high_bound += 100;
 	    goto restart;
 	}
-	sd->server = server;
+	enet_data->server = server;
     }
     svc->fd_add_select(cm, enet_host_get_sock_fd (server), 
 		       (select_list_func) enet_service_network, (void*)cm, (void*)trans);
-    return build_listen_attrs(cm, svc, sd, listen_info, address.port);
+
+    svc->trace_out(enet_data->cm, "CMENET Adding read_wake_fd as action on fd %d",
+		   enet_data->wake_read_fd);
+
+    svc->fd_add_select(cm, enet_data->wake_read_fd, (select_list_func)read_wake_fd_and_service, 
+                       (void*)cm, (void*)trans);
+
+    return build_listen_attrs(cm, svc, enet_data, listen_info, address.port);
 }
 
 #if defined(HAVE_WINDOWS_H) && !defined(NEED_IOVEC_DEFINE)
@@ -819,6 +852,9 @@ libcmenet_LTX_writev_func(CMtrans_services svc, enet_conn_data_ptr ecd,
         svc->trace_out(ecd->sd->cm, "ENET  ======  failed to send a packet to peer %p, state %d\n", ecd->peer, ecd->peer->state);
 	return -1;
     }
+
+    wake_enet_server_thread(ecd->sd);
+
     if (last_flush_call == 0) {
 	enet_host_flush(ecd->sd->server);
 	last_flush_call = time(NULL);
@@ -867,6 +903,7 @@ libcmenet_LTX_initialize(CManager cm, CMtrans_services svc,
 			 transport_entry trans, attr_list attrs)
 {
     static int atom_init = 0;
+    int filedes[2];
 
     enet_client_data_ptr enet_data;
     (void)attrs;
@@ -897,9 +934,14 @@ libcmenet_LTX_initialize(CManager cm, CMtrans_services svc,
     enet_data->server = NULL;
     enet_data->pending_data = NULL;
 
+    if (pipe(filedes) != 0) {
+	perror("Pipe for wake not created.  ENET wake mechanism inoperative.");
+	return NULL;
+    }
+    enet_data->wake_read_fd = filedes[0];
+    enet_data->wake_write_fd = filedes[1];
     svc->add_shutdown_task(cm, shutdown_enet_thread, (void *) enet_data, SHUTDOWN_TASK);
     svc->add_shutdown_task(cm, free_enet_data, (void *) enet_data, FREE_TASK);
-    svc->add_periodic_task(cm, 1, 0, enet_service_network_lock, (void*)trans);
     return (void *) enet_data;
 }
 
