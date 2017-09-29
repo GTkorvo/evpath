@@ -26,6 +26,7 @@
 #include <netinet/ip_var.h>
 #include <netinet/tcp.h>
 #include <netinet/tcp_var.h>
+#include <net/if.h>
 #endif
 
 #ifdef HAVE_UNAME
