@@ -213,7 +213,6 @@ read_wake_fd_and_service(CManager cm, void *void_trans)
 {
     transport_entry trans = (transport_entry) void_trans;
     enet_client_data_ptr ecd = (enet_client_data_ptr) trans->trans_data;
-    CMtrans_services svc = ecd->svc;
 
     char buffer;
     int fd = ecd->wake_read_fd;
