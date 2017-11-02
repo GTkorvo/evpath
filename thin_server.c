@@ -8,7 +8,6 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <unistd.h>
-#include "cercs_env.h"
 #include "evpath.h"
 #include "cm_internal.h"
 

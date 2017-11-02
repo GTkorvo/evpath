@@ -1,9 +1,6 @@
 #ifndef __I_O__
 #include <ffs.h>
 #endif
-#ifndef CERCS_ENV_H
-#include <cercs_env.h>
-#endif
 #ifndef _SYS_TIME_H
 #include "sys/time.h"
 #endif
@@ -239,6 +236,15 @@ typedef struct _CMConnHandlerList {
 } *CMConnHandlerList, CMConnHandlerListEntry;
 
 #define HEADER_BUFFER_SIZE 20
+#ifndef CHR_TIME_H
+/* to avoid including this everywhere it isn't needed, struct chr_time just needs to be big-ish.  Actually implementation can vary */
+  typedef struct chr_time {
+    double d1;
+    double d2;
+    double d3;
+  } chr_time;
+#endif
+
 struct _CMConnection {
     CManager cm;
     /* remote contact info */

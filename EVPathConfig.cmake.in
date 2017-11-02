@@ -14,5 +14,5 @@ set(EVPATH_INCLUDES "${rootDir}/@INCLUDE_INSTALL_DIR@")
 include(${myDir}/EVPathTargets.cmake)
 
 # set the expected library variable
-set(EVPATH_LIBRARIES evpath atl ffs cercs_env )
+set(EVPATH_LIBRARIES evpath atl ffs )
 

@@ -82,7 +82,7 @@ if [ "$PRINT_CFLAGS" == "yes" ]; then
 fi
 
 if [ "$PRINT_LDFLAGS" == "yes" ]; then
-    LDFLAGS="-L@CMAKE_INSTALL_PREFIX@/lib -levpath -L@FFS_LIB_DIR@ -lffs -L@ATL_LIB_DIR@ -latl -L@DILL_LIB_DIR@ -ldill -L@CERCS_ENV_LIB_DIR@ -lcercs_env @EVPATH_TRANSPORT_FULL_DEP_STR@"
+    LDFLAGS="-L@CMAKE_INSTALL_PREFIX@/lib -levpath -L@FFS_LIB_DIR@ -lffs -L@ATL_LIB_DIR@ -latl -L@DILL_LIB_DIR@ -ldill -lcercs_env @EVPATH_TRANSPORT_FULL_DEP_STR@"
     if [ $NFLAGS_ASKED -gt 1 ]; then
         echo -n "LDFLAGS="
     fi
@@ -90,7 +90,7 @@ if [ "$PRINT_LDFLAGS" == "yes" ]; then
 fi
 
 if [ "$PRINT_STATIC_LDFLAGS" == "yes" ]; then
-    LDFLAGS="@CMAKE_INSTALL_PREFIX@/lib/libevpath.a @FFS_STATIC_LIB@ @ATL_STATIC_LIB@ @DILL_STATIC_LIB@ @CERCS_ENV_STATIC_LIB@ @EVPATH_TRANSPORT_STATIC_DEP_STR@"
+    LDFLAGS="@CMAKE_INSTALL_PREFIX@/lib/libevpath.a @FFS_STATIC_LIB@ @ATL_STATIC_LIB@ @DILL_STATIC_LIB@ @EVPATH_TRANSPORT_STATIC_DEP_STR@"
     if [ $NFLAGS_ASKED -gt 1 ]; then
         echo -n "STATIC LDFLAGS="
     fi

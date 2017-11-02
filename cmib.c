@@ -61,7 +61,6 @@
 #endif
 
 #include <atl.h>
-#include <cercs_env.h>
 #include "evpath.h"
 #include "cm_transport.h"
 #include "cm_internal.h"
@@ -1229,7 +1228,7 @@ int no_more_redirect;
 			return -1;
 		}
 		sock_addr.s.sa_family = AF_INET;
-		if (((network_string = cercs_getenv("CM_NETWORK")) != NULL) &&
+		if (((network_string = getenv("CM_NETWORK")) != NULL) &&
 		    (host_name != NULL)) {
 			int name_len = strlen(host_name) + 2 + strlen(network_string);
 			char *new_host_name = svc->malloc_func(name_len);
@@ -1671,14 +1670,14 @@ attr_list listen_info;
 		sd->listen_port = int_port_num;
 		add_attr(ret_list, CM_TRANSPORT, Attr_String,
 		         (attr_value) strdup("ib"));
-		if ((IP != 0) && (cercs_getenv("CM_NETWORK") == NULL) &&
+		if ((IP != 0) && (getenv("CM_NETWORK") == NULL) &&
 		    (!query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
 		                 (attr_value *) (long)& network_string))) {
 			add_attr(ret_list, CM_IP_ADDR, Attr_Int4,
 			         (attr_value) (long)IP);
 		}
-		if ((cercs_getenv("CmibUseHostname") != NULL) || 
-		    (cercs_getenv("CM_NETWORK") != NULL) ||
+		if ((getenv("CmibUseHostname") != NULL) || 
+		    (getenv("CM_NETWORK") != NULL) ||
 		    (query_attr(listen_info, CM_NETWORK_POSTFIX, NULL,
 		                (attr_value *) (long)& network_string))) {
 			add_attr(ret_list, CM_IP_HOSTNAME, Attr_String,
@@ -2044,7 +2043,7 @@ CMtrans_services svc;
 	}    
 
 	LIST_INSERT_HEAD(&memlist, tb, entries);
-	perftrace = (cercs_getenv("CMIBTransportVerbose") != NULL);    
+	perftrace = (getenv("CMIBTransportVerbose") != NULL);    
 
 	return (void *) socket_data;
 }

@@ -40,8 +40,8 @@ inet_ntoa(struct in_addr ina)
 #include "ffs.h"
 #include "atl.h"
 #include "evpath.h"
+#include "chr_time.h"
 #include "cm_internal.h"
-#include "cercs_env.h"
 
 /*
  * The main function there is CMpbio_get_format_rep_callback, the routine
@@ -471,9 +471,9 @@ CMinit_local_formats(CManager cm)
 {
     if (CMself_hosted_formats == -1) {
 	CMself_hosted_formats = CM_SELF_FORMATS;  /* default set in CMake */
-	if (cercs_getenv("CMSelfFormats") != NULL) {
+	if (getenv("CMSelfFormats") != NULL) {
 	    CMself_hosted_formats = 1;
-	} else if (cercs_getenv("CMExternalFormats") != NULL) {
+	} else if (getenv("CMExternalFormats") != NULL) {
 	    CMself_hosted_formats = 0;
 	}
     }

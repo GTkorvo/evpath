@@ -60,7 +60,6 @@
 #endif
 
 #include <atl.h>
-#include <cercs_env.h>
 #include "evpath.h"
 #include "cm_transport.h"
 
@@ -792,7 +791,7 @@ attr_list listen_info;
 	    add_attr(ret_list, CM_IP_ADDR, Attr_Int4,
 		     (attr_value) (long)IP);
 	}
-	if ((cercs_getenv("CMSocketsUseHostname") != NULL) || 
+	if ((getenv("CMSocketsUseHostname") != NULL) || 
 	    use_hostname) {
 	    add_attr(ret_list, CM_IP_HOSTNAME, Attr_String,
 		     (attr_value) strdup(host_name));

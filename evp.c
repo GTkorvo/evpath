@@ -3263,7 +3263,7 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
 	static int size_set = 0;
 	int r;
 	if (size_set == 0) {
-	    char *size_str = cercs_getenv("CMDumpSize");
+	    char *size_str = getenv("CMDumpSize");
 	    size_set++;
 	    if (size_str != NULL) {
 		dump_char_limit = atoi(size_str);
@@ -3491,7 +3491,7 @@ EVPinit(CManager cm)
     internal_add_shutdown_task(cm, free_evp, NULL, FREE_TASK);
     {
         char *backpressure_env;
-        backpressure_env = cercs_getenv("EVBackpressure");
+        backpressure_env = getenv("EVBackpressure");
         if (backpressure_env && atoi(backpressure_env) != 0) {
             cm->evp->use_backpressure = 1;
         } else {

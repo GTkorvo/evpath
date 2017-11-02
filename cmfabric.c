@@ -65,7 +65,6 @@
 #include <rdma/fi_eq.h>
 
 #include <atl.h>
-#include <cercs_env.h>
 #include "evpath.h"
 #include "cm_transport.h"
 #include "cm_internal.h"
@@ -2260,8 +2259,8 @@ libcmfabric_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport
 	fd->listen_port = port_num;
 	add_attr(ret_list, CM_TRANSPORT, Attr_String,
 		 (attr_value) strdup("fabric"));
-	if ((cercs_getenv("CMFabricUseHostname") != NULL) || 
-	    (cercs_getenv("CM_NETWORK") != NULL)) {
+	if ((getenv("CMFabricUseHostname") != NULL) || 
+	    (getenv("CM_NETWORK") != NULL)) {
 	    add_attr(ret_list, CM_IP_HOSTNAME, Attr_String,
 		     (attr_value) strdup(fd->hostname));
 	} else if (IP == 0) {

@@ -14,6 +14,7 @@
 #endif
 #include <atl.h>
 #include <evpath.h>
+#include "chr_time.h"
 #include <cm_internal.h>
 #include <cm_transport.h>
 #if !NO_DYNAMIC_LINKING

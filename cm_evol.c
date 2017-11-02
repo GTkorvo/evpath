@@ -20,7 +20,6 @@
 #include <ffs.h>
 #include <atl.h>
 #include "evpath.h"
-#include "cercs_env.h"
 #include "cm_internal.h"
 #include "cm_transport.h"
 #include "cod.h"

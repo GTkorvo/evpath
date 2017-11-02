@@ -59,7 +59,6 @@
 #endif
 
 #include <atl.h>
-#include <cercs_env.h>
 #include "evpath.h"
 #include "cm_transport.h"
 
@@ -277,7 +276,7 @@ attr_list conn_attr_list;
 	svc->trace_out(cm, "CMUDP transport connect to port %d", int_port_num);
     }
 
-    if (((network_string = cercs_getenv("CM_NETWORK")) != NULL) &&
+    if (((network_string = getenv("CM_NETWORK")) != NULL) &&
 	(host_name != NULL)) {
 	int name_len = strlen(host_name) + 2 + strlen(network_string);
 	char *new_host_name = svc->malloc_func(name_len);

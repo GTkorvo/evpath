@@ -27,7 +27,7 @@
 #include <ffs.h>
 #include <atl.h>
 #include "evpath.h"
-#include "cercs_env.h"
+#include "chr_time.h"
 #include "cm_internal.h"
 #include "cm_transport.h"
 
@@ -582,7 +582,7 @@ static void
 CMinitialize(CManager cm)
 {
     char **transport_names = CMglobal_alternate_transports;
-    char *def = cercs_getenv("CMDefaultTransport");
+    char *def = getenv("CMDefaultTransport");
     if (def != NULL) CMglobal_default_transport = def;
     if (CMglobal_default_transport) {
 	if (load_transport(cm, CMglobal_default_transport, 0) == 0) {
@@ -994,14 +994,14 @@ CManager_free(CManager cm)
      int blocking_on_conn;
      CMConnection conn = INT_CMmalloc(sizeof(struct _CMConnection));
      if (first) {
-	 char *value = cercs_getenv("CMNonBlockWrite");
+	 char *value = getenv("CMNonBlockWrite");
 	 first = 0;
 	 if (value != NULL) {
 	     sscanf(value, "%d", &non_block_default);
 	     CMtrace_out(trans->cm, CMConnectionVerbose, "CM default blocking %d\n",
 			 non_block_default);
 	 }
-	 value = cercs_getenv("CMReadThread");
+	 value = getenv("CMReadThread");
 	 if (value != NULL) {
 	     sscanf(value, "%d", &read_thread_default);
 	     CMtrace_out(trans->cm, CMConnectionVerbose, "CM default read thread %d\n",
@@ -1897,19 +1897,19 @@ INT_CMConnection_failed(CMConnection conn)
      if (first) {
 	 char *tmp;
 	 first = 0;
-	 tmp = cercs_getenv("CMReadAheadMsgLimit");
+	 tmp = getenv("CMReadAheadMsgLimit");
 	 if (tmp != NULL) {
 	     if (sscanf(tmp, "%d", &read_ahead_msg_limit) != 1) {
 		 printf("Read ahead msg limit \"%s\" not parsed\n", tmp);
 	     }
 	 }
-	 tmp = cercs_getenv("CMReadAheadByteLimit");
+	 tmp = getenv("CMReadAheadByteLimit");
 	 if (tmp != NULL) {
 	     if (sscanf(tmp, "%ld", &read_ahead_byte_limit) != 1) {
 		 printf("Read ahead byte limit \"%s\" not parsed\n", tmp);
 	     }
 	 }
-	 tmp = cercs_getenv("CMBlockingReads");
+	 tmp = getenv("CMBlockingReads");
 	 if (tmp != NULL) {
 	     use_blocking_reads = atoi(tmp);
 	 }
@@ -2484,7 +2484,7 @@ INT_CMConnection_failed(CMConnection conn)
 	 static int size_set = 0;
 	 int r;
 	 if (size_set == 0) {
-	     char *size_str = cercs_getenv("CMDumpSize");
+	     char *size_str = getenv("CMDumpSize");
 	     size_set++;
 	     if (size_str != NULL) {
 		 dump_char_limit = atoi(size_str);
@@ -3108,7 +3108,7 @@ INT_CMConnection_failed(CMConnection conn)
 	 static int size_set = 0;
 	 int r;
 	 if (size_set == 0) {
-	     char *size_str = cercs_getenv("CMDumpSize");
+	     char *size_str = getenv("CMDumpSize");
 	     size_set++;
 	     if (size_str != NULL) {
 		 dump_char_limit = atoi(size_str);
@@ -3233,7 +3233,7 @@ INT_CMConnection_failed(CMConnection conn)
 	 static int size_set = 0;
 	 int r;
 	 if (size_set == 0) {
-	     char *size_str = cercs_getenv("CMDumpSize");
+	     char *size_str = getenv("CMDumpSize");
 	     size_set++;
 	     if (size_str != NULL) {
 		 dump_char_limit = atoi(size_str);

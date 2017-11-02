@@ -19,8 +19,8 @@
 #endif
 #include "atl.h"
 #include "evpath.h"
+#include "chr_time.h"
 #include "cm_internal.h"
-#include "cercs_env.h"
 
 
 extern void EVfprint_version(FILE* out);
@@ -43,31 +43,31 @@ extern int CMtrace_init(CManager cm, CMTraceType trace_type)
     char *str;
     CMtrace_val[0] = 0;
     CMtrace_val[EVWarning] = 1;  /* default on */
-    CMtrace_val[CMControlVerbose] = (cercs_getenv("CMControlVerbose") != NULL);
-    CMtrace_val[CMConnectionVerbose] = (cercs_getenv("CMConnectionVerbose") != NULL);
-    CMtrace_val[CMDataVerbose] = (cercs_getenv("CMDataVerbose") != NULL);
-    CMtrace_val[CMTransportVerbose] = (cercs_getenv("CMTransportVerbose") != NULL);
-    CMtrace_val[CMFormatVerbose] = (cercs_getenv("CMFormatVerbose") != NULL);
-    CMtrace_val[CMFreeVerbose] = (cercs_getenv("CMFreeVerbose") != NULL);
-    CMtrace_val[CMAttrVerbose] = (cercs_getenv("CMAttrVerbose") != NULL);
-    CMtrace_val[CMBufferVerbose] = (cercs_getenv("CMBufferVerbose") != NULL);
-    CMtrace_val[EVerbose] = (cercs_getenv("EVerbose") != NULL);
-    CMtrace_val[CMIBTransportVerbose] = (cercs_getenv("CMIBTransportVerbose") != NULL);    
-    CMtrace_val[EVdfgVerbose] = (cercs_getenv("EVdfgVerbose") != NULL);
-    CMtrace_timing = (cercs_getenv("CMTraceTiming") != NULL);
-    CMtrace_PID = (cercs_getenv("CMTracePID") != NULL);
-    if ((str = cercs_getenv("EVWarning")) != NULL) {
+    CMtrace_val[CMControlVerbose] = (getenv("CMControlVerbose") != NULL);
+    CMtrace_val[CMConnectionVerbose] = (getenv("CMConnectionVerbose") != NULL);
+    CMtrace_val[CMDataVerbose] = (getenv("CMDataVerbose") != NULL);
+    CMtrace_val[CMTransportVerbose] = (getenv("CMTransportVerbose") != NULL);
+    CMtrace_val[CMFormatVerbose] = (getenv("CMFormatVerbose") != NULL);
+    CMtrace_val[CMFreeVerbose] = (getenv("CMFreeVerbose") != NULL);
+    CMtrace_val[CMAttrVerbose] = (getenv("CMAttrVerbose") != NULL);
+    CMtrace_val[CMBufferVerbose] = (getenv("CMBufferVerbose") != NULL);
+    CMtrace_val[EVerbose] = (getenv("EVerbose") != NULL);
+    CMtrace_val[CMIBTransportVerbose] = (getenv("CMIBTransportVerbose") != NULL);    
+    CMtrace_val[EVdfgVerbose] = (getenv("EVdfgVerbose") != NULL);
+    CMtrace_timing = (getenv("CMTraceTiming") != NULL);
+    CMtrace_PID = (getenv("CMTracePID") != NULL);
+    if ((str = getenv("EVWarning")) != NULL) {
 	sscanf(str, "%d", &CMtrace_val[EVWarning]);
     }
-    if (cercs_getenv("CMVerbose") != NULL) {
+    if (getenv("CMVerbose") != NULL) {
 	int j;
 	for (j=0; j<CMLastTraceType; j++)
 	    CMtrace_val[j] = 1;
     }
     /* for low level verbose, value overrides general CMVerbose */
-    CMtrace_val[CMLowLevelVerbose] = (cercs_getenv("CMLowLevelVerbose") != NULL);
+    CMtrace_val[CMLowLevelVerbose] = (getenv("CMLowLevelVerbose") != NULL);
 
-    if (cercs_getenv("CMTraceFile") != NULL) {
+    if (getenv("CMTraceFile") != NULL) {
 	CMTrace_file_num = getpid();
     }
     if (CMTrace_file_num != -1) {

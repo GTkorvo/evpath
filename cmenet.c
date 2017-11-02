@@ -22,7 +22,6 @@
 #endif
 
 #include <atl.h>
-#include <cercs_env.h>
 #include "evpath.h"
 #include "cm_transport.h"
 
@@ -615,7 +614,7 @@ build_listen_attrs(CManager cm, CMtrans_services svc, enet_client_data_ptr sd,
 	add_attr(ret_list, CM_ENET_ADDR, Attr_Int4,
 		 (attr_value) (long)IP);
     }
-    if ((cercs_getenv("CMEnetsUseHostname") != NULL) || 
+    if ((getenv("CMEnetsUseHostname") != NULL) || 
 	use_hostname) {
 	add_attr(ret_list, CM_ENET_HOSTNAME, Attr_String,
 		 (attr_value) strdup(host_name));

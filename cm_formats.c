@@ -22,6 +22,7 @@
 #include "ffs.h"
 #include "atl.h"
 #include "evpath.h"
+#include "chr_time.h"
 #include "cm_internal.h"
 
 static CMFormat add_format_to_cm(CManager cm, CMFormat format);

@@ -232,7 +232,7 @@ get_self_ip_addr(void *cm, CMtrans_services svc)
      *  for the CM_LAST_RESORT_IP_ADDR environment variable.
      */
     if (rv == 0) {
-	char *c = cercs_getenv("CM_LAST_RESORT_IP_ADDR");
+	char *c = getenv("CM_LAST_RESORT_IP_ADDR");
 	if (svc)
 	    svc->trace_out(cm, "CM<transport> - Get self IP addr at last resort");
 	if (c != NULL) {
@@ -263,8 +263,8 @@ get_qual_hostname(void *cm, char *buf, int len, CMtrans_services svc, attr_list 
 {
     struct hostent *host = NULL;
 
-    char *network_string = cercs_getenv("CM_NETWORK");
-    char *hostname_string = cercs_getenv("CERCS_HOSTNAME");
+    char *network_string = getenv("CM_NETWORK");
+    char *hostname_string = getenv("CERCS_HOSTNAME");
     if (hostname_string != NULL) {
 	strncpy(buf, hostname_string, len);
 	return;

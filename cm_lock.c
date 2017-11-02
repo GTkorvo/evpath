@@ -12,6 +12,7 @@
 
 #include "atl.h"
 #include "evpath.h"
+#include "chr_time.h"
 #include "cm_internal.h"
 #include "config.h"
 #undef NDEBUG

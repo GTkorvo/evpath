@@ -7,8 +7,8 @@ SET( CMAKE_BUILD_TYPE "RelWithDebInfo" )
 ENDIF()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "cercs_env, dill, atl, ffs")
-set(CPACK_RPM_PACKAGE_REQUIRES "cercs_env, dill, atl, ffs")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "dill, atl, ffs")
+set(CPACK_RPM_PACKAGE_REQUIRES "dill, atl, ffs")
 
 include(CheckFunctionExists)
 include(CheckIncludeFiles)
@@ -73,7 +73,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 set (EVPATH_SRC_LIST cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c 
                        cm_lock.c cm_perf.c cm_pbio.c cm_interface.c version.c
                        cm_threadio.c cm_evol.c evp.c response.c metrics.c 
-		       dlloader.c ip_config.c 
+		       dlloader.c ip_config.c chr_time.c
                        revp.c evp_compat.c thin_server.c evp_threads.c ev_dfg.c)
 
 set (CERCS_FIND_OPTIONS)
@@ -111,7 +111,6 @@ if (DEFINED CERCS_USE_INSTALLED)
    list (APPEND CERCS_FIND_OPTIONS "USE_INSTALLED")
 endif(DEFINED CERCS_USE_INSTALLED) 
 
-FIND_CERCS_PROJECT (cercs_env LIBRARY cercs_env INCLUDES cercs_env.h REQUIRED ${CERCS_FIND_OPTIONS})
 FIND_CERCS_PROJECT (atl LIBRARY atl INCLUDES atl.h REQUIRED ${CERCS_FIND_OPTIONS})
 FIND_CERCS_PROJECT (ffs LIBRARY ffs INCLUDES ffs.h REQUIRED ${CERCS_FIND_OPTIONS})
 FIND_CERCS_PROJECT (dill LIBRARY dill REQUIRED ${CERCS_FIND_OPTIONS})
@@ -119,13 +118,9 @@ find_package (Threads)
 find_package (MPI)
 find_package (NVML)
 
-list (APPEND DEPLIBS "-L${CERCS_ENV_LIB_DIR}" "${CERCS_ENV_LIB_DIR}/libcercs_env.la")
 list (APPEND DEPLIBS "-L${ATL_LIB_DIR}" "${ATL_LIB_DIR}/libatl.la")
 list (APPEND DEPLIBS "-L${FFS_LIB_DIR}" "${FFS_LIB_DIR}/libffs.la")
 list (APPEND DEPLIBS "-L${DILL_LIB_DIR}" "${DILL_LIB_DIR}/libdill.la")
-if (EXISTS "${CERCS_ENV_LIB_DIR}/libcercs_env.a")
-  set (CERCS_ENV_STATIC_LIB "${CERCS_ENV_LIB_DIR}/libcercs_env.a")
-endif()
 if (EXISTS "${ATL_LIB_DIR}/libatl.a")
   set (ATL_STATIC_LIB "${ATL_LIB_DIR}/libatl.a")
 endif()
@@ -155,9 +150,9 @@ else()
    list (APPEND BASE_LIBS rt)
 endif()
 
-list (APPEND INC_DIRS ${CERCS_ENV_INCLUDE_DIR} ${ATL_INCLUDE_DIR} ${FFS_INCLUDE_DIR})
-list (APPEND LIB_DIRS ${CMAKE_CURRENT_BINARY_DIR} ${CERCS_ENV_LIB_DIR} ${ATL_LIB_DIR} ${FFS_LIB_DIR} ${DILL_LIB_DIR})
-list (APPEND BASE_LIBS ${FFS_LIBRARIES} ${ATL_LIBRARIES} ${DILL_LIBRARIES} ${CERCS_ENV_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} m )
+list (APPEND INC_DIRS ${ATL_INCLUDE_DIR} ${FFS_INCLUDE_DIR})
+list (APPEND LIB_DIRS ${CMAKE_CURRENT_BINARY_DIR} ${ATL_LIB_DIR} ${FFS_LIB_DIR} ${DILL_LIB_DIR})
+list (APPEND BASE_LIBS ${FFS_LIBRARIES} ${ATL_LIBRARIES} ${DILL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} m )
 
 list(REMOVE_DUPLICATES INC_DIRS)
 FOREACH (DIR ${INC_DIRS})

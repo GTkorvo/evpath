@@ -13,6 +13,7 @@
 #include <ffs.h>
 #include <atl.h>
 #include "evpath.h"
+#include "chr_time.h"
 #include "cm_internal.h"
 
 typedef struct _CMCondition {
