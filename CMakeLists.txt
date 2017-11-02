@@ -291,8 +291,10 @@ IF (HAVE_IBVERBS OR HAVE_UGNI)
 	   
 	   list (APPEND EVPATH_TRANSPORT_DEP_LIBS ${NNTI_LIBRARIES} ${ENET_LIBRARIES})
 	   list (APPEND EVPATH_TRANSPORT_FULL_DEP "-L${NNTI_LIB_DIR}" "${NNTI_LIBRARIES}" "-L${ENET_LIB_DIR}" "${ENET_LIBRARIES}")
-	   if (EXISTS "${NNTI__LIB_DIR}/libtrios_nnti.a") 
-	     list (APPEND EVPATH_TRANSPORT_STATIC_DEPS "${NNTI_LIB_DIR}/libtrios_nnti.a" "${NNTI_LIB_DIR}/libtrios_support.a") 
+	   if (EXISTS "${NNTI_LIB_DIR}/libtrios_nnti.a") 
+	     list (APPEND EVPATH_TRANSPORT_STATIC_DEPS
+	   "${NNTI_LIB_DIR}/libtrios_nnti.a"
+	   "${NNTI_LIB_DIR}/libtrios_support.a" "-lstdc++" "${ENET_LIBRARIES}") 
 	   endif ()
 	   list (APPEND DEPLIBS ${NNTI_LIBRARIES})
         ENDIF (NOT NO_TRANSPORT_MODULES)
