@@ -10,7 +10,7 @@
 #include <signal.h>
 #include "evpath.h"
 #include <errno.h>
-#include "cercs_env.h"
+#include "chr_time.h"
 #ifdef BUILD_WITH_MPI
 #include "mpi.h"
 #define CONTACTLEN 1024
