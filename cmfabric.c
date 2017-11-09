@@ -308,15 +308,6 @@ static atom_t CM_IP_ADDR = -1;
 static atom_t CM_IP_INTERFACE = -1;
 static atom_t CM_TRANSPORT = -1;
 
-static double getlocaltime()
-{
-	struct timeval t;
-	double dt;
-	gettimeofday(&t, NULL);
-	dt = (double) t.tv_usec / 1e6 + t.tv_sec;
-	return dt;
-}
-
 static int
 check_host(hostname, sin_addr)
 	char *hostname;
@@ -406,7 +397,7 @@ static int internal_write_piggyback(CMtrans_services svc,
 	memcpy(fcd->send_buf, msg, msg->u.pb.total_length);
 	int ret, sent = 0;
 	
-	svc->trace_out(fcd->fabd->cm, "fi_send on conn_ep\n");
+	svc->trace_out(fcd->fabd->cm, "fi_send on conn_ep, length %d, send_buf %p\n", msg->u.pb.total_length, fcd->send_buf);
 	ret = fi_send(fcd->conn_ep, fcd->send_buf, msg->u.pb.total_length, fi_mr_desc(fcd->send_mr), 0, &sent);
 	if (ret) {
 	    FT_PRINTERR("fi_send", ret);
@@ -549,12 +540,10 @@ static int handle_response(CMtrans_services svc,
     //read back response
     struct response *rep;
     rinfo *write_request;
-    int free_data_elements;
     
     rep = &msg->u.resp;
     write_request = ptr_from_int64(rep->request_ID);
     
-    free_data_elements = (write_request->notify_func == NULL);
     if (rep->max_length == -1) {
 	fprintf(stderr, "WRITE FAILED, request %p\n", write_request);
 	return -1;
@@ -1000,9 +989,9 @@ can_do_something(fabric_client_data_ptr fabd)
 		}
 		
 		svc->trace_out(fcd->fabd->cm, "fi_read, buffer %p, len %d, (keys.rkey %lx, keys.addr %lx)\n", this_pull->dest, remote->length, remote->rkey, remote->remote_addr);
-		struct pollfd poll_list[1];
-		poll_list[0].fd = fcd->sfd;
-		poll_list[0].events = POLLIN|POLLPRI;
+//		struct pollfd poll_list[1];
+//		poll_list[0].fd = fcd->sfd;
+//		poll_list[0].events = POLLIN|POLLPRI;
 //		int pret = poll(&poll_list[0], (unsigned long)1, 0);
 //		printf("Before read poll list ret %d, revents = %x\n", pret, poll_list[0].revents);
 		ssize_t ret = fi_read(fcd->conn_ep, this_pull->dest, 
@@ -1140,13 +1129,12 @@ static void handle_request(CMtrans_services svc,
                            struct control_message *msg)
 {
     //handling the request message
-    int ret = 0;
     if (fcd->fabd->avail) {
 	add_to_pull_queue(svc, fcd, msg);
 	wake_pull_thread(fcd->fabd);
     } else {
 	/* immediate pull and handle */
-	ret = perform_pull(svc, fcd, msg);
+	(void) perform_pull(svc, fcd, msg);
     }
 }
 
@@ -1170,7 +1158,6 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 	fabric_client_data_ptr fabd = (fabric_client_data_ptr) trans->trans_data;
 	CMtrans_services svc = fabd->svc;
 	struct control_message *msg;
-	double start =0;
 	fabric_conn_data_ptr fcd;
 	int ret, call_data_available;
 	CMbuffer CMbuffer_to_return = NULL;
@@ -1178,7 +1165,6 @@ CMFABRIC_data_available(transport_entry trans, CMConnection conn)
 	fcd = (fabric_conn_data_ptr) svc->get_transport_data(conn);
 	fids[0] = &fcd->rcq->fid;
 	fabd->trans = trans;
-	start = getlocaltime();    
 
 	svc->trace_out(fabd->cm, "At the beginning of CMFabric_data_available: ");
 	ret = fi_trywait(fcd->fabd->fab, fids, 1);
@@ -1354,7 +1340,6 @@ fabric_service_incoming(void *void_trans, void *void_eq)
     fabric_client_data_ptr fabd = (fabric_client_data_ptr) trans->trans_data;
     struct fi_eq_cm_entry entry;
     uint32_t event;
-    struct fi_info *info = NULL;
     ssize_t rd;
 
     rd = fi_eq_sread(fabd->cmeq, &event, &entry, sizeof entry, -1, FI_PEEK);
@@ -1377,7 +1362,6 @@ fabric_service_incoming(void *void_trans, void *void_eq)
 	fabric_accept_conn(void_trans, void_eq);
     } else {
 	rd = fi_eq_sread(fabd->cmeq, &event, &entry, sizeof entry, -1, 0);
-	info = entry.info;
 	if (event == FI_SHUTDOWN){
 	    fabd->svc->trace_out(fabd->cm, "CMFABRIC got a shutdown event for some conn, who knows which one?\n");
 	} else {
@@ -1838,6 +1822,7 @@ static int alloc_ep_res(fabric_conn_data_ptr fcd, struct fi_info *fi)
 	}
 
 	access_mode = FI_REMOTE_WRITE | FI_WRITE;
+	printf("fi_mr_reg length %lu, send_buf %p\n", MAX(fcd->buffer_size, sizeof(uint64_t)), fcd->send_buf);
 	ret = fi_mr_reg(fabd->dom, fcd->send_buf, MAX(fcd->buffer_size, sizeof(uint64_t)), 
 			access_mode, 0, 0, 0, &fcd->send_mr, NULL);
 	if (ret) {
@@ -1977,14 +1962,14 @@ static int server_listen(fabric_client_data_ptr fd, attr_list listen_info)
     struct fi_info *fi, *prov_use;
     CMtrans_services svc = fd->svc;
     int ret;
-    int port_num, attr_port_num;
+    int attr_port_num;
     char *port_str = NULL;
 
 //    ret = fi_getinfo(FT_FIVERSION, fd->opts.src_addr, fd->opts.src_port, FI_SOURCE,
 //		     fd->hints, &fi);
     if (listen_info != NULL
 	&& !get_int_attr(listen_info, CM_IP_PORT, &attr_port_num)) {
-	port_num = 0;
+	attr_port_num = 0;
     } else {
 	if (attr_port_num > USHRT_MAX || attr_port_num < 0) {
 	    fprintf(stderr, "Requested port number %d is invalid\n", attr_port_num);
@@ -2123,9 +2108,6 @@ static int server_connect(fabric_conn_data_ptr fcd)
 	int ret;
 	fabric_client_data_ptr fabd = fcd->fabd;
 
-/* connection attributes, temporarily here */
-	enum fi_mr_mode mr_mode;
-
 	rd = fi_eq_sread(fabd->cmeq, &event, &entry, sizeof entry, -1, 0);
 	if (rd != sizeof entry) {
 	    if (rd == -FI_EAVAIL) {
@@ -2149,7 +2131,6 @@ static int server_connect(fabric_conn_data_ptr fcd)
 		goto err1;
 	}
 
-	mr_mode = info->domain_attr->mr_mode;
 	ret = fi_domain(fabd->fab, info, &fabd->dom, NULL);
 	if (ret) {
 		FT_PRINTERR("fi_domain", ret);
@@ -2351,7 +2332,7 @@ libcmfabric_LTX_writev_complete_notify_func(CMtrans_services svc,
 	svc->trace_out(fcd->fabd->cm, "CMFABRIC writev of %d bytes on fd %d",
 	               left, fd);
 	
-	if (left < PIGGYBACK)
+	if (left + msg_offset() < PIGGYBACK)
 	{
 		//total size is less than the piggyback size
 		iget = internal_write_piggyback(svc, fcd, left, iov, iovcnt);
