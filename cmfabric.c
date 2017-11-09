@@ -823,7 +823,8 @@ static void
 kill_thread(fabric_client_data_ptr fabd)
 {
     fabd->thread_should_run = 0;
-    wake_pull_thread(fabd);
+    if (fabd->thread_init) wake_pull_thread(fabd);
+    fabd->thread_init = 0;
 }
 
 static void
