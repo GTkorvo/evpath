@@ -1,3 +1,6 @@
+#ifndef _CM_CONFIG_H
+#define _CM_CONFIG_H
+
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
 /* Define to 1 if you have the <enet/enet.h> header file. */
@@ -135,6 +138,9 @@
 /* Define to 1 if you have the `getifaddrs' function. */
 #cmakedefine HAVE_GETIFADDRS
 
+/* Define to 1 if you have the `clock_gettime' function. */
+#cmakedefine HAVE_CLOCK_GETTIME
+
 /* Define to 1 if you have the ANSI C header files. */
 #cmakedefine STDC_HEADERS
 
@@ -181,3 +187,5 @@
 #cmakedefine WORDS_BIGENDIAN
 
 #define CM_DEFAULT_TRANSPORT "@CM_DEFAULT_TRANSPORT@"
+
+#endif

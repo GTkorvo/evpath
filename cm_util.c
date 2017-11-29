@@ -160,9 +160,9 @@ CMtransport_trace(CManager cm, char *format, ...)
             fprintf(cm->CMTrace_file, "P%lxT%lx - ", (long) getpid(), (long)thr_thread_self());
         }
         if (CMtrace_timing) {
-            struct timespec ts;
-            clock_gettime(CLOCK_MONOTONIC, &ts);
-            fprintf(cm->CMTrace_file, "%lld.%.9ld - ", (long long)ts.tv_sec, ts.tv_nsec);
+            TRACE_TIME_DECL;
+            TRACE_TIME_GET;
+            fprintf(cm->CMTrace_file, TRACE_TIME_PRINTDETAILS);
         }
 #ifdef STDC_HEADERS
 	va_start(ap, format);
