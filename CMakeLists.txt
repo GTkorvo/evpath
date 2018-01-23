@@ -361,7 +361,8 @@ INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/revpath.h DESTINATION include)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/ev_dfg.h DESTINATION include)
 INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/cm_transport.h DESTINATION include)
 
-INSTALL(TARGETS ${TARGETS} EXPORT EVPathExport
+INSTALL(TARGETS ${TARGETS}
+  EXPORT EVPathTargets
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
@@ -407,7 +408,7 @@ set(EVPATH_VERSION ${EVPATH_MAJOR_VERSION}.${EVPATH_MINOR_VERSION}.${EVPATH_PATC
 # set up install directories. INCLUDE_INSTALL_DIR and LIB_INSTALL_DIR must not be absolute paths
 set(LIB_INSTALL_DIR_SUFFIX "" CACHE STRING "The directories where to install libraries to")
 set(LIB_INSTALL_DIR lib${LIB_INSTALL_DIR_SUFFIX} )
-set(CMAKECONFIG_INSTALL_DIR ${LIB_INSTALL_DIR}/cmake/EVPath ) 
+set(CMAKECONFIG_INSTALL_DIR ${LIB_INSTALL_DIR}/CMake/EVPath ) 
 
 # Use a versioned install directory for the headers so multiple versions can be installed in parallel
 set(INCLUDE_INSTALL_DIR include )
@@ -415,13 +416,13 @@ set(INCLUDE_INSTALL_DIR include )
 # not changable, but we set a variable anyway for consistency
 set(BIN_INSTALL_DIR bin)
 
-# This "exports" all targets which have been put into the export set "EVPathExport".
+# This "exports" all targets which have been put into the export set "EVPathTargets".
 # This means that cmake generates a file with the given filename, which can later on be loaded
 # by projects using this package.
 # This file contains add_library(EVPath IMPORTED) statements for each target in the export set, so
 # when loaded later on cmake will create "imported" library targets from these, which can be used
 # in many ways in the same way as a normal library target created via a normal add_library().
-install(EXPORT EVPathExport DESTINATION ${CMAKECONFIG_INSTALL_DIR} FILE EVPathTargets.cmake )
+install(EXPORT EVPathTargets DESTINATION ${CMAKECONFIG_INSTALL_DIR} FILE EVPathTargets.cmake )
 
 # figure out the relative path from the installed Config.cmake file to the install prefix (which may be at
 # runtime different from the chosen CMAKE_INSTALL_PREFIX if under Windows the package was installed anywhere)
