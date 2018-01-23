@@ -739,8 +739,6 @@ copy_EVevent_list(EVevent_list list)
 EVSimpleHandlerFunc
 REVPlookup_handler(char *name)
 {
-    static lt_dlhandle h = NULL;
-    static void *dh = NULL;
     EVSimpleHandlerFunc f = NULL;
     if (strncmp("0x", name, 2) == 0) {
 	/* hex constant */
@@ -750,6 +748,8 @@ REVPlookup_handler(char *name)
 	return f;
     } 
 #if !NO_DYNAMIC_LINKING
+    static lt_dlhandle h = NULL;
+    static void *dh = NULL;
     if (h == NULL) {
 	(void) lt_dlinit();
 	h = lt_dlopen(NULL);
