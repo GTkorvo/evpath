@@ -5,18 +5,6 @@
    fun:alloc_dill_jump_table
 }
 {
-   cercs_env, not really
-   Memcheck:Value8
-   fun:init_env_table
-   fun:cercs_getenv
-}
-{
-   cercs_env, not really
-   Memcheck:Cond
-...
-   fun:cercs_getenv
-}
-{
    Funky strcpy overlap in decode
    Memcheck:Overlap
    fun:strcpy
