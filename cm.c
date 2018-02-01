@@ -3030,6 +3030,10 @@ INT_CMConnection_failed(CMConnection conn)
 	 actual = conn->trans->writev_func(&CMstatic_trans_svcs, 
 					   conn->transport_data, 
 					   full_vec, vec_count, attrs);
+	 if (actual <= 0) {
+	     CMtrace_out(conn->cm, CMFreeVerbose, "Calling write failed connection failed with dereference %p\n", conn);
+	     INT_CMConnection_failed(conn);
+	 }
 	 if (notify_func) {
 	     (notify_func)(notify_client_data);
 	 }
@@ -3342,7 +3346,7 @@ INT_CMConnection_failed(CMConnection conn)
 	 if (tmp_vec != &static_vec[0]) {
 	     INT_CMfree(tmp_vec);
 	 }
-	 if (actual == 0) {
+	 if (actual <= 0) {
 	     /* fail */
 	     CMtrace_out(conn->cm, CMFreeVerbose, "Calling connection (write failed) failed with dereference %p\n", conn);
 	     INT_CMConnection_failed(conn);
