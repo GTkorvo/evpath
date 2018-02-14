@@ -420,13 +420,14 @@ retry:
         }
 	svc->trace_out(cm, "Connection to %s:%d succeeded.\n", inet_ntoa(sin_addr), address.port);
     } else {
-        if (event.type == ENET_EVENT_TYPE_DISCONNECT) {
+        if ((event.type == ENET_EVENT_TYPE_DISCONNECT) ||
+            (event.type == ENET_EVENT_TYPE_NONE)) {
             /* Either the 5 seconds are up or a disconnect event was */
             /* received. Reset the peer in the event the 5 seconds   */
             /* had run out without any significant event.            */
             enet_peer_reset (peer);
 
-            printf ("Connection to %s:%d failed   type was %d.\n", inet_ntoa(sin_addr), address.port, event.type);
+            svc->trace_out(cm, "Connection to %s:%d failed   type was %d.\n", inet_ntoa(sin_addr), address.port, event.type);
             return 0;
 
         } else if (event.type == ENET_EVENT_TYPE_RECEIVE) {
