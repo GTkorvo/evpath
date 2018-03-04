@@ -22,6 +22,18 @@ include(CheckBrokenTitanCompiler)
 include(CTest)
 configure_file(CTestCustom.ctest.in CTestCustom.ctest @ONLY)
 
+include(CMakeDependentOption)
+
+# Setup shared library defaults.  If explicitly specified somehow, then default 
+# to that.  Otherwise base the default on whether or not shared libs are even
+# supported.
+get_property(SHARED_LIBS_SUPPORTED GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS)
+cmake_dependent_option(BUILD_SHARED_LIBS
+  "Build shared libraries (so/dylib/dll)." ${SHARED_LIBS_SUPPORTED}
+  "SHARED_LIBS_SUPPORTED" OFF
+)
+mark_as_advanced(BUILD_SHARED_LIBS)
+
 if(MSVC)
   # Force to always compile with W4
   if(CMAKE_CXX_FLAGS MATCHES "/W[0-4]")
