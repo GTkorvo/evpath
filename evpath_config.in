@@ -82,7 +82,7 @@ if [ "$PRINT_CFLAGS" == "yes" ]; then
 fi
 
 if [ "$PRINT_LDFLAGS" == "yes" ]; then
-    LDFLAGS="$<TARGET_FILE:evpath>  $<TARGET_FILE:ffs>  $<TARGET_FILE:atl>  $<TARGET_FILE:dill> @EVPATH_TRANSPORT_FULL_DEP_STR@ @CMAKE_THREAD_LIBS_INIT@"
+    LDFLAGS="-L@CMAKE_INSTALL_PREFIX@/lib -levpath $<TARGET_FILE:ffs>  $<TARGET_FILE:atl>  $<TARGET_FILE:dill> @EVPATH_TRANSPORT_FULL_DEP_STR@ @CMAKE_THREAD_LIBS_INIT@"
     if [ $NFLAGS_ASKED -gt 1 ]; then
         echo -n "LDFLAGS="
     fi
@@ -90,7 +90,7 @@ if [ "$PRINT_LDFLAGS" == "yes" ]; then
 fi
 
 if [ "$PRINT_STATIC_LDFLAGS" == "yes" ]; then
-    LDFLAGS="$<TARGET_FILE:evpath>   $<TARGET_FILE:ffs>  $<TARGET_FILE:atl>  $<TARGET_FILE:dill> @EVPATH_TRANSPORT_STATIC_DEP_STR@ @CMAKE_THREAD_LIBS_INIT@"
+    LDFLAGS="-L@CMAKE_INSTALL_PREFIX@/lib -levpath $<TARGET_FILE:ffs>  $<TARGET_FILE:atl>  $<TARGET_FILE:dill> @EVPATH_TRANSPORT_STATIC_DEP_STR@ @CMAKE_THREAD_LIBS_INIT@"
     if [ $NFLAGS_ASKED -gt 1 ]; then
         echo -n "STATIC LDFLAGS="
     fi
