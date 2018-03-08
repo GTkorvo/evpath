@@ -446,7 +446,8 @@ configure_file(EVPathConfig.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/EVPathConfig.cm
 # Create a EVPathConfig.cmake file. <name>Config.cmake files are searched by find_package()
 # automatically. We configure that file so that we can put any information we want in it,
 # e.g. version numbers, include directories, etc.
-configure_file(evpath_config.in ${CMAKE_CURRENT_BINARY_DIR}/evpath_config @ONLY )
+configure_file(evpath_config.in ${CMAKE_CURRENT_BINARY_DIR}/evpath_config.gen @only )
+file (GENERATE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/evpath_config INPUT ${CMAKE_CURRENT_BINARY_DIR}/evpath_config.gen )
 install(PROGRAMS ${CMAKE_BINARY_DIR}/evpath_config DESTINATION bin)
 
 # Additionally, when cmake has found a EVPathConfig.cmake, it can check for a EVPathConfigVersion.cmake
