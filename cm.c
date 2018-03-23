@@ -3555,8 +3555,8 @@ INT_CMConnection_failed(CMConnection conn)
      lt_dlhandle handle;	
      lt_dladdsearchdir(EVPATH_LIBRARY_BUILD_DIR);
      lt_dladdsearchdir(EVPATH_LIBRARY_INSTALL_DIR);
-     libname = malloc(strlen("libcmselect") + strlen(MODULE_EXT) + 1);
-     strcpy(libname, "libcmselect");
+     libname = malloc(strlen("lib" CM_LIBRARY_PREFIX "cmselect") + strlen(MODULE_EXT) + 1);
+     strcpy(libname, "lib" CM_LIBRARY_PREFIX "cmselect");
      strcat(libname, MODULE_EXT);
      handle = CMdlopen(cm->CMTrace_file, libname, 0);
      free(libname);

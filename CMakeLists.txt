@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.0)
-project(EVPath VERSION 4.3.0)
+project(EVPath VERSION 4.3.0 LANGUAGES C)
 
 # Some boilerplate to setup nice output directories
 set(CMAKE_INSTALL_BINDIR bin CACHE STRING "Installation runtime subdirectory")
@@ -113,18 +113,30 @@ endif()
 
 set(CMAKE_MACOSX_RPATH 1)
 
-add_library(evpath
+add_library(EVPath
   cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c 
   cm_lock.c cm_perf.c cm_pbio.c cm_interface.c version.c
   cm_threadio.c cm_evol.c evp.c response.c metrics.c 
   dlloader.c ip_config.c chr_time.c
   revp.c evp_compat.c thin_server.c evp_threads.c ev_dfg.c)
-add_library(EVPath::evpath ALIAS evpath)
-target_include_directories(evpath PUBLIC
+add_library(EVPath::EVPath ALIAS EVPath)
+add_library(evpath ALIAS EVPath)
+target_include_directories(EVPath PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
+
+set(EVPATH_LIBRARY_PREFIX "" CACHE STRING
+  "Prefix to prepend to the output library name")
+mark_as_advanced(EVPATH_LIBRARY_PREFIX)
+if(EVPATH_LIBRARY_PREFIX)
+  set_target_properties(EVPath PROPERTIES
+    LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}evpath)
+else()
+  set_target_properties(EVPath PROPERTIES LIBRARY_OUTPUT_NAME evpath)
+endif()
+
 
 set(EVPATH_TRANSPORT_DEP_LIBS)
 
@@ -141,17 +153,18 @@ list(INSERT CMAKE_PREFIX_PATH 0 ${CMAKE_INSTALL_PREFIX})
 find_package(atl REQUIRED)
 find_package(ffs REQUIRED)
 find_package(dill REQUIRED)
-target_link_libraries(evpath PUBLIC atl::atl ffs::ffs PRIVATE dill::dill)
+target_link_libraries(EVPath PUBLIC atl::atl ffs::ffs PRIVATE dill::dill)
 
 find_package(Threads)
 if(Threads_FOUND)
-  target_link_libraries(evpath PRIVATE ${CMAKE_THREAD_LIBS_INIT})
+  set(EVPATH_PRIVATE_Threads ON)
+  target_link_libraries(EVPath PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
 find_package(NVML QUIET)
 if(NVML_FOUND)
-  target_include_directories(evpath PRIVATE ${NVML_INCLUDE_DIR})
-  target_link_libraries(evpath PRIVATE ${NVML_LIBRARY})
+  target_include_directories(EVPath PRIVATE ${NVML_INCLUDE_DIR})
+  target_link_libraries(EVPath PRIVATE ${NVML_LIBRARY})
 endif()
 
 include(CheckSymbolExists)
@@ -161,31 +174,41 @@ if(NOT HAVE_CLOCK_GETTIME)
   include(CheckLibraryExists)
   CHECK_LIBRARY_EXISTS(rt clock_gettime "time.h" HAVE_CLOCK_GETTIME)
   if(HAVE_CLOCK_GETTIME)
-    target_link_libraries(evpath PRIVATE rt)
+    target_link_libraries(EVPath PRIVATE rt)
   endif()
 endif()
 
 set(CM_DEFAULT_TRANSPORT "sockets")
 set(EVPATH_TRANSPORT_TARGETS)
 if(EVPATH_TRANSPORT_MODULES)
-  add_library(cmsockets MODULE cmsockets.c ip_config.c)
+  target_link_libraries(EVPath PRIVATE ${CMAKE_DL_LIBS})
+
   add_library(cmselect MODULE cmselect.c)
+  add_library(cmsockets MODULE cmsockets.c ip_config.c)
   add_library(cmudp MODULE cmudp.c)
   add_library(cmmulticast MODULE cmmulticast.c)
+
+  if(EVPATH_LIBRARY_PREFIX)
+    foreach(M cmselect cmsockets cmudp cmmulticast)
+      set_target_properties(${M} PROPERTIES
+        LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}${M})
+    endforeach()
+  endif()
 
   target_link_libraries(cmselect evpath atl::atl)
   target_link_libraries(cmsockets evpath atl::atl)
   target_link_libraries(cmudp evpath atl::atl)
   target_link_libraries(cmmulticast evpath atl::atl)
+
   list(APPEND EVPATH_TRANSPORT_TARGETS cmselect cmsockets cmudp cmmulticast)
 else()
   # dummy dyn linking in cm.c and cm_transport.c
   set(NO_DYNAMIC_LINKING 1)
 
-  target_sources(evpath PRIVATE cmsockets.c)
-  target_sources(evpath PRIVATE cmselect.c)
-  target_sources(evpath PRIVATE cmudp.c)
-  target_sources(evpath PRIVATE cmmulticast.c)
+  target_sources(EVPath PRIVATE cmsockets.c)
+  target_sources(EVPath PRIVATE cmselect.c)
+  target_sources(EVPath PRIVATE cmudp.c)
+  target_sources(EVPath PRIVATE cmmulticast.c)
 endif()
 
 set(RUN_NNTI_TESTS FALSE)
@@ -197,11 +220,16 @@ if(ENET_FOUND)
   set(RUN_ENET_TESTS TRUE)
   if(EVPATH_TRANSPORT_MODULES)
     add_library(cmenet MODULE cmenet.c ip_config.c)
+    if(EVPATH_LIBRARY_PREFIX)
+      set_target_properties(cmenet PROPERTIES
+        LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmenet)
+    endif()
+
     target_link_libraries(cmenet evpath enet::enet)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmenet)
   else()
-    target_sources(evpath PRIVATE cmenet.c)
-    target_link_libraries(evpath PRIVATE enet::enet)
+    target_sources(EVPath PRIVATE cmenet.c)
+    target_link_libraries(EVPath PRIVATE enet::enet)
   endif()
 else()
   message(STATUS " - Enet library was not found.  This is not a fatal error, just that the Enet transport will not be built.")
@@ -212,11 +240,15 @@ find_package(LibFabric)
 if(LIBFABRIC_FOUND) 
   if(EVPATH_TRANSPORT_MODULES)
     add_library(cmfabric MODULE cmfabric.c ip_config.c)
+    if(EVPATH_LIBRARY_PREFIX)
+      set_target_properties(cmfabric PROPERTIES
+        LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmfabric)
+    endif()
     target_link_libraries(cmfabric evpath atl::atl libfabric::libfabric)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmfabric)
   else()
-    target_sources(evpath PRIVATE cmfabric.c)
-    target_link_libraries(evpath PRIVATE libfabric::libfabric)
+    target_sources(EVPath PRIVATE cmfabric.c)
+    target_link_libraries(EVPath PRIVATE libfabric::libfabric)
   endif()
 else()
   message(STATUS " - LibFabric package was not found.  This is not a fatal error, just that the fabric transport will not be built.")
@@ -243,11 +275,15 @@ if(HAVE_IBVERBS)
 
   if(EVPATH_TRANSPORT_MODULES)
     add_library(cmib MODULE cmib.c)
+    if(EVPATH_LIBRARY_PREFIX)
+      set_target_properties(cmib PROPERTIES
+        LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmib)
+    endif()
     target_link_libraries(cmib evpath ibverbs)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmib)
   else()
-    target_sources(evpath PRIVATE cmib.c)
-    target_link_libraries(evpath PRIVATE ibverbs)
+    target_sources(EVPath PRIVATE cmib.c)
+    target_link_libraries(EVPath PRIVATE ibverbs)
   endif()
   set(IB_FOUND 1)
 endif()
@@ -275,13 +311,17 @@ if(HAVE_IBVERBS OR HAVE_UGNI)
     endif()
     if(EVPATH_TRANSPORT_MODULES)
       add_library(cmnnti MODULE cmnnti.c)
+      if(EVPATH_LIBRARY_PREFIX)
+        set_target_properties(cmnnti PROPERTIES
+          LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmnnti)
+      endif()
       target_include_directories(cmnnti PRIVATE ${NNTI_INCLUDE_DIR})
       target_link_libraries(cmnnti evpath ${NNTI_LIBRARIES} enet::enet atl::atl)
       list(APPEND EVPATH_TRANSPORT_TARGETS cmnnti)
     else()
-      target_sources(evpath PRIVATE cmnnti.c)
-      target_include_directories(evpath PRIVATE ${NNTI_INCLUDE_DIR})
-      target_link_libraries(evpath PRIVATE ${NNTI_LIBRARIES})
+      target_sources(EVPath PRIVATE cmnnti.c)
+      target_include_directories(EVPath PRIVATE ${NNTI_INCLUDE_DIR})
+      target_link_libraries(EVPath PRIVATE ${NNTI_LIBRARIES})
     endif()
   endif()
 endif()
@@ -366,7 +406,7 @@ install(
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-install(TARGETS evpath ${EVPATH_TRANSPORT_TARGETS} EXPORT EVPathTargets
+install(TARGETS EVPath ${EVPATH_TRANSPORT_TARGETS} EXPORT EVPathTargets
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -432,7 +472,75 @@ configure_file(
   @ONLY
 )
 
+# So, this big ol thing...
+# This function will walk to dependency graph of a target and determine the full
+# list of transitive library and header information needed to use it.  The
+# purpose is to extract the necessary usage requirements for a non-CMake
+# project to consume evpath
+function(traverse_target_interface in_target out_libs out_inc_dirs)
+  get_target_property(libs ${in_target} INTERFACE_LINK_LIBRARIES)
+  if(NOT libs)
+    set(libs)
+  endif()
+  get_target_property(inc_dirs ${in_target} INTERFACE_INCLUDE_DIRECTORIES)
+  if(NOT inc_dirs)
+    set(inc_dirs)
+  endif()
+  list(INSERT libs 0 "$<TARGET_FILE:${in_target}>")
+
+  set(_has_targets TRUE)
+  while(_has_targets)
+    set(_libs)
+    set(_has_targets FALSE)
+    foreach(L IN LISTS libs)
+      if(L MATCHES "<LINK_ONLY:(.*)>")
+        set(L ${CMAKE_MATCH_1})
+      endif()
+      if(TARGET ${L})
+        set(_has_targets TRUE)
+        get_target_property(L_libs ${L} INTERFACE_LINK_LIBRARIES)
+        get_target_property(L_inc_dirs ${L} INTERFACE_INCLUDE_DIRECTORIES)
+        list(APPEND _libs "$<TARGET_FILE:${L}>")
+        if(L_libs)
+          list(APPEND _libs ${L_libs})
+        endif()
+        if(L_inc_dirs)
+          list(APPEND inc_dirs ${L_inc_dirs})
+        endif()
+      elseif(L MATCHES "^(/|-|\\$<)")
+        list(APPEND _libs "${L}")
+      else()
+        list(APPEND _libs "-l${L}")
+      endif()
+    endforeach()
+    set(libs ${_libs})
+  endwhile()
+
+  set(${out_libs} ${libs} PARENT_SCOPE)
+  set(${out_inc_dirs} ${inc_dirs} PARENT_SCOPE)
+endfunction()
+
+traverse_target_interface(EVPath
+  EVPATH_INTERFACE_LINK_INFO
+  EVPATH_INTERFACE_INCLUDE_DIRECTORIES)
+
+# Filter out any build interface items
+set(_EVPATH_INSTALL_INC_DIRS)
+foreach(D IN LISTS EVPATH_INTERFACE_INCLUDE_DIRECTORIES)
+  if(D MATCHES "<BUILD_INTERFACE:(.*)>")
+    continue()
+  elseif(D MATCHES "<INSTALL_INTERFACE:(.*)>")
+    list(APPEND _EVPATH_INSTALL_INC_DIRS
+      "${CMAKE_INSTALL_PREFIX}/${CMAKE_MATCH_1}")
+  else()
+    list(APPEND _EVPATH_INSTALL_INC_DIRS "${D}")
+  endif()
+endforeach()
+set(EVPATH_INTERFACE_INCLUDE_DIRECTORIES ${_EVPATH_INSTALL_INC_DIRS})
+
 # Create a evpath_config
+list(REMOVE_DUPLICATES EVPATH_INTERFACE_LINK_INFO)
+list(REMOVE_DUPLICATES EVPATH_INTERFACE_INCLUDE_DIRECTORIES)
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/evpath_config.in
   ${CMAKE_CURRENT_BINARY_DIR}/evpath_config.gen

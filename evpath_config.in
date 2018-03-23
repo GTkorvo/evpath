@@ -37,9 +37,9 @@ do
         c) PRINT_CFLAGS=yes; let "NFLAGS_ASKED=NFLAGS_ASKED+1";;
         l) PRINT_LDFLAGS=yes; let "NFLAGS_ASKED=NFLAGS_ASKED+1";;
         s) PRINT_STATIC_LDFLAGS=yes; let "NFLAGS_ASKED=NFLAGS_ASKED+1";;
-        v) echo "@EVPATH_VERSION@"; 
+        v) echo "@EVPath_VERSION@"; 
            exit 0;;
-        i) echo "EVPath @EVPATH_VERSION_TEXT@"; 
+        i) echo "EVPath @EVPath_VERSION@"; 
            echo "Installed from "
            echo "  source directory: @CMAKE_CURRENT_SOURCE_DIR@"; 
            echo "  build directory:  @CMAKE_CURRENT_BINARY_DIR@"; 
@@ -74,7 +74,7 @@ if [ "$PRINT_DIR" == "yes" ]; then
 fi
 
 if [ "$PRINT_CFLAGS" == "yes" ]; then
-    CFLAGS="-I@CMAKE_INSTALL_PREFIX@/include @CONFIG_INCLUDES@"
+    CFLAGS="$<$<BOOL:@EVPATH_INTERFACE_INCLUDE_DIRECTORIES@>:-I$<JOIN:@EVPATH_INTERFACE_INCLUDE_DIRECTORIES@, -I>>"
     if [ $NFLAGS_ASKED -gt 1 ]; then
         echo -n "CFLAGS="
     fi
@@ -82,7 +82,7 @@ if [ "$PRINT_CFLAGS" == "yes" ]; then
 fi
 
 if [ "$PRINT_LDFLAGS" == "yes" ]; then
-    LDFLAGS="-L@CMAKE_INSTALL_PREFIX@/lib -levpath $<TARGET_FILE:ffs::ffs>  $<TARGET_FILE:atl::atl>  $<TARGET_FILE:dill::dill> @EVPATH_TRANSPORT_FULL_DEP_STR@ @CMAKE_THREAD_LIBS_INIT@"
+    LDFLAGS="$<JOIN:@EVPATH_INTERFACE_LINK_INFO@, >"
     if [ $NFLAGS_ASKED -gt 1 ]; then
         echo -n "LDFLAGS="
     fi
@@ -90,7 +90,7 @@ if [ "$PRINT_LDFLAGS" == "yes" ]; then
 fi
 
 if [ "$PRINT_STATIC_LDFLAGS" == "yes" ]; then
-    LDFLAGS="-L@CMAKE_INSTALL_PREFIX@/lib -levpath $<TARGET_FILE:ffs::ffs>  $<TARGET_FILE:atl::atl>  $<TARGET_FILE:dill::dill> @EVPATH_TRANSPORT_STATIC_DEP_STR@ @CMAKE_THREAD_LIBS_INIT@"
+    LDFLAGS="$<JOIN:@EVPATH_INTERFACE_LINK_INFO@, >"
     if [ $NFLAGS_ASKED -gt 1 ]; then
         echo -n "STATIC LDFLAGS="
     fi
