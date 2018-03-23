@@ -1,23 +1,18 @@
-cmake_minimum_required(VERSION 2.8)
+set(TESTS evtest extract_test remote_terminal_test)
 
-set (TESTS evtest extract_test remote_terminal_test)
-
-ENABLE_TESTING()
-
-INCLUDE_DIRECTORIES(BEFORE ${evpath_BINARY_DIR} ${evpath_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/revtests.tsts "" )
-foreach (TEST ${TESTS} )
-    ADD_EXECUTABLE(revp_${TEST} ${TEST}.c)
-    SET_TARGET_PROPERTIES(revp_${TEST} PROPERTIES LINKER_LANGUAGE ${C_EXECUTABLE_LINKER_LANGUAGE})
-    TARGET_LINK_LIBRARIES(revp_${TEST} evpath ${BASE_LIBS})
-    ADD_TEST(revp_${TEST} "revp_${TEST}")
-    LIST( APPEND REVTESTS "revp_${TEST}")
-    file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/revtests.tsts "revp_${TEST}\n" )
+foreach(T ${TESTS})
+  add_executable(revp_${T} ${T}.c)
+  target_link_libraries(revp_${T} evpath atl::atl)
+  add_test(NAME revp_${T} COMMAND "revp_${T}")
+  list(APPEND REVTESTS "revp_${T}")
+  file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/revtests.tsts "revp_${T}\n" )
 endforeach()
 
-if (TEST_INSTALL_DIRECTORY) 
+if(TEST_INSTALL_DIRECTORY) 
   install(TARGETS ${REVTESTS} DESTINATION "${TEST_INSTALL_DIRECTORY}")
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/revtests.tsts DESTINATION "${TEST_INSTALL_DIRECTORY}")
-endif (TEST_INSTALL_DIRECTORY) 
-
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/revtests.tsts
+    DESTINATION "${TEST_INSTALL_DIRECTORY}")
+endif()

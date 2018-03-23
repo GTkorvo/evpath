@@ -88,10 +88,10 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 	i++;
     }
 #if !NO_DYNAMIC_LINKING 
-    libname = INT_CMmalloc(strlen(trans_name) + strlen("libcm") + strlen(MODULE_EXT) 
+    libname = INT_CMmalloc(strlen(trans_name)+strlen("lib" CM_LIBRARY_PREFIX "cm")+strlen(MODULE_EXT) 
 		       + 1);
     
-    strcpy(libname, "libcm");
+    strcpy(libname, "lib" CM_LIBRARY_PREFIX "cm");
     strcat(libname, trans_name);
     strcat(libname, MODULE_EXT);
 

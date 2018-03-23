@@ -90,8 +90,19 @@ CMdlopen(void *CMTrace_filev, char *in_lib, int mode)
     dlh = malloc(sizeof(*dlh));
     tmp = rindex(lib, '/'); /* find name start */
     if (!tmp) tmp = lib;
-    dlh->lib_prefix = malloc(strlen(tmp) + 4);
-    strcpy(dlh->lib_prefix, tmp);
+
+    char *cm_lib_prefix;
+    if(strlen(CM_LIBRARY_PREFIX) > 0 &&
+      (cm_lib_prefix = strstr(tmp, CM_LIBRARY_PREFIX))) {
+      dlh->lib_prefix = malloc(strlen(tmp) - strlen(CM_LIBRARY_PREFIX) + 4);
+      strncpy(dlh->lib_prefix, tmp, cm_lib_prefix-tmp);
+      strcpy(dlh->lib_prefix + (cm_lib_prefix - tmp),
+          cm_lib_prefix + strlen(CM_LIBRARY_PREFIX));
+    }
+    else {
+      dlh->lib_prefix = malloc(strlen(tmp) + 4);
+      strcpy(dlh->lib_prefix, tmp);
+    }
     tmp = rindex(dlh->lib_prefix, '.');
     strcpy(tmp, "_LTX_");  /* kill postfix, add _LTX_ */
     dlh->dlopen_handle = handle;

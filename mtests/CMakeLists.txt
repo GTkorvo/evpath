@@ -1,49 +1,41 @@
-cmake_minimum_required(VERSION 2.8)
+set(TESTS cmtest cmping cmconn bulktest take_test)
 
-set (TESTS cmtest cmping cmconn bulktest take_test)
-
-if(MPI_C_INCLUDE_PATH)
-include_directories(${MPI_C_INCLUDE_PATH})
-endif()
-
-ENABLE_TESTING()
-
-INCLUDE_DIRECTORIES(BEFORE ${evpath_BINARY_DIR} ${evpath_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/cmtests.tsts "" )
-foreach (TEST ${TESTS} )
-    ADD_EXECUTABLE(mtests_${TEST} ${TEST}.c)
-    TARGET_LINK_LIBRARIES(mtests_${TEST} evpath ${BASE_LIBS})
-    ADD_TEST(mtests_${TEST} mtests_${TEST})
-    SET_TARGET_PROPERTIES(mtests_${TEST} PROPERTIES LINKER_LANGUAGE ${C_EXECUTABLE_LINKER_LANGUAGE})
-    LIST( APPEND CMTESTS "mtests_${TEST}")
-    file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/cmtests.tsts "mtests_${TEST}\n" )
+foreach(T ${TESTS})
+  add_executable(mtests_${T} ${T}.c)
+  target_link_libraries(mtests_${T} evpath atl::atl)
+  add_test(NAME mtests_${T} COMMAND mtests_${T})
+  list(APPEND CMTESTS mtests_${T})
+  file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/cmtests.tsts "mtests_${T}\n")
 endforeach()
 
-ADD_TEST (mtests_cmtest_UDP mtests_cmtest -t udp)
-ADD_TEST (mtests_cmping_UDP mtests_cmping -t udp)
-ADD_TEST (mtests_non_blocking_bulk mtests_bulktest -size 1024000)
-SET_TESTS_PROPERTIES(mtests_non_blocking_bulk PROPERTIES ENVIRONMENT "CMNonBlockWrite=1")
-ADD_EXECUTABLE (trans_test trans_test.c)
-SET_TARGET_PROPERTIES(trans_test PROPERTIES LINKER_LANGUAGE ${C_EXECUTABLE_LINKER_LANGUAGE})
-TARGET_LINK_LIBRARIES(trans_test evpath ${BASE_LIBS})
+add_test(NAME mtests_cmtest_UDP COMMAND mtests_cmtest -t udp)
+add_test(NAME mtests_cmping_UDP COMMAND mtests_cmping -t udp)
+add_test(NAME mtests_non_blocking_bulk COMMAND mtests_bulktest -size 1024000)
+set_tests_properties(mtests_non_blocking_bulk PROPERTIES
+  ENVIRONMENT "CMNonBlockWrite=1")
+add_executable(trans_test trans_test.c)
+target_link_libraries(trans_test evpath atl::atl)
 
-if (MPI_FOUND)
-  ADD_EXECUTABLE (mpi_trans_test trans_test.c)
-  SET_TARGET_PROPERTIES(mpi_trans_test PROPERTIES LINKER_LANGUAGE ${C_EXECUTABLE_LINKER_LANGUAGE})
-  set_target_properties(mpi_trans_test PROPERTIES COMPILE_FLAGS "${MPI_C_COMPILE_FLAGS} -DBUILD_WITH_MPI=1")
-  if(MPI_LINK_FLAGS)
-    set_target_properties(mpi_trans_test PROPERTIES LINK_FLAGS "${MPI_C_LINK_FLAGS}")
-  endif()
-  if(MPI_C_LIBRARIES)
-    TARGET_LINK_LIBRARIES(mpi_trans_test evpath ${MPI_C_LIBRARIES} ${BASE_LIBS})
-  else()
-    TARGET_LINK_LIBRARIES(mpi_trans_test evpath ${BASE_LIBS})
-  endif()
+if(MPI_FOUND)
+  add_executable(mpi_trans_test trans_test.c)
+  target_compile_options(mpi_trans_test PRIVATE ${MPI_C_COMPILE_FLAGS})
+  target_link_libraries(mpi_trans_test evpath atl::atl ${MPI_C_LIBRARIES})
+  target_include_directories(mpi_trans_test PRIVATE ${MPI_C_INCLUDE_PATH})
+  target_compile_defintions(mpi_trans_test PRIVATE BUILD_WITH_MPI=1)
+
 endif()
-configure_file(transport_test.pl transport_test.pl COPYONLY)
-configure_file(test_spec test_spec COPYONLY)
-file (WRITE "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/transport_test.pl
+  ${CMAKE_CURRENT_BINARY_DIR}/transport_test.pl
+  COPYONLY)
+configure_file(
+  ${CMAKE_CURRENT_SOURCE_DIR}/test_spec
+  ${CMAKE_CURRENT_BINARY_DIR}/test_spec
+  COPYONLY)
+file(WRITE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/correctness_spec" 
 "%macro = (\n"
 "        basic_size_list  => [ \"size:24 vectors:1 msg_count:10\",\n"
 "			      \"size:102400 vectors:1 msg_count:3\" ],\n"
@@ -53,26 +45,31 @@ file (WRITE "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec"
 "      );\n")
 file (APPEND "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
 "\$test_set{\"sockets\"} = \"basic_size_list all_read_buffer_styles all_write_buffer_styles\";\n")
-IF (RUN_NNTI_TESTS)
-    file (APPEND "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
-         "\$test_set{\"nnti\"} = \"basic_size_list all_read_buffer_styles all_write_buffer_styles\";\n")
-ENDIF (RUN_NNTI_TESTS)
-IF (RUN_ENET_TESTS)
-    file (APPEND "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
-         "\$test_set{\"enet\"} = \"basic_size_list all_read_buffer_styles all_write_buffer_styles\";\n")
-ENDIF (RUN_ENET_TESTS)
-IF (RUN_IB_TESTS)
-    file (APPEND "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
-         "\$test_set{\"ib\"} = \"basic_size_list all_read_buffer_styles all_write_buffer_styles\";\n")
-ENDIF (RUN_IB_TESTS)
+if(RUN_NNTI_TESTS)
+  file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
+    "\$test_set{\"nnti\"} = \"basic_size_list all_read_buffer_styles all_write_buffer_styles\";\n")
+endif()
+if(RUN_ENET_TESTS)
+  file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
+    "\$test_set{\"enet\"} = \"basic_size_list all_read_buffer_styles all_write_buffer_styles\";\n")
+endif()
+if(RUN_IB_TESTS)
+  file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/correctness_spec" 
+    "\$test_set{\"ib\"} = \"basic_size_list all_read_buffer_styles all_write_buffer_styles\";\n")
+endif()
 
-ADD_TEST (all_transports perl ./transport_test.pl -q -f ./correctness_spec)
-ADD_TEST (non_blocking_transports perl ./transport_test.pl -q -f ./correctness_spec)
-SET_TESTS_PROPERTIES(non_blocking_transports PROPERTIES ENVIRONMENT "CMNonBlockWrite=1")
+add_test(NAME all_transports
+  COMMAND perl transport_test.pl -q -f ./correctness_spec)
+add_test(NAME non_blocking_transports
+  COMMAND perl transport_test.pl -q -f ./correctness_spec)
+set_tests_properties(non_blocking_transports
+  PROPERTIES ENVIRONMENT "CMNonBlockWrite=1")
 
-if (TEST_INSTALL_DIRECTORY) 
-  install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/run_remote_tests.pl DESTINATION "${TEST_INSTALL_DIRECTORY}")
+if(TEST_INSTALL_DIRECTORY) 
+  install(
+    FILES
+      ${CMAKE_CURRENT_BINARY_DIR}/cmtests.tsts
+      ${CMAKE_CURRENT_SOURCE_DIR}/run_remote_tests.pl
+    DESTINATION "${TEST_INSTALL_DIRECTORY}")
   install(TARGETS ${CMTESTS} DESTINATION "${TEST_INSTALL_DIRECTORY}")
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/cmtests.tsts DESTINATION "${TEST_INSTALL_DIRECTORY}")
-endif (TEST_INSTALL_DIRECTORY) 
-
+endif() 
