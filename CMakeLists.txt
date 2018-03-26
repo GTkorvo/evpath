@@ -130,13 +130,8 @@ target_include_directories(EVPath PUBLIC
 set(EVPATH_LIBRARY_PREFIX "" CACHE STRING
   "Prefix to prepend to the output library name")
 mark_as_advanced(EVPATH_LIBRARY_PREFIX)
-if(EVPATH_LIBRARY_PREFIX)
-  set_target_properties(EVPath PROPERTIES
-    LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}evpath)
-else()
-  set_target_properties(EVPath PROPERTIES LIBRARY_OUTPUT_NAME evpath)
-endif()
-
+set_target_properties(EVPath PROPERTIES
+  OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}evpath)
 
 set(EVPATH_TRANSPORT_DEP_LIBS)
 
@@ -161,10 +156,9 @@ if(Threads_FOUND)
   target_link_libraries(EVPath PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
-find_package(NVML QUIET)
+find_package(NVML)
 if(NVML_FOUND)
-  target_include_directories(EVPath PRIVATE ${NVML_INCLUDE_DIR})
-  target_link_libraries(EVPath PRIVATE ${NVML_LIBRARY})
+  target_link_libraries(EVPath PRIVATE nvml::nvml)
 endif()
 
 include(CheckSymbolExists)
@@ -188,12 +182,10 @@ if(EVPATH_TRANSPORT_MODULES)
   add_library(cmudp MODULE cmudp.c)
   add_library(cmmulticast MODULE cmmulticast.c)
 
-  if(EVPATH_LIBRARY_PREFIX)
-    foreach(M cmselect cmsockets cmudp cmmulticast)
-      set_target_properties(${M} PROPERTIES
-        LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}${M})
-    endforeach()
-  endif()
+  foreach(M cmselect cmsockets cmudp cmmulticast)
+    set_target_properties(${M} PROPERTIES
+      OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}${M})
+  endforeach()
 
   target_link_libraries(cmselect evpath atl::atl)
   target_link_libraries(cmsockets evpath atl::atl)
@@ -220,10 +212,8 @@ if(ENET_FOUND)
   set(RUN_ENET_TESTS TRUE)
   if(EVPATH_TRANSPORT_MODULES)
     add_library(cmenet MODULE cmenet.c ip_config.c)
-    if(EVPATH_LIBRARY_PREFIX)
-      set_target_properties(cmenet PROPERTIES
-        LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmenet)
-    endif()
+    set_target_properties(cmenet PROPERTIES
+      OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmenet)
 
     target_link_libraries(cmenet evpath enet::enet)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmenet)
@@ -236,14 +226,12 @@ else()
 endif()
 
 # libfabric transport
-find_package(LibFabric)
+find_package(LIBFABRIC)
 if(LIBFABRIC_FOUND) 
   if(EVPATH_TRANSPORT_MODULES)
     add_library(cmfabric MODULE cmfabric.c ip_config.c)
-    if(EVPATH_LIBRARY_PREFIX)
-      set_target_properties(cmfabric PROPERTIES
-        LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmfabric)
-    endif()
+    set_target_properties(cmfabric PROPERTIES
+      OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmfabric)
     target_link_libraries(cmfabric evpath atl::atl libfabric::libfabric)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmfabric)
   else()
@@ -282,10 +270,8 @@ if(HAVE_IBVERBS)
 
   if(EVPATH_TRANSPORT_MODULES)
     add_library(cmib MODULE cmib.c)
-    if(EVPATH_LIBRARY_PREFIX)
-      set_target_properties(cmib PROPERTIES
-        LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmib)
-    endif()
+    set_target_properties(cmib PROPERTIES
+      OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmib)
     target_link_libraries(cmib evpath ibverbs)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmib)
   else()
@@ -308,27 +294,20 @@ endif()
 CHECK_LIBRARY_EXISTS(ugni GNI_CqCreate "" HAVE_UGNI)
 
 if(HAVE_IBVERBS OR HAVE_UGNI)
-  find_package (nnti)
+  find_package(NNTI)
   if(NNTI_FOUND)
-    string(REGEX REPLACE trios_nnti trios_support
-      NNTI_SUP_LIB "${NNTI_LIBRARIES}")
-    list(APPEND NNTI_LIBRARIES ${NNTI_SUP_LIB})
     if(CercsArch STREQUAL "ppc64")
       set(RUN_NNTI_TESTS FALSE)
     endif()
     if(EVPATH_TRANSPORT_MODULES)
       add_library(cmnnti MODULE cmnnti.c)
-      if(EVPATH_LIBRARY_PREFIX)
-        set_target_properties(cmnnti PROPERTIES
-          LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmnnti)
-      endif()
-      target_include_directories(cmnnti PRIVATE ${NNTI_INCLUDE_DIR})
-      target_link_libraries(cmnnti evpath ${NNTI_LIBRARIES} enet::enet atl::atl)
+      set_target_properties(cmnnti PROPERTIES
+        OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmnnti)
+      target_link_libraries(cmnnti evpath nnti::nnti enet::enet atl::atl)
       list(APPEND EVPATH_TRANSPORT_TARGETS cmnnti)
     else()
       target_sources(EVPath PRIVATE cmnnti.c)
-      target_include_directories(EVPath PRIVATE ${NNTI_INCLUDE_DIR})
-      target_link_libraries(EVPath PRIVATE ${NNTI_LIBRARIES})
+      target_link_libraries(EVPath PRIVATE nnti::nnti)
     endif()
   endif()
 endif()
@@ -557,7 +536,7 @@ file(GENERATE
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/evpath_config
   INPUT ${CMAKE_CURRENT_BINARY_DIR}/evpath_config.gen
 )
-install(PROGRAMS ${CMAKE_BINARY_DIR}/evpath_config
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/evpath_config
   DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Additionally, when cmake has found a EVPathConfig.cmake, it can check for a
