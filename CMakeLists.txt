@@ -536,7 +536,7 @@ file(GENERATE
   OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/evpath_config
   INPUT ${CMAKE_CURRENT_BINARY_DIR}/evpath_config.gen
 )
-install(PROGRAMS ${CMAKE_BINARY_DIR}/evpath_config
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/evpath_config
   DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Additionally, when cmake has found a EVPathConfig.cmake, it can check for a
