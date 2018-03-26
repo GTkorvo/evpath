@@ -130,13 +130,8 @@ target_include_directories(EVPath PUBLIC
 set(EVPATH_LIBRARY_PREFIX "" CACHE STRING
   "Prefix to prepend to the output library name")
 mark_as_advanced(EVPATH_LIBRARY_PREFIX)
-if(EVPATH_LIBRARY_PREFIX)
-  set_target_properties(EVPath PROPERTIES
-    LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}evpath)
-else()
-  set_target_properties(EVPath PROPERTIES LIBRARY_OUTPUT_NAME evpath)
-endif()
-
+set_target_properties(EVPath PROPERTIES
+  OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}evpath)
 
 set(EVPATH_TRANSPORT_DEP_LIBS)
 
@@ -187,12 +182,10 @@ if(EVPATH_TRANSPORT_MODULES)
   add_library(cmudp MODULE cmudp.c)
   add_library(cmmulticast MODULE cmmulticast.c)
 
-  if(EVPATH_LIBRARY_PREFIX)
-    foreach(M cmselect cmsockets cmudp cmmulticast)
-      set_target_properties(${M} PROPERTIES
-        LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}${M})
-    endforeach()
-  endif()
+  foreach(M cmselect cmsockets cmudp cmmulticast)
+    set_target_properties(${M} PROPERTIES
+      OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}${M})
+  endforeach()
 
   target_link_libraries(cmselect evpath atl::atl)
   target_link_libraries(cmsockets evpath atl::atl)
@@ -219,10 +212,8 @@ if(ENET_FOUND)
   set(RUN_ENET_TESTS TRUE)
   if(EVPATH_TRANSPORT_MODULES)
     add_library(cmenet MODULE cmenet.c ip_config.c)
-    if(EVPATH_LIBRARY_PREFIX)
-      set_target_properties(cmenet PROPERTIES
-        LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmenet)
-    endif()
+    set_target_properties(cmenet PROPERTIES
+      OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmenet)
 
     target_link_libraries(cmenet evpath enet::enet)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmenet)
@@ -239,10 +230,8 @@ find_package(LIBFABRIC)
 if(LIBFABRIC_FOUND) 
   if(EVPATH_TRANSPORT_MODULES)
     add_library(cmfabric MODULE cmfabric.c ip_config.c)
-    if(EVPATH_LIBRARY_PREFIX)
-      set_target_properties(cmfabric PROPERTIES
-        LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmfabric)
-    endif()
+    set_target_properties(cmfabric PROPERTIES
+      OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmfabric)
     target_link_libraries(cmfabric evpath atl::atl libfabric::libfabric)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmfabric)
   else()
@@ -281,10 +270,8 @@ if(HAVE_IBVERBS)
 
   if(EVPATH_TRANSPORT_MODULES)
     add_library(cmib MODULE cmib.c)
-    if(EVPATH_LIBRARY_PREFIX)
-      set_target_properties(cmib PROPERTIES
-        LIBRARY_OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmib)
-    endif()
+    set_target_properties(cmib PROPERTIES
+      OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmib)
     target_link_libraries(cmib evpath ibverbs)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmib)
   else()
