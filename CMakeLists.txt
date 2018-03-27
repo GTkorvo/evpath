@@ -6,7 +6,7 @@ set(CMAKE_INSTALL_BINDIR bin CACHE STRING "Installation runtime subdirectory")
 set(CMAKE_INSTALL_LIBDIR lib CACHE STRING "Installation library subdirectory")
 set(CMAKE_INSTALL_INCLUDEDIR include
   CACHE STRING "Installation include subdirectory")
-set(CMAKE_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake
+set(CMAKE_INSTALL_CMAKEDIR ${CMAKE_INSTALL_LIBDIR}/cmake/EVPath
   CACHE STRING "Installation CMake subdirectory")
 mark_as_advanced(CMAKE_INSTALL_BINDIR)
 mark_as_advanced(CMAKE_INSTALL_LIBDIR)
@@ -207,7 +207,7 @@ set(RUN_NNTI_TESTS FALSE)
 
 # enet transport
 set(RUN_ENET_TESTS FALSE)
-find_package(enet 1.3.14)
+find_package(enet 1.3.13)
 if(ENET_FOUND)
   set(RUN_ENET_TESTS TRUE)
   if(EVPATH_TRANSPORT_MODULES)
@@ -440,14 +440,7 @@ export(EXPORT EVPathTargets NAMESPACE EVPath::
 # targets from these, which can be used in many ways in the same way as a
 # normal library target created via a normal add_library().
 install(EXPORT EVPathTargets NAMESPACE EVPath::
-  DESTINATION ${CMAKE_INSTALL_CMAKEDIR}/EVPath)
-
-# figure out the relative path from the installed Config.cmake file to the
-# install prefix (which may be at runtime different from the chosen
-# CMAKE_INSTALL_PREFIX if under Windows the package was installed anywhere)
-# This relative path will be configured into the EVPathConfig.cmake
-file(RELATIVE_PATH relInstallDir
-  ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_CMAKEDIR} ${CMAKE_INSTALL_PREFIX})
+  DESTINATION ${CMAKE_INSTALL_CMAKEDIR})
 
 # Create a EVPathConfig.cmake file. <name>Config.cmake files are searched by
 # find_package() automatically. We configure that file so that we can put any
@@ -554,7 +547,7 @@ install(
   FILES
     ${CMAKE_CURRENT_BINARY_DIR}/EVPathConfig.cmake
     ${CMAKE_CURRENT_BINARY_DIR}/EVPathConfigVersion.cmake
-  DESTINATION ${CMAKE_INSTALL_CMAKEDIR}/EVPath
+  DESTINATION ${CMAKE_INSTALL_CMAKEDIR}
 )
 
 configure_file(
