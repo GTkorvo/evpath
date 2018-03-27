@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.0)
-project(EVPath VERSION 4.3.0 LANGUAGES C)
+project(EVPath VERSION 4.3.1 LANGUAGES C)
 
 # Some boilerplate to setup nice output directories
 set(CMAKE_INSTALL_BINDIR bin CACHE STRING "Installation runtime subdirectory")
@@ -145,9 +145,9 @@ cmake_dependent_option(EVPATH_TRANSPORT_MODULES
 )
 
 list(INSERT CMAKE_PREFIX_PATH 0 ${CMAKE_INSTALL_PREFIX})
-find_package(atl REQUIRED)
-find_package(ffs REQUIRED)
-find_package(dill REQUIRED)
+find_package(atl 2.2.1 REQUIRED)
+find_package(ffs 1.5.1 REQUIRED)
+find_package(dill 2.3.1 REQUIRED)
 target_link_libraries(EVPath PUBLIC atl::atl ffs::ffs PRIVATE dill::dill)
 
 find_package(Threads)
@@ -207,7 +207,7 @@ set(RUN_NNTI_TESTS FALSE)
 
 # enet transport
 set(RUN_ENET_TESTS FALSE)
-find_package(enet)
+find_package(enet 1.3.14)
 if(ENET_FOUND)
   set(RUN_ENET_TESTS TRUE)
   if(EVPATH_TRANSPORT_MODULES)
