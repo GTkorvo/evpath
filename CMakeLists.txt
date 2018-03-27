@@ -152,12 +152,14 @@ target_link_libraries(EVPath PUBLIC atl::atl ffs::ffs PRIVATE dill::dill)
 
 find_package(Threads)
 if(Threads_FOUND)
-  set(EVPATH_PRIVATE_Threads ON)
   target_link_libraries(EVPath PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
 find_package(NVML)
 if(NVML_FOUND)
+  if(NOT BUILD_SHARED_LIBS)
+    list(APPEND EXTRA_INSTALL_PACKAGES NVML)
+  endif()
   target_link_libraries(EVPath PRIVATE nvml::nvml)
 endif()
 
@@ -235,6 +237,9 @@ if(LIBFABRIC_FOUND)
     target_link_libraries(cmfabric evpath atl::atl libfabric::libfabric)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmfabric)
   else()
+    if(NOT BUILD_SHARED_LIBS)
+      list(APPEND EXTRA_INSTALL_PACKAGES LIBFABRIC)
+    endif()
     target_sources(EVPath PRIVATE cmfabric.c)
     target_link_libraries(EVPath PRIVATE libfabric::libfabric)
   endif()
@@ -248,19 +253,18 @@ CHECK_LIBRARY_EXISTS(ibverbs ibv_create_qp "" HAVE_IBVERBS)
 if(HAVE_IBVERBS)
   if(BUILD_TESTING)
     if(NOT CMAKE_CROSSCOMPILING)
-      message(STATUS "Check for enough rlimit to run IB tests")
+      message(STATUS "Check MEMLOCK rlimit for IB tests")
       file(READ "${CMAKE_CURRENT_SOURCE_DIR}/cmake/GOOD_MEMLOCK_LIMIT.c" _SOURCE)
       CHECK_C_SOURCE_RUNS("${_SOURCE}" GOOD_MEMLOCK_LIMIT)
       if(GOOD_MEMLOCK_LIMIT)
-        message(STATUS
-          "Check for large enough MEMLOCK rlimit to run IB tests - yes" )
+        message(STATUS "Check MEMLOCK rlimit for IB tests - yes" )
         set(RUN_IB_TESTS TRUE)
         set(RUN_NNTI_TESTS FALSE)
       else()
-        message(STATUS "Check for large enough MEMLOCK rlimit to run IB tests - no")
-        message(WARNING 
-          "Building InfiniBand transport, but current RLIMIT_MEMLOCK value " 
-          "will prevent successful runs.  Not running IB transport tests.")
+        message(STATUS "Check MEMLOCK rlimit for IB tests - no")
+	message(STATUS "  Building InfiniBand transport, but current")
+        message(STATUS "  RLIMIT_MEMLOCK value will prevent successful runs.")
+        message(STATUS "  Not running IB transport tests.")
       endif()
     else()
       set(RUN_IB_TESTS TRUE)
@@ -306,11 +310,24 @@ if(HAVE_IBVERBS OR HAVE_UGNI)
       target_link_libraries(cmnnti evpath nnti::nnti enet::enet atl::atl)
       list(APPEND EVPATH_TRANSPORT_TARGETS cmnnti)
     else()
+      if(NOT BUILD_SHARED_LIBS)
+        list(APPEND EXTRA_INSTALL_PACKAGES NNTI)
+      endif()
       target_sources(EVPath PRIVATE cmnnti.c)
-      target_link_libraries(EVPath PRIVATE nnti::nnti)
+      target_link_libraries(EVPath PRIVATE nnti::nnti enet::enet atl::atl)
     endif()
   endif()
 endif()
+
+# Extra find module dependencies
+foreach(P ${EXTRA_INSTALL_PACKAGES})
+  configure_file(
+    ${EVPath_SOURCE_DIR}/cmake/Find${P}.cmake
+    ${EVPath_BINARY_DIR}/Find${P}.cmake
+    COPYONLY)
+  install(FILES ${EVPath_BINARY_DIR}/Find${P}.cmake
+    DESTINATION ${CMAKE_INSTALL_CMAKEDIR})
+endforeach()
 
 add_custom_command(
   OUTPUT "cm_interface.c" "revp.c" "revpath.h"
@@ -452,7 +469,7 @@ configure_file(
 )
 
 # So, this big ol thing...
-# This function will walk to dependency graph of a target and determine the full
+# This function will walk the dependency graph of a target to determine the full
 # list of transitive library and header information needed to use it.  The
 # purpose is to extract the necessary usage requirements for a non-CMake
 # project to consume evpath
