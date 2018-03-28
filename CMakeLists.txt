@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.2)
 project(EVPath VERSION 4.3.1 LANGUAGES C)
 
 if(POLICY CMP0074)
