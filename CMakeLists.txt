@@ -131,6 +131,15 @@ target_include_directories(EVPath PUBLIC
   $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
+check_function_exists(sqrt HAVE_SQRT)
+if(NOT HAVE_SQRT)
+  check_library_exists(m sqrt "" HAVE_LIBM_SQRT)
+  if(NOT HAVE_LIBM_SQRT)
+    message(FATAL_ERROR "Unable to use C math library functions (with or without -lm)")
+  endif()
+  target_link_libraries(EVPath PRIVATE m)
+endif()
+
 set(EVPATH_LIBRARY_PREFIX "" CACHE STRING
   "Prefix to prepend to the output library name")
 mark_as_advanced(EVPATH_LIBRARY_PREFIX)
