@@ -172,6 +172,16 @@ if(NOT DEFINED CM_SELF_FORMATS)
   set(CM_SELF_FORMATS 1)
 endif()
 
+if (DEFINED EVPATH_NO_RDMA) 
+  option(EVPATH_NO_RDMA "Don't use any RDMA library"
+    "${EVPATH_NO_RDMA}")
+  if (EVPATH_NO_RDMA)
+    SET (EVPATH_USE_LIBFABRIC OFF)
+    SET (EVPATH_USE_NNTI OFF)
+    SET (EVPATH_USE_IBVERBS OFF)
+  endif()
+endif()
+
 cmake_dependent_option(EVPATH_TRANSPORT_MODULES
   "Enable stand-alone transport modules" ${BUILD_SHARED_LIBS}
   "SHARED_LIBS_SUPPORTED" OFF
@@ -319,7 +329,9 @@ if(LIBFABRIC_FOUND)
     list(APPEND _pkg_config_private_reqs "libfabric >= ${LIBFABRIC_VERSION}")
   endif()
 else()
-  message(STATUS " - LibFabric package was not found.  This is not a fatal error, just that the fabric transport will not be built.")
+  if (EVPATH_USE_LIBFABRIC)
+    message(STATUS " - LibFabric package was not found.  This is not a fatal error, just that the fabric transport will not be built.")
+  endif()
 endif()
 
 # ibverbs transport
@@ -643,5 +655,6 @@ if(NOT EVPATH_QUIET)
   message(STATUS "EVPATH_USE_NNTI = ${EVPATH_USE_NNTI}")
   message(STATUS "EVPATH_TRANSPORT_MODULES = ${EVPATH_TRANSPORT_MODULES} (${EVPATH_TRANSPORT_TARGETS})")
   message(STATUS "Change a value with: cmake -D<Variable>=<Value>" )
+  message(STATUS "To turn off all RDMA transports (fabric,ib,nnti) in EVPATH set EVPATH_NO_RDMA=1" )
   message(STATUS "-----------------------------------------------------------------------------" )
 endif()
