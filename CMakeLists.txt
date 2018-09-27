@@ -53,7 +53,7 @@ configure_file(CTestCustom.ctest.in CTestCustom.ctest @ONLY)
 
 include(CMakeDependentOption)
 
-# Setup shared library defaults.  If explicitly specified somehow, then default 
+# Setup shared library defaults.  If explicitly specified somehow, then default
 # to that.  Otherwise base the default on whether or not shared libs are even
 # supported.
 get_property(SHARED_LIBS_SUPPORTED GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS)
@@ -63,7 +63,7 @@ cmake_dependent_option(BUILD_SHARED_LIBS
 )
 mark_as_advanced(BUILD_SHARED_LIBS)
 
-# Setup PIC defaults.  If explicitly specified somehow, then default 
+# Setup PIC defaults.  If explicitly specified somehow, then default
 # to that.  Otherwise base the default on whether or not shared libs are even
 # supported.
 if(DEFINED EVPATH_ENABLE_PIC)
@@ -94,33 +94,10 @@ elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall ")
 endif()
 
-# use, i.e. don't skip the full RPATH for the build tree
-set(CMAKE_SKIP_BUILD_RPATH  FALSE)
-
-# when building, don't use the install RPATH already
-# (but later on when installing)
-set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE) 
-
-set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-
-# add the automatically determined parts of the RPATH
-# which point to directories outside the build tree to the install RPATH
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-
-
-# the RPATH to be used when installing, but only if it's not a system directory
-list(FIND CMAKE_PLATFORM_IMPLICIT_LINK_DIRECTORIES
-  "${CMAKE_INSTALL_PREFIX}/lib" isSystemDir)
-if(isSystemDir EQUAL -1)
-  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-endif()
-
-set(CMAKE_MACOSX_RPATH 1)
-
 add_library(EVPath
-  cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c 
+  cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c
   cm_lock.c cm_perf.c cm_pbio.c cm_interface.c version.c
-  cm_threadio.c cm_evol.c evp.c response.c metrics.c 
+  cm_threadio.c cm_evol.c evp.c response.c metrics.c
   dlloader.c ip_config.c chr_time.c
   revp.c evp_compat.c thin_server.c evp_threads.c ev_dfg.c)
 add_library(EVPath::EVPath ALIAS EVPath)
@@ -155,7 +132,7 @@ if(NOT HAVE_MATH)
   if(NOT HAVE_LIBM_MATH)
     message(FATAL_ERROR "Unable to use C math library functions")
   endif()
-    
+
   target_link_libraries(EVPath PRIVATE m)
   list(APPEND _pkg_config_private_libs m)
 endif()
@@ -172,13 +149,12 @@ if(NOT DEFINED CM_SELF_FORMATS)
   set(CM_SELF_FORMATS 1)
 endif()
 
-if (DEFINED EVPATH_NO_RDMA) 
-  option(EVPATH_NO_RDMA "Don't use any RDMA library"
-    "${EVPATH_NO_RDMA}")
-  if (EVPATH_NO_RDMA)
-    SET (EVPATH_USE_LIBFABRIC OFF)
-    SET (EVPATH_USE_NNTI OFF)
-    SET (EVPATH_USE_IBVERBS OFF)
+if(DEFINED EVPATH_NO_RDMA)
+  option(EVPATH_NO_RDMA "Don't use any RDMA library" "${EVPATH_NO_RDMA}")
+  if(EVPATH_NO_RDMA)
+    set(EVPATH_USE_LIBFABRIC OFF)
+    set(EVPATH_USE_NNTI OFF)
+    set(EVPATH_USE_IBVERBS OFF)
   endif()
 endif()
 
@@ -312,7 +288,7 @@ else()
   option(EVPATH_USE_LIBFABRIC "Build the libfabric transport"
     ${LIBFABRIC_FOUND})
 endif()
-if(LIBFABRIC_FOUND) 
+if(LIBFABRIC_FOUND)
   if(EVPATH_TRANSPORT_MODULES)
     add_library(cmfabric MODULE cmfabric.c ip_config.c)
     set_target_properties(cmfabric PROPERTIES
@@ -329,7 +305,7 @@ if(LIBFABRIC_FOUND)
     list(APPEND _pkg_config_private_reqs "libfabric >= ${LIBFABRIC_VERSION}")
   endif()
 else()
-  if (EVPATH_USE_LIBFABRIC)
+  if(EVPATH_USE_LIBFABRIC)
     message(STATUS " - LibFabric package was not found.  This is not a fatal error, just that the fabric transport will not be built.")
   endif()
 endif()
@@ -502,7 +478,7 @@ try_compile(HAVE_SYSCONF
   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/check_sysconf.c
 )
 
-if(CMAKE_C_COMPILER_ID MATCHES "Intel") 
+if(CMAKE_C_COMPILER_ID MATCHES "Intel")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -shared-intel")
 endif()
 
@@ -533,23 +509,27 @@ _pkg_expand_libs("${_pkg_config_private_libs}" _pkg_config_private_libs)
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/evpath.pc.in
   ${CMAKE_CURRENT_BINARY_DIR}/evpath.pc
-  @ONLY)
+  @ONLY
+)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/evpath.pc
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
+)
 configure_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/evpath_config.in
   ${CMAKE_CURRENT_BINARY_DIR}/evpath_config
-  @ONLY)
+  @ONLY
+)
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/evpath_config
-  DESTINATION "${CMAKE_INSTALL_BINDIR}")
+  DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
 
 install(
   FILES
     evpath.h
     cm_schedule.h
-    ev_dfg.h 
+    ev_dfg.h
     cm_transport.h
-    ${CMAKE_CURRENT_BINARY_DIR}/revpath.h 
+    ${CMAKE_CURRENT_BINARY_DIR}/revpath.h
   DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
@@ -565,16 +545,16 @@ set(EVPATH_LIBRARY_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/lib)
 add_executable(cmprobe cmprobe.c)
 target_link_libraries(cmprobe evpath atl::atl)
 
-if(CMAKE_C_COMPILER_ID MATCHES "Intel") 
+if(CMAKE_C_COMPILER_ID MATCHES "Intel")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -shared-intel")
 endif()
 
 find_program(SSH ssh)
-if(SSH) 
+if(SSH)
   set(SSH_PATH "${SSH}")
-endif() 
+endif()
 
-if(BUILD_TESTING) 
+if(BUILD_TESTING)
   enable_testing()
 
   add_subdirectory(tests)
@@ -635,7 +615,7 @@ configure_file(
   ${CMAKE_CURRENT_BINARY_DIR}/config.h
 )
 
-if(TEST_INSTALL_DIRECTORY) 
+if(TEST_INSTALL_DIRECTORY)
   set(EVPATH_TEST_INSTALL_DIR ${TEST_INSTALL_DIRECTORY})
 endif()
 
