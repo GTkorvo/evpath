@@ -596,10 +596,10 @@ configure_file(
 # EVPathConfigVersion.cmake in the same directory when figuring out the version
 # of the package when a version has been specified in the find_package() call,
 # e.g. find_package(EVPath 1.0)
-configure_file(
-  EVPathConfigVersion.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/EVPathConfigVersion.cmake
-  @ONLY
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+  ${PROJECT_BINARY_DIR}/EVPathConfigVersion.cmake
+  COMPATIBILITY SameMajorVersion
 )
 
 # Install these two files into the same directory as the generated exports-file.
