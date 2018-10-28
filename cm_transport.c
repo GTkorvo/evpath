@@ -32,13 +32,20 @@ static void
 free_global_transports()
 {
     int i = 0;
-    while (global_transports[i]) {
-        CMdlclose(global_transports[i]->dlhandle);
-	free(global_transports[i]->trans_name);
-	free(global_transports[i]);
+    transport_entry *tmp;
+    if (global_transports == NULL) {
+	return;
+    } else {
+	tmp = global_transports;
+	global_transports = NULL;
+    }
+    while (tmp[i]) {
+	CMdlclose(tmp[i]->dlhandle);
+	free(tmp[i]->trans_name);
+	free(tmp[i]);
 	i++;
     }
-    free(global_transports);
+    free(tmp);
     CMdlclearsearchlist();
 }
 
