@@ -40,13 +40,17 @@ free_global_transports()
 	global_transports = NULL;
     }
     while (tmp[i]) {
+#if !NO_DYNAMIC_LINKING
 	CMdlclose(tmp[i]->dlhandle);
+#endif
 	free(tmp[i]->trans_name);
 	free(tmp[i]);
 	i++;
     }
     free(tmp);
+#if !NO_DYNAMIC_LINKING
     CMdlclearsearchlist();
+#endif
 }
 
 int
@@ -87,9 +91,9 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 {
     transport_entry *trans_list = global_transports;
     transport_entry transport = NULL;
-    transport_entry transport_to_free = NULL;
     int i = 0;
 #if !NO_DYNAMIC_LINKING
+    transport_entry transport_to_free = NULL;
     char *libname;
     lt_dlhandle handle;	
 #endif
@@ -215,6 +219,15 @@ load_transport(CManager cm, const char *trans_name, int quiet)
     if (strcmp(trans_name, "enet") == 0) {
 	extern transport_entry cmenet_add_static_transport(CManager cm, CMtrans_services svc);
 	transport = cmenet_add_static_transport(cm, &CMstatic_trans_svcs);
+	transport->data_available = CMDataAvailable;  /* callback pointer */
+	transport->write_possible = CMWriteQueuedData;  /* callback pointer */
+	(void) add_transport_to_cm(cm, transport);
+    }
+#endif
+#ifdef UDT4_FOUND
+    if (strcmp(trans_name, "udt4") == 0) {
+	extern transport_entry cmudt4_add_static_transport(CManager cm, CMtrans_services svc);
+	transport = cmudt4_add_static_transport(cm, &CMstatic_trans_svcs);
 	transport->data_available = CMDataAvailable;  /* callback pointer */
 	transport->write_possible = CMWriteQueuedData;  /* callback pointer */
 	(void) add_transport_to_cm(cm, transport);
