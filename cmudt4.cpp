@@ -160,46 +160,6 @@ create_udt4_conn_data(CMtrans_services svc)
     return ucd;
 }
 
-#ifdef NOTDEF
-static
-void 
-dump_sockaddr(who, sa)
-char *who;
-struct sockaddr_in *sa;
-{
-    unsigned char *addr;
-
-    addr = (unsigned char *) &(sa->sin_addr.s_addr);
-
-    printf("%s: family=%d port=%d addr=%d.%d.%d.%d\n",
-	   who,
-	   ntohs(sa->sin_family),
-	   ntohs(sa->sin_port),
-	   addr[0], addr[1], addr[2], addr[3]);
-}
-
-static
-void 
-dump_sockinfo(msg, fd)
-char *msg;
-int fd;
-{
-    int nl;
-    struct sockaddr_in peer, me;
-
-    printf("Dumping sockinfo for fd=%d: %s\n", fd, msg);
-
-    nl = sizeof(me);
-    getsockname(fd, (struct sockaddr *) &me, &nl);
-    dump_sockaddr("Me", &me);
-
-    nl = sizeof(peer);
-    getpeername(fd, (struct sockaddr *) &peer, &nl);
-    dump_sockaddr("Peer", &peer);
-}
-
-#endif
-
 static void
 udt4_service_epoll(void *void_trans, void *void_conn_sock);
 
@@ -246,6 +206,9 @@ is_private_10(int IP)
     return ((IP & 0xff000000) == 0x0A000000);	/* equal 10.x.x.x */
 }
 
+extern attr_list
+libcmudt4_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr_list listen_info);
+
 static int
 initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_list attrs, udt4_conn_data_ptr ucd, attr_list conn_attr_list)
 {
@@ -257,7 +220,6 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_lis
     char *host_name;
     int remote_IP = -1;
     static int host_ip = 0;
-    int sock_len;
     union {
 	struct sockaddr s;
 	struct sockaddr_in s_I4;
@@ -295,6 +257,11 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_lis
     }
     port_num = int_port_num;
 
+    /* we should already be listening, but if not, listen */
+    if (utd->listen_port == -1) {
+	attr_list l = libcmudt4_LTX_non_blocking_listen(cm, svc, trans, NULL);
+	if (l) free_attr_list(l);
+    }
 	/* INET socket connection, host_name is the machine name */
         char ip_str[INET_ADDRSTRLEN];
 
@@ -308,7 +275,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_lis
 		if (host_ip == 0) {
 		    svc->trace_out(cm, "UDT4 connect FAILURE --> Host not found \"%s\", no IP addr supplied in contact list", host_name);
 		} else {
-		    svc->trace_out(cm, "CMSOCKET --> Host not found \"%s\", Using supplied IP addr %x",
+		    svc->trace_out(cm, "CMUDT4 --> Host not found \"%s\", Using supplied IP addr %x",
 				   host_name == NULL ? "(unknown)" : host_name,
 				   host_ip);
 		    sock_addr.s_I4.sin_addr.s_addr = ntohl(host_ip);
@@ -338,6 +305,11 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_lis
 	  svc->trace_out(cm, "UDT4 connect FAILURE --> Connect() to IP %s failed", ip_str);
 	  UDT::close(sock);
 	}
+	int local_listen_port = htonl(utd->listen_port);
+	if (UDT::send(sock, (char*)&local_listen_port, 4, 0) < 0) {
+	    svc->trace_out(cm, "UDT4 send of listen port failed\n");
+	    return -1;
+	}
 
     svc->trace_out(cm, "--> Connection established");
     ucd->remote_IP = remote_IP;
@@ -347,9 +319,6 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_lis
 
     add_attr(conn_attr_list, CM_FD, Attr_Int4,
 	     (attr_value) (long)sock);
-    sock_len = sizeof(sock_addr);
-    UDT::getsockname(sock, (struct sockaddr *) &sock_addr, &sock_len);
-    int_port_num = ntohs(((struct sockaddr_in *) &sock_addr)->sin_port);
     add_attr(conn_attr_list, CM_THIS_CONN_PORT, Attr_Int4,
 	     (attr_value) (long)int_port_num);
     add_attr(conn_attr_list, CM_PEER_IP, Attr_Int4,
@@ -391,6 +360,7 @@ libcmudt4_LTX_initiate_conn(CManager cm, CMtrans_services svc, transport_entry t
     ucd->conn = conn;
 
     svc->trace_out(cm, "Cmudt4 Adding trans->data_available as action on fd %d", sock);
+    add_sock_map_data(utd, sock, ucd);
     UDT::epoll_add_usock(utd->eid, sock, NULL);
 
     free_attr_list(conn_attr_list);
@@ -495,6 +465,45 @@ libcmudt4_LTX_connection_eq(CManager cm, CMtrans_services svc, transport_entry t
     return 0;
 }
 
+static attr_list
+build_listen_attrs(CManager cm, CMtrans_services svc, udt4_transport_data_ptr sd,
+		   attr_list listen_info, int int_port_num)
+{
+    char host_name[256];
+    attr_list ret_list;
+    int IP;
+    int use_hostname = 0;
+    
+    svc->trace_out(cm, "CMUdt4 listen succeeded on port %d",
+		       int_port_num);
+    get_IP_config(host_name, sizeof(host_name), &IP, NULL, NULL,
+		  &use_hostname, listen_info, svc->trace_out, (void *)cm);
+
+    ret_list = create_attr_list();
+
+    if (sd) {
+	sd->hostname = strdup(host_name);
+	sd->listen_port = int_port_num;
+    }
+    if ((IP != 0) && !use_hostname) {
+	add_attr(ret_list, CM_IP_ADDR, Attr_Int4,
+		 (attr_value) (long)IP);
+    }
+    if ((getenv("CMUseHostname") != NULL) || 
+	use_hostname) {
+	add_attr(ret_list, CM_IP_HOSTNAME, Attr_String,
+		 (attr_value) strdup(host_name));
+    } else if (IP == 0) {
+        add_int_attr(ret_list, CM_IP_ADDR, INADDR_LOOPBACK);
+    }
+    add_attr(ret_list, CM_IP_PORT, Attr_Int4,
+	     (attr_value) (long)int_port_num);
+    
+    add_attr(ret_list, CM_TRANSPORT, Attr_String,
+	     (attr_value) strdup("udt4"));
+    return ret_list;
+}
+
 /* 
  * Create an IP socket for connection from other CMs
  */
@@ -510,8 +519,20 @@ libcmudt4_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_e
     u_short port_num = 0;
     int port_range_low, port_range_high;
     int use_hostname = 0;
+    int int_port_num;
     int IP;
     char host_name[256];
+
+    if (utd->listen_port != -1) {
+	/* we're already listening */
+        if (port_num == 0) {
+	    /* not requesting a specific port, return what we have */
+	    return build_listen_attrs(cm, svc, NULL, listen_info, utd->listen_port);
+	} else {
+	    printf("CMlisten_specific() requesting a specific port follows other Udt4 operation which initiated listen at another port.  Only one listen allowed, second listen fails.\n");
+	    return NULL;
+	}
+    }
 
     conn_sock = UDT::socket(AF_INET, SOCK_STREAM, 0);
 
@@ -545,6 +566,7 @@ libcmudt4_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_e
     sock_addr.sin_family = AF_INET;
     sock_addr.sin_addr.s_addr = INADDR_ANY;
     sock_addr.sin_port = htons(port_num);
+
     if (sock_addr.sin_port != 0) {
 	/* specific port requested. set REUSEADDR, REUSEPORT because previous server might have died badly */
         if (UDT::setsockopt(conn_sock, SOL_SOCKET, UDT_REUSEADDR, (char *) &sock_opt_val,
@@ -559,6 +581,11 @@ libcmudt4_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_e
 	    fprintf(stderr, "Cannot bind INET socket\n");
 	    return NULL;
 	}
+	/* begin listening for conns */
+	if (UDT::listen(conn_sock, FD_SETSIZE)) {
+	    fprintf(stderr, "listen failed %s\n", UDT::getlasterror().getErrorMessage());
+	    return NULL;
+	}
     } else {
 	long seedval = time(NULL) + getpid();
 	/* port num is free.  Constrain to range to standards */
@@ -569,12 +596,26 @@ libcmudt4_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_e
 	while (tries > 0) {
 	    int target = port_range_low + size * drand48();
 	    sock_addr.sin_port = htons(target);
+	    int_port_num = target;
 	    svc->trace_out(cm, "UDT4 trying to bind port %d", target);
 	    result = UDT::bind(conn_sock, (struct sockaddr *) &sock_addr,
 			       sizeof sock_addr);
-	    fprintf(stderr, "Bind result %d\n", result);
 	    tries--;
-	    if (result != UDT::ERROR) tries = 0;
+	    /* begin listening for conns */
+	    result = UDT::listen(conn_sock, FD_SETSIZE);
+	    if (result != UDT::ERROR) {
+	      tries = 0;
+	    } else {
+	      /* 
+	       *  For some reason, UDT4 gives conflicting port errors
+	       *  on listen rather than bind.  You can't bind a socket
+	       *  more than once, so on error we have to close the old
+	       *  and start with a new UDT::socket.
+	       */
+	      UDT::close(conn_sock);
+	      conn_sock = UDT::socket(AF_INET, SOCK_STREAM, 0);
+	    }
+	      
 	    if (tries%5 == 4) {
 		/* try reseeding in case we're in sync with another process */
 		srand48(time(NULL) + getpid());
@@ -598,12 +639,6 @@ libcmudt4_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_e
 	fprintf(stderr, "Cannot get socket name\n");
 	return NULL;
     }
-    /* begin listening for conns and set the backlog */
-    if (UDT::listen(conn_sock, FD_SETSIZE)) {
-	std::cout << "send: " << UDT::getlasterror().getErrorMessage() << std::endl;
-	fprintf(stderr, "listen failed\n");
-	return NULL;
-    }
     /* set the port num as one we can be contacted at */
 
     UDT::epoll_add_usock(utd->eid, conn_sock, NULL);
@@ -614,7 +649,6 @@ libcmudt4_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_e
     utd->listen_sock = conn_sock;
 
     {
-	int int_port_num = ntohs(sock_addr.sin_port);
 	attr_list ret_list;
 
 	svc->trace_out(cm, "UDT4 listen succeeded on port %d, fd %d",
@@ -658,44 +692,6 @@ struct iovec {
 #define IOV_MAX 16
 #endif
 
-#ifndef HAVE_WRITEV
-static
-int 
-writev(fd, iov, iovcnt)
-int fd;
-struct iovec *iov;
-int iovcnt;
-{
-    int wrote = 0;
-    int i;
-    for (i = 0; i < iovcnt; i++) {
-	int left = iov[i].iov_len;
-	int iget = 0;
-
-	while (left > 0) {
-	    iget = write(fd, (char *) iov[i].iov_base + iov[i].iov_len - left, left);
-	    if (iget == -1) {
-		int lerrno = errno;
-		if ((lerrno != EWOULDBLOCK) &&
-		    (lerrno != EAGAIN) &&
-		    (lerrno != EINTR)) {
-		    /* serious error */
-		    return -1;
-		} else {
-		    if (lerrno == EWOULDBLOCK) {
-			printf("Cmudt4 write Would block, fd %d, length %d",
-				       fd, left);
-		    }
-		    iget = 0;
-		}
-	    }
-	    left -= iget;
-	}
-	wrote += iov[i].iov_len;
-    }
-    return wrote;
-}
-#endif
 
 extern int
 libcmudt4_LTX_writev_func(CMtrans_services svc, udt4_conn_data_ptr ucd, void *iovs, int iovcnt, attr_list attrs)
@@ -719,13 +715,17 @@ libcmudt4_LTX_writev_func(CMtrans_services svc, udt4_conn_data_ptr ucd, void *io
       memcpy(tmp, iov[i].iov_base, iov[i].iov_len);
       tmp += iov[i].iov_len;
     }
-    int sent = UDT::send(ucd->udtsock, buffer, left, 0);
-    if (sent < 0)
-      {
-	std::cout << "send: " << UDT::getlasterror().getErrorMessage() << std::endl;
-	return 0;
+    tmp = buffer;
+    while (left > 0) {
+      int sent = UDT::send(ucd->udtsock, tmp, left, 0);
+      
+      if (sent < 0) {
+	  svc->trace_out(ucd->utd->cm, "UDT4 send failed, error was %s\n", UDT::getlasterror().getErrorMessage());
+	  return 0;
       }
-
+      left -= sent;
+      tmp += sent;
+    }
     free(buffer);
     return iovcnt;
 }
@@ -754,7 +754,7 @@ libcmudt4_LTX_read_to_buffer_func(CMtrans_services svc, udt4_conn_data_ptr ucd, 
     }
 
     if (UDT::ERROR == (iget = UDT::recv(ucd->udtsock, (char*)buffer, requested_len, 0))) {
-      std::cout << "recv:" << UDT::getlasterror().getErrorMessage() << std::endl;
+      svc->trace_out(ucd->utd->cm, "CMUDT4 recv failed, error was %s\n", UDT::getlasterror().getErrorMessage());;
     }
     if ((iget == -1) || (iget == 0)) {
 	int lerrno = errno;
@@ -762,12 +762,12 @@ libcmudt4_LTX_read_to_buffer_func(CMtrans_services svc, udt4_conn_data_ptr ucd, 
 	    (lerrno != EAGAIN) &&
 	    (lerrno != EINTR)) {
 	    /* serious error */
-	    svc->trace_out(ucd->utd->cm, "CMSocket iget was -1, errno is %d, returning 0 for read",
+	    svc->trace_out(ucd->utd->cm, "CMUDT4 iget was -1, errno is %d, returning 0 for read",
 			   lerrno);
 	    return -1;
 	} else {
 	    if (non_blocking) {
-		svc->trace_out(ucd->utd->cm, "CMSocket iget was -1, would block, errno is %d",
+		svc->trace_out(ucd->utd->cm, "CMUDT4 iget was -1, would block, errno is %d",
 			   lerrno);
 		return 0;
 	    }
@@ -778,9 +778,7 @@ libcmudt4_LTX_read_to_buffer_func(CMtrans_services svc, udt4_conn_data_ptr ucd, 
     while (left > 0) {
 	int lerrno;
 	if (UDT::ERROR == (iget = UDT::recv(ucd->udtsock, ((char*)buffer) + requested_len - left, left, 0))) {
-	  std::cout << "recv:" << UDT::getlasterror().getErrorMessage() << std::endl;
-	} else {
-	  printf("Got data 2nd try!  len %d, first int %x\n", iget, *((int*)buffer));
+	  svc->trace_out(ucd->utd->cm, "recv failed, message was %s\n", UDT::getlasterror().getErrorMessage());
 	}
 	lerrno = errno;
 	if (iget == -1) {
@@ -788,14 +786,14 @@ libcmudt4_LTX_read_to_buffer_func(CMtrans_services svc, udt4_conn_data_ptr ucd, 
 		(lerrno != EAGAIN) &&
 		(lerrno != EINTR)) {
 		/* serious error */
-		svc->trace_out(ucd->utd->cm, "CMSocket iget was -1, errno is %d, returning %d for read", 
+		svc->trace_out(ucd->utd->cm, "Cmudt4 iget was -1, errno is %d, returning %d for read", 
 			   lerrno, requested_len - left);
 		return (requested_len - left);
 	    } else {
 		iget = 0;
 	    }
 	} else if (iget == 0) {
-	    svc->trace_out(ucd->utd->cm, "CMSocket iget was 0, errno is %d, returning %d for read", 
+	    svc->trace_out(ucd->utd->cm, "Cmudt4 iget was 0, errno is %d, returning %d for read", 
 			   lerrno, requested_len - left);
 	    return requested_len - left;	/* end of file */
 	}
@@ -817,7 +815,8 @@ udt4_service_epoll(void *void_trans, void *not_used)
 	printf("UTD4 service network, CManager not locked\n");
     }
 
-    UDT::epoll_wait(utd->eid, &readfds, NULL, 50);
+    int ret = UDT::epoll_wait(utd->eid, &readfds, NULL, 50);
+    svc->trace_out(utd->cm, "Epoll_wait returned %d\n", ret);
     for (std::set<UDTSOCKET>::iterator i = readfds.begin(); i != readfds.end(); ++ i)
       {
 	if (*i == utd->listen_sock) {
@@ -836,7 +835,12 @@ udt4_service_epoll(void *void_trans, void *not_used)
 	  UDT::getpeername(ucd->udtsock, (struct sockaddr *)&remote, &remote_len);
 	  add_int_attr(conn_attr_list, CM_PEER_IP, ntohl(remote.sin_addr.s_addr));
 	  ucd->remote_IP = ntohl(remote.sin_addr.s_addr);   /* remote_IP is in host byte order */
-	  ucd->remote_contact_port = remote.sin_port;
+	  if (UDT::recv(ucd->udtsock, (char *) &ucd->remote_contact_port, 4, 0) < 0) {
+	    svc->trace_out(utd->cm, "Remote host dropped connection without data");
+	    return;
+	  } else {
+	    ucd->remote_contact_port = ntohl(ucd->remote_contact_port);
+	  }
 	  add_attr(conn_attr_list, CM_PEER_LISTEN_PORT, Attr_Int4,
 		   (attr_value) (long)ucd->remote_contact_port);
 	  struct in_addr addr;
@@ -859,24 +863,12 @@ udt4_service_epoll(void *void_trans, void *not_used)
 	      }
 	    }
 	    if (ucd == NULL) {
-	      printf("Internal consistency error, conn data not found\n");
+	      printf("Internal consistency error, conn data for sock %x not found\n", *i);
 	    }
 	    svc->trace_out(cm, "Calling data available on connection %p\n", ucd->conn);
 	    (trans->data_available)(trans, ucd->conn);
 	  }
       }
-}
-
-static
-void
-udt4_poll_epoll(CManager cm, void *void_trans)
-{
-    transport_entry trans = (transport_entry) void_trans;
-    udt4_transport_data_ptr utd = (udt4_transport_data_ptr) trans->trans_data;
-    CMtrans_services svc = utd->svc;
-    ACQUIRE_CM_LOCK(svc, cm);
-    udt4_service_epoll(void_trans, NULL);
-    DROP_CM_LOCK(svc, cm);
 }
 
 extern void *
@@ -920,7 +912,7 @@ libcmudt4_LTX_initialize(CManager cm, CMtrans_services svc, transport_entry tran
 
     svc->fd_add_select(cm, localFD, udt4_service_epoll,
 		       (void *) trans, (void *)udt4_data);
-    svc->add_periodic_task(cm, 1, 0, (CMPollFunc) udt4_poll_epoll, (void *)trans);
+    //    svc->add_periodic_task(cm, 1, 0, (CMPollFunc) udt4_poll_epoll, (void *)trans);
     return (void *) udt4_data;
 }
 
