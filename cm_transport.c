@@ -236,7 +236,6 @@ load_transport(CManager cm, const char *trans_name, int quiet)
     if (!transport) return 0;
 #endif
     CMtrace_out(cm, CMTransportVerbose, "Loaded transport %s.\n", trans_name);
-    CMtrace_out(cm, CMTransportVerbose, "Listen is %p\n", transport->listen);
     if (global_transports != NULL) {
       global_transports = INT_CMrealloc(global_transports, 
 				    sizeof(global_transports) * (i + 2));
