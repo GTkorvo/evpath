@@ -177,7 +177,7 @@ add_sock_map_data(udt4_transport_data_ptr udt, UDTSOCKET sock, udt4_conn_data_pt
   udt->conn_count++;
 }
 
-extern void
+extern "C" void
 libcmudt4_LTX_shutdown_conn(CMtrans_services svc, udt4_conn_data_ptr ucd)
 {
     svc->connection_deref(ucd->conn);
@@ -206,7 +206,7 @@ is_private_10(int IP)
     return ((IP & 0xff000000) == 0x0A000000);	/* equal 10.x.x.x */
 }
 
-extern attr_list
+extern "C" attr_list
 libcmudt4_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr_list listen_info);
 
 static int
@@ -337,7 +337,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_lis
  * the waiting socket).  Otherwise, establish an INET socket connection
  * (name_str stores the machine name).
  */
-extern CMConnection
+extern "C" CMConnection
 libcmudt4_LTX_initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_list attrs)
 {
     udt4_conn_data_ptr ucd = create_udt4_conn_data(svc);
@@ -376,7 +376,7 @@ libcmudt4_LTX_initiate_conn(CManager cm, CMtrans_services svc, transport_entry t
  * For udt4, this involves checking to see if the host name is the 
  * same as ours and if the IP_PORT matches the one we are listening on.
  */
-extern int
+extern "C" int
 libcmudt4_LTX_self_check(CManager cm, CMtrans_services svc, transport_entry trans, attr_list attrs)
 {
 
@@ -425,7 +425,7 @@ libcmudt4_LTX_self_check(CManager cm, CMtrans_services svc, transport_entry tran
     return 1;
 }
 
-extern int
+extern "C" int
 libcmudt4_LTX_connection_eq(CManager cm, CMtrans_services svc, transport_entry trans, attr_list attrs, udt4_conn_data_ptr ucd)
 {
 
@@ -507,7 +507,7 @@ build_listen_attrs(CManager cm, CMtrans_services svc, udt4_transport_data_ptr sd
 /* 
  * Create an IP socket for connection from other CMs
  */
-extern attr_list
+extern "C" attr_list
 libcmudt4_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr_list listen_info)
 {
     udt4_transport_data_ptr utd = (udt4_transport_data_ptr) trans->trans_data;
@@ -693,7 +693,7 @@ struct iovec {
 #endif
 
 
-extern int
+extern "C" int
 libcmudt4_LTX_writev_func(CMtrans_services svc, udt4_conn_data_ptr ucd, void *iovs, int iovcnt, attr_list attrs)
 {
     int left = 0;
@@ -740,7 +740,7 @@ free_udt4_data(CManager cm, void *utdv)
     svc->free_func(utd);
 }
 
-extern int
+extern "C" int
 libcmudt4_LTX_read_to_buffer_func(CMtrans_services svc, udt4_conn_data_ptr ucd, void *buffer, int requested_len, int non_blocking)
 {
     int left, iget;
@@ -871,7 +871,7 @@ udt4_service_epoll(void *void_trans, void *not_used)
       }
 }
 
-extern void *
+extern "C" void *
 libcmudt4_LTX_initialize(CManager cm, CMtrans_services svc, transport_entry trans)
 {
     static int atom_init = 0;
@@ -916,7 +916,7 @@ libcmudt4_LTX_initialize(CManager cm, CMtrans_services svc, transport_entry tran
     return (void *) udt4_data;
 }
 
-extern attr_list
+extern "C" attr_list
 libcmudt4_LTX_get_transport_characteristics(transport_entry trans, CMtrans_services svc,
 					       void* vutd)
 {
@@ -924,7 +924,7 @@ libcmudt4_LTX_get_transport_characteristics(transport_entry trans, CMtrans_servi
     return utd->characteristics;
 }
 
-extern void *
+extern "C" void *
 libcmudt4_LTX_read_block_func(CMtrans_services svc,
 			      udt4_conn_data_ptr conn_data, int *actual_len,
 			      int *offset_ptr)
