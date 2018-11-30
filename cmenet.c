@@ -321,6 +321,13 @@ enet_accept_conn(enet_client_data_ptr sd, transport_entry trans,
 		   inet_ntoa(addr),
 		   enet_conn_data->remote_contact_port);
     free_attr_list(conn_attr_list);
+
+    /* 
+     * try flushing connection verify message here to make 
+     * sure it's established 
+     */
+    enet_host_flush(sd->server);
+
     return enet_conn_data;
 }
 
