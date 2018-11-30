@@ -74,9 +74,9 @@ void wait_for_pending_write(CMConnection conn);
 static void cm_wake_any_pending_write(CMConnection conn);
 static void transport_wake_any_pending_write(CMConnection conn);
 static void cm_set_pending_write(CMConnection conn);
-static int drop_CM_lock(CManager cm, char *file, int line);
-static int acquire_CM_lock(CManager cm, char *file, int line);
-static int return_CM_lock_status(CManager cm, char *file, int line);
+static int drop_CM_lock(CManager cm, const char *file, int line);
+static int acquire_CM_lock(CManager cm, const char *file, int line);
+static int return_CM_lock_status(CManager cm, const char *file, int line);
 static void add_buffer_to_pending_queue(CManager cm, CMConnection conn, CMbuffer buf, long length);
 static void cond_wait_CM_lock(CManager cm, void *cond, char *file, int line);
 
@@ -130,20 +130,20 @@ static void cond_wait_CM_lock(CManager cm, void *vcond, char *file, int line)
     cm->locked++;
 }
 
-static int drop_CM_lock(CManager cm, char *file, int line)
+static int drop_CM_lock(CManager cm, const char *file, int line)
 {
     int ret = cm->locked;
     IntCManager_unlock(cm, file, line);
     return ret;
 }
 
-static int acquire_CM_lock(CManager cm, char *file, int line)
+static int acquire_CM_lock(CManager cm, const char *file, int line)
 {
     IntCManager_lock(cm, file, line);
     return cm->locked;
 }
 
-static int return_CM_lock_status(CManager cm, char *file, int line)
+static int return_CM_lock_status(CManager cm, const char *file, int line)
 {
     (void) file;
     (void) line;
@@ -3543,7 +3543,9 @@ INT_CMConnection_failed(CMConnection conn)
      SelectInitFunc select_free_function = (SelectInitFunc)task_data[0];
      CMtrace_out(cm, CMFreeVerbose, "calling select FREE function, %p\n", task_data[1]);
      select_free_function(&CMstatic_trans_svcs, cm, &task_data[1]);
+#if !NO_DYNAMIC_LINKING
      CMdlclose(task_data[2]);
+#endif
      free(task_data);
  }
 
