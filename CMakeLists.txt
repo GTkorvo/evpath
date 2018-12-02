@@ -312,7 +312,7 @@ else()
   option(EVPATH_USE_UDT4 "Build the udt4 transport" ${UDT4_FOUND})
 endif()
 if(UDT4_FOUND)
-  set(RUN_UDT4_TESTS TRUE)
+  set(RUN_UDT4_TESTS FALSE)   # DON'T TEST.  UDT4 NOT USEFUL
   if(EVPATH_TRANSPORT_MODULES)
     add_library(cmudt4 MODULE cmudt4.cpp ip_config.c)
     set_target_properties(cmudt4 PROPERTIES

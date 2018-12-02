@@ -2214,6 +2214,18 @@ INT_CMConnection_failed(CMConnection conn)
 	   }
  #endif
 	   CManager_unlock(cm);
+	   switch (*(int*)buffer) {
+	   case 0x5042494f:
+	   case 0x4f494250:  /* incoming FFS format protocol message */
+	     {
+	       extern int CM_pbio_query(CMConnection conn, CMTransport trans,
+					char *buffer, long length);
+	       
+	       int ret = CM_pbio_query(conn, conn->trans, buffer, length);
+	       CManager_lock(cm);
+	       return ret;
+	     }
+	   }
 	   ret = CMdo_non_CM_handler(conn, *(int*)buffer, buffer, length);
 	   CManager_lock(cm);
 	   if (local) cm_return_data_buf(cm, local);
@@ -3681,8 +3693,7 @@ clear_foreign_handlers()
 					  (foreign_handler_count + 1));
      } else {
 	 foreign_handler_list = INT_CMmalloc(sizeof(foreign_handler_list[0]));
-//  reenable this when ADIOS2 problem is sorted
-//	 atexit(clear_foreign_handlers);
+	 atexit(clear_foreign_handlers);
      }
      foreign_handler_list[foreign_handler_count].header = header;
      foreign_handler_list[foreign_handler_count].handler = handler;
