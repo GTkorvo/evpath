@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+#include <pthread.h>
 
 #include <enet/enet.h>
 #include <arpa/inet.h>
@@ -432,7 +433,6 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
     peer = enet_host_connect (sd->server, & address, 1, 0);    
     peer->data = enet_conn_data;
     svc->trace_out(cm, "ENET ========   On init Assigning peer %p has data %p\n", peer, enet_conn_data);
-    
     if (peer == NULL)
     {
        fprintf (stderr, 
@@ -442,10 +442,12 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
     
     /* Wait up to 'timeout' milliseconds for the connection attempt to succeed. */
     int finished = 0;
-    int start = enet_time_get();
+    int got_connection = 0;
+    enet_uint32 end = enet_time_get() + timeout;
     while (!finished) {
         int ret = enet_host_service (sd->server, & event, 100); 
-        if ((start + timeout) > enet_time_get()) {
+        enet_uint32 now = enet_time_get();
+        if (now > end) {
             finished = 1;
         }
         if (ret <= 0) continue;
@@ -470,6 +472,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
                 enet_host_flush (sd->server);
                 svc->trace_out(cm, "Connection to %s:%d succeeded.\n", inet_ntoa(sin_addr), address.port);
                 finished = 1;
+                got_connection = 1;
             }
             break;
         }
@@ -509,10 +512,14 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
             }
             break;
         }
-        }            
+        }
     }
 
-    svc->trace_out(cm, "--> Connection established");
+    if (!got_connection) {
+        svc->trace_out("--> Connection failed because of timeout", getpid(), pthread_self(), peer, peer->state);
+        return 0;
+    }
+    svc->trace_out(cm, "--> Connection established\n");
     enet_conn_data->remote_host = host_name == NULL ? NULL : strdup(host_name);
     enet_conn_data->remote_IP = htonl(host_ip);
     enet_conn_data->remote_contact_port = int_port_num;
@@ -982,6 +989,7 @@ libcmenet_LTX_initialize(CManager cm, CMtrans_services svc,
 	    fprintf (stderr, "An error occurred while initializing ENet.\n");
 	    //return EXIT_FAILURE;
 	}
+        enet_time_set(0);   /* rollover in 50 days */
     }
     if (atom_init == 0) {
 	CM_ENET_HOSTNAME = attr_atom_from_string("CM_ENET_HOST");
