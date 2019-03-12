@@ -554,7 +554,7 @@ get_IP_config(char *hostname_buf, int len, int* IP_p, int *port_range_low_p, int
     }
 
     get_string_attr(attrs, CM_IP_INTERFACE, &interface);
-    if (!interface) {
+    if (interface) {
 	interface = getenv(IPCONFIG_ENVVAR_PREFIX "INTERFACE");
     }
     if (interface) {
