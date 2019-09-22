@@ -3563,8 +3563,6 @@ INT_CMget_ip_config_diagnostics(CManager cm)
      return handle;
  }
 
- typedef void (*SelectInitFunc)(CMtrans_services svc, CManager cm, void *client_data);
-
  static void
  select_shutdown(CManager cm, void *shutdown_funcv)
  {
@@ -3590,11 +3588,11 @@ INT_CMget_ip_config_diagnostics(CManager cm)
  static void
  CM_init_select(CMControlList cl, CManager cm)
  {
-     CMPollFunc blocking_function, polling_function;
      SelectInitFunc init_function;
      SelectInitFunc shutdown_function;
      SelectInitFunc select_free_function;
      void *dlhandle = NULL;
+     
  #if !NO_DYNAMIC_LINKING
      char *libname;
      lt_dlhandle handle;	
@@ -3620,8 +3618,12 @@ INT_CMget_ip_config_diagnostics(CManager cm)
 	 (CMAddPeriodicFunc)lt_dlsym(handle, "add_delayed_task");  
      cl->remove_periodic = (CMRemovePeriodicFunc)lt_dlsym(handle, "remove_periodic");  
      cl->wake_select = (CMWakeSelectFunc)lt_dlsym(handle, "wake_function");
-     blocking_function = (CMPollFunc)lt_dlsym(handle, "blocking_function");
-     polling_function = (CMPollFunc)lt_dlsym(handle, "polling_function");
+    cl->network_blocking_function.func = (CMPollFunc)lt_dlsym(handle, "blocking_function");
+    cl->network_blocking_function.client_data = (void*)&(cl->select_data);
+    cl->network_blocking_function.cm = NULL;
+    cl->network_polling_function.func = (CMPollFunc)lt_dlsym(handle, "polling_function");;
+    cl->network_polling_function.client_data = (void*)&(cl->select_data);
+    cl->network_polling_function.cm = NULL;
      init_function = (SelectInitFunc)lt_dlsym(handle, "select_initialize");
      shutdown_function = (SelectInitFunc)lt_dlsym(handle, "select_shutdown");
      select_free_function = (SelectInitFunc)lt_dlsym(handle, "select_free");
@@ -3635,8 +3637,12 @@ INT_CMget_ip_config_diagnostics(CManager cm)
 	 (CMAddPeriodicFunc)libcmselect_LTX_add_delayed_task;
      cl->remove_periodic = (CMRemovePeriodicFunc)libcmselect_LTX_remove_periodic;
      cl->wake_select = (CMWakeSelectFunc)libcmselect_LTX_wake_function;
-     blocking_function = (CMPollFunc)libcmselect_LTX_blocking_function;
-     polling_function = (CMPollFunc)libcmselect_LTX_polling_function;
+    cl->network_blocking_function.func = (CMPollFunc)libcmselect_LTX_blocking_function;
+    cl->network_blocking_function.client_data = (void*)&(cl->select_data);
+    cl->network_blocking_function.cm = NULL;
+    cl->network_polling_function.func =  (CMPollFunc)libcmselect_LTX_polling_function;
+    cl->network_polling_function.client_data = (void*)&(cl->select_data);
+    cl->network_polling_function.cm = NULL;
      init_function = (SelectInitFunc)libcmselect_LTX_select_initialize;
      shutdown_function = (SelectInitFunc) libcmselect_LTX_select_shutdown;
      select_free_function = (SelectInitFunc) libcmselect_LTX_select_free;
@@ -3645,19 +3651,12 @@ INT_CMget_ip_config_diagnostics(CManager cm)
 
  #endif
      if ((cl->add_select == NULL) || (cl->remove_select == NULL) || 
-	 (blocking_function == NULL) || (cl->add_periodic == NULL) ||
+	 (cl->network_blocking_function.func == NULL) || (cl->add_periodic == NULL) ||
 	 (cl->remove_periodic == NULL)) {
 	 printf("Select failed to load properly\n");
 	 exit(1);
      }
      init_function(&CMstatic_trans_svcs, cm, &cm->control_list->select_data);
-    assert(cl->network_blocking_function.func == NULL);
-    cl->network_blocking_function.func = blocking_function;
-    cl->network_blocking_function.client_data = (void*)&(cl->select_data);
-    cl->network_blocking_function.cm = NULL;
-    cl->network_polling_function.func = polling_function;
-    cl->network_polling_function.client_data = (void*)&(cl->select_data);
-    cl->network_polling_function.cm = NULL;
     if (cl->has_thread == -1) {
 	thr_thread_t server_thread = 
 	    thr_fork((void*(*)(void*))server_thread_func, 

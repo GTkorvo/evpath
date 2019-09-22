@@ -164,23 +164,10 @@ typedef struct free_block_rec {
 typedef void (*CMNetworkFunc)(void *svcs, void *client_data);
 
 
-typedef void (*CMRemoveSelectFunc)(void *svcs, void *select_data, int fd);
-
-typedef struct _periodic_task *periodic_task_handle;
-
 struct _CMTaskHandle {
     CManager cm;
     periodic_task_handle task;
 };
-
-typedef periodic_task_handle (*CMAddPeriodicFunc) 
-   (void *svcs, void *select_data, int period_sec, int period_usec,
-	  select_list_func func, void *param1, void *param2);
-
-typedef void (*CMRemovePeriodicFunc)(void *svcs, void *select_data, 
-					   periodic_task_handle handle);
-
-typedef void (*CMWakeSelectFunc)(void *svcs, void *select_data);
 
 typedef struct _CMControlList {
     func_entry network_blocking_function;
