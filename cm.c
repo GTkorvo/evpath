@@ -290,30 +290,6 @@ CMControlList_set_blocking_func(CMControlList cl, CManager cm,
 				CMPollFunc bfunc, CMPollFunc pfunc,
 				void *client_data)
 {
-    assert(cl->network_blocking_function.func == NULL);
-    cl->network_blocking_function.func = bfunc;
-    cl->network_blocking_function.client_data = client_data;
-    cl->network_blocking_function.cm = NULL;
-    cl->network_polling_function.func = pfunc;
-    cl->network_polling_function.client_data = client_data;
-    cl->network_polling_function.cm = NULL;
-    if (cl->has_thread == -1) {
-	thr_thread_t server_thread = 
-	    thr_fork((void*(*)(void*))server_thread_func, 
-		     (void*)cm);
-	if (server_thread ==  (thr_thread_t) NULL) {
-	    return;
-	}
-	CMtrace_out(cm, CMLowLevelVerbose,
-		    "CM - Forked comm thread %lx\n", (long)server_thread);
-	cm->control_list->server_thread = server_thread;
-	cm->control_list->cl_reference_count++;
-	cm->control_list->free_reference_count++;
-	cl->has_thread = 1;
-	cm->reference_count++;
-	CMtrace_out(cm, CMFreeVerbose, "Forked - CManager %lx ref count now %d\n", 
-		    (long) cm, cm->reference_count);
-    }
 }
 
 extern void
@@ -3675,9 +3651,30 @@ INT_CMget_ip_config_diagnostics(CManager cm)
 	 exit(1);
      }
      init_function(&CMstatic_trans_svcs, cm, &cm->control_list->select_data);
-     CMControlList_set_blocking_func(cl, cm, blocking_function, 
-				     polling_function,
-				     (void*)&(cl->select_data));
+    assert(cl->network_blocking_function.func == NULL);
+    cl->network_blocking_function.func = blocking_function;
+    cl->network_blocking_function.client_data = (void*)&(cl->select_data);
+    cl->network_blocking_function.cm = NULL;
+    cl->network_polling_function.func = polling_function;
+    cl->network_polling_function.client_data = (void*)&(cl->select_data);
+    cl->network_polling_function.cm = NULL;
+    if (cl->has_thread == -1) {
+	thr_thread_t server_thread = 
+	    thr_fork((void*(*)(void*))server_thread_func, 
+		     (void*)cm);
+	if (server_thread ==  (thr_thread_t) NULL) {
+	    return;
+	}
+	CMtrace_out(cm, CMLowLevelVerbose,
+		    "CM - Forked comm thread %lx\n", (long)server_thread);
+	cm->control_list->server_thread = server_thread;
+	cm->control_list->cl_reference_count++;
+	cm->control_list->free_reference_count++;
+	cl->has_thread = 1;
+	cm->reference_count++;
+	CMtrace_out(cm, CMFreeVerbose, "Forked - CManager %lx ref count now %d\n", 
+		    (long) cm, cm->reference_count);
+    }
      cl->select_initialized = 1;
      CMtrace_out(cm, CMFreeVerbose, "CManager adding select shutdown function, %lx\n",(long)shutdown_function);
      internal_add_shutdown_task(cm, select_shutdown, (void*)shutdown_function, SHUTDOWN_TASK);
