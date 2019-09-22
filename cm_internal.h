@@ -101,6 +101,7 @@ typedef struct _CManager {
     transport_entry *transports;
     int initialized;
     int reference_count;
+    char *control_module_choice;  /* this is static, doesn't need to be free'd */
 
     CMControlList control_list;	/* the control list for this DE */
 
@@ -386,6 +387,7 @@ extern void INT_CMfree(void *ptr);
 extern void INT_CMadd_shutdown_task(CManager cm, CMPollFunc func, void *client_data, int task_type);
 extern void INT_CManager_close(CManager cm);
 extern CManager INT_CManager_create ();
+extern CManager INT_CManager_create_control ( char *control_module);
 extern int INT_CMlisten_specific(CManager cm, attr_list listen_info);
 extern void INT_CMConnection_close(CMConnection conn);
 extern void internal_connection_close(CMConnection conn);

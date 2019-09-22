@@ -1128,3 +1128,22 @@ void *client_data;
 	(*((select_data_ptr*)client_data))->closed = 1;
     }
 }
+
+extern void
+libcmepoll_init_sel_item(struct _select_item *sel_item)
+{
+    sel_item->add_select = (CMAddSelectFunc)libcmepoll_LTX_add_select;
+    sel_item->remove_select = (CMRemoveSelectFunc)libcmepoll_LTX_remove_select;
+    sel_item->write_select = (CMAddSelectFunc) libcmepoll_LTX_write_select;
+    sel_item->add_periodic = (CMAddPeriodicFunc)libcmepoll_LTX_add_periodic;
+    sel_item->add_delayed_task = 
+	 (CMAddPeriodicFunc)libcmepoll_LTX_add_delayed_task;
+    sel_item->remove_periodic = (CMRemovePeriodicFunc)libcmepoll_LTX_remove_periodic;
+    sel_item->wake_function = (CMWakeSelectFunc)libcmepoll_LTX_wake_function;
+    sel_item->blocking_function = (CMPollFunc)libcmepoll_LTX_blocking_function;
+    sel_item->polling_function =  (CMPollFunc)libcmepoll_LTX_polling_function;
+    sel_item->initialize = (SelectInitFunc)libcmepoll_LTX_select_initialize;
+    sel_item->shutdown = (SelectInitFunc) libcmepoll_LTX_select_shutdown;
+    sel_item->free = (SelectInitFunc) libcmepoll_LTX_select_free;
+    sel_item->stop = (CMWakeSelectFunc) libcmepoll_LTX_select_stop;
+}
