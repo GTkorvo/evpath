@@ -3618,6 +3618,12 @@ INT_CMget_ip_config_diagnostics(CManager cm)
      free(task_data);
  }
 
+#ifdef HAVE_SYS_EPOLL_H
+extern void
+libcmepoll_init_sel_item(struct _select_item *sel_item);
+#endif
+extern void
+libcmselect_init_sel_item(struct _select_item *sel_item);
 
 static void
 CM_init_select(CMControlList cl, CManager cm)
@@ -3666,10 +3672,14 @@ CM_init_select(CMControlList cl, CManager cm)
 #else
 
 #ifdef HAVE_SYS_EPOLL_H
-     libcmepoll_init_sel_item(&sel_item);
-#else 
-     libcmselect_init_sel_item(&sel_item);
+    if (strcmp(select_module, "epoll") == 0) {
+	libcmepoll_init_sel_item(&sel_item);
+    }
 #endif
+    if (strcmp(select_module, "select") == 0) {
+	libcmselect_init_sel_item(&sel_item);
+    }
+
 #endif
      cl->add_select = sel_item.add_select;
      cl->remove_select = sel_item.remove_select;
