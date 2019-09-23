@@ -555,8 +555,13 @@ void *arg2;
     }
     FD_SET(fd, (fd_set *) sd->fdset);
     if (fd > FD_SETSIZE) {
-	fprintf(stderr, "Internal Error, stupid WINSOCK large FD bug.\n");
-	fprintf(stderr, "Increase FD_SETSIZE.  Item not added to fdset.\n");
+	fprintf(stderr, "The file descriptor number (%d) has exceeded the capability of select() on this system\n");
+#indef HAVE_WINDOWS_H
+	fprintf(stderr, "Increase FD_SETSIZE if possible.\n");
+#else
+        fprintf(stderr, "Try running with a different control module if possible\n");
+#endif
+        fprintf(stderr, "Item not added to fdset.\n");
     }
     svc->verbose(sd->cm, CMSelectVerbose, "Adding fd %d to select read list", fd);
     sd->select_items[fd].func = func;
@@ -614,8 +619,13 @@ void *arg2;
 	FD_CLR(fd, (fd_set *) sd->write_set);
     }
     if (fd > FD_SETSIZE) {
-	fprintf(stderr, "Internal Error, stupid WINSOCK large FD bug.\n");
-	fprintf(stderr, "Increase FD_SETSIZE.  Item not added to fdset.\n");
+	fprintf(stderr, "The file descriptor number (%d) has exceeded the capability of select() on this system\n");
+#indef HAVE_WINDOWS_H
+	fprintf(stderr, "Increase FD_SETSIZE if possible.\n");
+#else
+        fprintf(stderr, "Try running with a different control module if possible\n");
+#endif
+        fprintf(stderr, "Item not added to fdset.\n");
     }
     sd->write_items[fd].func = func;
     sd->write_items[fd].arg1 = arg1;
