@@ -555,8 +555,8 @@ void *arg2;
     }
     FD_SET(fd, (fd_set *) sd->fdset);
     if (fd > FD_SETSIZE) {
-	fprintf(stderr, "The file descriptor number (%d) has exceeded the capability of select() on this system\n");
-#indef HAVE_WINDOWS_H
+	fprintf(stderr, "The file descriptor number (%d) has exceeded the capability of select() on this system\n", fd);
+#ifndef HAVE_WINDOWS_H
 	fprintf(stderr, "Increase FD_SETSIZE if possible.\n");
 #else
         fprintf(stderr, "Try running with a different control module if possible\n");
@@ -619,8 +619,8 @@ void *arg2;
 	FD_CLR(fd, (fd_set *) sd->write_set);
     }
     if (fd > FD_SETSIZE) {
-	fprintf(stderr, "The file descriptor number (%d) has exceeded the capability of select() on this system\n");
-#indef HAVE_WINDOWS_H
+	fprintf(stderr, "The file descriptor number (%d) has exceeded the capability of select() on this system\n", fd);
+#ifndef HAVE_WINDOWS_H
 	fprintf(stderr, "Increase FD_SETSIZE if possible.\n");
 #else
         fprintf(stderr, "Try running with a different control module if possible\n");
