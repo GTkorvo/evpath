@@ -232,13 +232,15 @@ if(EVPATH_TRANSPORT_MODULES)
   target_link_libraries(cmudp evpath atl::atl)
   target_link_libraries(cmmulticast evpath atl::atl)
 
+  list(APPEND EVPATH_TRANSPORT_TARGETS cmselect cmsockets cmudp cmmulticast)
+
   if (HAVE_SYS_EPOLL_H)
      add_library(cmepoll MODULE cmepoll.c)
      set_target_properties(cmepoll PROPERTIES
      	  OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmepoll)
      target_link_libraries(cmepoll evpath atl::atl)
+     list(APPEND EVPATH_TRANSPORT_TARGETS cmepoll)
   endif()
-  list(APPEND EVPATH_TRANSPORT_TARGETS cmselect cmsockets cmudp cmmulticast)
 else()
   # dummy dyn linking in cm.c and cm_transport.c
   set(NO_DYNAMIC_LINKING 1)
