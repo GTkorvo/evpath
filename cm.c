@@ -757,7 +757,8 @@ INT_CManager_create_control(char *control_module)
 
     if (control_module != NULL) {
 	char *tmp = strdup(control_module);
-	for (char *c = tmp; *c; ++c) *c = tolower(*c);
+	char *c;
+	for (c = tmp; *c; ++c) *c = tolower(*c);
 #ifdef HAVE_SYS_EPOLL_H
 	if (strcmp(tmp, "epoll") == 0) {
 	    cm->control_module_choice = "epoll";
