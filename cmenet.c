@@ -49,6 +49,7 @@ typedef struct enet_client_data {
     int wake_write_fd;
     int wake_read_fd;
     enet_uint32 last_host_service_zero_return;
+    CMTaskHandle periodic_handle;
 } *enet_client_data_ptr;
 
 typedef struct enet_connection_data {
@@ -839,7 +840,7 @@ libcmenet_LTX_non_blocking_listen(CManager cm, CMtrans_services svc,
     svc->fd_add_select(cm, enet_host_get_sock_fd (server), 
 		       (select_list_func) enet_service_network, (void*)cm, (void*)trans);
 
-    svc->add_periodic_task(cm, 0, 100, (CMPollFunc) enet_service_network_lock, (void*)trans);
+    enet_data->periodic_handle = svc->add_periodic_task(cm, 0, 100, (CMPollFunc) enet_service_network_lock, (void*)trans);
 
     svc->trace_out(enet_data->cm, "CMENET Adding read_wake_fd as action on fd %d",
 		   enet_data->wake_read_fd);
@@ -986,6 +987,7 @@ shutdown_enet_thread
 	ENetHost * server = ecd->server;
 	enet_host_flush(ecd->server);
 	svc->fd_remove_select(cm, enet_host_get_sock_fd (server));
+	svc->remove_periodic(ecd->periodic_handle);
 	ecd->server = NULL;
 	enet_host_destroy(server);
     }
