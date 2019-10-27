@@ -520,6 +520,7 @@ void *arg2;
 	}
 	sd->sel_item_max = fd;
     }
+    memset(&ep_event, 0, sizeof(ep_event));
     ep_event.events = EPOLLIN;
     ep_event.data.fd = fd;
     if(epoll_ctl(sd->epfd, EPOLL_CTL_ADD, fd, &ep_event) < 0) {
