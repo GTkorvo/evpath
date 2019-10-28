@@ -560,6 +560,7 @@ void *arg2;
 	/* assert CM is locked */
 	assert(CM_LOCKED(svc, sd->cm));
     }
+    memset(&ep_event, 0, sizeof(ep_event));
     sd->select_consistency_number++;
     if (fd > sd->sel_item_max) {
 	int i;
