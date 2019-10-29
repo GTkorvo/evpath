@@ -287,6 +287,25 @@ else()
   message(STATUS " - Enet library was not found.  This is not a fatal error, just that the Enet transport will not be built.")
 endif()
 
+if(NOT (DEFINED EVPATH_USE_ZPL_ENET))
+  option(EVPATH_USE_ZPL_ENET "Build the enet transport" "ON")
+endif()
+if(EVPATH_USE_ZPL_ENET)
+  set(RUN_ZPL_ENET_TESTS TRUE)
+  CONFIGURE_FILE(cmenet.c cmzplenet.c COPYONLY)
+  SET_SOURCE_FILES_PROPERTIES(cmzplenet.c PROPERTIES COMPILE_FLAGS "-DUSE_ZPL_ENET=1")
+  if(EVPATH_TRANSPORT_MODULES)
+    add_library(cmzplenet MODULE cmzplenet.c ip_config.c)
+    set_target_properties(cmzplenet PROPERTIES
+      OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmzplenet)
+
+    target_link_libraries(cmzplenet evpath)
+    list(APPEND EVPATH_TRANSPORT_TARGETS cmzplenet)
+  else()
+    target_sources(EVPath PRIVATE cmzplenet.c)
+  endif()
+endif()
+
 # udt4 transport
 set(RUN_UDT4_TESTS FALSE)
 if(NOT(DEFINED EVPATH_USE_UDT4))
