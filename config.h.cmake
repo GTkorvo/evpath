@@ -9,8 +9,8 @@
 /* Define to 1 if you have the enet header and libraries */
 #cmakedefine ENET_FOUND
 
-/* Define to 1 to use the embedded ZPL enet header */
-#cmakedefine USE_ZPL_ENET
+/* Define to 1 to if ZPL ENET transport was built */
+#cmakedefine ZPL_ENET_AVAILABLE
 
 /* Define to 1 if you have the udt4 header and libraries */
 #cmakedefine UDT4_FOUND

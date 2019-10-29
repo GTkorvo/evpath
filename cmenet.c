@@ -16,12 +16,21 @@
 #define ENET_IMPLEMENTATION
 #define USE_IPV6
 #define MAX_CLIENTS 4095
+#include <netinet/in.h>
+namespace zplenet
+{
+// undefine __cplusplus so that the things in enet.h end up in this namespace
+#undef __cplusplus
 #include <zpl-enet/include/enet.h>
+#define __cplusplus
     /*  extra function to access the UDP socket FD */
     ENET_API enet_uint32 enet_host_get_sock_fd(ENetHost *);
     enet_uint32 enet_host_get_sock_fd(ENetHost *host) {
         return host->socket;
     }
+}
+using namespace zplenet;
+
 #define TPORT "CMZplEnet"
 #define TRANSPORT_STRING "zplenet"
 #define INTERFACE_NAME(NAME) libcmzplenet_LTX_ ## NAME
@@ -133,8 +142,7 @@ check_host(char *hostname, void *sin_addr)
 static enet_conn_data_ptr 
 create_enet_conn_data(CMtrans_services svc)
 {
-    enet_conn_data_ptr enet_conn_data =
-    svc->malloc_func(sizeof(struct enet_connection_data));
+    enet_conn_data_ptr enet_conn_data = (enet_conn_data_ptr) svc->malloc_func(sizeof(struct enet_connection_data));
     enet_conn_data->remote_host = NULL;
     enet_conn_data->remote_contact_port = -1;
     enet_conn_data->read_buffer = NULL;
@@ -190,7 +198,7 @@ enet_service_network(CManager cm, void *void_trans)
         svc->trace_out(cm, "ENET Handling pending data\n");
         queued_data entry = ecd->pending_data;
         ecd->pending_data = entry->next;
-        handle_packet(cm, svc, trans, entry->econn_d, entry->packet);
+        handle_packet(cm, svc, trans, (enet_conn_data_ptr) entry->econn_d, entry->packet);
         free(entry);
     }
 
@@ -236,9 +244,9 @@ enet_service_network(CManager cm, void *void_trans)
             break;
 	}
         case ENET_EVENT_TYPE_RECEIVE: {
-	    enet_conn_data_ptr econn_d = event.peer->data;
+	    enet_conn_data_ptr econn_d = (enet_conn_data_ptr) event.peer->data;
             if (econn_d) {
-                handle_packet(cm, svc, trans, event.peer->data, event.packet);
+                handle_packet(cm, svc, trans, econn_d, event.packet);
             } else {
 #ifndef USE_IPV6
                 struct in_addr addr;
@@ -260,11 +268,11 @@ enet_service_network(CManager cm, void *void_trans)
         case ENET_EVENT_TYPE_DISCONNECT_TIMEOUT:
 #endif
         case ENET_EVENT_TYPE_DISCONNECT: {
-	    enet_conn_data_ptr enet_conn_data = event.peer->data;
+	    enet_conn_data_ptr enet_conn_data = (enet_conn_data_ptr) event.peer->data;
 	    svc->trace_out(cm, "Got a disconnect on connection %p\n",
 		event.peer->data);
 
-            enet_conn_data = event.peer->data;
+            enet_conn_data = (enet_conn_data_ptr) event.peer->data;
 	    enet_conn_data->read_buffer_len = -1;
             svc->connection_fail(enet_conn_data->conn);
         }
@@ -586,7 +594,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
                                &straddr[0],
                                event.peer->address.port);
 #endif                
-                enet_connection_data = enet_accept_conn(ecd, trans, &event.peer->address);
+                enet_connection_data = (enet_conn_data_ptr) enet_accept_conn(ecd, trans, &event.peer->address);
                 
                 /* Store any relevant client information here. */
                 svc->trace_out(cm, "ENET ========   Assigning peer %p has data %p\n", event.peer, enet_connection_data);
@@ -613,18 +621,18 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
                 svc->trace_out(cm, "Connection to %s:%d failed   type was %d.\n", inet_ntoa(sin_addr), address.port, event.type);
                 return 0;
             } else {
-                enet_conn_data_ptr enet_conn_data = event.peer->data;
+                enet_conn_data_ptr enet_conn_data = (enet_conn_data_ptr) event.peer->data;
                 svc->trace_out(cm, "Got a disconnect on connection %p\n",
                                event.peer->data);
                 
-                enet_conn_data = event.peer->data;
+                enet_conn_data = (enet_conn_data_ptr) event.peer->data;
                 enet_conn_data->read_buffer_len = -1;
                 svc->connection_fail(enet_conn_data->conn);
             }
             break;
         case ENET_EVENT_TYPE_RECEIVE: {
-	    enet_conn_data_ptr econn_d = event.peer->data;
-            queued_data entry = malloc(sizeof(*entry));
+	    enet_conn_data_ptr econn_d = (enet_conn_data_ptr) event.peer->data;
+            queued_data entry = (queued_data) malloc(sizeof(*entry));
             entry->next = NULL;
             entry->econn_d = econn_d;
             entry->packet = event.packet;
@@ -699,7 +707,7 @@ INTERFACE_NAME(self_check)(CManager cm, CMtrans_services svc,
 			 transport_entry trans, attr_list attrs)
 {
 
-    enet_client_data_ptr ecd = trans->trans_data;
+    enet_client_data_ptr ecd = (enet_client_data_ptr) trans->trans_data;
     int host_addr;
     int int_port_num;
     char *host_name;
@@ -867,7 +875,7 @@ extern attr_list
 INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
 				  transport_entry trans, attr_list listen_info)
 {
-    enet_client_data_ptr enet_data = trans->trans_data;
+    enet_client_data_ptr enet_data = (enet_client_data_ptr) trans->trans_data;
     ENetAddress address;
     ENetHost * server;
 
@@ -1151,7 +1159,7 @@ INTERFACE_NAME(initialize)(CManager cm, CMtrans_services svc,
         sscanf(env, "%d", &enet_host_service_warn_interval);
         fprintf(stderr, "DEBUG: Setting enet_host_service_warn_interval to %d\n", enet_host_service_warn_interval);
     }
-    enet_data = svc->malloc_func(sizeof(struct enet_client_data));
+    enet_data = (enet_client_data_ptr) svc->malloc_func(sizeof(struct enet_client_data));
     enet_data->cm = cm;
     enet_data->hostname = NULL;
     enet_data->listen_port = -1;
@@ -1170,15 +1178,15 @@ INTERFACE_NAME(initialize)(CManager cm, CMtrans_services svc,
     return (void *) enet_data;
 }
 
-extern transport_entry
-#ifndef USE_ZPL_ENET
-cmenet_add_static_transport(CManager cm, CMtrans_services svc)
+#ifdef USE_ZPL_ENET
+extern "C" {
+extern transport_entry cmzplenet_add_static_transport(CManager cm, CMtrans_services svc)
 #else
-cmzplenet_add_static_transport(CManager cm, CMtrans_services svc)
+extern transport_entry cmenet_add_static_transport(CManager cm, CMtrans_services svc)
 #endif
 {
     transport_entry transport;
-    transport = svc->malloc_func(sizeof(struct _transport_item));
+    transport = (transport_entry) svc->malloc_func(sizeof(struct _transport_item));
     memset(transport, 0, sizeof(*transport));
 #ifndef USE_ZPL_ENET
     transport->trans_name = strdup("enet");
@@ -1188,9 +1196,9 @@ cmzplenet_add_static_transport(CManager cm, CMtrans_services svc)
     transport->cm = cm;
     transport->transport_init = (CMTransport_func)INTERFACE_NAME(initialize);
     transport->listen = (CMTransport_listen_func)INTERFACE_NAME(non_blocking_listen);
-    transport->initiate_conn = (CMConnection(*)())INTERFACE_NAME(initiate_conn);
-    transport->self_check = (int(*)())INTERFACE_NAME(self_check);
-    transport->connection_eq = (int(*)())INTERFACE_NAME(connection_eq);
+    transport->initiate_conn = (CMTransport_conn_func)INTERFACE_NAME(initiate_conn);
+    transport->self_check = (CMTransport_self_check_func)INTERFACE_NAME(self_check);
+    transport->connection_eq = (CMTransport_connection_eq_func)INTERFACE_NAME(connection_eq);
     transport->shutdown_conn = (CMTransport_shutdown_conn_func)INTERFACE_NAME(shutdown_conn);
     transport->read_block_func = (CMTransport_read_block_func)INTERFACE_NAME(read_block_func);
     transport->read_to_buffer_func = (CMTransport_read_to_buffer_func)NULL;
@@ -1201,3 +1209,6 @@ cmzplenet_add_static_transport(CManager cm, CMtrans_services svc)
     }
     return transport;
 }
+#ifdef USE_ZPL_ENET
+}
+#endif
