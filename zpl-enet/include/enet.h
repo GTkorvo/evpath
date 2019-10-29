@@ -2411,6 +2411,7 @@ extern "C" {
         if (peerID == ENET_PROTOCOL_MAXIMUM_PEER_ID) {
             peer = NULL;
         } else if (peerID >= host->peerCount) {
+            printf("INCOMING PEER ID %d IS GREATER THAN NATIVE PEER COUNT %zu.  COMMAND DISCARDED, BUT THIS SHOULD NEVER HAPPEN\n", peerID, host->peerCount);
             return 0;
         } else {
             peer = &host->peers[peerID];
