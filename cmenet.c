@@ -108,7 +108,12 @@ static atom_t CM_TRANSPORT = -1;
 
 static enet_uint32 enet_host_service_warn_interval = 0;
 
-extern attr_list
+#ifdef __cplusplus
+extern "C"
+#else
+extern
+#endif
+attr_list
 INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
                                     transport_entry trans, attr_list listen_info);
 
@@ -423,7 +428,12 @@ enet_accept_conn(enet_client_data_ptr ecd, transport_entry trans,
     return enet_conn_data;
 }
 
-extern void
+#ifdef __cplusplus
+extern "C"
+#else
+extern
+#endif
+void
 INTERFACE_NAME(shutdown_conn)(CMtrans_services svc, enet_conn_data_ptr scd)
 {
     svc->connection_deref(scd->conn);
@@ -673,7 +683,12 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 /* 
  * Initiate a ENET RUDP connection with another CM.
  */
-extern CMConnection
+#ifdef __cplusplus
+extern "C"
+#else
+extern
+#endif
+CMConnection
 INTERFACE_NAME(initiate_conn)(CManager cm, CMtrans_services svc,
 			    transport_entry trans, attr_list attrs)
 {
@@ -702,7 +717,12 @@ INTERFACE_NAME(initiate_conn)(CManager cm, CMtrans_services svc,
  * For enet, this involves checking to see if the host name is the 
  * same as ours and if the CM_ENET_PORT matches the one we are listening on.
  */
-extern int
+#ifdef __cplusplus
+extern "C"
+#else
+extern
+#endif
+int
 INTERFACE_NAME(self_check)(CManager cm, CMtrans_services svc, 
 			 transport_entry trans, attr_list attrs)
 {
@@ -754,7 +774,12 @@ INTERFACE_NAME(self_check)(CManager cm, CMtrans_services svc,
     return 1;
 }
 
-extern int
+#ifdef __cplusplus
+extern "C"
+#else
+extern
+#endif
+int
 INTERFACE_NAME(connection_eq)(CManager cm, CMtrans_services svc,
 			    transport_entry trans, attr_list attrs,
 			    enet_conn_data_ptr ecd)
@@ -871,7 +896,12 @@ wake_enet_server_thread(enet_client_data_ptr enet_data)
 /* 
  * Create an IP socket for connection from other CMs
  */
-extern attr_list
+#ifdef __cplusplus
+extern "C"
+#else
+extern
+#endif
+attr_list
 INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
 				  transport_entry trans, attr_list listen_info)
 {
@@ -993,7 +1023,12 @@ struct iovec {
 
 #endif
 
-extern void *
+#ifdef __cplusplus
+extern "C"
+#else
+extern
+#endif
+void *
 INTERFACE_NAME(read_block_func)(CMtrans_services svc,
 			      enet_conn_data_ptr conn_data, int *actual_len,
 			      int *offset_ptr)
@@ -1043,7 +1078,12 @@ static struct timespec time_diff(struct timespec start, struct timespec end)
 }
 #endif
 
-extern int
+#ifdef __cplusplus
+extern "C"
+#else
+extern
+#endif
+int
 INTERFACE_NAME(writev_func)(CMtrans_services svc, enet_conn_data_ptr ecd,
 			  struct iovec *iov, int iovcnt, attr_list attrs)
 {
@@ -1122,7 +1162,12 @@ shutdown_enet_thread
     }
 }
 
-extern void *
+#ifdef __cplusplus
+extern "C"
+#else
+extern
+#endif
+void *
 INTERFACE_NAME(initialize)(CManager cm, CMtrans_services svc,
 			 transport_entry trans, attr_list attrs)
 {
