@@ -71,6 +71,8 @@ typedef struct enet_client_data {
     int wake_read_fd;
     enet_uint32 last_host_service_zero_return;
     CMTaskHandle periodic_handle;
+    pthread_mutex_t enet_lock;
+    int enet_locked;
 } *enet_client_data_ptr;
 
 typedef struct enet_connection_data {
@@ -110,6 +112,31 @@ extern
 attr_list
 INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
                                     transport_entry trans, attr_list listen_info);
+
+#define ENETlock(lock) IntENET_lock(lock, __FILE__, __LINE__)
+#define ENETunlock(lock) IntENET_unlock(lock, __FILE__, __LINE__)
+
+static void
+IntENET_lock(enet_client_data_ptr ecd, char *file, int line)
+{
+//    if (file) printf("Trying ENET Lock at %s, line %d\n", file, line);
+    pthread_mutex_lock(&ecd->enet_lock);
+    ecd->enet_locked++;
+}
+
+static void
+IntENET_unlock(enet_client_data_ptr ecd, char *file, int line)
+{
+//    if (file) printf("ENET Unlock at %s, line %d\n", file, line);
+    ecd->enet_locked--;
+    pthread_mutex_unlock(&ecd->enet_lock);
+}
+
+static void
+ENETassert_locked(enet_client_data_ptr ecd)
+{
+    assert(ecd->enet_locked);
+}
 
 static int
 check_host(char *hostname, void *sin_addr)
@@ -156,7 +183,9 @@ enet_accept_conn(enet_client_data_ptr ecd, transport_entry trans,
 static void free_func(void *packet)
 {
     /* Clean up the packet now that we're done using it. */
+//    ENETlock(enet_data);
     enet_packet_destroy ((ENetPacket*)packet);
+//    ENETunlock(enet_data);
 }
 
 static void
@@ -201,13 +230,18 @@ enet_service_network(CManager cm, void *void_trans)
         free(entry);
     }
 
-    while (ecd->server && (enet_host_service (ecd->server, & event, 0) > 0)) {
+    while (ecd->server) {
+        IntENET_lock(ecd, NULL, 0);
+        int ret = enet_host_service (ecd->server, & event, 0);
+        IntENET_unlock(ecd, NULL, 0);
         if (enet_host_service_warn_interval && 
             (enet_time_get() > (ecd->last_host_service_zero_return + enet_host_service_warn_interval))) {
             fprintf(stderr, "WARNING, time between zero return for enet_host_service = %d msecs\n",
                     enet_time_get() - ecd->last_host_service_zero_return);
         }
-
+        if (ret <= 0) {
+            break;
+        }
         switch (event.type) {
 	case ENET_EVENT_TYPE_NONE:
 	    break;
@@ -278,6 +312,7 @@ enet_service_network(CManager cm, void *void_trans)
 	}
     }
     ecd->last_host_service_zero_return = enet_time_get();
+    IntENET_unlock(ecd, NULL, 0);
 }
 
 static
@@ -550,6 +585,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
     }
 
     /* Initiate the connection, allocating the two channels 0 and 1. */
+    ENETlock(ecd);
     peer = enet_host_connect (ecd->server, & address, 1, 0);    
     if (peer == NULL)
     {
@@ -558,7 +594,8 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
        exit (EXIT_FAILURE);
     }
     
-    enet_peer_timeout(event.peer, 0, 0, 5000);
+    enet_peer_timeout(peer, 0, 0, 5000);
+    ENETunlock(ecd);
     peer->data = enet_conn_data;
     svc->trace_out(cm, "ENET ========   On init Assigning peer %p has data %p\n", peer, enet_conn_data);
 
@@ -567,7 +604,9 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
     int got_connection = 0;
     enet_uint32 end = enet_time_get() + timeout;
     while (!finished) {
+        ENETlock(ecd);
         int ret = enet_host_service (ecd->server, & event, 100); 
+        ENETunlock(ecd);
         enet_uint32 now = enet_time_get();
         if (enet_host_service_warn_interval && 
             (enet_time_get() > (ecd->last_host_service_zero_return + enet_host_service_warn_interval))) {
@@ -606,9 +645,13 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
                 svc->trace_out(cm, "ENET ========   Assigning peer %p has data %p\n", event.peer, enet_connection_data);
                 event.peer->data = enet_connection_data;
                 ((enet_conn_data_ptr)enet_connection_data)->peer = event.peer;
+                ENETlock(ecd);
                 enet_host_flush (ecd->server);
+                ENETunlock(ecd);
             } else {
+                ENETlock(ecd);
                 enet_host_flush (ecd->server);
+                ENETunlock(ecd);
                 svc->trace_out(cm, "Connection to %s:%d succeeded.\n", inet_ntoa(sin_addr), address.port);
                 finished = 1;
                 got_connection = 1;
@@ -875,14 +918,14 @@ build_listen_attrs(CManager cm, CMtrans_services svc, enet_client_data_ptr ecd,
 }
 
 static void
-wake_enet_server_thread(enet_client_data_ptr enet_data)
+wake_enet_server_thread(enet_client_data_ptr ecd)
 {
     static char buffer = 'W';  /* doesn't matter what we write */
-    if (enet_data->wake_write_fd != -1) {
+    if (ecd->wake_write_fd != -1) {
 #ifdef HAVE_WINDOWS_H
-	send(enet_data->wake_write_fd, &buffer, 1, 0);
+	send(ecd->wake_write_fd, &buffer, 1, 0);
 #else
-	if (write(enet_data->wake_write_fd, &buffer, 1) != 1) {
+	if (write(ecd->wake_write_fd, &buffer, 1) != 1) {
 	    printf("Whoops, wake write failed\n");
 	}
 #endif
@@ -901,7 +944,7 @@ attr_list
 INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
 				  transport_entry trans, attr_list listen_info)
 {
-    enet_client_data_ptr enet_data = (enet_client_data_ptr) trans->trans_data;
+    enet_client_data_ptr ecd = (enet_client_data_ptr) trans->trans_data;
     ENetAddress address;
     ENetHost * server;
 
@@ -928,11 +971,11 @@ INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
 
     address.host = ENET_HOST_ANY;
 
-    if (enet_data->server != NULL) {
+    if (ecd->server != NULL) {
 	/* we're already listening */
         if (port_num == 0) {
 	    /* not requesting a specific port, return what we have */
-	    return build_listen_attrs(cm, svc, NULL, listen_info, enet_data->listen_port);
+	    return build_listen_attrs(cm, svc, NULL, listen_info, ecd->listen_port);
 	} else {
 	    printf("CMlisten_specific() requesting a specific port follows other Enet operation which initiated listen at another port.  Only one listen allowed, second listen fails.\n");
 	    return NULL;
@@ -946,17 +989,19 @@ INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
 	address.port = port_num;
 
 	svc->trace_out(cm, "CMEnet trying to bind selected port %d", port_num);
+        ENETlock(ecd);
 	server = enet_host_create (& address /* the address to bind the server host to */, 
                                    MAX_CLIENTS,     /* max 4095 connections */
 				   1      /* allow up to 2 channels to be used, 0 and 1 */,
 				   0      /* assume any amount of incoming bandwidth */,
 				   0      /* assume any amount of outgoing bandwidth */);
+        ENETunlock(ecd);
 	if (server == NULL) {
 	    fprintf (stderr, 
 		     "An error occurred while trying to create an ENet server host.\n");
 	    return NULL;
 	}
-	enet_data->server = server;
+	ecd->server = server;
     } else {
 	long seedval = time(NULL) + getpid();
 	/* port num is free.  Constrain to range 26000 : 26100 */
@@ -975,11 +1020,13 @@ INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
 	    address.port = target;
 	    svc->trace_out(cm, "CMEnet trying to bind port %d", target);
 
+            ENETlock(ecd);
 	    server = enet_host_create (& address /* the address to bind the server host to */, 
 				       MAX_CLIENTS     /* 0 means dynamic alloc clients and/or outgoing connnections */,
 				       1      /* allow up to 2 channels to be used, 0 and 1 */,
 				       0      /* assume any amount of incoming bandwidth */,
 				       0      /* assume any amount of outgoing bandwidth */);
+            ENETunlock(ecd);
 	    tries--;
 	    if (server != NULL) tries = 0;
 	    if (tries == 5) {
@@ -991,20 +1038,20 @@ INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
 	    high_bound += 100;
 	    goto restart;
 	}
-	enet_data->server = server;
+	ecd->server = server;
     }
     svc->fd_add_select(cm, enet_host_get_sock_fd (server), 
 		       (select_list_func) enet_service_network, (void*)cm, (void*)trans);
 
-    enet_data->periodic_handle = svc->add_periodic_task(cm, 0, 100, (CMPollFunc) enet_service_network_lock, (void*)trans);
+    ecd->periodic_handle = svc->add_periodic_task(cm, 0, 100, (CMPollFunc) enet_service_network_lock, (void*)trans);
 
-    svc->trace_out(enet_data->cm, "CMENET Adding read_wake_fd as action on fd %d",
-		   enet_data->wake_read_fd);
+    svc->trace_out(ecd->cm, "CMENET Adding read_wake_fd as action on fd %d",
+		   ecd->wake_read_fd);
 
-    svc->fd_add_select(cm, enet_data->wake_read_fd, (select_list_func)read_wake_fd_and_service, 
+    svc->fd_add_select(cm, ecd->wake_read_fd, (select_list_func)read_wake_fd_and_service, 
                        (void*)cm, (void*)trans);
 
-    return build_listen_attrs(cm, svc, enet_data, listen_info, address.port);
+    return build_listen_attrs(cm, svc, ecd, listen_info, address.port);
 }
 
 #if defined(HAVE_WINDOWS_H) && !defined(NEED_IOVEC_DEFINE)
@@ -1096,8 +1143,10 @@ INTERFACE_NAME(writev_func)(CMtrans_services svc, enet_conn_data_ptr ecd,
 		   length, ecd->peer);
 
    /* Create a reliable packet of the right size */
+    ENETlock(ecd->ecd);
     ENetPacket * packet = enet_packet_create (NULL, length, 
 					      ENET_PACKET_FLAG_RELIABLE);
+    ENETunlock(ecd->ecd);
 
     length = 0;
     /* copy in the data */
@@ -1107,14 +1156,17 @@ INTERFACE_NAME(writev_func)(CMtrans_services svc, enet_conn_data_ptr ecd,
     }
 
     /* Send the packet to the peer over channel id 0. */
+    ENETlock(ecd->ecd);
     if (enet_peer_send (ecd->peer, 0, packet) == -1) {
         enet_packet_destroy(packet);
         svc->trace_out(ecd->ecd->cm, "ENET  ======  failed to send a packet to peer %p, state %d\n", ecd->peer, ecd->peer->state);
 	return -1;
     }
+    ENETunlock(ecd->ecd);
 
     wake_enet_server_thread(ecd->ecd);
 
+    ENETlock(ecd->ecd);
     if (last_flush_call == 0) {
 	enet_host_flush(ecd->ecd->server);
 	last_flush_call = time(NULL);
@@ -1125,6 +1177,7 @@ INTERFACE_NAME(writev_func)(CMtrans_services svc, enet_conn_data_ptr ecd,
 	    enet_host_flush(ecd->ecd->server);
 	}
     }
+    ENETunlock(ecd->ecd);
     return iovcnt;
 }
 
@@ -1151,11 +1204,15 @@ shutdown_enet_thread
     (void)cm;
     if (ecd->server != NULL) {
 	ENetHost * server = ecd->server;
+        ENETlock(ecd);
 	enet_host_flush(ecd->server);
+        ENETunlock(ecd);
 	svc->fd_remove_select(cm, enet_host_get_sock_fd (server));
 	svc->remove_periodic(ecd->periodic_handle);
 	ecd->server = NULL;
+        ENETlock(ecd);
 	enet_host_destroy(server);
+        ENETunlock(ecd);
     }
 }
 
@@ -1202,6 +1259,8 @@ INTERFACE_NAME(initialize)(CManager cm, CMtrans_services svc,
         fprintf(stderr, "DEBUG: Setting enet_host_service_warn_interval to %d\n", enet_host_service_warn_interval);
     }
     enet_data = (enet_client_data_ptr) svc->malloc_func(sizeof(struct enet_client_data));
+    pthread_mutex_init(&enet_data->enet_lock, NULL);
+    enet_data->enet_locked = 0;
     enet_data->cm = cm;
     enet_data->hostname = NULL;
     enet_data->listen_port = -1;
