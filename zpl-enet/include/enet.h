@@ -1,3 +1,8 @@
+/*
+ *   THIS FILE HAS BEEN MODIFIED SO THAT ALL API FUNCTIONS ARE STATIC FOR INCLUDE-ONLY USAGE.
+ *   Greg Eisenhauer, Georgia Tech College of Computing. Tue Nov  5 10:59:29 EST 2019
+ */
+
 /**
  * include/enet.h - a Single-Header auto-generated variant of enet.h library.
  *
@@ -128,7 +133,7 @@
     #define ENET_API __declspec( dllimport )
     #endif // ENET_IMPLEMENTATION
     #else
-    #define ENET_API extern
+    #define ENET_API static
     #endif // ENET_DLL
 
     typedef fd_set ENetSocketSet;
@@ -182,7 +187,7 @@
     } ENetBuffer;
 
     #define ENET_CALLBACK
-    #define ENET_API extern
+    #define ENET_API static
 
     typedef fd_set ENetSocketSet;
 
@@ -954,8 +959,8 @@ extern "C" {
     ENET_API void       enet_host_compress(ENetHost *, const ENetCompressor *);
     ENET_API void       enet_host_channel_limit(ENetHost *, size_t);
     ENET_API void       enet_host_bandwidth_limit(ENetHost *, enet_uint32, enet_uint32);
-    extern   void       enet_host_bandwidth_throttle(ENetHost *);
-    extern  enet_uint64 enet_host_random_seed(void);
+    ENET_API   void       enet_host_bandwidth_throttle(ENetHost *);
+    ENET_API  enet_uint64 enet_host_random_seed(void);
 
     ENET_API int                 enet_peer_send(ENetPeer *, enet_uint8, ENetPacket *);
     ENET_API ENetPacket *        enet_peer_receive(ENetPeer *, enet_uint8 * channelID);
@@ -967,18 +972,18 @@ extern "C" {
     ENET_API void                enet_peer_disconnect_now(ENetPeer *, enet_uint32);
     ENET_API void                enet_peer_disconnect_later(ENetPeer *, enet_uint32);
     ENET_API void                enet_peer_throttle_configure(ENetPeer *, enet_uint32, enet_uint32, enet_uint32);
-    extern int                   enet_peer_throttle(ENetPeer *, enet_uint32);
-    extern void                  enet_peer_reset_queues(ENetPeer *);
-    extern void                  enet_peer_setup_outgoing_command(ENetPeer *, ENetOutgoingCommand *);
-    extern ENetOutgoingCommand * enet_peer_queue_outgoing_command(ENetPeer *, const ENetProtocol *, ENetPacket *, enet_uint32, enet_uint16);
-    extern ENetIncomingCommand * enet_peer_queue_incoming_command(ENetPeer *, const ENetProtocol *, const void *, size_t, enet_uint32, enet_uint32);
-    extern ENetAcknowledgement * enet_peer_queue_acknowledgement(ENetPeer *, const ENetProtocol *, enet_uint16);
-    extern void                  enet_peer_dispatch_incoming_unreliable_commands(ENetPeer *, ENetChannel *);
-    extern void                  enet_peer_dispatch_incoming_reliable_commands(ENetPeer *, ENetChannel *);
-    extern void                  enet_peer_on_connect(ENetPeer *);
-    extern void                  enet_peer_on_disconnect(ENetPeer *);
+    ENET_API int                   enet_peer_throttle(ENetPeer *, enet_uint32);
+    ENET_API void                  enet_peer_reset_queues(ENetPeer *);
+    ENET_API void                  enet_peer_setup_outgoing_command(ENetPeer *, ENetOutgoingCommand *);
+    ENET_API ENetOutgoingCommand * enet_peer_queue_outgoing_command(ENetPeer *, const ENetProtocol *, ENetPacket *, enet_uint32, enet_uint16);
+    ENET_API ENetIncomingCommand * enet_peer_queue_incoming_command(ENetPeer *, const ENetProtocol *, const void *, size_t, enet_uint32, enet_uint32);
+    ENET_API ENetAcknowledgement * enet_peer_queue_acknowledgement(ENetPeer *, const ENetProtocol *, enet_uint16);
+    ENET_API void                  enet_peer_dispatch_incoming_unreliable_commands(ENetPeer *, ENetChannel *);
+    ENET_API void                  enet_peer_dispatch_incoming_reliable_commands(ENetPeer *, ENetChannel *);
+    ENET_API void                  enet_peer_on_connect(ENetPeer *);
+    ENET_API void                  enet_peer_on_disconnect(ENetPeer *);
 
-    extern size_t enet_protocol_command_size (enet_uint8);
+    ENET_API size_t enet_protocol_command_size (enet_uint8);
 
 #ifdef __cplusplus
 }

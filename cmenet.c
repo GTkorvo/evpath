@@ -17,19 +17,12 @@
 #define USE_IPV6
 #define MAX_CLIENTS 4095
 #include <netinet/in.h>
-namespace zplenet
-{
-// undefine __cplusplus so that the things in enet.h end up in this namespace
-#undef __cplusplus
 #include <zpl-enet/include/enet.h>
-#define __cplusplus
     /*  extra function to access the UDP socket FD */
     ENET_API enet_uint32 enet_host_get_sock_fd(ENetHost *);
     enet_uint32 enet_host_get_sock_fd(ENetHost *host) {
         return host->socket;
     }
-}
-using namespace zplenet;
 
 #define TPORT "CMZplEnet"
 #define TRANSPORT_STRING "zplenet"
@@ -565,6 +558,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
        exit (EXIT_FAILURE);
     }
     
+    enet_peer_timeout(event.peer, 0, 0, 5000);
     peer->data = enet_conn_data;
     svc->trace_out(cm, "ENET ========   On init Assigning peer %p has data %p\n", peer, enet_conn_data);
 
@@ -604,6 +598,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
                 svc->trace_out(cm, "A new client connected from %s:%u.\n", 
                                &straddr[0],
                                event.peer->address.port);
+                enet_peer_timeout(event.peer, 0, 0, 5000);
 #endif                
                 enet_connection_data = (enet_conn_data_ptr) enet_accept_conn(ecd, trans, &event.peer->address);
                 
@@ -1226,7 +1221,6 @@ INTERFACE_NAME(initialize)(CManager cm, CMtrans_services svc,
 }
 
 #ifdef USE_ZPL_ENET
-extern "C" {
 extern transport_entry cmzplenet_add_static_transport(CManager cm, CMtrans_services svc)
 #else
 extern transport_entry cmenet_add_static_transport(CManager cm, CMtrans_services svc)
@@ -1256,6 +1250,3 @@ extern transport_entry cmenet_add_static_transport(CManager cm, CMtrans_services
     }
     return transport;
 }
-#ifdef USE_ZPL_ENET
-}
-#endif
