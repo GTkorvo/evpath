@@ -573,7 +573,6 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 
     /* ENET connection, host_name is the machine name */
     ENetAddress address;
-    ENetEvent event;
     ENetPeer *peer;
     sin_addr.s_addr = htonl(host_ip);
 
@@ -587,7 +586,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 		       int_port_num);
 #else
         char straddr[INET6_ADDRSTRLEN];
-        inet_ntop(AF_INET6, &event.peer->address.host, straddr,
+        inet_ntop(AF_INET6, &address.host, straddr,
                   sizeof(straddr));
 	svc->trace_out(cm, "Attempting ENET RUDP connection, USING host=\"%s\", IP = %s, port %d",
 		       host_name == 0 ? "(unknown)" : host_name, 
@@ -646,6 +645,7 @@ initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
     int got_connection = 0;
     enet_uint32 end = enet_time_get() + timeout;
     while (!finished) {
+        ENetEvent event;
         ENETlock(ecd);
         int ret = enet_host_service (ecd->server, & event, 100); 
         ENETunlock(ecd);
