@@ -1519,9 +1519,9 @@ timeout_conn(CManager cm, void *client_data)
 	 long wait_condition = INT_CMCondition_get(cm, NULL);
 	 CMTaskHandle task = INT_CMadd_delayed_task(cm, 5, 0, timeout_conn,
 						    (void*)wait_condition);
-	 if (CMtrace_on(conn->cm, CMConnectionVerbose)) {
+	 if (CMtrace_on(cm, CMConnectionVerbose)) {
 	     char *attr_str = attr_list_to_string(attrs);
-	     CMtrace_out(conn->cm, CMConnectionVerbose, 
+	     CMtrace_out(cm, CMConnectionVerbose, 
 			 "CM - Try to establish connection %p - %s, wait condition %ld\n", (void*)conn,
 			 attr_str, wait_condition);
 	     INT_CMfree(attr_str);
@@ -1530,7 +1530,7 @@ timeout_conn(CManager cm, void *client_data)
 						 trans, attrs, wait_condition);
 	 // Upon wake, condition will have either been signaled (return 1) or failed (return 0)
 	 result = INT_CMCondition_wait(cm, wait_condition);
-	 CMtrace_out(conn->cm, CMConnectionVerbose, 
+	 CMtrace_out(cm, CMConnectionVerbose, 
 		     "CM - CMConnection wait returned, result %d\n", result);
 	 if (result == 1) {
 	     INT_CMremove_task(task);
