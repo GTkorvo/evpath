@@ -1510,7 +1510,7 @@ timeout_conn(CManager cm, void *client_data)
  CMConnection
  try_conn_init(CManager cm, transport_entry trans, attr_list attrs)
  {
-     CMConnection conn;
+     CMConnection conn = NULL;
      if (trans->initiate_conn) {
 	 conn = trans->initiate_conn(cm, &CMstatic_trans_svcs,
 				     trans, attrs);
