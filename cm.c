@@ -1502,7 +1502,6 @@ static
 void
 timeout_conn(CManager cm, void *client_data)
 {
-    printf("TIMEOUT CONNECTION in CM.c, signalling %ld\n", (long) client_data);
     INT_CMCondition_fail(cm, (long) client_data);
 }
 
