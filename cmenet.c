@@ -1017,45 +1017,67 @@ INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
 		     "An error occurred while trying to create an ENet server host.\n");
 	    return NULL;
 	}
-	ecd->server = server;
     } else {
-	long seedval = time(NULL) + getpid();
-	/* port num is free.  Constrain to range 26000 : 26100 */
 	int low_bound, high_bound;
-	int size;
-	int tries;
-	srand48(seedval);
 	get_IP_config(NULL, 0, NULL, &low_bound, &high_bound,
 		      NULL, listen_info, svc->trace_out, (void *)cm);
+        if (high_bound == -1) {
+            /* unconstrained port */
+            address.port = 0;
 
-    restart:
-	size = high_bound - low_bound;
-	tries = 10;
-	while (tries > 0) {
-	    int target = low_bound + size * drand48();
-	    address.port = target;
-	    svc->trace_out(cm, "CMEnet trying to bind port %d", target);
-
+            svc->trace_out(cm, "CMEnet trying to bind to any available port");
             ENETlock(ecd);
-	    server = enet_host_create (& address /* the address to bind the server host to */, 
-				       MAX_CLIENTS     /* 0 means dynamic alloc clients and/or outgoing connnections */,
-				       1      /* allow up to 2 channels to be used, 0 and 1 */,
-				       0      /* assume any amount of incoming bandwidth */,
-				       0      /* assume any amount of outgoing bandwidth */);
+            server = enet_host_create (& address /* the address to bind the server host to */, 
+                                       MAX_CLIENTS,     /* max 4095 connections */
+                                       1      /* allow up to 2 channels to be used, 0 and 1 */,
+                                       0      /* assume any amount of incoming bandwidth */,
+                                       0      /* assume any amount of outgoing bandwidth */);
             ENETunlock(ecd);
-	    tries--;
-	    if (server != NULL) tries = 0;
-	    if (tries == 5) {
-		/* try reseeding in case we're in sync with another process */
-		srand48(time(NULL) + getpid());
-	    }
-	}
-	if (server == NULL) {
-	    high_bound += 100;
-	    goto restart;
-	}
-	ecd->server = server;
+            if (server == NULL) {
+                fprintf (stderr, 
+                         "An error occurred while trying to create an ENet server host.\n");
+                return NULL;
+            }
+            address.port = server->address.port;
+            svc->trace_out(cm, "CMEnet is listening on port %d\n", address.port);
+        } else {
+            /* specified port range */
+            long seedval = time(NULL) + getpid();
+            /* port num is free.  Constrain to range 26000 : 26100 */
+            int size;
+            int tries;
+            srand48(seedval);
+
+        restart:
+            size = high_bound - low_bound;
+            tries = 10;
+            while (tries > 0) {
+                int target = low_bound + size * drand48();
+                address.port = target;
+                
+                svc->trace_out(cm, "CMEnet trying to bind port %d", target);
+                
+                ENETlock(ecd);
+                server = enet_host_create (& address /* the address to bind the server host to */, 
+                                           MAX_CLIENTS     /* 0 means dynamic alloc clients and/or outgoing connnections */,
+                                           1      /* allow up to 2 channels to be used, 0 and 1 */,
+                                           0      /* assume any amount of incoming bandwidth */,
+                                           0      /* assume any amount of outgoing bandwidth */);
+                ENETunlock(ecd);
+                tries--;
+                if (server != NULL) tries = 0;
+                if (tries == 5) {
+                    /* try reseeding in case we're in sync with another process */
+                    srand48(time(NULL) + getpid());
+                }
+            }
+            if (server == NULL) {
+                high_bound += 100;
+                goto restart;
+            }
+        }
     }
+    ecd->server = server;
     svc->fd_add_select(cm, enet_host_get_sock_fd (server), 
 		       (select_list_func) enet_service_network, (void*)cm, (void*)trans);
 
