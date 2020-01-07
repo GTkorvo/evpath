@@ -1136,6 +1136,7 @@ free_socket_data(CManager cm, void *sdv)
     CMtrans_services svc = sd->svc;
     if (sd->hostname != NULL)
 	svc->free_func(sd->hostname);
+    free_attr_list(sd->characteristics);
     svc->free_func(sd);
 }
 
@@ -1196,6 +1197,7 @@ libcmsockets_LTX_get_transport_characteristics(transport_entry trans, CMtrans_se
 					       void* vsd)
 {
     struct socket_client_data * sd = (struct socket_client_data *) vsd;
+    add_ref_attr_list(sd->characteristics);
     return sd->characteristics;
 }
 
