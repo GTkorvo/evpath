@@ -794,6 +794,8 @@ attr_list listen_info;
 		       int_port_num, conn_sock);
 	ret_list = create_attr_list();
 
+	if (sd->hostname != NULL)
+	    svc->free_func(sd->hostname);
 	sd->hostname = strdup(host_name);
 	sd->listen_port = int_port_num;
 	if ((IP != 0) && (!use_hostname)) {
