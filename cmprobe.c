@@ -1,7 +1,6 @@
 #include "config.h"
 
 #include <stdio.h>
-#include <atl.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif

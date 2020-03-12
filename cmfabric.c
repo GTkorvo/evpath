@@ -61,7 +61,6 @@
 #include <rdma/fi_errno.h>
 #include <rdma/fi_eq.h>
 
-#include <atl.h>
 #include "evpath.h"
 #include "cm_transport.h"
 #include "cm_internal.h"
