@@ -22,7 +22,6 @@
 #endif
 #include <arpa/inet.h>
 
-#include <atl.h>
 #include "evpath.h"
 #include "cm_transport.h"
 #include <Trios_nnti.h>
