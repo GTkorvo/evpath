@@ -58,6 +58,7 @@
 #include <memory.h>
 #endif
 
+#include <atl.h>
 #include "evpath.h"
 #include "cm_transport.h"
 

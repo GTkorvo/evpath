@@ -92,6 +92,7 @@ extern void ZPLENETdummy() {  // for warning suppression
 #include <mach/mach.h>
 #endif
 
+#include <atl.h>
 #include "evpath.h"
 #include "cm_transport.h"
 
