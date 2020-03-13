@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.2)
 project(EVPath VERSION 4.5.0 LANGUAGES C CXX)
 
+message("DEBUG: CI TEST: DO NOT MERGE")
+
 # Enable <PackageName>_ROOT variables for dependency searching
 # CMake v3.12
 if(POLICY CMP0074)
