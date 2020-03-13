@@ -286,7 +286,7 @@ if(ENET_FOUND)
     set_target_properties(cmenet PROPERTIES
       OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmenet)
 
-    target_link_libraries(cmenet PRIVATE evpath_headers enet::enet)
+    target_link_libraries(cmenet PRIVATE evpath_headers atl::atl enet::enet)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmenet)
   else()
     target_sources(EVPath PRIVATE cmenet.c)
@@ -344,7 +344,7 @@ if(UDT4_FOUND)
     set_target_properties(cmudt4 PROPERTIES
       OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmudt4)
 
-    target_link_libraries(cmudt4 PRIVATE evpath_headers udt4::udt4)
+    target_link_libraries(cmudt4 PRIVATE evpath_headers atl::atl udt4::udt4)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmudt4)
   else()
     target_sources(EVPath PRIVATE cmudt4.cpp)
@@ -429,7 +429,8 @@ if(IBVERBS_FOUND)
     add_library(cmib MODULE cmib.c)
     set_target_properties(cmib PROPERTIES
       OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmib)
-    target_link_libraries(cmib PRIVATE evpath_headers ${IBVERBS_LIBRARIES})
+    target_link_libraries(cmib PRIVATE
+      evpath_headers atl::atl ${IBVERBS_LIBRARIES})
     list(APPEND EVPATH_TRANSPORT_TARGETS cmib)
   else()
     target_sources(EVPath PRIVATE cmib.c)
@@ -467,7 +468,8 @@ if(IBVERBS_FOUND)
       add_library(cmnnti MODULE cmnnti.c)
       set_target_properties(cmnnti PROPERTIES
         OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmnnti)
-      target_link_libraries(cmnnti PRIVATE evpath_headers nnti::nnti enet::enet atl::atl)
+      target_link_libraries(cmnnti PRIVATE
+        evpath_headers atl::atl nnti::nnti enet::enet)
       list(APPEND EVPATH_TRANSPORT_TARGETS cmnnti)
     else()
       if(NOT BUILD_SHARED_LIBS)
