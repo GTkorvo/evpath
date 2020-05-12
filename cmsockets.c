@@ -1150,7 +1150,7 @@ libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc, transport_entry t
     (void)trans;
     socket_client_data_ptr socket_data;
     svc->trace_out(cm, "Initialize TCP/IP Socket transport built in %s",
-		   EVPATH_LIBRARY_BUILD_DIR);
+		   EVPATH_MODULE_BUILD_DIR);
     if (socket_global_init == 0) {
 #ifdef HAVE_WINDOWS_H
 	int nErrorStatus;
