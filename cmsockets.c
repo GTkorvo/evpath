@@ -86,7 +86,8 @@ typedef struct socket_client_data {
     CManager cm;
     char *hostname;
     int listen_port;
-    int conn_sock;
+    int listen_fd_count;
+    int *listen_fds;
     attr_list characteristics;
     CMtrans_services svc;
 } *socket_client_data_ptr;
@@ -787,7 +788,10 @@ attr_list listen_info;
     svc->fd_add_select(cm, conn_sock, socket_accept_conn,
 		       (void *) trans, (void *) (long)conn_sock);
 
-    sd->conn_sock = conn_sock;
+    sd->listen_fds = realloc(sd->listen_fds,
+			     sizeof(int)*(sd->listen_fd_count+1));
+    sd->listen_fds[sd->listen_fd_count] = conn_sock;
+    sd->listen_fd_count++;
     {
 	int int_port_num = ntohs(sock_addr.sin_port);
 	attr_list ret_list;
@@ -1141,7 +1145,10 @@ free_socket_data(CManager cm, void *sdv)
     if (sd->hostname != NULL)
 	svc->free_func(sd->hostname);
     free_attr_list(sd->characteristics);
-    close(sd->conn_sock);
+    for(int i = 0 ; i < sd->listen_fd_count; i++) {
+	close(sd->listen_fds[i]);
+    }
+    svc->free_func(sd->listen_fds);
     svc->free_func(sd);
 }
 
@@ -1192,6 +1199,8 @@ libcmsockets_LTX_initialize(CManager cm, CMtrans_services svc, transport_entry t
     socket_data->listen_port = -1;
     socket_data->svc = svc;
     socket_data->characteristics = create_attr_list();
+    socket_data->listen_fd_count = 0;
+    socket_data->listen_fds = malloc(sizeof(int));
     add_int_attr(socket_data->characteristics, CM_TRANSPORT_RELIABLE, 1);
     svc->add_shutdown_task(cm, free_socket_data, (void *) socket_data, FREE_TASK);
     return (void *) socket_data;
