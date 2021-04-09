@@ -61,6 +61,3 @@ set(CTEST_UPDATE_TYPE git)
 
 list(APPEND CTEST_UPDATE_NOTES_FILES "${CMAKE_CURRENT_LIST_FILE}")
 include(${CMAKE_CURRENT_LIST_DIR}/../../dashboard/evpath_common.cmake)
-if(ctest_build_num_warnings GREATER 0)
-  message(FATAL_ERROR "Found ${ctest_build_num_warnings} warnings.")
-endif()
