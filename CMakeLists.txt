@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.2)
+
+# The directory label is used for CDash to treat EVPath as a subproject of
+# GTKorvo
+set(CMAKE_DIRECTORY_LABELS EVPath)
+
 project(EVPath VERSION 4.5.0 LANGUAGES C CXX)
 
 # Enable <PackageName>_ROOT variables for dependency searching
