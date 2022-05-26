@@ -11,6 +11,8 @@ extern "C" {
 #include "cm_schedule.h"
 #endif
 
+#include <stddef.h>
+
 typedef struct _transport_item *transport_entry;
 typedef struct _transport_item *CMTransport;
 
