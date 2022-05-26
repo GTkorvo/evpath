@@ -2140,7 +2140,7 @@ timeout_conn(CManager cm, void *client_data)
 	     }
 	     message_buffer->ref_count++;
 	     CMtrace_out(cm, CMBufferVerbose, "Received buffer %p from transport read_block_func, increment ref count, now is %d\n", message_buffer, message_buffer->ref_count);
-	     tmp_message_buffer = message_buffer->buffer + offset;
+	     tmp_message_buffer = (char *)message_buffer->buffer + offset;
 	     buffer_data_end = data_length;
 	     cm->abort_read_ahead = 1;
 
@@ -2521,7 +2521,7 @@ timeout_conn(CManager cm, void *client_data)
 
 	 if (cm_buffer == NULL) {
 	     local = fill_cmbuffer(cm, buffer, length);
-	     data_buffer = (data_buffer - buffer) + local->buffer;
+	     data_buffer = (data_buffer - buffer) + (char*)local->buffer;
 	     buffer = local->buffer;
 	     cm_buffer = local;
 	 }
@@ -2741,7 +2741,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
 		 conn->queued_data.rem_attr_len);
      if (conn->queued_data.rem_header_len != 0) {
 	 struct FFSEncodeVec tmp_vec[1];
-	 size_t actual;
+	 ssize_t actual;
 	 tmp_vec[0].iov_base = conn->queued_data.rem_header;
 	 tmp_vec[0].iov_len = conn->queued_data.rem_header_len;
 	 actual = trans->NBwritev_func(&CMstatic_trans_svcs,
@@ -2785,7 +2785,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
 	 size_t vec_count = 0;
 	 size_t length = 0;
 	 FFSEncodeVector vec = conn->queued_data.vector_data;
-	 size_t actual = 0;
+	 ssize_t actual = 0;
 
 	 while(vec[vec_count].iov_base != NULL) {
 	     length += vec[vec_count].iov_len;

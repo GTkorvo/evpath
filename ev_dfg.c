@@ -1502,7 +1502,6 @@ max_output_for_action(char *action, int cur_max)
     case Action_Terminal:
     case Action_Bridge:
 	return cur_max;
-	break;
     case Action_Filter:
     case Action_Immediate:
 	if (strncmp(action, "Router Action", 13) == 0) {
@@ -2346,7 +2345,7 @@ dfg_master_msg_handler(CManager cm, CMConnection conn, void *vmsg,
 		       void *client_data, attr_list attrs)
 {
     EVmaster master = (EVmaster)((uintptr_t)client_data & (~0x7));
-    EVmaster_msg_type msg_type = ((uintptr_t)client_data & 0x7);
+    EVmaster_msg_type msg_type = (EVmaster_msg_type) ((uintptr_t)client_data & 0x7);
     queue_master_msg(master, vmsg, msg_type, conn, /*copy*/1);
     /* we'll handle this in the poll handler */
 }

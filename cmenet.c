@@ -32,8 +32,8 @@ extern void ZPLENETdummy() {  // for warning suppression
      (void) enet_socket_listen(0, 0) ;
      (void) enet_socket_accept(0, NULL) ;
      (void) enet_socket_connect(0, NULL) ;
-     (void) enet_socket_get_option(0, 1, NULL) ;
-     (void) enet_socket_shutdown(0, 1) ;
+     (void) enet_socket_get_option(0, (ENetSocketOption) 1, NULL) ;
+     (void) enet_socket_shutdown(0, (ENetSocketShutdown) 1) ;
      (void) enet_socketset_select(0, NULL, NULL, 0) ;
      (void) enet_address_get_host(NULL, NULL, 0 ) ;
      (void) enet_host_get_peers_count( NULL) ;
@@ -1280,6 +1280,7 @@ INTERFACE_NAME(initialize)(CManager cm, CMtrans_services svc,
 	CM_NETWORK_POSTFIX = attr_atom_from_string("CM_NETWORK_POSTFIX");
 	CM_ENET_CONN_TIMEOUT = attr_atom_from_string("CM_ENET_CONN_TIMEOUT");
 	CM_ENET_CONN_REUSE = attr_atom_from_string("CM_ENET_CONN_REUSE");
+        (void)CM_NETWORK_POSTFIX;
 	atom_init++;
     }
     if (env) {

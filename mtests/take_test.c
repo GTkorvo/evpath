@@ -254,6 +254,7 @@ main(int argc, char **argv)
     int i;
 
     PARSE_ARGS();
+    (void) transport;
 
     srand48(getpid());
     CM_TRANSPORT = attr_atom_from_string("CM_TRANSPORT");
