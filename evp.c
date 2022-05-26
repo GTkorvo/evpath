@@ -1280,7 +1280,6 @@ decode_action(CManager cm, event_item *event, response_cache_element *act)
 	    event->reference_format = act->o.decode.target_reference_format;
 	    return event;
 	}
-	break;
     case Event_Freeable:
     case Event_App_Owned:
     {
@@ -1386,6 +1385,7 @@ cod_decode_event(CManager cm, int stone_num, int act_num, event_item *event) {
 	printf("Warning!  bad multiq action found for incoming an event on stone %x, stage %d\n",
 	       stone->local_id, stage);
 	printf("A decode response should be installed into the response cache for event type \"%s\" (%p)\n", tmp = global_name_of_FMFormat(event->reference_format), event->reference_format);
+        free(tmp);
 	dump_stone(stone);
     }
     return decode_action(cm, event, &stone->response_cache[resp_id]);

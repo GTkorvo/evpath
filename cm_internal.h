@@ -362,10 +362,10 @@ extern int CMpbio_send_format_preload(FMFormat ioformat, CMConnection conn);
 extern void CMformat_preload(CMConnection conn, CMFormat format);
 extern void CMinit_local_formats(CManager cm);
 
-extern CMbuffer cm_get_data_buf(CManager cm, size_t length);
+extern CMbuffer cm_get_data_buf(CManager cm, ssize_t length);
 extern void cm_return_data_buf(CManager cm, CMbuffer cmb);
-extern CMbuffer cm_create_transport_buffer(CManager cmb, void* buffer, size_t length);
-extern CMbuffer cm_create_transport_and_link_buffer(CManager cmb, void* buffer, size_t length);
+extern CMbuffer cm_create_transport_buffer(CManager cmb, void* buffer, ssize_t length);
+extern CMbuffer cm_create_transport_and_link_buffer(CManager cmb, void* buffer, ssize_t length);
 
 extern CMincoming_format_list CMidentify_rollbackCMformat 
 (CManager cm, char *data_buffer);

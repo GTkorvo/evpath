@@ -1746,7 +1746,7 @@ timeout_conn(CManager cm, void *client_data)
  }
 
  extern CMbuffer
- cm_create_transport_buffer(CManager cm, void *buffer, size_t length)
+ cm_create_transport_buffer(CManager cm, void *buffer, ssize_t length)
  {
      CMbuffer tmp;
      (void)cm;
@@ -1763,7 +1763,7 @@ timeout_conn(CManager cm, void *client_data)
  }
 
  extern CMbuffer
- cm_create_transport_and_link_buffer(CManager cm, void *buffer, size_t length)
+ cm_create_transport_and_link_buffer(CManager cm, void *buffer, ssize_t length)
  {
      CMbuffer tmp;
      tmp = INT_CMmalloc(sizeof(*tmp));
@@ -1779,7 +1779,7 @@ timeout_conn(CManager cm, void *client_data)
 
  /* alloc temporary buffer for CM use */
  extern CMbuffer
- cm_get_data_buf(CManager cm, size_t length)  
+ cm_get_data_buf(CManager cm, ssize_t length)  
  {
      int buffer_count = 0;
      CMbuffer tmp = cm->cm_buffer_list;
@@ -2004,7 +2004,7 @@ timeout_conn(CManager cm, void *client_data)
      static int use_blocking_reads = 1;
      int first_four = 0;
      char *tmp_message_buffer = NULL;
-     size_t data_length;
+     ssize_t data_length;
      CMbuffer message_buffer;
      size_t buffer_full_point, buffer_data_end;
 
@@ -2094,7 +2094,7 @@ timeout_conn(CManager cm, void *client_data)
 	      *    - or use_blocking_reads is false and use_read_thread is false
 	      */
 	     int non_blocking = first_four || !use_blocking_reads;
-	     size_t actual;
+	     ssize_t actual;
 	     if (conn->use_read_thread) {
 		 non_blocking = 0;
 		 CManager_unlock(cm);
@@ -2129,7 +2129,7 @@ timeout_conn(CManager cm, void *client_data)
 	     }
 	     data_length = buffer_data_end;
 	 } else {
-	     size_t offset;
+	     ssize_t offset;
 	     message_buffer = trans->read_block_func(&CMstatic_trans_svcs, 
 						     conn->transport_data,
 						     &data_length, &offset);
@@ -2966,7 +2966,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
 	 CMbuffer buf = cm_get_data_buf(conn->cm, length);
 	 FFSEncodeVector vec = buf->buffer;
 	 vec[0].iov_len = data_length;
-	 vec[0].iov_base = buf->buffer + (sizeof(tmp_vec[0])*2);
+	 vec[0].iov_base = ((char*)buf->buffer) + (sizeof(tmp_vec[0])*2);
 	 vec[1].iov_len = 0;
 	 vec[1].iov_base = NULL;
 	 conn->queued_data.buffer_to_free = buf;

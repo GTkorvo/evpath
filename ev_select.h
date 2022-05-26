@@ -10,8 +10,8 @@
 #define USE_MEMSET
 #endif
 #endif
-#if defined(__NVCC__)
-#define USE_MEMSET
+#if defined(__NVCOMPILER)
+#define USE_MEMSET 1
 #endif
 #ifdef USE_MEMSET
 #include <string.h>
