@@ -604,6 +604,7 @@ EVaction
 INT_EVassoc_immediate_action(CManager cm, EVstone stone_num, 
 			 char *action_spec, void *client_data)
 {
+#ifdef HAVE_COD_H
     event_path_data evp = cm->evp;
     EVaction action_num;
     proto_action *act;
@@ -633,12 +634,17 @@ INT_EVassoc_immediate_action(CManager cm, EVstone stone_num,
     }	
     clear_response_cache(stone);
     return action_num;
+#else
+    fprintf(stderr, "No code generation in FFS, action unavailable\n");
+    return -1;
+#endif    
 }
 
 EVaction
 INT_EVassoc_multi_action(CManager cm, EVstone stone_num, 
 			  char *action_spec, void *client_data)
 {
+#ifdef HAVE_COD_H
     event_path_data evp = cm->evp;
     int action_num;
     stone_type stone;
@@ -663,12 +669,17 @@ INT_EVassoc_multi_action(CManager cm, EVstone stone_num,
    stone->proto_action_count++;
     clear_response_cache(stone);
     return action_num;
+#else
+    fprintf(stderr, "No code generation in FFS, action unavailable\n");
+    return -1;
+#endif    
 }
 
 EVaction
 INT_EVassoc_congestion_action(CManager cm, EVstone stone_num, 
 			      char *action_spec, void *client_data)
 {
+#ifdef HAVE_COD_H
     event_path_data evp = cm->evp;
     int action_num;
     stone_type stone;
@@ -690,6 +701,10 @@ INT_EVassoc_congestion_action(CManager cm, EVstone stone_num,
     stone->proto_action_count++;
     clear_response_cache(stone);
     return action_num;
+#else
+    fprintf(stderr, "No code generation in FFS, action unavailable\n");
+    return -1;
+#endif    
 }
 
 EVstone
@@ -697,6 +712,7 @@ INT_EVassoc_filter_action(CManager cm, EVstone stone_num,
 		      FMStructDescList format_list, EVSimpleHandlerFunc handler,
 		      EVstone out_stone_num, void *client_data)
 {
+#ifdef HAVE_COD_H
     event_path_data evp = cm->evp;
     stone_type stone;
 
@@ -729,6 +745,10 @@ INT_EVassoc_filter_action(CManager cm, EVstone stone_num,
     CMtrace_out(cm, EVerbose, "Adding filter action %d to stone %x\n",
 		proto_action_num, stone_num);
     return proto_action_num;
+#else
+    fprintf(stderr, "No code generation in FFS, action unavailable\n");
+    return -1;
+#endif    
 }
 
 static storage_queue_ops storage_queue_default_ops;
@@ -2319,6 +2339,7 @@ extern EVaction
 INT_EVassoc_anon_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
 			       EVMultiHandlerFunc func, void *client_data, FMFormat anon_target)
 {
+#ifdef HAVE_COD_H
     event_path_data evp = cm->evp;
     stone_type stone;
     int resp_num;
@@ -2354,6 +2375,10 @@ INT_EVassoc_anon_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
     stone->response_cache_count += 1;
     fix_response_cache(stone);
     return resp_num;
+#else
+    fprintf(stderr, "No code generation in FFS, action unavailable\n");
+    return -1;
+#endif    
 }
 
 extern EVaction
@@ -2361,6 +2386,7 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
 				  EVMultiHandlerFunc func, void *client_data, 
 				 FMFormat *reference_formats, int_free_func free_func)
 {
+#ifdef HAVE_COD_H
     event_path_data evp = cm->evp;
     stone_type stone;
     int resp_num;
@@ -2401,6 +2427,10 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
     stone->response_cache_count += queue_count;
     fix_response_cache(stone);
     return resp_num;
+#else
+    fprintf(stderr, "No code generation in FFS, action unavailable\n");
+    return -1;
+#endif    
 }
 
 extern EVstone

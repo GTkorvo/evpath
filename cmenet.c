@@ -1099,7 +1099,7 @@ INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
 #ifdef NEED_IOVEC_DEFINE
 struct iovec {
     void *iov_base;
-    int iov_len;
+    size_t iov_len;
 };
 
 #endif
@@ -1111,8 +1111,8 @@ extern
 #endif
 void *
 INTERFACE_NAME(read_block_func)(CMtrans_services svc,
-			      enet_conn_data_ptr conn_data, int *actual_len,
-			      int *offset_ptr)
+                                enet_conn_data_ptr conn_data, int *actual_len,
+                                size_t *offset_ptr)
 {
     CMbuffer cb;
 
@@ -1166,10 +1166,10 @@ extern
 #endif
 int
 INTERFACE_NAME(writev_func)(CMtrans_services svc, enet_conn_data_ptr ecd,
-			  struct iovec *iov, int iovcnt, attr_list attrs)
+			  struct iovec *iov, size_t iovcnt, attr_list attrs)
 {
-    int i;
-    int length = 0;
+    size_t i;
+    size_t length = 0;
 
     (void) attrs;
     for (i = 0; i < iovcnt; i++) {

@@ -7,7 +7,12 @@
 #include <unistd.h>
 #include <strings.h>
 
+#ifdef HAVE_COD_H
 #include "cod.h"
+#else
+#define cod_get_client_data(x,y) NULL
+typedef void *cod_exec_context;
+#endif
 #include "evpath.h"
 #include "cm_internal.h"
 #include "ev_dfg.h"
