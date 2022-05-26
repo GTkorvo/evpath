@@ -3127,7 +3127,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
      ((int*)full_vec[0].iov_base)[0] = 
 	 (((int*)full_vec[0].iov_base)[0] & 0xffffff00) | (unsigned char) checksum;
      if ((conn->do_non_blocking_write == 1) && (conn->trans->NBwritev_func)) {
-	 size_t actual_bytes;
+	 ssize_t actual_bytes;
 	 actual_bytes = 
 	     conn->trans->NBwritev_func(&CMstatic_trans_svcs, 
 					     conn->transport_data, 

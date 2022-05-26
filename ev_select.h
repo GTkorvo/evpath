@@ -7,14 +7,18 @@
 
 #if defined(__has_feature)
 #if __has_feature(memory_sanitizer)
-
+#define USE_MEMSET
+#endif
+#endif
+#if defined(__NVCC__)
+#define USE_MEMSET
+#endif
+#ifdef USE_MEMSET
 #include <string.h>
 #define EVPATH_FD_ZERO(set) \
 do { \
     memset((set), 0, sizeof(fd_set)); \
 } while (0)
-
-#endif
 #endif
 
 #ifndef EVPATH_FD_ZERO

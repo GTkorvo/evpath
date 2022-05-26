@@ -335,7 +335,7 @@ libcmudp_data_available(void *vtrans, void *vinput)
 {
     transport_entry trans = vtrans;
     int input_fd = (long)vinput;
-    size_t nbytes;
+    ssize_t nbytes;
     udp_transport_data_ptr utd = (udp_transport_data_ptr) trans->trans_data;
     udp_conn_data_ptr ucd = utd->connections;
     struct sockaddr_in addr;
