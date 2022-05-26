@@ -38,8 +38,8 @@
 #ifdef HAVE_COD_H
 #include "cod.h"
 #else
-#define cod_assoc_externs(x,y) 0
-#define cod_parse_for_context(x,y) 0
+#define cod_assoc_externs(x,y)
+#define cod_parse_for_context(x,y)
 #endif
 #include <fcntl.h>
 

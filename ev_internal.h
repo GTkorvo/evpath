@@ -207,6 +207,7 @@ typedef struct extern_entry {
     void *extern_value;
 } cod_extern_entry;
 typedef cod_extern_entry *cod_extern_list;
+#define COD_EXTERN_ENTRY_DEFINED
 #endif
 typedef struct _extern_routine_struct {
     char *extern_decl;

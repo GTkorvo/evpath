@@ -201,6 +201,7 @@ _pkg_get_target_prefix(atl::atl atl_PREFIX)
 _pkg_get_target_prefix(ffs::ffs ffs_PREFIX)
 list(APPEND _pkg_config_pfxs "${atl_PREFIX}" "${ffs_PREFIX}")
 
+set(CMAKE_REQUIRED_INCLUDES "${ffs_PREFIX}/include")
 CHECK_INCLUDE_FILE(cod.h HAVE_COD_H)
 if (HAVE_COD_H)
    find_package(dill 2.3.1 REQUIRED)
