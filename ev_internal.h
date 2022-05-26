@@ -198,7 +198,7 @@ typedef struct _stone {
     stall_callback *unstall_callbacks;
 } *stone_type;
     
-#ifndef __COD__H__
+#ifndef HAVE_COD_H
 struct _ecl_code_struct;
 typedef struct extern_entry {
     /*! the textual name of the external entry */
@@ -206,9 +206,9 @@ typedef struct extern_entry {
     /*! the address of the external entry */
     void *extern_value;
 } cod_extern_entry;
-typedef cod_extern_entry *cod_extern_list;
 #define COD_EXTERN_ENTRY_DEFINED
 #endif
+typedef struct extern_entry cod_extern_entry;
 typedef struct _extern_routine_struct {
     char *extern_decl;
     cod_extern_entry *externs;
