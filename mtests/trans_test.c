@@ -313,7 +313,7 @@ main(argc, argv)
 	} else if (strcmp(&argv[1][1], "size") == 0) {
 	    char *endptr;
 	    if (!argv[2]) {
-		printf("Bad -size argument \"%s\"\n", argv[2]);
+		printf("No argument to -size\n");
 		usage();
 	    }
 	    size = strtol(argv[2], &endptr, 10);

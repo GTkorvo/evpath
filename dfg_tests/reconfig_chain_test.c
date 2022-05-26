@@ -80,6 +80,7 @@ join_handler(EVmaster master, char *identifier, void* available_sources, void *a
 	if (strcmp(identifier, "origin") == 0) {
 	    canon_name = strdup("origin");
 	} else if (client_count < static_node_count) {
+	    canon_name = malloc(25);
 	    sprintf(canon_name, "client%d", client_count-1);
 	} else {
 	    canon_name = strdup("terminal");
