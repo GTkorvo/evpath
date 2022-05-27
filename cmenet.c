@@ -631,10 +631,10 @@ enet_initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans,
 		       int_port_num);
 #else
         char straddr[INET6_ADDRSTRLEN];
-        ((enet_uint32 *)&host_ipv6.s6_addr)[0] = 0;
-        ((enet_uint32 *)&host_ipv6.s6_addr)[1] = 0;
-        ((enet_uint32 *)&host_ipv6.s6_addr)[2] = htonl(0xffff);
-        ((enet_uint32 *)&host_ipv6.s6_addr)[3] = htonl(host_ip);
+        *((enet_uint32 *)&host_ipv6.s6_addr) = 0;
+        *(((enet_uint32 *)&host_ipv6.s6_addr) + 1) = 0;
+        *(((enet_uint32 *)&host_ipv6.s6_addr) + 2) = htonl(0xffff);
+        *(((enet_uint32 *)&host_ipv6.s6_addr) + 3)] = htonl(host_ip);
         inet_ntop(AF_INET6, &host_ipv6, straddr,
                   sizeof(straddr));
 
