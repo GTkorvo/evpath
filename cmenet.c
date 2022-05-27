@@ -1111,8 +1111,8 @@ extern
 #endif
 void *
 INTERFACE_NAME(read_block_func)(CMtrans_services svc,
-                                enet_conn_data_ptr conn_data, int *actual_len,
-                                size_t *offset_ptr)
+                                enet_conn_data_ptr conn_data, ssize_t *actual_len,
+                                ssize_t *offset_ptr)
 {
     CMbuffer cb;
 

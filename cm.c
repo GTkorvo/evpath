@@ -2763,7 +2763,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
      }
      if (conn->queued_data.rem_attr_len != 0) {
 	 struct FFSEncodeVec tmp_vec[1];
-	 size_t actual;
+	 ssize_t actual;
 	 tmp_vec[0].iov_base = conn->queued_data.rem_attr_base;
 	 tmp_vec[0].iov_len = conn->queued_data.rem_attr_len;
 	 actual = trans->NBwritev_func(&CMstatic_trans_svcs,
