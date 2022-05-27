@@ -95,7 +95,7 @@ static FMStructDescRec simple_format_list[] =
     {NULL, NULL}
 };
 
-static size_t size = 10000000000;
+static size_t size = 100000;
 static size_t vecs = 1;
 
 static
