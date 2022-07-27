@@ -1330,7 +1330,7 @@ encode_event(CManager cm, event_item *event)
     event->encoded_event = 
 	FFSencode(event->ioBuffer, event->reference_format,
 		  event->decoded_event,
-		  (long*) &event->event_len);
+		  &event->event_len);
     event->event_encoded = 1;
 }
 
