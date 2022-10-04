@@ -2718,28 +2718,33 @@ timeout_conn(CManager cm, void *client_data)
      cm_return_data_buf(cm, buf);
  }
 
- void
- INT_CMregister_handler(CMFormat format, CMHandlerFunc handler,
-			void *client_data)
- {
-     CManager cm = format->cm;
-     int i;
-     format->handler = handler;
-     format->client_data = client_data;
+void
+INT_CMregister_handler(CMFormat format, CMHandlerFunc handler,
+		       void *client_data)
+{
+    CManager cm = format->cm;
+    int i;
+    format->handler = handler;
+    format->client_data = client_data;
 
-     for (i=0; i< cm->in_format_count; i++) {
-	 if (cm->in_formats[i].format == format->ffsformat) {
-	     if (!cm->in_formats[i].handler) {
-		 cm->in_formats[i].handler = handler;
-		 cm->in_formats[i].client_data = client_data;
-	     } else if ((cm->in_formats[i].handler != handler) ||
-			(cm->in_formats[i].client_data != client_data)) {
-		 fprintf(stderr, "Warning, CMregister_handler() called multiple times for the same format with different handler or client_data\n");
-		 fprintf(stderr, "Repeated calls will be ignored\n");
-	     }
-	 }
-     }
- }
+    for (i=0; i< cm->in_format_count; i++) {
+	if (strcmp(name_of_FMformat(FMFormat_of_original(cm->in_formats[i].format)), format->format_name) == 0) {
+	    if (format->registration_pending) {
+	        CMcomplete_format_registration(format, 1);
+	    }
+	    if (cm->in_formats[i].format == format->ffsformat) {
+	        if (!cm->in_formats[i].handler) {
+		    cm->in_formats[i].handler = handler;
+		    cm->in_formats[i].client_data = client_data;
+		} else if ((cm->in_formats[i].handler != handler) ||
+			   (cm->in_formats[i].client_data != client_data)) {
+		    fprintf(stderr, "Warning, CMregister_handler() called multiple times for the same format with different handler or client_data\n");
+		    fprintf(stderr, "Repeated calls will be ignored\n");
+		}
+	    }
+	}
+    }
+}
 
 extern void
 INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
