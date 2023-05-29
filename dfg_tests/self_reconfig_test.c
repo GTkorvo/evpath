@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include "config.h"
 
 #include <string.h>
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#include "config.h"
+#endif
 #include "evpath.h"
 #include "ev_dfg.h"
 #include "test_support.h"

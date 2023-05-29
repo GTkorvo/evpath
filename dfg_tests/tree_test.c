@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include <unistd.h>
-
 #include "config.h"
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
 #include "ev_dfg.h"
 #include "test_support.h"
 

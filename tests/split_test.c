@@ -8,13 +8,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#ifdef HAVE_ARPA_INET_H
 #include <arpa/inet.h>
+#endif
 #include "evpath.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x)
+#define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
 #else
 #include <sys/wait.h>
 #endif
@@ -218,7 +221,7 @@ char **argv;
 	    free_attr_list(contact_list);
 	}	
 	stone = EValloc_stone(cm);
-	EVassoc_terminal_action(cm, stone, simple_format_list, simple_handler, NULL);
+	EVassoc_terminal_action(cm, stone, simple_format_list, (EVSimpleHandlerFunc)simple_handler, NULL);
 	printf("Contact list \"%d:%s\"\n", stone, string_list);
 	CMsleep(cm, 120);
     } else {
@@ -353,7 +356,7 @@ do_regression_master_test()
     srand48(1);
 
     handle = EValloc_stone(cm);
-    EVassoc_terminal_action(cm, handle, simple_format_list, simple_handler, &message_count);
+    EVassoc_terminal_action(cm, handle, simple_format_list, (EVSimpleHandlerFunc)simple_handler, &message_count);
     
     args[2] = string_list;
     args[2] = malloc(10 + strlen(string_list));

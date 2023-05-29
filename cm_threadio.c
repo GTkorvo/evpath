@@ -47,10 +47,10 @@ thr_fork(func, arg)
 void*(*func)(void*);
 void *arg;
 {
-    pthread_t new_thread = 0;
-    int err = pthread_create(&new_thread, NULL, (void*(*)(void*))func, arg);
+    thr_thread_t new_thread = 0;
+    int err = thr_thread_create(&new_thread, NULL, (void*(*)(void*))func, arg);
     if (err != 0) {
-	return  (thr_thread_t) NULL;
+	return  (thr_thread_t) (intptr_t) NULL;
     } else {
 	return (thr_thread_t) new_thread;
     }
