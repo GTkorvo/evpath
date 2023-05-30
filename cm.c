@@ -26,6 +26,7 @@
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif
+#include <inttypes.h>
 #include <ffs.h>
 #include <atl.h>
 #include "evpath.h"
@@ -130,7 +131,7 @@ static void cond_wait_CM_lock(CManager cm, void *vcond, char *file, int line)
     CMtrace_out(cm, CMLowLevelVerbose, "CManager Condition wait at \"%s\" line %d\n",
 		file, line);
     cm->locked--;
-    thr_condition_wait(cond, &cm->exchange_lock);
+    thr_condition_wait(*cond, cm->exchange_lock);
     CMtrace_out(cm, CMLowLevelVerbose, "CManager Condition wake at \"%s\" line %d\n",
 		file, line);
     cm->locked++;
@@ -173,7 +174,7 @@ CMpoll_forever(CManager cm)
 	should_exit++;
     }
     while(!cl->closed) {
-	CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Forever - thread %Ix doing wait\n", (intptr_t)thr_thread_self());
+	CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Forever - thread %zx doing wait\n", (size_t)thr_thread_self());
 	if (CMcontrol_list_wait(cl) == -1) {
 	    CMtrace_out(cm, CMLowLevelVerbose, "CM Poll Forever - doing close and exit\n");
 	    /* 
@@ -212,7 +213,7 @@ INT_CMrun_network(CManager cm)
 	/* What?  We're polling, but we're not the server thread? */
 	fprintf(stderr, "Warning:  CMrun_network() called when another thread may already be handling the network\n");
 	fprintf(stderr, "          This situation may result in unexpected I/O blocking.\n");
-	fprintf(stderr, "          Server thread set to %Ix.\n", (intptr_t) thr_thread_self());
+	fprintf(stderr, "          Server thread set to %zx.\n", (size_t) thr_thread_self());
     }
     cm->control_list->server_thread = thr_thread_self();
     cm->control_list->has_thread = 1;
@@ -227,9 +228,7 @@ CM_test_thread_func()
 }
 
 static thr_thread_t 
-thr_fork(func, arg)
-void*(*func)(void*);
-void *arg;
+thr_fork(void*(*func)(void*), void *arg)
 {
     thr_thread_t new_thread = 0;
     int err = thr_thread_create(&new_thread, NULL, (void*(*)(void*))func, arg);
@@ -699,7 +698,7 @@ CMcontrol_list_wait(CMControlList cl)
 	/* What?  We're polling, but we're not the server thread? */
 	fprintf(stderr, "Warning:  Multiple threads calling CMnetwork_wait\n");
 	fprintf(stderr, "          This situation may result in unexpected I/O blocking.\n");
-	fprintf(stderr, "          Server thread set to %Ix.\n", (intptr_t) thr_thread_self());
+	fprintf(stderr, "          Server thread set to %zx.\n", (size_t) thr_thread_self());
     }
     cl->server_thread = thr_thread_self();
     if (cl->network_blocking_function.func != NULL) {
@@ -726,12 +725,12 @@ INT_CManager_create()
 static void
 atl_mutex_lock(void* lock)
 {
-    thr_mutex_lock(lock);
+    thr_mutex_lock(*((thr_mutex_t*)lock));
 }
 static void
 atl_mutex_unlock(void* lock)
 {
-    thr_mutex_unlock(lock);
+    thr_mutex_unlock(*((thr_mutex_t*)lock));
 }
 extern
 CManager
@@ -2543,7 +2542,7 @@ timeout_conn(CManager cm, void *client_data)
      }
      if (event_msg) {
 	 CMbuffer local = NULL;
-	 CMtrace_out(cm, CMDataVerbose, "CM - Receiving event message data len %zd, attr len %d, stone_id %x\n",
+	 CMtrace_out(cm, CMDataVerbose, "CM - Receiving event message data len %"  PRId64 ", attr len %d, stone_id %x\n",
 		     data_length, attr_length, stone_id);
 	 if (attrs == NULL){
 	     attrs = CMcreate_attr_list(cm);

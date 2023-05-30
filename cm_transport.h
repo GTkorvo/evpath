@@ -18,6 +18,9 @@ extern "C" {
     typedef SSIZE_T ssize_t;
 #else
 #include <unistd.h>
+#ifndef SOCKET
+#define SOCKET int
+#endif
 #endif
 
 typedef struct _transport_item *transport_entry;

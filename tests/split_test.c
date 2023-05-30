@@ -8,9 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#ifdef HAVE_ARPA_INET_H
-#include <arpa/inet.h>
-#endif
 #include "evpath.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
@@ -20,6 +17,7 @@
 #define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
 #else
 #include <sys/wait.h>
+#include <arpa/inet.h>
 #endif
 
 typedef struct _complex_rec {
@@ -83,8 +81,7 @@ static FMStructDescRec simple_format_list[] =
 
 static
 void 
-generate_record(event)
-simple_rec_ptr event;
+generate_record(simple_rec_ptr event)
 {
     long sum = 0;
     event->integer_field = (int) lrand48() % 100;
@@ -111,11 +108,7 @@ int quiet = 1;
 
 static
 int
-simple_handler(cm, vevent, client_data, attrs)
-CManager cm;
-void *vevent;
-void *client_data;
-attr_list attrs;
+simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 {
     simple_rec_ptr event = vevent;
     long sum = 0, scan_sum = 0;
@@ -162,9 +155,7 @@ char *control = NULL;
 #include "support.c"
 
 int
-main(argc, argv)
-int argc;
-char **argv;
+main(int argc, char **argv)
 {
     CManager cm;
     int regression_master = 1;
@@ -279,8 +270,7 @@ char **argv;
 static pid_t subproc_proc = 0;
 
 static void
-fail_and_die(signal)
-int signal;
+fail_and_die(int signal)
 {
     fprintf(stderr, "split_test failed to complete in reasonable time\n");
     if (subproc_proc != 0) {

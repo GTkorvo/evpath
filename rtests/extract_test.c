@@ -8,9 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#ifdef HAVE_ARPA_INET_H
-#include <arpa/inet.h>
-#endif
 #include "evpath.h"
 #include "revpath.h"
 #ifdef HAVE_WINDOWS_H
@@ -22,6 +19,7 @@
 #define srand48(x)
 #define kill(x,y) TerminateProcess(OpenProcess(0, 0, (DWORD)x),y)
 #else
+#include <arpa/inet.h>
 #include <sys/wait.h>
 #endif
 

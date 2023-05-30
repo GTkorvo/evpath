@@ -43,9 +43,7 @@ void* read_thread_func(void *conn_raw) {
 }
 
 static thr_thread_t 
-thr_fork(func, arg)
-void*(*func)(void*);
-void *arg;
+thr_fork(void*(*func)(void*), void *arg)
 {
     thr_thread_t new_thread = 0;
     int err = thr_thread_create(&new_thread, NULL, (void*(*)(void*))func, arg);

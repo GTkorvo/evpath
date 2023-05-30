@@ -374,11 +374,7 @@ libcmmulticast_LTX_connection_eq(CManager cm, CMtrans_services svc, transport_en
 
 
 extern attr_list
-libcmmulticast_LTX_non_blocking_listen(cm, svc, trans, listen_info)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list listen_info;
+libcmmulticast_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr_list listen_info)
 {
     /* meaningless in muticast */
     return NULL;
@@ -402,11 +398,7 @@ struct iovec {
  *  that are more efficient if they allocate their own buffer space.
  */
 extern void *
-libcmmulticast_LTX_read_func(svc, mcd, requested_len, actual_len)
-CMtrans_services svc;
-mcast_conn_data_ptr mcd;
-int requested_len;
-int *actual_len;
+libcmmulticast_LTX_read_func(CMtrans_services svc, mcast_conn_data_ptr mcd, int requested_len, int *actual_len)
 {
     char *ret = &mcd->read_buffer[mcd->read_pointer];
     *actual_len = requested_len;

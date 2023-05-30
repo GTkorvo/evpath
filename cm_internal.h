@@ -19,7 +19,7 @@
 #define thr_thread_self() pthread_self()
 #define thr_thread_exit(status) pthread_exit(status);
 #define thr_thread_detach(thread) pthread_detach(thread);
-#define thr_thread_yield() pthread_yield();
+#define thr_thread_yield() sched_yield()
 #define thr_thread_join(t, s) pthread_join(t, s)
 #define thr_mutex_init(m) pthread_mutex_init(&m, NULL);
 #define thr_mutex_lock(m) pthread_mutex_lock(&m);
@@ -30,6 +30,7 @@
 #define thr_condition_signal(c) pthread_cond_signal(&c);
 #define thr_condition_broadcast(c) pthread_cond_broadcast(&c);
 #define thr_condition_free(c) pthread_cond_destroy(&c);
+#define thr_thread_create(w,x,y,z) pthread_create(w,x,y,z);
 #else
 //#include <mutex>
 #include <Windows.h>

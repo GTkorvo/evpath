@@ -11,9 +11,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#ifdef HAVE_ARPA_INET_H
-#include <arpa/inet.h>
-#endif
 #include "evpath.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
@@ -23,6 +20,7 @@
 #define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
 #else
 #include <sys/wait.h>
+#include <arpa/inet.h>
 #endif
 
 typedef struct _complex_rec {
@@ -189,7 +187,7 @@ output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     return 0;
 }
 
-static int do_regression_master_test();
+static int do_regression_master_test(int do_dll);
 static int regression = 1;
 static int repeat_count = 10;
 static atom_t CM_TRANSPORT;

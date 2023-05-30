@@ -132,7 +132,7 @@ get_self_ip_iface(CMTransport_trace trace_func, void* trace_data, char *iface)
 		first_call = 0;
 		return IP;
 	    }
-	    printf("Warning!  " IPCONFIG_ENVVAR_PREFIX "INTERFACE specified as \"%s\", but no active interface by that name found\n", interface);
+	    printf("Warning!  " IPCONFIG_ENVVAR_PREFIX "INTERFACE specified as \"%s\", but no active interface by that name found\n", iface);
 	}
 	    
 	first_call = 0;

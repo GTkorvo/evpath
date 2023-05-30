@@ -49,6 +49,9 @@ FMStructDescRec thin_formats[] = {
     {"thin_message", simple_field_list, sizeof(simple_rec), NULL},
     {NULL, NULL, 0, NULL}};
 
+#ifndef _MSC_VER
+#define SOCKET int
+#endif
 static SOCKET do_connection(char* host, int port);
 static void generate_record (simple_rec_ptr event);
 
@@ -78,7 +81,7 @@ main(int argc, char **argv)
 	printf("Connection to %s:%d failed\n", remote_host, remote_port);
 	exit(1);
     }
-    out_connection = open_FFSfd((void*)conn, "w");
+    out_connection = open_FFSfd((void*)(intptr_t)conn, "w");
 
     sprintf(comment, "Stone %d", stone);
     write_comment_FFSfile(out_connection, comment);

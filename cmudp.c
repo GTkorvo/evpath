@@ -114,8 +114,7 @@ typedef struct udp_connection_data {
 #endif
 
 static udp_conn_data_ptr
-create_udp_conn_data(svc)
-CMtrans_services svc;
+create_udp_conn_data(CMtrans_services svc)
 {
     udp_conn_data_ptr udp_conn_data =
 	svc->malloc_func(sizeof(struct udp_connection_data));
@@ -193,9 +192,7 @@ int fd;
 #endif
 
 extern void
-libcmudp_LTX_shutdown_conn(svc, ucd)
-CMtrans_services svc;
-udp_conn_data_ptr ucd;
+libcmudp_LTX_shutdown_conn(CMtrans_services svc, udp_conn_data_ptr ucd)
 {
     unlink_connection(ucd->utd, ucd);
     svc->connection_deref(ucd->conn);

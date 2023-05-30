@@ -129,9 +129,7 @@ static atom_t CM_IP_ADDR = -1;
 #define TIMING_GUARD_STOP gettimeofday(&t1, NULL);    timersub(&t1, &t0, &diff); if (diff.tv_sec > 0) fprintf(stderr, "TIME GUARD at %s:%d exceeded, time was was <%ld.%06ld> secs\n", __FILE__, __LINE__, (long)diff.tv_sec, (long)diff.tv_usec);}
 
 static int
-check_host(hostname, sin_addr)
-char *hostname;
-void *sin_addr;
+check_host(char *hostname, void *sin_addr)
 {
     struct hostent *host_addr;
     host_addr = gethostbyname(hostname);
@@ -154,8 +152,7 @@ void *sin_addr;
 }
 
 static socket_conn_data_ptr 
-create_socket_conn_data(svc)
-CMtrans_services svc;
+create_socket_conn_data(CMtrans_services svc)
 {
     socket_conn_data_ptr socket_conn_data =
     svc->malloc_func(sizeof(struct socket_connection_data));
@@ -214,9 +211,7 @@ int fd;
  * Accept socket connection
  */
 static void
-socket_accept_conn(void_trans, void_conn_sock)
-void *void_trans;
-void *void_conn_sock;
+socket_accept_conn(void *void_trans, void *void_conn_sock)
 {
     transport_entry trans = (transport_entry) void_trans;
     int conn_sock = (int) (intptr_t) void_conn_sock;
@@ -317,9 +312,7 @@ void *void_conn_sock;
 }
 
 extern void
-libcmsockets_LTX_shutdown_conn(svc, scd)
-CMtrans_services svc;
-socket_conn_data_ptr scd;
+libcmsockets_LTX_shutdown_conn(CMtrans_services svc, socket_conn_data_ptr scd)
 {
     svc->connection_deref(scd->conn);
     svc->fd_remove_select(scd->sd->cm, scd->fd);
@@ -347,13 +340,7 @@ is_private_10(int IP)
 }
 
 static SOCKET
-initiate_conn(cm, svc, trans, attrs, socket_conn_data, conn_attr_list)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
-socket_conn_data_ptr socket_conn_data;
-attr_list conn_attr_list;
+initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_list attrs, socket_conn_data_ptr socket_conn_data, attr_list conn_attr_list)
 {
     SOCKET sock;
 
@@ -524,11 +511,7 @@ attr_list conn_attr_list;
  * (name_str stores the machine name).
  */
 extern CMConnection
-libcmsockets_LTX_initiate_conn(cm, svc, trans, attrs)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
+libcmsockets_LTX_initiate_conn(CManager cm, CMtrans_services svc, transport_entry trans, attr_list attrs)
 {
     socket_conn_data_ptr socket_conn_data = create_socket_conn_data(svc);
     attr_list conn_attr_list = create_attr_list();
@@ -568,11 +551,7 @@ attr_list attrs;
  * same as ours and if the IP_PORT matches the one we are listening on.
  */
 extern int
-libcmsockets_LTX_self_check(cm, svc, trans, attrs)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
+libcmsockets_LTX_self_check(CManager cm, CMtrans_services svc, transport_entry trans, attr_list attrs)
 {
 
     socket_client_data_ptr sd = trans->trans_data;
@@ -627,12 +606,7 @@ attr_list attrs;
 }
 
 extern int
-libcmsockets_LTX_connection_eq(cm, svc, trans, attrs, scd)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list attrs;
-socket_conn_data_ptr scd;
+libcmsockets_LTX_connection_eq(CManager cm, CMtrans_services svc, transport_entry trans, attr_list attrs, socket_conn_data_ptr scd)
 {
 
     int int_port_num;
@@ -675,11 +649,7 @@ socket_conn_data_ptr scd;
  * Create an IP socket for connection from other CMs
  */
 extern attr_list
-libcmsockets_LTX_non_blocking_listen(cm, svc, trans, listen_info)
-CManager cm;
-CMtrans_services svc;
-transport_entry trans;
-attr_list listen_info;
+libcmsockets_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transport_entry trans, attr_list listen_info)
 {
     socket_client_data_ptr sd = trans->trans_data;
     unsigned int length;
@@ -870,11 +840,7 @@ struct iovec {
 #endif
 
 extern void
-libcmsockets_LTX_set_write_notify(trans, svc, scd, enable)
-transport_entry trans;
-CMtrans_services svc;
-socket_conn_data_ptr scd;
-int enable;
+libcmsockets_LTX_set_write_notify(transport_entry trans, CMtrans_services svc, socket_conn_data_ptr scd, int enable)
 {
     if (enable != 0) {
 	svc->fd_write_select(trans->cm, scd->fd, (select_list_func) trans->write_possible,
@@ -917,13 +883,7 @@ set_block_state(CMtrans_services svc, socket_conn_data_ptr scd,
 }
 
 extern ssize_t
-libcmsockets_LTX_read_to_buffer_func(svc, scd, buffer, requested_len, 
-				     non_blocking)
-CMtrans_services svc;
-socket_conn_data_ptr scd;
-void *buffer;
-ssize_t requested_len;
-int non_blocking;
+libcmsockets_LTX_read_to_buffer_func(CMtrans_services svc, socket_conn_data_ptr scd, void *buffer, ssize_t requested_len, int non_blocking)
 {
     ssize_t left, iget;
 #ifndef _MSC_VER
@@ -1043,11 +1003,7 @@ int iovcnt;
 }
 #endif
 
-int long_writev(svc, scd, iovs, iovcnt)
-CMtrans_services svc;
-socket_conn_data_ptr scd;
-void *iovs;
-int iovcnt;
+int long_writev(CMtrans_services svc, socket_conn_data_ptr scd, void *iovs, int iovcnt)
 {
     assert(0);   // for right now, don't try this
     return 0;
@@ -1059,12 +1015,7 @@ int iovcnt;
 #endif
 
 extern ssize_t
-libcmsockets_LTX_writev_func(svc, scd, iovs, iovcnt, attrs)
-CMtrans_services svc;
-socket_conn_data_ptr scd;
-void *iovs;
-int iovcnt;
-attr_list attrs;
+libcmsockets_LTX_writev_func(CMtrans_services svc, socket_conn_data_ptr scd, void *iovs, int iovcnt, attr_list attrs)
 {
     SOCKET fd = scd->fd;
     ssize_t left = 0;

@@ -1105,8 +1105,7 @@ generate_multityped_code(CManager cm, struct response_spec *mrd, stone_type ston
 
 extern
 void
-free_struct_list(list)
-FMStructDescList list;
+free_struct_list(FMStructDescList list)
 {
     int format_count = 0;
     int format;

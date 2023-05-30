@@ -8,9 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
-#ifdef HAVE_ARPA_INET_H
-#include <arpa/inet.h>
-#endif
 #include "evpath.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
@@ -22,6 +19,7 @@
 #define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
 #else
 #include <sys/wait.h>
+#include <arpa/inet.h>
 #endif
 
 typedef struct _complex_rec {
