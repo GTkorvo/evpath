@@ -45,6 +45,14 @@ char *COD_generate = "{\n\
     return 1;\n\
 }";
 
+static void
+fail_and_die(int signal)
+{
+    (void)signal;
+    fprintf(stderr, "auto_tree_test failed to complete in reasonable time\n");
+    exit(1);
+}
+
 extern int
 be_test_master(int argc, char **argv)
 {
@@ -60,7 +68,11 @@ be_test_master(int argc, char **argv)
     EVdfg test_dfg;
     EVclient_sinks sink_capabilities;
 
+#ifdef HAVE_WINDOWS_H
+    SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
+#else
     alarm(240);  /* reset time limit to 4 minutes */
+#endif
     if (argc == 1) {
 	sscanf(argv[0], "%d", &level_count);
     }

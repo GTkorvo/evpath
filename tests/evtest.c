@@ -11,6 +11,8 @@
 #include "evpath.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x)

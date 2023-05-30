@@ -27,6 +27,14 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 }
 
 
+static void
+fail_and_die(int signal)
+{
+    (void)signal;
+    fprintf(stderr, "tree_test failed to complete in reasonable time\n");
+    exit(1);
+}
+
 extern int
 be_test_master(int argc, char **argv)
 {
@@ -45,7 +53,11 @@ be_test_master(int argc, char **argv)
     EVclient_sinks sink_capabilities;
     EVclient_sources source_capabilities;
 
-    alarm(240);  /* reset time limit to 4 minutes */
+#ifdef HAVE_WINDOWS_H
+    SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
+#else
+    alarm(300);
+#endif
     if (argc == 1) {
 	sscanf(argv[0], "%d", &level_count);
     }

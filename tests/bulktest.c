@@ -607,8 +607,7 @@ do_regression_master_test()
 	if (exit_state == 0) {
 	    if (quiet <= 0)
 		printf("Subproc exitted\n");
-	}
-	else {
+	} else {
 	    printf("Single remote subproc exit with status %d\n",
 		exit_state);
 	}
@@ -642,8 +641,8 @@ do_regression_master_test()
 	    }
 	    done++;
 	}
-    }
 #endif
+    }
     if (msg_count != msg_limit) {
 	int i = 10;
 	while ((i >= 0) && (msg_count != msg_limit)) {
