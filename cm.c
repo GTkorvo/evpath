@@ -1375,7 +1375,6 @@ INT_CMConnection_failed(CMConnection conn)
  static void
  INT_CMControlList_close(CMControlList cl, CManager cm)
  {
-     void *status;
      cl->cl_reference_count--;
      cl->closed = 1;
 
