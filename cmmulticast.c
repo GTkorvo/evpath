@@ -423,11 +423,12 @@ int iovcnt;
 attr_list attrs;
 {
     SOCKET fd = mcd->output_fd;
+#ifndef _MSC_VER
+    // no real equivalent on windows
     struct sockaddr_in addr = mcd->output_addr;
     struct msghdr msg;
     svc->trace_out(mcd->mtd->cm, "CMMcast writev of %d vectors on fd %d",
 		   iovcnt, fd);
-#ifndef _MSC_VER
     memset(&msg, 0, sizeof(msg));
     msg.msg_name = (void*)&addr;
     msg.msg_namelen = sizeof(addr);

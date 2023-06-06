@@ -651,7 +651,6 @@ size_t iovcnt;
 attr_list attrs;
 {
     SOCKET fd = ucd->utd->socket_fd;
-    struct sockaddr_in addr = ucd->dest_addr;
     if (ucd->utd->socket_fd == -1) {
 	if ((ucd->utd->socket_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
 	    perror("socket");
@@ -662,6 +661,7 @@ attr_list attrs;
     svc->trace_out(ucd->utd->cm, "CMUdp writev of %d vectors on fd %d",
 		   iovcnt, fd);
 #ifndef _MSC_VER
+    struct sockaddr_in addr = ucd->dest_addr;
     struct msghdr msg;
     memset(&msg, 0, sizeof(msg));
     msg.msg_name = (void*)&addr;
@@ -673,6 +673,7 @@ attr_list attrs;
 	exit(1);
     }
 #else
+    // no reimplementation for windows currently
 #endif
     return (int)iovcnt;
 }
