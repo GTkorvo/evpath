@@ -91,7 +91,7 @@ trans_test_upcall(CManager cm, void *buffer, size_t length, int type, attr_list 
 	}
 	if (list) {
 	    get_int_attr(list, CM_TRANS_TEST_REPEAT, &expected_count);
-	    get_long_attr(list, CM_TRANS_TEST_SIZE, &write_size);
+	    get_long_attr(list, CM_TRANS_TEST_SIZE, (ssize_t*) &write_size);
 	    get_int_attr(list, CM_TRANS_TEST_VERBOSE, &verbose);
 	    get_int_attr(list, CM_TRANS_TEST_TAKE_RECEIVE_BUFFER, &take);
 	}
@@ -267,9 +267,7 @@ usage()
 }
 
 int
-main(argc, argv)
-    int argc;
-    char **argv;
+main(int argc, char **argv)
 {
     CManager cm;
     CMConnection conn = NULL;
@@ -501,7 +499,7 @@ main(argc, argv)
 	    openings[2].offset.tv_sec = 0; openings[2].offset.tv_usec = 0;
 	    openings[2].duration.tv_sec = 0; openings[2].duration.tv_usec = 0;
 #ifdef HAVE_GETTIMEOFDAY
-	    gettimeofday((struct timeval*)now, NULL);
+	    gettimeofday((struct timeval*)&now, NULL);
 #else
 	    /* GSE...  No gettimeofday on windows.
 	     * Must use _ftime, get millisec time, convert to usec.  Bleh.
