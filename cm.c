@@ -3242,7 +3242,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
      void *header_ptr = NULL;
      int header_len = 0;
      int no_attr_header[2] = {0x434d4400, 0};  /* CMD\0 in first entry */
-     int no_attr_long_header[4] = {0x434d4401, 0x434d4401, 0, 0};  /* CMD\1 in first entry, pad to 16 */
+//  not yet impl     int no_attr_long_header[4] = {0x434d4401, 0x434d4401, 0, 0};  /* CMD\1 in first entry, pad to 16 */
      int attr_header[4] = {0x434d4100, 0x434d4100, 0, 0};  /* CMA\0 in first entry, pad to 16 */
      int attr_long_header[4] = {0x434d4101, 0, 0, 0};  /* CMA\1 in first entry */
      FFSEncodeVector vec;
@@ -3547,7 +3547,6 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
 			 "Writing %lu vectors, total %zu bytes (including attrs) in writev\n", 
 			 vec_count, byte_count);
 	 }
-	 char *header_ptr = (char*)&header[0];
 	 actual = INT_CMwrite_raw(conn, tmp_vec, vec, vec_count, byte_count, attrs,
 				     vec == &preencoded_vec[0]);
 	 if (tmp_vec != &static_vec[0]) {
