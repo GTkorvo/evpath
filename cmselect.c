@@ -6,8 +6,6 @@
 #include <winsock2.h>
 #include <windows.h>
 #include <sys/timeb.h>
-#define getpid()	_getpid()
-#define close(x) closesocket(x)
 #else
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -60,6 +58,10 @@
 #endif
 #ifdef HAVE_SCHED_H
 #include <sched.h>
+#endif
+#ifdef _MSC_VER
+#define getpid()	_getpid()
+#define close(x) closesocket(x)
 #endif
 #undef realloc
 #undef malloc

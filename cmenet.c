@@ -10,7 +10,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+#ifdef USE_PTHREADS
 #include <pthread.h>
+#endif
 #include <sys/types.h>
 
 #ifdef USE_ZPL_ENET
