@@ -107,7 +107,7 @@
 #define thr_thread_detach(thread) 
 #define thr_thread_yield() 
 #define thr_thread_join(t, s) (void)s
-#define thr_mutex_init(m, x) 
+#define thr_mutex_init(m)
 #define thr_mutex_lock(m)
 #define thr_mutex_unlock(m)
 #define thr_mutex_free(m)
@@ -280,7 +280,7 @@ static void
 IntENET_lock(enet_client_data_ptr ecd, char *file, int line)
 {
 //    if (file) printf("(PID %lx, TID %lx) Trying ENET Lock at %s, line %d\n", (long) getpid(), (long)gettid(), file, line);
-    thr_mutex_lock(&ecd->enet_lock);
+    thr_mutex_lock(ecd->enet_lock);
 //    if (file) printf("GOT ENET Lock at %s, line %d\n", file, line);
     ecd->enet_locked++;
 }
@@ -290,7 +290,7 @@ IntENET_unlock(enet_client_data_ptr ecd, char *file, int line)
 {
 //    if (file) printf("(PID %lx, TID %lx) ENET Unlock at %s, line %d\n", (long) getpid(), (long)gettid(), file, line);
     ecd->enet_locked--;
-    thr_mutex_unlock(&ecd->enet_lock);
+    thr_mutex_unlock(ecd->enet_lock);
 }
 
 static int
@@ -1547,7 +1547,7 @@ INTERFACE_NAME(initialize)(CManager cm, CMtrans_services svc,
     }
     enet_data = (enet_client_data_ptr) svc->malloc_func(sizeof(struct enet_client_data));
     memset(enet_data, 0, sizeof(struct enet_client_data));
-    thr_mutex_init(&enet_data->enet_lock, NULL);
+    thr_mutex_init(enet_data->enet_lock);
     enet_data->enet_locked = 0;
     enet_data->cm = cm;
     enet_data->hostname = NULL;
