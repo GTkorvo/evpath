@@ -47,18 +47,18 @@
 #ifdef HAVE_MEMORY_H
 #include <memory.h>
 #endif
-
-#include <atl.h>
-#include "evpath.h"
-#include "cm_transport.h"
-#include "cm_internal.h"
-#include "ev_select.h"
 #ifdef HAVE_PTHREAD_H
 #include <pthread.h>
 #endif
 #ifdef HAVE_SCHED_H
 #include <sched.h>
 #endif
+
+#include <atl.h>
+#include "evpath.h"
+#include "cm_transport.h"
+#include "cm_internal.h"
+#include "ev_select.h"
 #ifdef _MSC_VER
 #define getpid()	_getpid()
 #define close(x) closesocket(x)
