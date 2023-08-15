@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.5)
 
 # The directory label is used for CDash to treat EVPath as a subproject of
 # GTKorvo
