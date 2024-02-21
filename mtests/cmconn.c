@@ -27,6 +27,7 @@
 #endif
 #include "evpath.h"
 #ifdef HAVE_SYS_WAIT_H
+#define _POSIX_SOURCE
 #include <sys/wait.h>
 #endif
 #ifdef _MSC_VER
