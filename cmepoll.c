@@ -900,7 +900,7 @@ int err;
  *  NT Sux.
  */
 
-int
+static int
 pipe(filedes)
 int filedes[2];
 {
