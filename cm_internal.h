@@ -15,6 +15,8 @@
 #include <pthread.h>
 #define thr_mutex_t pthread_mutex_t
 #define thr_thread_t pthread_t
+#define thr_thread_id thr_thread_t
+#define thr_get_thread_id(t) (t)
 #define thr_condition_t pthread_cond_t
 #define thr_thread_self() pthread_self()
 #define thr_thread_exit(status) pthread_exit(status);
