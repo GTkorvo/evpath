@@ -591,7 +591,7 @@ if (PERL_FOUND)
     OUTPUT "cm_interface.c" "revp.c" "revpath.h" "revp_internal.h"
     SOURCE
       ${CMAKE_CURRENT_SOURCE_DIR}/evpath.h ${CMAKE_CURRENT_SOURCE_DIR}/ev_dfg.h
-    COMMAND ${PERL_COMMAND}
+    COMMAND ${PERL_EXECUTABLE}
       ${CMAKE_CURRENT_SOURCE_DIR}/gen_interface.pl
       ${CMAKE_CURRENT_SOURCE_DIR}/evpath.h
       ${CMAKE_CURRENT_SOURCE_DIR}/ev_dfg.h
