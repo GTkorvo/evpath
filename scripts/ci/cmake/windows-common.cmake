@@ -1,4 +1,4 @@
-# Client maintainer: chuck.atkins@kitware.com
+# Client maintainer: eisen@cc.gatech.edu
 
 message("DEBUG: PATH: $ENV{PATH}")
 

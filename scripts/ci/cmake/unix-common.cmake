@@ -1,4 +1,4 @@
-# Client maintainer: chuck.atkins@kitware.com
+# Client maintainer: eisen@cc.gatech.edu
 
 set(ENV{atl_ROOT}  "$ENV{CI_ROOT_DIR}/atl/install")
 set(ENV{LD_LIBRARY_PATH} "$ENV{atl_ROOT}/lib:$ENV{LD_LIBRARY_PATH}")
