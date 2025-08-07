@@ -69,50 +69,50 @@ jobs:
       GH_YML_JOBNAME: ${{ matrix.jobname }}
       GH_YML_BUILDTYPE: ${{ matrix.buildtype }}
       GH_YML_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
- 
+
     strategy:
       fail-fast: false
       matrix:
         buildtype: [ release, debug ]
         jobname: [
-          windows2025-vs2022-clang,
+          windows2022-vs2022-clang,
           windows2025-vs2022-msvc,
           macos-clang ]
         include:
-        - jobname: windows2025-vs2022-msvc
+        - jobname: windows2022-vs2022-clang
           vm: windows-latest
-        - jobname: windows2025-vs2022-clang
+        - jobname: windows2025-vs2022-msvc
           vm: windows-latest
         - jobname: macos-clang
           vm: macos-latest
 
- #   defaults:
- #     run:
- #       shell: bash
+    defaults:
+      run:
+        shell: bash
 
- #   steps:
- #   - uses: actions/checkout@v2
- #     with:
- #       ref: ${{ github.event.pull_request.head.sha }}
- #       path: source
- #   - name: Setup
- #     if: ${{ runner.os == 'Windows' }}
- #     run: |
- #         . source/scripts/ci/setup/windows.sh
- #         source/scripts/ci/setup/install-atl.sh ${{ matrix.buildtype }}
- #         source/scripts/ci/setup/install-ffs.sh ${{ matrix.buildtype }}
- #   - name: Setup
- #     if: ${{ runner.os == 'macOS' }}
- #     run: |
- #         . source/scripts/ci/setup/macos.sh
- #         source/scripts/ci/setup/install-atl.sh ${{ matrix.buildtype }}
- #         source/scripts/ci/setup/install-dill.sh ${{ matrix.buildtype }}
- #         source/scripts/ci/setup/install-ffs.sh ${{ matrix.buildtype }}
- #   - name: Update
- #     run: source/scripts/ci/gh-actions/run.sh update
- #   - name: Configure
- #     run: source/scripts/ci/gh-actions/run.sh configure
- #   - name: Build
- #     run: source/scripts/ci/gh-actions/run.sh build
- #   - name: Test
- #     run: source/scripts/ci/gh-actions/run.sh test
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        path: source
+    - name: Setup
+      if: ${{ runner.os == 'Windows' }}
+      run: |
+          . source/scripts/ci/setup/windows.sh
+          source/scripts/ci/setup/install-atl.sh ${{ matrix.buildtype }}
+          source/scripts/ci/setup/install-ffs.sh ${{ matrix.buildtype }}
+    - name: Setup
+      if: ${{ runner.os == 'macOS' }}
+      run: |
+          . source/scripts/ci/setup/macos.sh
+          source/scripts/ci/setup/install-atl.sh ${{ matrix.buildtype }}
+          source/scripts/ci/setup/install-dill.sh ${{ matrix.buildtype }}
+          source/scripts/ci/setup/install-ffs.sh ${{ matrix.buildtype }}
+    - name: Update
+      run: source/scripts/ci/gh-actions/run.sh update
+    - name: Configure
+      run: source/scripts/ci/gh-actions/run.sh configure
+    - name: Build
+      run: source/scripts/ci/gh-actions/run.sh build
+    - name: Test
+      run: source/scripts/ci/gh-actions/run.sh test
