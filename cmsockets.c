@@ -7,6 +7,7 @@
 #define FD_SETSIZE 1024
 #endif
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <process.h>
 #include <time.h>
@@ -1002,7 +1003,7 @@ libcmsockets_LTX_read_to_buffer_func(CMtrans_services svc, socket_conn_data_ptr 
 #ifndef HAVE_WRITEV
 static
 ssize_t
-writev(int fd, struct iovec *iov, int iovcnt)
+writev(SOCKET fd, struct iovec *iov, size_t iovcnt)
 {
     ssize_t wrote = 0;
     int i;
