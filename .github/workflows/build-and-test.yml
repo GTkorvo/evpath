@@ -76,6 +76,7 @@ jobs:
           windows2025-vs2022-clang,
           windows2022-vs2022-msvc,
           windows2022-vs2022-msvc-static,
+          windows2022-vs2022-msvc-win32,
           macos-clang ]
         include:
         - jobname: windows2025-vs2022-clang
@@ -83,6 +84,8 @@ jobs:
         - jobname: windows2022-vs2022-msvc
           vm: windows-2022
         - jobname: windows2022-vs2022-msvc-static
+          vm: windows-2022
+        - jobname: windows2022-vs2022-msvc-win32
           vm: windows-2022
         - jobname: macos-clang
           vm: macos-latest
