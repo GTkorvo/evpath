@@ -3181,6 +3181,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
 	     }
 	     start = 0;
 	 }
+	 (void)count;
      }
      ((int*)full_vec[0].iov_base)[0] = 
 	 (((int*)full_vec[0].iov_base)[0] & 0xffffff00) | (unsigned char) checksum;
@@ -3431,7 +3432,6 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
      int attr_len = 0;
      int do_write = 1;
      void *encoded_attrs = NULL;
-     int attrs_present = 0;
      CManager cm = conn->cm;
 
      /* ensure conn is open */
@@ -3512,7 +3512,6 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
 	 data_length = event->event_len;
      }
      if (attrs != NULL) {
-	 attrs_present++;
 	 encoded_attrs = encode_attr_for_xmit(attrs, conn->attr_encode_buffer,
 					      &attr_len);
 	 attr_len = (attr_len +7) & -8;  /* round up to even 8 */
