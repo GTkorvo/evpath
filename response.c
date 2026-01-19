@@ -23,7 +23,7 @@
 #define cod_exec_context_free(x) 0
 #define cod_code_free(x) 0
 #define cod_assoc_externs(x,y) 0
-#define cod_parse_for_context(x,y) 0
+#define cod_parse_for_context(x,y) (void)x
 #define cod_set_closure(x,y,z) 0
 #define cod_add_int_constant_to_parse_context(name, i, context) 0
 #endif
@@ -1290,7 +1290,6 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
     free(formatList);
     free(format_map);
     if (nearest_proto_action != -1) {
-	int action_generated = 0;
 	proto_action *proto = &stone->proto_actions[nearest_proto_action];
 	if (proto->action_type == Action_Immediate) {
 	    /* must be immediate action */
@@ -1320,7 +1319,6 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
 	    if (instance == NULL) return 0;
 	    instance->stone = stone->local_id;
 	    instance->proto_action_id = nearest_proto_action;
-	    action_generated++;
 	    switch(mrd->response_type) {
 	    case Response_Filter:
 		INT_EVassoc_mutated_imm_action(cm, stone->local_id, nearest_proto_action,
@@ -1355,7 +1353,6 @@ response_determination(CManager cm, stone_type stone, action_class stage, event_
             }
 	    instance->stone = stone->local_id;
 	    instance->proto_action_id = nearest_proto_action;
-	    action_generated++;
 	    INT_EVassoc_mutated_multi_action(cm, stone->local_id, nearest_proto_action,
 					     queued_wrapper, instance,
 					     proto->matching_reference_formats, free_multi_response);
