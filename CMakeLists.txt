@@ -59,6 +59,17 @@ endif()
 if(WIN32)
   # Automagic to do the DLL / LIB song and dance
   set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+
+  # MSVC warning suppressions (must be before any targets are defined)
+  if(MSVC OR CMAKE_C_SIMULATE_ID MATCHES "MSVC")
+    add_compile_definitions(
+      _CRT_SECURE_NO_DEPRECATE
+      _CRT_SECURE_NO_WARNINGS
+      _SCL_SECURE_NO_DEPRECATE
+      _WINSOCK_DEPRECATED_NO_WARNINGS
+      _CRT_NONSTDC_NO_DEPRECATE
+      FFS_SRC)
+  endif()
 endif()
 
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "dill, atl, ffs")
