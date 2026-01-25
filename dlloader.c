@@ -67,6 +67,7 @@ DLFCN_EXPORT     char* dlerror(void)
 
     if (var.lasterror) {
 	sprintf(errstr, "%s error #%ld", var.err_rutin, var.lasterror);
+	var.lasterror = 0;  /* Clear error after reporting */
 	return errstr;
     }
     else {
@@ -202,7 +203,7 @@ CMdlsym(void *vdlh, char *sym)
       free(tmp2);
     }
     free(tmp);
-    if (!sym_val) 
+    if (!sym_val)
 	sym_val = dlsym(dlh->dlopen_handle, sym);
     return sym_val;
 #endif

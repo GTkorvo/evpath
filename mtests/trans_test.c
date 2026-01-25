@@ -219,13 +219,39 @@ pid_t
 run_subprocess(char **args)
 {
 #ifdef HAVE_WINDOWS_H
-    intptr_t child;
-    child = _spawnv(_P_NOWAIT, args[0], args);
-    if (child == -1) {
-	printf("failed for cmtest\n");
-	perror("spawnv");
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+    char comm_line[8191];
+    char module[MAX_PATH];
+    int i;
+
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+    GetModuleFileName(NULL, &module[0], MAX_PATH);
+    i = 1;
+    strcpy(comm_line, module);
+    strcat(comm_line, " ");
+    while (args[i] != NULL) {
+        strcat(comm_line, args[i]);
+        strcat(comm_line, " ");
+        i++;
     }
-    return child;
+    if (!CreateProcess(module,
+                       comm_line,
+                       NULL,           // Process handle not inheritable
+                       NULL,           // Thread handle not inheritable
+                       FALSE,          // Set handle inheritance to FALSE
+                       0,              // No creation flags
+                       NULL,           // Use parent's environment block
+                       NULL,           // Use parent's starting directory
+                       &si,            // Pointer to STARTUPINFO structure
+                       &pi))
+    {
+        printf("CreateProcess failed (%d).\n", GetLastError());
+        return 0;
+    }
+    return (intptr_t) pi.hProcess;
 #else
     pid_t child = fork();
 /*    int i = 0;
@@ -289,12 +315,22 @@ main(int argc, char **argv)
 	MPI_Finalize();
 	exit(1);
     }
+#ifdef _MSC_VER
+    /* On Windows, check for absolute path (drive letter or UNC path) */
+    if (!((argv0[0] && argv0[1] == ':') || (argv0[0] == '\\' && argv0[1] == '\\'))) {
+	strcat(path, "\\");
+	strcat(path, argv0);
+    } else {
+	strcpy(path, argv0);
+    }
+#else
     if (argv0[0] != '/') {
 	strcat(path, "/");
 	strcat(path, argv0);
     } else {
 	strcpy(path, argv0);
     }
+#endif
     subproc_args[--start_subproc_arg_count] = strdup(path);
     while (argv[1] && (argv[1][0] == '-')) {
 	subproc_args[cur_subproc_arg++] = strdup(argv[1]);

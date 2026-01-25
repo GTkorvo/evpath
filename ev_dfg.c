@@ -248,13 +248,16 @@ handle_queued_messages(CManager cm, void* vmaster)
     EVmaster_msg_ptr next;
     EVmaster_msg_ptr *last_ptr;
 
-    if (master->queued_messages == NULL) return;
+    if (master->queued_messages == NULL) {
+        return;
+    }
     assert(CManager_locked(cm));
     next = master->queued_messages;
     last_ptr = &master->queued_messages;
     while(next != NULL) {
+	char action = action_model[master->state][next->msg_type];
 	CMtrace_out(cm, EVdfgVerbose, "EVDFG handle_queued_messages -  master DFG state is %s\n", str_state[master->state]);
-	switch (action_model[master->state][next->msg_type]) {
+	switch (action) {
 	case 'H':
 	    CMtrace_out(cm, EVdfgVerbose, "Master Message is type %s, calling handler\n", master_msg_str[next->msg_type]);
 	    *last_ptr = next->next;  /* remove msg from queue */
@@ -273,7 +276,7 @@ handle_queued_messages(CManager cm, void* vmaster)
 	    next = next->next;
 	    break;
 	default:
-	    printf("Unexpected action type '%c', discarding\n", action_model[master->state][next->msg_type]);
+	    printf("Unexpected action type '%c', discarding\n", action);
 	    /* falling through */
 	case 'I':
 	    *last_ptr = next->next;  /* remove msg from queue */
@@ -2467,8 +2470,9 @@ queue_master_msg(EVmaster master, void*vmsg, EVmaster_msg_type msg_type, CMConne
     }
 }
 
+static const char *msg_type_names[] = {"node_join", "deploy_ack", "shutdown_contrib", "conn_shutdown", "flush_reconfig"};
 static void
-dfg_master_msg_handler(CManager cm, CMConnection conn, void *vmsg, 
+dfg_master_msg_handler(CManager cm, CMConnection conn, void *vmsg,
 		       void *client_data, attr_list attrs)
 {
     EVmaster master = (EVmaster)((uintptr_t)client_data & (~0x7));

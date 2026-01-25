@@ -17,7 +17,7 @@
 #define lrand48() rand()
 #define srand48(x)
 #define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
-#define waitpid(x, tmp, z) {   WaitForSingleObject(OpenProcess(0,0,(DWORD)x), INFINITE);    GetExitCodeProcess(OpenProcess(0,0,(DWORD)x), tmp);}
+#define waitpid(x, tmp, z) { WaitForSingleObject((HANDLE)(x), INFINITE); GetExitCodeProcess((HANDLE)(x), (LPDWORD)(tmp)); CloseHandle((HANDLE)(x)); }
 #else
 #include <sys/wait.h>
 #endif
@@ -143,9 +143,16 @@ run_subprocess(char **args)
 {
 #ifdef HAVE_WINDOWS_H
     intptr_t child;
-    child = _spawnv(_P_NOWAIT, "./evtest.exe", args);
+    if (no_fork) {
+	int i = 0;
+	printf("Would have run :");
+	while(args[i] != NULL) printf(" %s", args[i++]);
+	printf("\n");
+	return 0;
+    }
+    child = _spawnv(_P_NOWAIT, args[0], args);
     if (child == -1) {
-	printf("failed for evtest\n");
+	printf("failed for %s\n", args[0]);
 	perror("spawnv");
     }
     return child;

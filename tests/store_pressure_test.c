@@ -460,7 +460,7 @@ subprocess_work(const char *contact_list) {
 
 static pid_t run_subprocess(char **args);
 static pid_t subproc_proc = 0;
-static void wait_for_subprocess(void);
+static void wait_for_subprocess(CManager cm);
 static void do_remote_test(void) {
     CManager cm;
     cm = CManager_create();
@@ -475,7 +475,7 @@ static void do_remote_test(void) {
     free_attr_list(contact_list);
     run_subprocess(subproc_args);
     CMsleep(cm, 20);
-    wait_for_subprocess();
+    wait_for_subprocess(cm);
     /* CManager_close(cm); */
 }
 
@@ -509,18 +509,33 @@ main(int argc, char **argv)
     return failures;
 }
 
-static void wait_for_subprocess(void) {
+static void wait_for_subprocess(CManager cm) {
     int exit_state;
 #ifdef HAVE_WINDOWS_H
-    if (_cwait(&exit_state, subproc_proc, 0) == -1) {
-        perror("cwait");
-    }
-    if (exit_state == 0) {
-        if (quiet <= 0) 
-            printf("Passed single remote subproc test\n");
-    } else {
-        printf("Single remote subproc exit with status %d\n",
-               exit_state);
+    {
+        int done = 0;
+        while (!done) {
+            DWORD wait_result;
+            CMsleep(cm, 1);
+            wait_result = WaitForSingleObject((HANDLE)subproc_proc, 0);
+            if (wait_result == WAIT_OBJECT_0) {
+                DWORD child_exit_code;
+                GetExitCodeProcess((HANDLE)subproc_proc, &child_exit_code);
+                exit_state = (int)child_exit_code;
+                if (exit_state == 0) {
+                    if (quiet <= 0)
+                        printf("Passed single remote subproc test\n");
+                } else {
+                    printf("Single remote subproc exit with status %d\n",
+                           exit_state);
+                }
+                CloseHandle((HANDLE)subproc_proc);
+                done++;
+            } else if (wait_result == WAIT_FAILED) {
+                perror("WaitForSingleObject");
+                done++;
+            }
+        }
     }
 #else
     if (waitpid(subproc_proc, &exit_state, 0) == -1) {
