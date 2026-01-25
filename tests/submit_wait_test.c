@@ -233,7 +233,7 @@ subprocess_work(const char *contact_list) {
 
 static pid_t run_subprocess(char **args);
 static pid_t subproc_proc = 0;
-static void wait_for_subprocess(CManager cm);
+static void local_wait_for_subprocess(CManager cm);
 static void do_remote_test(void) {
     CManager cm;
     attr_list contact_list;
@@ -248,7 +248,7 @@ static void do_remote_test(void) {
     free_attr_list(contact_list);
     run_subprocess(subproc_args);
     CMsleep(cm, 30);
-    wait_for_subprocess(cm);
+    local_wait_for_subprocess(cm);
     if (deferred == 0) {
         fail("Didn't actually need to defer sending anything");
     }
@@ -276,41 +276,15 @@ main(int argc, char **argv)
     return failures;
 }
 
-static void wait_for_subprocess(CManager cm) {
+static void local_wait_for_subprocess(CManager cm) {
     int exit_state;
-#ifdef HAVE_WINDOWS_H
-    {
-        int done = 0;
-        while (!done) {
-            DWORD wait_result;
-            CMsleep(cm, 1);
-            wait_result = WaitForSingleObject((HANDLE)subproc_proc, 0);
-            if (wait_result == WAIT_OBJECT_0) {
-                DWORD child_exit_code;
-                GetExitCodeProcess((HANDLE)subproc_proc, &child_exit_code);
-                exit_state = (int)child_exit_code;
-                if (exit_state == 0) {
-                    if (quiet <= 0)
-                        printf("Passed single remote subproc test\n");
-                } else {
-                    printf("Single remote subproc exit with status %d\n",
-                           exit_state);
-                }
-                CloseHandle((HANDLE)subproc_proc);
-                done++;
-            } else if (wait_result == WAIT_FAILED) {
-                perror("WaitForSingleObject");
-                done++;
-            }
-        }
-    }
-#else
-    if (waitpid(subproc_proc, &exit_state, 0) == -1) {
-        perror("waitpid");
+    (void)cm;
+    if (wait_for_subprocess(subproc_proc, &exit_state, 1) == -1) {
+        perror("wait_for_subprocess");
     }
     if (WIFEXITED(exit_state)) {
         if (WEXITSTATUS(exit_state) == 0) {
-            if (quiet <- 1) 
+            if (quiet <= -1)
                 printf("Passed single remote subproc test\n");
         } else {
             printf("Single remote subproc exit with status %d\n",
@@ -320,6 +294,4 @@ static void wait_for_subprocess(CManager cm) {
         printf("Single remote subproc died with signal %d\n",
                WTERMSIG(exit_state));
     }
-#endif
-
 }

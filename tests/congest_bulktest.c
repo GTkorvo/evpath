@@ -407,42 +407,16 @@ do_regression_master_test()
 	printf("Waiting for remote....\n");
     }
     while (!done) {
-#ifdef HAVE_WINDOWS_H
-	DWORD wait_result;
-	if (quiet <= 0) {
-	    printf(",");
-	    fflush(stdout);
-	}
-	CMsleep(cm, 50);
-	wait_result = WaitForSingleObject((HANDLE)subproc_proc, 0);
-	if (wait_result == WAIT_OBJECT_0) {
-	    DWORD child_exit_code;
-	    GetExitCodeProcess((HANDLE)subproc_proc, &child_exit_code);
-	    exit_state = (int)child_exit_code;
-	    if (exit_state == 0) {
-		if (quiet <= 0)
-		    printf("Subproc exitted\n");
-	    } else {
-		printf("Single remote subproc exit with status %d\n",
-		       exit_state);
-	    }
-	    CloseHandle((HANDLE)subproc_proc);
-	    done++;
-	} else if (wait_result == WAIT_FAILED) {
-	    perror("WaitForSingleObject");
-	    done++;
-	}
-#else
-	int result;
+	pid_t result;
 	if (quiet <= 0) {
 	    printf(",");
 	    fflush(stdout);
 	}
 	CMsleep(cm, 50);
 
-	result = waitpid(subproc_proc, &exit_state, WNOHANG);
+	result = wait_for_subprocess(subproc_proc, &exit_state, 0);
 	if (result == -1) {
-	    perror("waitpid");
+	    perror("wait_for_subprocess");
 	    done++;
 	}
 	if (result == subproc_proc) {
@@ -460,7 +434,6 @@ do_regression_master_test()
 	    }
 	    done++;
 	}
-#endif
     }
     if (msg_count != msg_limit) {
 	int i = 10;

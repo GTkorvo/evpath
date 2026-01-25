@@ -7,6 +7,25 @@ static int no_fork = 0;
 #include <process.h>
 #endif
 
+#ifdef HAVE_WINDOWS_H
+/* Define waitpid-style macros for Windows */
+#ifndef WIFEXITED
+#define WIFEXITED(s)    (((s) & 0x7f) == 0)
+#endif
+#ifndef WEXITSTATUS
+#define WEXITSTATUS(s)  (((s) >> 8) & 0xff)
+#endif
+#ifndef WIFSIGNALED
+#define WIFSIGNALED(s)  (((s) & 0x7f) != 0 && ((s) & 0x7f) != 0x7f)
+#endif
+#ifndef WTERMSIG
+#define WTERMSIG(s)     ((s) & 0x7f)
+#endif
+#ifndef WNOHANG
+#define WNOHANG 1
+#endif
+#endif
+
 static void
 usage()
 {
@@ -181,6 +200,37 @@ run_subprocess(char **args)
 	}
     }
     return child;
+#endif
+}
+
+/*
+ * Cross-platform wait for subprocess.
+ * Returns: pid on success, 0 if non-blocking and child not exited, -1 on error.
+ * exit_state is encoded like waitpid - use WIFEXITED/WEXITSTATUS/etc to analyze.
+ */
+static pid_t
+wait_for_subprocess(pid_t proc, int *exit_state, int block)
+{
+#ifdef HAVE_WINDOWS_H
+    DWORD timeout = block ? INFINITE : 0;
+    DWORD wait_result = WaitForSingleObject((HANDLE)proc, timeout);
+
+    if (wait_result == WAIT_OBJECT_0) {
+	DWORD child_exit_code;
+	GetExitCodeProcess((HANDLE)proc, &child_exit_code);
+	CloseHandle((HANDLE)proc);
+	/* Encode exit status like Linux: exit_code in bits 8-15, 0 in bits 0-7 */
+	*exit_state = (int)(child_exit_code << 8);
+	return proc;
+    } else if (wait_result == WAIT_TIMEOUT) {
+	/* Non-blocking and child still running */
+	return 0;
+    } else {
+	/* WAIT_FAILED or other error */
+	return -1;
+    }
+#else
+    return waitpid(proc, exit_state, block ? 0 : WNOHANG);
 #endif
 }
 
