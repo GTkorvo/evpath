@@ -399,7 +399,7 @@ do_regression_master_test()
         printf("Message count high too early\n");
     }
     EVsend_stored(cm, fstone, faction);
-    free(string_list);
+    atl_free(string_list);
     CManager_close(cm);
     if (message_count != repeat_count) printf("Message count == %d\n", message_count);
     return !(!failed && message_count == repeat_count);

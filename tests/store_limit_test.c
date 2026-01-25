@@ -392,7 +392,7 @@ do_regression_master_test()
 	       WTERMSIG(exit_state));
     }
 #endif
-    free(string_list);
+    atl_free(string_list);
     CManager_close(cm);
     if (message_count != repeat_count) printf("Message count == %d\n", message_count);
     return !(message_count == repeat_count);

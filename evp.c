@@ -1005,8 +1005,10 @@ INT_EVassoc_conversion_action(CManager cm, int stone_id, int stage,
 	char *incoming_tmp = global_name_of_FMFormat(incoming_format);
 	fprintf(cm->CMTrace_file, "Adding Conversion action %d to ", a);
 	fprint_stone_identifier(cm->CMTrace_file, cm->evp, stone_id);
-	fprintf(cm->CMTrace_file, "\n   Incoming format is %s, target %s\n", incoming_tmp, 
+	fprintf(cm->CMTrace_file, "\n   Incoming format is %s, target %s\n", incoming_tmp,
 	       target_tmp);
+	ffs_free(target_tmp);
+	ffs_free(incoming_tmp);
     }
     stone->response_cache = realloc(stone->response_cache,
 			     sizeof(stone->response_cache[0]) * (a + 1));
@@ -1118,9 +1120,11 @@ determine_action(CManager cm, stone_type stone, action_class stage, event_item *
     if (event->reference_format == NULL) {
 	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is NULL\n");
     } else {
+	char *tmp = global_name_of_FMFormat(event->reference_format);
 	CMtrace_out(cm, EVerbose, "Call to determine_action, event reference_format is %p (%s), stage is %d, encoded is %d\n",
-		    event->reference_format, global_name_of_FMFormat(event->reference_format),
+		    event->reference_format, tmp,
 		    stage, event->event_encoded);
+	ffs_free(tmp);
     }
     return_response = check_response_cache(cm, stone, stage, event);
 
@@ -1387,7 +1391,7 @@ cod_decode_event(CManager cm, int stone_num, int act_num, event_item *event) {
 	printf("Warning!  bad multiq action found for incoming an event on stone %x, stage %d\n",
 	       stone->local_id, stage);
 	printf("A decode response should be installed into the response cache for event type \"%s\" (%p)\n", tmp = global_name_of_FMFormat(event->reference_format), event->reference_format);
-        free(tmp);
+        ffs_free(tmp);
 	dump_stone(stone);
     }
     return decode_action(cm, event, &stone->response_cache[resp_id]);
@@ -1428,7 +1432,7 @@ fdump_action(FILE* out, stone_type stone, response_cache_element *resp, int a, c
 	    char *tmp;
 	    fprintf(out, "\"%s\" (%p), ", tmp = global_name_of_FMFormat(act->matching_reference_formats[i]), act->matching_reference_formats[i]);
 	    i++;
-	    free(tmp);
+	    ffs_free(tmp);
 	}
     } else {
 	fprintf(out, " NULL");
@@ -1512,10 +1516,12 @@ fdump_stone(FILE* out, stone_type stone)
     fprintf(out, "  response_cache_count %d:\n", stone->response_cache_count);
     for (i=0; i< stone->response_cache_count; i++) {
 	response_cache_element *resp = &stone->response_cache[i];
+	char *tmp = resp->reference_format ? global_name_of_FMFormat(resp->reference_format) : NULL;
 	fprintf(out, "Response cache item %d, reference format %p (%s)\n", i, resp->reference_format,
-		resp->reference_format ? global_name_of_FMFormat(resp->reference_format) : "<none>");
+		tmp ? tmp : "<none>");
 	fprintf(out, "stage %d, action_type %s, proto_action_id %d, requires_decoded %d\n", resp->stage,
 	       action_str[resp->action_type], resp->proto_action_id, resp->requires_decoded);
+	if (tmp) ffs_free(tmp);
     }
 }
 
@@ -1762,7 +1768,7 @@ process_events_stone(CManager cm, int s, action_class c)
                 } else {
                     printf("    Unhandled incoming event format was NULL\n");
                 }
-                if (tmp) free(tmp);
+                if (tmp) ffs_free(tmp);
                 event = dequeue_item(cm, stone, item);
                 return_event(evp, event);
             }
@@ -1784,13 +1790,15 @@ process_events_stone(CManager cm, int s, action_class c)
 		resp = &stone->response_cache[resp_id];
 	    }
 	    if (CMtrace_on(cm, EVerbose)) {
+		char *tmp = resp->reference_format ? global_name_of_FMFormat(resp->reference_format) : NULL;
 		fprintf(cm->CMTrace_file, "next action event %p on ", event);
 		fprint_stone_identifier(cm->CMTrace_file, evp, s);
 		fprintf(cm->CMTrace_file, " action type is %s, reference_format is %p (%s), stage is %d, requires_decoded is %d\n",
-			action_str[resp->action_type], resp->reference_format, 
-			resp->reference_format ? global_name_of_FMFormat(resp->reference_format) : "<none>",
+			action_str[resp->action_type], resp->reference_format,
+			tmp ? tmp : "<none>",
 			resp->stage, resp->requires_decoded);
 		fdump_action(cm->CMTrace_file, stone, resp, resp->proto_action_id, "    ");
+		if (tmp) ffs_free(tmp);
 	    }
             act = &stone->response_cache[resp_id];
 	}
@@ -2365,14 +2373,13 @@ INT_EVassoc_anon_multi_action(CManager cm, EVstone stone_id, EVaction act_num,
     resp->stage = cached_stage_for_action(&stone->proto_actions[act_num]);
     resp->reference_format = anon_target;
     if (CMtrace_on(cm, EVerbose)) {
-	char *tmp;
 	if (resp->reference_format) {
-	    tmp = global_name_of_FMFormat(resp->reference_format);
+	    char *tmp = global_name_of_FMFormat(resp->reference_format);
+	    fprintf(cm->CMTrace_file, "\tResponse %d for format \"%s\"(%p)", stone->response_cache_count, tmp, resp->reference_format);
+	    ffs_free(tmp);
 	} else {
-	    tmp = strdup("<none>");
+	    fprintf(cm->CMTrace_file, "\tResponse %d for format \"<none>\"(%p)", stone->response_cache_count, resp->reference_format);
 	}
-	fprintf(cm->CMTrace_file, "\tResponse %d for format \"%s\"(%p)", stone->response_cache_count, tmp, resp->reference_format);
-	free(tmp);
     }
     stone->response_cache_count += 1;
     fix_response_cache(stone);
@@ -2416,14 +2423,13 @@ INT_EVassoc_mutated_multi_action(CManager cm, EVstone stone_id, EVaction act_num
         resp->stage = cached_stage_for_action(&stone->proto_actions[act_num]);
 	resp->reference_format = reference_formats[i];
 	if (CMtrace_on(cm, EVerbose)) {
-	    char *tmp;
 	    if (resp->reference_format) {
-		tmp = global_name_of_FMFormat(resp->reference_format);
+		char *tmp = global_name_of_FMFormat(resp->reference_format);
+		fprintf(cm->CMTrace_file, "\tResponse %d for format \"%s\"(%p)\n", stone->response_cache_count+i, tmp, resp->reference_format);
+		ffs_free(tmp);
 	    } else {
-		tmp = strdup("<none>");
+		fprintf(cm->CMTrace_file, "\tResponse %d for format \"<none>\"(%p)\n", stone->response_cache_count+i, resp->reference_format);
 	    }
-	    fprintf(cm->CMTrace_file, "\tResponse %d for format \"%s\"(%p)\n", stone->response_cache_count+i, tmp, resp->reference_format);
-	    free(tmp);
 	}
     }
     stone->response_cache_count += queue_count;
@@ -3314,7 +3320,11 @@ internal_cm_network_submit(CManager cm, CMbuffer cm_data_buf,
 		dump_char_limit = atoi(size_str);
 	    }
 	}
-	fprintf(cm->CMTrace_file, "CM - record type %s, contents are:\n  ", global_name_of_FMFormat(event->reference_format));
+	{
+	    char *tmp = global_name_of_FMFormat(event->reference_format);
+	    fprintf(cm->CMTrace_file, "CM - record type %s, contents are:\n  ", tmp);
+	    ffs_free(tmp);
+	}
 	r = FMfdump_encoded_data(cm->CMTrace_file, event->reference_format,
 				event->encoded_event, dump_char_limit);
 	if (r && !warned) {

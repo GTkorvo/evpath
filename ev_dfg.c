@@ -1402,7 +1402,7 @@ free_master(CManager cm, void *vmaster)
 	    free(master->nodes[i].str_contact_list);
     }
     free(master->nodes);
-    if (master->my_contact_str) free(master->my_contact_str);
+    if (master->my_contact_str) atl_free(master->my_contact_str);
     free(master);
 }
 
@@ -1458,7 +1458,7 @@ free_attrs_msg(EVflush_attrs_reconfig_ptr msg)
 {
     int i = 0;
     for (i = 0; i < msg->count; i++) {
-	free(msg->attr_stone_list[i].attr_str);
+	atl_free(msg->attr_stone_list[i].attr_str);
     }
     free(msg->attr_stone_list);
     free(msg);
@@ -2047,7 +2047,7 @@ dfg_assoc_client(CManager cm, char* node_name, char *master_contact, EVmaster ma
 	    free(msg.sinks[i].name);
 	}
 	free(msg.sinks);
-	free(msg.contact_string);
+	atl_free(msg.contact_string);
 	free(msg.node_name);
     }
     CMtrace_out(cm, EVdfgVerbose, "DFG %p node name %s\n", client, node_name);

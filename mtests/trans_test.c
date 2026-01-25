@@ -24,7 +24,7 @@
 #include <direct.h>
 #include <sys/timeb.h>
 #include <time.h>
-#define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
+#define kill(x,y) TerminateProcess((HANDLE)(x), y)
 #define getcwd(x,y) _getcwd(x,y)
 #endif
 

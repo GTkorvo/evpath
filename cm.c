@@ -1554,10 +1554,10 @@ timeout_conn(CManager cm, void *client_data)
 						    (void*)(intptr_t)wait_condition);
 	 if (CMtrace_on(cm, CMConnectionVerbose)) {
 	     char *attr_str = attr_list_to_string(attrs);
-	     CMtrace_out(cm, CMConnectionVerbose, 
+	     CMtrace_out(cm, CMConnectionVerbose,
 			 "CM - Try to establish connection %p - %s, wait condition %ld\n", (void*)conn,
 			 attr_str, wait_condition);
-	     INT_CMfree(attr_str);
+	     atl_free(attr_str);
 	 }
 	 void *client_data = trans->initiate_conn_nonblocking(cm, &CMstatic_trans_svcs,
 						 trans, attrs, wait_condition);
@@ -1576,10 +1576,10 @@ timeout_conn(CManager cm, void *client_data)
      if (conn != NULL) {
 	 if (CMtrace_on(conn->cm, CMConnectionVerbose)) {
 	     char *attr_str = attr_list_to_string(attrs);
-	     CMtrace_out(conn->cm, CMConnectionVerbose, 
+	     CMtrace_out(conn->cm, CMConnectionVerbose,
 			 "CM - Establish connection %p - %s\n", (void*)conn,
 			 attr_str);
-	     INT_CMfree(attr_str);
+	     atl_free(attr_str);
 	 }
 	 if (conn->use_read_thread) {
 	     INT_CMstart_read_thread(conn);

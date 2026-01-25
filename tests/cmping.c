@@ -390,7 +390,7 @@ do_regression_master_test()
 	       WTERMSIG(exit_state));
     }
 #endif
-    free(string_list);
+    atl_free(string_list);
     CManager_close(cm);
     return !(message_count == 1);
 }

@@ -31,7 +31,7 @@
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x)
-#define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
+#define kill(x,y) TerminateProcess((HANDLE)(x), y)
 #else
 #include <sys/wait.h>
 #endif
@@ -128,7 +128,7 @@ do_master_stuff(CManager cm)
 	}
 	string_list = attr_list_to_string(contact_list);
 	printf("Contact list \"%s\"\n", string_list);
-	free(string_list);
+	atl_free(string_list);
 	msg_format = CMregister_simple_format(cm, "conn_msg", msg_field_list, sizeof(msgrec));
 	CMregister_handler(msg_format, msg_handler, NULL);
 	CMsleep(cm, 120);
@@ -184,7 +184,7 @@ main(int argc, char **argv)
 	if (!quiet)
 	    printf("Contact list sent to client is \"%s\"\n", msg.contact_list);
 	CMwrite(conn_to_master, msg_format, &msg);
-	free(msg.contact_list);
+	atl_free(msg.contact_list);
 	CMsleep(cm, 20);
     }
     if (conn_to_master) {
@@ -218,7 +218,7 @@ do_regression_master_test()
     char *string_list;
     int i;
 #ifdef HAVE_WINDOWS_H
-    SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
+    SetTimer(NULL, 5, 300*1000, (TIMERPROC) fail_and_die);
 #else
     struct sigaction sigact;
     sigact.sa_flags = 0;
@@ -300,7 +300,7 @@ do_regression_master_test()
 	       WTERMSIG(exit_state));
     }
 #endif
-    free(string_list);
+    atl_free(string_list);
     CManager_close(cm);
     if (master_success != 1) printf("Master_success == %d\n", master_success);
     return !(master_success == 1);

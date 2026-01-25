@@ -16,7 +16,7 @@
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x)
-#define kill(x,y) TerminateProcess(OpenProcess(0, 0, (DWORD)x),y)
+#define kill(x,y) TerminateProcess((HANDLE)(x), y)
 #else
 #include <sys/socket.h>
 #include <sys/wait.h>
@@ -285,7 +285,7 @@ do_regression_master_test()
     CMFormat format;
     int message_count = 0, i;
 #ifdef HAVE_WINDOWS_H
-    SetTimer(NULL, 5, 1000, (TIMERPROC) fail_and_die);
+    SetTimer(NULL, 5, 300*1000, (TIMERPROC) fail_and_die);
 #else
     struct sigaction sigact;
     sigact.sa_flags = 0;
@@ -389,7 +389,7 @@ do_regression_master_test()
 	       WTERMSIG(exit_state));
     }
 #endif
-    free(string_list);
+    atl_free(string_list);
     CManager_close(cm);
     if (message_count != 1) printf("Message count == %d\n", message_count);
     return !(message_count == 1);

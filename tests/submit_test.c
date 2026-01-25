@@ -17,7 +17,7 @@
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x)
-#define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
+#define kill(x,y) TerminateProcess((HANDLE)(x), y)
 #else
 #include <sys/wait.h>
 #include <arpa/inet.h>
@@ -439,7 +439,7 @@ do_regression_master_test()
 	       WTERMSIG(exit_state));
     }
 #endif
-    free(string_list);
+    atl_free(string_list);
     CManager_close(cm);
     if (message_count != repeat_count) printf("Message count == %d\n", message_count);
     return !(message_count == repeat_count);

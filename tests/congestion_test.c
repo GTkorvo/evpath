@@ -480,7 +480,7 @@ do_regression_master_test()
 	}
     }
     free(args[6]);
-    free(string_list);
+    atl_free(string_list);
     CManager_close(cm);
     if (message_count != expected_count) {
 	printf ("failure, received %d messages instead of %d\n",

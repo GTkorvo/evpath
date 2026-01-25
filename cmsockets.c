@@ -937,6 +937,10 @@ libcmsockets_LTX_read_to_buffer_func(CMtrans_services svc, socket_conn_data_ptr 
 	svc->trace_out(scd->sd->cm, "CMSocket switch to non-blocking fd %d",
 		       scd->fd);
 	set_block_state(svc, scd, Non_Block);
+    } else if (!non_blocking && (scd->block_state == Non_Block)) {
+	svc->trace_out(scd->sd->cm, "CMSocket switch to blocking fd %d",
+		       scd->fd);
+	set_block_state(svc, scd, Block);
     }
     ssize_t read_len = requested_len;
     if (read_len > MAX_RW_COUNT) read_len = MAX_RW_COUNT;
@@ -948,7 +952,7 @@ libcmsockets_LTX_read_to_buffer_func(CMtrans_services svc, socket_conn_data_ptr 
 	    (lerrno != EAGAIN) &&
 	    (lerrno != EINTR)) {
 	    /* serious error */
-	    svc->trace_out(scd->sd->cm, "CMSocket iget was -1, errno is %d, returning 0 for read",
+	    svc->trace_out(scd->sd->cm, "CMSocket iget was -1, errno is %d, returning -1 for read",
 			   lerrno);
 	    return -1;
 	} else {

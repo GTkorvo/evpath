@@ -17,7 +17,7 @@
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x)
-#define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
+#define kill(x,y) TerminateProcess((HANDLE)(x), y)
 #else
 #include <sys/wait.h>
 #endif
