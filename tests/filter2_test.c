@@ -26,7 +26,7 @@
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x)
-#define kill(x,y) TerminateProcess((HANDLE)(x), y)
+#define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
 #else
 #include <sys/wait.h>
 #include <arpa/inet.h>
@@ -533,39 +533,12 @@ do_regression_master_test()
     if (quiet <= 0) {
 	printf("Waiting for remote....\n");
     }
-#ifdef HAVE_WINDOWS_H
-    {
-	int done = 0;
-	while (!done) {
-	    DWORD wait_result;
-	    CMsleep(cm, 1);
-	    wait_result = WaitForSingleObject((HANDLE)subproc_proc, 0);
-	    if (wait_result == WAIT_OBJECT_0) {
-		DWORD child_exit_code;
-		GetExitCodeProcess((HANDLE)subproc_proc, &child_exit_code);
-		exit_state = (int)child_exit_code;
-		if (exit_state == 0) {
-		    if (quiet <= 0)
-			printf("Passed single remote subproc test\n");
-		} else {
-		    printf("Single remote subproc exit with status %d\n",
-			   exit_state);
-		}
-		CloseHandle((HANDLE)subproc_proc);
-		done++;
-	    } else if (wait_result == WAIT_FAILED) {
-		perror("WaitForSingleObject");
-		done++;
-	    }
-	}
-    }
-#else
-    if (waitpid(subproc_proc, &exit_state, 0) == -1) {
-	perror("waitpid");
+    if (wait_for_subprocess(subproc_proc, &exit_state, 1) == -1) {
+	perror("wait_for_subprocess");
     }
     if (WIFEXITED(exit_state)) {
 	if (WEXITSTATUS(exit_state) == 0) {
-	    if (quiet <- 1) 
+	    if (quiet <= -1)
 		printf("Passed single remote subproc test\n");
 	} else {
 	    printf("Single remote subproc exit with status %d\n",
@@ -575,7 +548,6 @@ do_regression_master_test()
 	printf("Single remote subproc died with signal %d\n",
 	       WTERMSIG(exit_state));
     }
-#endif
     atl_free(string_list);
     free(args[count]);
     free(filter);
