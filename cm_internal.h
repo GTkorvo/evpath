@@ -44,7 +44,10 @@ extern void win_mutex_free(SRWLOCK* m);
 extern void win_condition_init(CONDITION_VARIABLE *c);
 extern void win_condition_wait(CONDITION_VARIABLE *c, SRWLOCK *m);
 extern void win_condition_signal(CONDITION_VARIABLE *c);
+extern void win_condition_broadcast(CONDITION_VARIABLE *c);
 extern void win_condition_free(CONDITION_VARIABLE *c);
+extern void win_thread_join(HANDLE thread, void **status);
+extern void win_thread_detach(HANDLE thread);
 #define thr_mutex_t SRWLOCK
 #define thr_thread_t HANDLE
 #define thr_thread_id DWORD
@@ -53,9 +56,9 @@ extern void win_condition_free(CONDITION_VARIABLE *c);
 #define thr_thread_self() GetCurrentThreadId()
 #define thr_thread_exit(status) ExitThread((DWORD)(intptr_t)status)
 #define thr_get_thread_id(t) GetThreadId(t)
-#define thr_thread_detach(thread) 
-#define thr_thread_yield() 
-#define thr_thread_join(t, s) (void)s
+#define thr_thread_detach(thread) win_thread_detach(thread)
+#define thr_thread_yield() SwitchToThread()
+#define thr_thread_join(t, s) win_thread_join(t, s)
 #define thr_mutex_init(m) win_mutex_init(&m)
 #define thr_mutex_lock(m) win_mutex_lock(&m)
 #define thr_mutex_unlock(m) win_mutex_unlock(&m)
@@ -63,7 +66,7 @@ extern void win_condition_free(CONDITION_VARIABLE *c);
 #define thr_condition_init(c) win_condition_init(&c)
 #define thr_condition_wait(c, m) win_condition_wait(&c, &m)
 #define thr_condition_signal(c) win_condition_signal(&c)
-#define thr_condition_broadcast(c) error
+#define thr_condition_broadcast(c) win_condition_broadcast(&c)
 #define thr_condition_free(c) win_condition_free(&c)
 #endif
 
@@ -255,6 +258,7 @@ typedef struct _CMControlList {
     int has_thread;
     int cond_polling;
     thr_thread_id server_thread;
+    thr_thread_t server_thread_handle;  /* Windows needs handle for join */
 } CMControlList_s;
 
 struct queued_data_rec {
