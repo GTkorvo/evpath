@@ -115,13 +115,21 @@ elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
 add_library(EVPath
-  cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c 
+  cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c
   cm_lock.c cm_perf.c cm_pbio.c cm_interface.c version.c
-  cm_threadio.c cm_evol.c evp.c response.c metrics.c 
+  cm_threadio.c cm_evol.c evp.c response.c metrics.c
   dlloader.c ip_config.c chr_time.c revpath.h revp_internal.h
   revp.c evp_compat.c thin_server.c evp_threads.c ev_dfg.c)
 add_library(EVPath::EVPath ALIAS EVPath)
 add_library(evpath ALIAS EVPath)
+
+# GCC 12-14 emit spurious -Warray-bounds warning in ev_dfg.c; update upper bound if needed
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "12" AND
+     CMAKE_C_COMPILER_VERSION VERSION_LESS "15")
+    set_source_files_properties(ev_dfg.c PROPERTIES COMPILE_FLAGS "-Wno-array-bounds")
+  endif()
+endif()
 
 # MSVC warning suppressions
 if(MSVC OR CMAKE_C_SIMULATE_ID MATCHES "MSVC")
