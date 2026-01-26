@@ -443,33 +443,21 @@ do_regression_master_test()
 	printf("Waiting for remote....\n");
     }
     while (!done) {
-#ifdef HAVE_WINDOWS_H
-	if (_cwait(&exit_state, subproc_proc, 0) == -1) {
-	    perror("cwait");
-	}
-	if (exit_state == 0) {
-	    if (quiet <= 0) 
-		printf("Subproc exitted\n");
-	} else {
-	    printf("Single remote subproc exit with status %d\n",
-		   exit_state);
-	}
-#else
-	int result;
+	pid_t result;
 	if (quiet <= 0) {
 	    printf(".");
 	    fflush(stdout);
 	}
 	CMsleep(cm, 1);
-	result = waitpid(subproc_proc, &exit_state, WNOHANG);
+	result = wait_for_subprocess(subproc_proc, &exit_state, 0);
 	if (result == -1) {
-	    perror("waitpid");
+	    perror("wait_for_subprocess");
 	    done++;
 	}
 	if (result == subproc_proc) {
 	    if (WIFEXITED(exit_state)) {
 		if (WEXITSTATUS(exit_state) == 0) {
-		    if (quiet <= -1) 
+		    if (quiet <= -1)
 			printf("Subproc exited\n");
 		} else {
 		    printf("Single remote subproc exit with status %d\n",
@@ -481,12 +469,12 @@ do_regression_master_test()
 	    }
 	    done++;
 	}
-#endif
     }
-    if (msg_count != MSG_COUNT) {
+    if (message_count != expected_count) {
 	int i = 10;
-	while ((i >= 0) && (msg_count != MSG_COUNT)) {
+	while ((i >= 0) && (message_count != expected_count)) {
 	    CMsleep(cm, 1);
+	    i--;
 	}
     }
     atl_free(string_list);

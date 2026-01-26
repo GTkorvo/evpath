@@ -337,24 +337,12 @@ do_regression_master_test()
     if (quiet <= 0) {
 	printf("Waiting for remote....\n");
     }
-#ifdef HAVE_WINDOWS_H
-    if (_cwait(&exit_state, subproc_proc, 0) == -1) {
-	perror("cwait");
-    }
-    if (exit_state == 0) {
-	if (quiet <= 0) 
-	    printf("Passed single remote subproc test\n");
-    } else {
-	printf("Single remote subproc exit with status %d\n",
-	       exit_state);
-    }
-#else
-    if (waitpid(subproc_proc, &exit_state, 0) == -1) {
-	perror("waitpid");
+    if (wait_for_subprocess(subproc_proc, &exit_state, 1) == -1) {
+	perror("wait_for_subprocess");
     }
     if (WIFEXITED(exit_state)) {
 	if (WEXITSTATUS(exit_state) == 0) {
-	    if (quiet <- 1) 
+	    if (quiet <= -1)
 		printf("Passed single remote subproc test\n");
 	} else {
 	    printf("Single remote subproc exit with status %d\n",
@@ -364,7 +352,6 @@ do_regression_master_test()
 	printf("Single remote subproc died with signal %d\n",
 	       WTERMSIG(exit_state));
     }
-#endif
     atl_free(string_list);
     CManager_close(cm);
     if (message_count != 1) printf("Message count == %d\n", message_count);

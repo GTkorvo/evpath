@@ -264,6 +264,7 @@ INT_CMfork_comm_thread(CManager cm)
 		return 0;
 	    }
 	    cm->control_list->server_thread = thr_get_thread_id(server_thread);
+	    cm->control_list->server_thread_handle = server_thread;
 	    cm->control_list->has_thread = 1;
 	    cm->reference_count++;
 	    CMtrace_out(cm, CMFreeVerbose, "Forked - CManager %p ref count now %d\n", 
@@ -709,8 +710,10 @@ CMcontrol_list_wait(CMControlList cl)
     }
     cl->server_thread = thr_thread_self();
     if (cl->network_blocking_function.func != NULL) {
-	cl->network_blocking_function.func((void*)&CMstatic_trans_svcs,
-					   cl->network_blocking_function.client_data);
+	if (!cl->closed) {
+	    cl->network_blocking_function.func((void*)&CMstatic_trans_svcs,
+					       cl->network_blocking_function.client_data);
+	}
     }
     CMcontrol_list_poll(cl);
     return 1;
@@ -1064,6 +1067,7 @@ CManager_free(CManager cm)
      new_list->add_select = NULL;
      new_list->remove_select = NULL;
      new_list->server_thread =  (thr_thread_id)0;
+     new_list->server_thread_handle = (thr_thread_t)0;
      new_list->network_blocking_function.func = NULL;
      new_list->network_polling_function.func = NULL;
      new_list->polling_function_list = NULL;
@@ -1404,7 +1408,8 @@ INT_CMConnection_failed(CMConnection conn)
 	 (cl->wake_select)((void*)&CMstatic_trans_svcs,
 			   &cl->select_data);
 	 CManager_unlock(cm);
-	 thr_thread_join(cl->server_thread, &status);
+	 thr_thread_join(cl->server_thread_handle, &status);
+	 cl->server_thread_handle = (thr_thread_t)0;
 	 CManager_lock(cm);
 	 cl->has_thread = 0;
      }
@@ -2295,7 +2300,7 @@ timeout_conn(CManager cm, void *client_data)
      int64_t data_length, decoded_length;
      int attr_length = 0, i;
      int header_len;
-     int stone_id;
+     int stone_id = 0;
      char *decode_buffer = NULL, *data_buffer;
      FFSTypeHandle local_format, original_format;
      CManager cm = conn->cm;
@@ -2377,9 +2382,12 @@ timeout_conn(CManager cm, void *client_data)
 	   CManager_lock(cm);
 	   if (local) cm_return_data_buf(cm, local);
 	   if (ret == -1) {
-	       printf("Unknown message on connection %p, failed %d, closed %d, %x\n", conn, conn->failed, conn->closed, *(int*)buffer);
-	       CMtrace_out(conn->cm, CMFreeVerbose, "Calling connection unknown message failed with dereference %p\n", conn);
-	       INT_CMConnection_failed(conn);
+	       /* Only fail connection if not already closed - stale data on closed connections is expected */
+	       if (!conn->closed) {
+		   printf("Unknown message on connection %p, failed %d, closed %d, %x\n", conn, conn->failed, conn->closed, *(int*)buffer);
+		   CMtrace_out(conn->cm, CMFreeVerbose, "Calling connection unknown message failed with dereference %p\n", conn);
+		   INT_CMConnection_failed(conn);
+	       }
 	   }
 	   return 0;
        }
@@ -3867,6 +3875,7 @@ CM_init_select(CMControlList cl, CManager cm)
 	CMtrace_out(cm, CMLowLevelVerbose,
 		    "CM - Forked comm thread %p\n", (void*)(intptr_t)server_thread);
 	cm->control_list->server_thread = thr_get_thread_id(server_thread);
+	cm->control_list->server_thread_handle = server_thread;
 	cm->control_list->cl_reference_count++;
 	cm->control_list->free_reference_count++;
 	cl->has_thread = 1;

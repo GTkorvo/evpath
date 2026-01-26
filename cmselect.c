@@ -443,7 +443,7 @@ socket_select(CMtrans_services svc, select_data_ptr sd, int timeout_sec, int tim
 	    }
 	    if (FD_ISSET(i, &wr_set)) {
 		if (sd->write_items[i].func != NULL) {
-		    svc->verbose(sd->cm, CMSelectVerbose, 
+		    svc->verbose(sd->cm, CMSelectVerbose,
 				   "Running select write action on fd %d",
 				   i);
 		    sd->write_items[i].func(sd->write_items[i].arg1,
@@ -451,12 +451,12 @@ socket_select(CMtrans_services svc, select_data_ptr sd, int timeout_sec, int tim
 		} else {
 		    assert(!FD_ISSET(i, (fd_set *)sd->write_set));
 		}
-		if (sd->select_consistency_number != 
+		if (sd->select_consistency_number !=
 		    tmp_select_consistency_number) return;
 	    }
 	    if (FD_ISSET(i, &rd_set)) {
 		if (sd->select_items[i].func != NULL) {
-		    svc->verbose(sd->cm, CMSelectVerbose, 
+		    svc->verbose(sd->cm, CMSelectVerbose,
 				   "Running select read action on fd %d",
 				   i);
 		    sd->select_items[i].func(sd->select_items[i].arg1,

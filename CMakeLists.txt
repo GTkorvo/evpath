@@ -354,7 +354,8 @@ if(ENET_FOUND)
     add_library(cmenet MODULE cmenet.c ip_config.c)
     set_target_properties(cmenet PROPERTIES
       OUTPUT_NAME ${EVPATH_LIBRARY_PREFIX}cmenet
-      LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/${EVPATH_INSTALL_MODULE_DIR})
+      LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/${EVPATH_INSTALL_MODULE_DIR}
+      WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 
     target_link_libraries(cmenet PRIVATE evpath_headers atl::atl enet::enet)
     list(APPEND EVPATH_TRANSPORT_TARGETS cmenet)
