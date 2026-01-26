@@ -178,7 +178,8 @@ handshake_with_parent(CManager cm, attr_list parent_contact_list)
 
 static int regression = 1;
 static char* transport = NULL;
-#include "../mtests/support.c"
+static char* control = NULL;
+#include "support.c"
 
 int
 main(int argc, char **argv)

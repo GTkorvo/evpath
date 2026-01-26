@@ -103,6 +103,7 @@ static int regression = 1;
 static atom_t CM_TRANSPORT;
 
 char *transport = NULL;
+static char *control = NULL;
 #include "support.c"
 
 void

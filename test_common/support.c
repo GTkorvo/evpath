@@ -42,14 +42,18 @@ usage()
     exit(1);
 }
 
+#ifndef PARSE_EXTRA_ARGS
+#define PARSE_EXTRA_ARGS
+#endif
+
 #define PARSE_ARGS() \
     argv0 = argv[0];\
     while (argv[1] && (argv[1][0] == '-')) {\
-	if (strcmp(&argv[1][1], "control") == 0) {	\
+	if (strcmp(&argv[1][1], "control") == 0) {\
 	    control = argv[2];\
 	    argv++;\
 	    argc--;\
-	} else if (argv[1][1] == 'c') {		\
+	} else if (argv[1][1] == 'c') {\
 	    regression_master = 0;\
 	} else if (strcmp(&argv[1][1], "ssh") == 0) {\
 	    char *destination_host;\
@@ -92,6 +96,7 @@ usage()
 		ssh_args[4] = NULL;\
 	    }\
 	    argv++; argc--;\
+	PARSE_EXTRA_ARGS\
 	} else if (argv[1][1] == 's') {\
 	    regression_master = 0;\
 	} else if (argv[1][1] == 'q') {\
@@ -122,6 +127,7 @@ static int inet_aton(const char* cp, struct in_addr* addr)
 pid_t
 run_subprocess(char **args)
 {
+    char **run_args = args;
 #ifdef HAVE_WINDOWS_H
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
@@ -139,7 +145,7 @@ run_subprocess(char **args)
       strcat(comm_line, args[i]);
       strcat(comm_line, " ");
       i++;
-      
+
     }
     if (!CreateProcess(module,
 		       comm_line,
@@ -148,10 +154,10 @@ run_subprocess(char **args)
         FALSE,          // Set handle inheritance to FALSE
         0,              // No creation flags
         NULL,           // Use parent's environment block
-        NULL,           // Use parent's starting directory 
+        NULL,           // Use parent's starting directory
         &si,            // Pointer to STARTUPINFO structure
-		       &pi ) 
-    ) 
+		       &pi )
+    )
     {
         printf( "CreateProcess failed (%lu).\n", GetLastError() );
 	printf("Args were argv[0] = %s\n", args[0]);
@@ -160,7 +166,6 @@ run_subprocess(char **args)
     }
     return (intptr_t) pi.hProcess;
 #else
-    char **run_args = args;
     pid_t child;
     if (quiet <=0) {printf("Forking subprocess\n");}
     if (ssh_args[0] != NULL) {
@@ -175,7 +180,7 @@ run_subprocess(char **args)
 	}
 	if (remote_directory[0] != 0) {
 	  if (strrchr(argv0, '/')) argv0 = strrchr(argv0, '/') + 1;
-	  run_args[i] = malloc(strlen(remote_directory) + 
+	  run_args[i] = malloc(strlen(remote_directory) +
 			       strlen(argv0) + 4);
 	  strcpy(run_args[i], remote_directory);
 	  if (remote_directory[strlen(remote_directory)-1] != '/')
@@ -219,11 +224,7 @@ run_subprocess(char **args)
  * Returns: pid on success, 0 if non-blocking and child not exited, -1 on error.
  * exit_state is encoded like waitpid - use WIFEXITED/WEXITSTATUS/etc to analyze.
  */
-#if defined(__GNUC__) || defined(__clang__)
-static pid_t __attribute__((unused))
-#else
 static pid_t
-#endif
 wait_for_subprocess(pid_t proc, int *exit_state, int block)
 {
 #ifdef HAVE_WINDOWS_H

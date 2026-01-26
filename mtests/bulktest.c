@@ -227,6 +227,7 @@ static int do_regression_master_test();
 static int regression = 1;
 static atom_t CM_TRANSPORT;
 static char *transport;
+static char *control = NULL;
 
 #define PARSE_EXTRA_ARGS } else if (strcmp(&argv[1][1], "size") == 0) {\
 	    if (sscanf(argv[2], "%zu", &size) != 1) {\
