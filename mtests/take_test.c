@@ -9,6 +9,7 @@
 #include <string.h>
 #include <signal.h>
 #include "evpath.h"
+#include "support.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -148,7 +149,6 @@ generate_record(simple_rec_ptr event)
     }
 }
 
-int quiet = 1;
 static int msg_count = 0;
 #define QUEUE_SIZE 10
 simple_rec_ptr queue[QUEUE_SIZE];
@@ -226,10 +226,7 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 static atom_t CM_TRANSPORT;
-static char *transport = NULL;
-static char *control = NULL;
 
 #define PARSE_EXTRA_ARGS } else if (strcmp(&argv[1][1], "size") == 0) {\
 	    if (sscanf(argv[2], "%zu", &size) != 1) {\
@@ -245,7 +242,6 @@ static char *control = NULL;
 	    argv++;\
 	    argc--;\
 
-#include "support.c"
 
 int
 main(int argc, char **argv)

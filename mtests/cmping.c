@@ -9,6 +9,7 @@
 #include <string.h>
 #include <signal.h>
 #include "evpath.h"
+#include "support.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #include <winsock2.h>
@@ -23,7 +24,6 @@
 
 #define generate_record generate_simple_record
 
-int quiet = 1;
 int I_am_the_client = 0;
 static CMFormat format = NULL;
 
@@ -68,15 +68,11 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 
 static atom_t CM_TRANSPORT;
 static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
 
-char *transport = NULL;
-static char *control = NULL;
-#include "support.c"
 
 int
 main(int argc, char **argv)

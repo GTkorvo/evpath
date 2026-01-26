@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #endif
 #include "evpath.h"
+#include "support.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -54,7 +55,6 @@ static FMStructDescRec simple_format_list[] =
     {NULL, NULL}
 };
 
-int quiet = 1;
 
 static
 int
@@ -92,12 +92,8 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 extern 	void EVthin_socket_listen(CManager cm,  char **hostname, int *thin_port);
 
-char *transport = NULL;
-char *control = NULL;
-#include "support.c"
 
 int
 main(int argc, char **argv)

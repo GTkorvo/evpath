@@ -12,6 +12,7 @@
 #include <arpa/inet.h>
 #endif
 #include "evpath.h"
+#include "support.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -106,7 +107,6 @@ generate_record(simple_rec_ptr event)
     event->scan_sum = (int) sum;
 }
 
-int quiet = 1;
 
 static
 int
@@ -172,11 +172,7 @@ raw_handler(CManager cm, void *vevent, size_t len, void *client_data,
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 
-char *transport = NULL;
-char *control = NULL;
-#include "support.c"
 
 int
 main(int argc, char **argv)

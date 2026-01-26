@@ -9,6 +9,7 @@
 #include <string.h>
 #include <signal.h>
 #include "evpath.h"
+#include "support.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -79,7 +80,6 @@ static FMStructDescRec simple_format_list[] =
     {NULL, NULL}
 };
 
-int quiet = 1;
 
 static
 int
@@ -119,7 +119,6 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 static atom_t CM_TRANSPORT;
 static atom_t CM_NETWORK_POSTFIX;
 static atom_t CM_MCAST_ADDR;
@@ -150,10 +149,7 @@ char *ECL_generate = "{\n\
     return count == 1;\n\
 }";
 
-char *transport = NULL;
-char *control = NULL;
 
-#include "support.c"
 
 int
 main(int argc, char **argv)

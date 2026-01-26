@@ -9,6 +9,7 @@
 #include <string.h>
 #include <signal.h>
 #include "evpath.h"
+#include "support.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -107,7 +108,6 @@ static FMStructDescRec simple_format_list[] =
 
 static size_t size = 400;
 static int vecs = 20;
-int quiet = 1;
 
 int message_count = 0;
 
@@ -224,11 +224,7 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 static atom_t CM_TRANSPORT;
-static char *transport;
-static char *control = NULL;
-
 #define PARSE_EXTRA_ARGS } else if (strcmp(&argv[1][1], "size") == 0) {\
 	    if (sscanf(argv[2], "%zu", &size) != 1) {\
 		printf("Unparseable argument to -size, %s\n", argv[2]);\
@@ -243,7 +239,6 @@ static char *control = NULL;
 	    argv++;\
 	    argc--;
 
-#include "support.c"
 
 int
 main(int argc, char **argv)

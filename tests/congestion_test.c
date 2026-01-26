@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <arpa/inet.h>
 #include "evpath.h"
+#include "support.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -103,7 +104,6 @@ static FMStructDescRec *simple_format_lists[] = {
 
 static int size = 400;
 static int vecs = 400;
-int quiet = 1;
 
 static
 void 
@@ -183,7 +183,6 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 static atom_t CM_TRANSPORT;
 static atom_t CM_NETWORK_POSTFIX;
 static atom_t CM_MCAST_ADDR;
@@ -201,8 +200,6 @@ data_free(void *event_data, void *client_data)
     free(event_data);
 }
 
-char *transport = NULL;
-#include "support.c"
 
 int
 main(int argc, char **argv)

@@ -20,10 +20,9 @@
 #endif
 
 #include "simple_rec.h"
+#include "support.h"
 
 #define generate_record generate_simple_record
-
-int quiet = 1;
 
 static
 int
@@ -63,16 +62,10 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 static atom_t CM_TRANSPORT;
 static atom_t CM_NETWORK_POSTFIX;
 static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
-
-char *transport = NULL;
-char *control = NULL;
-
-#include "support.c"
 
 int
 main(int argc, char **argv)

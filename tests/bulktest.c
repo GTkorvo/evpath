@@ -11,6 +11,7 @@
 #include <string.h>
 #include <signal.h>
 #include "evpath.h"
+#include "support.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -129,7 +130,6 @@ static FMStructDescRec response_format_list[] =
 
 static int size = 400;
 static int vecs = 20;
-static int quiet = 1;
 static int request_response = 0;
 static int print_bandwidth = 0;
 
@@ -247,14 +247,11 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 static atom_t CM_TRANSPORT;
 static atom_t CM_NETWORK_POSTFIX;
 static atom_t CM_MCAST_ADDR;
 static atom_t CM_MCAST_PORT;
-char *transport = NULL;
 
-#include "support.c"
 
 int
 main(int argc, char **argv)
@@ -311,20 +308,13 @@ main(int argc, char **argv)
 		}
 	    }
 	    if (second_colon) {
-	        strcpy(remote_directory, second_colon+1);
+	        set_remote_directory(second_colon+1);
 	    }
 	    if (strlen(SSH_PATH) == 0) {
 		printf("SSH_PATH in config.h is empty!  Can't run ssh\n");
 		exit(1);
 	    }
-	    ssh_args[0] = strdup(SSH_PATH);
-	    ssh_args[1] = destination_host;
-	    ssh_args[2] = NULL;
-	    if (ssh_port != NULL) {
-	        ssh_args[2] = "-p";
-	        ssh_args[3] = ssh_port;
-		ssh_args[4] = NULL;
-	    }
+	    set_ssh_args(destination_host, ssh_port);
 	    argv++; argc--;
 	} else if (argv[1][1] == 'c') {
 	    regression_master = 0;

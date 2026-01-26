@@ -9,6 +9,7 @@
 #include <string.h>
 #include <signal.h>
 #include "evpath.h"
+#include "support.h"
 #include "revpath.h"
 #ifdef HAVE_WINDOWS_H
 #include <windows.h>
@@ -83,8 +84,6 @@ static FMStructDescRec simple_format_list[] =
     {"nested", nested_field_list, sizeof(nested), NULL},
     {NULL, NULL}
 };
-
-int quiet = 1;
 
 static
 int
@@ -178,10 +177,6 @@ handshake_with_parent(CManager cm, attr_list parent_contact_list)
     return conn;
 }
 
-static int regression = 1;
-static char *transport = NULL;
-static char *control = NULL;
-#include "support.c"
 
 int
 main(int argc, char **argv)

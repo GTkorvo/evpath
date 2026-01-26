@@ -5,7 +5,7 @@ include_directories(${CMAKE_SOURCE_DIR}/test_common)
 
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/cmtests.tsts "" )
 foreach(T ${TESTS})
-  add_executable(mtests_${T} ${T}.c)
+  add_executable(mtests_${T} ${T}.c ${CMAKE_SOURCE_DIR}/test_common/support.c)
   target_link_libraries(mtests_${T} evpath atl::atl)
   add_test(NAME mtests_${T} COMMAND mtests_${T})
   list(APPEND CMTESTS mtests_${T})

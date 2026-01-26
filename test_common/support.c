@@ -1,35 +1,51 @@
-static char *ssh_args[6]={NULL, NULL, NULL, NULL, NULL, NULL};
-static char remote_directory[1024] = "";
-static char *argv0;
-static int no_fork = 0;
-#ifdef _MSC_VER
-#define pid_t intptr_t
-#include <process.h>
+#include "config.h"
+#include "support.h"
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
 #endif
 
 #ifdef HAVE_WINDOWS_H
-/* Define waitpid-style macros for Windows */
-#ifndef WIFEXITED
-#define WIFEXITED(s)    (((s) & 0x7f) == 0)
-#endif
-#ifndef WEXITSTATUS
-#define WEXITSTATUS(s)  (((s) >> 8) & 0xff)
-#endif
-#ifndef WIFSIGNALED
-#define WIFSIGNALED(s)  (((s) & 0x7f) != 0 && ((s) & 0x7f) != 0x7f)
-#endif
-#ifndef WTERMSIG
-#define WTERMSIG(s)     ((s) & 0x7f)
-#endif
-#ifndef WNOHANG
-#define WNOHANG 1
-#endif
-#else
-#include <sys/wait.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #endif
 
-static void
-usage()
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
+
+/* Global variables */
+int quiet = 1;
+int regression = 1;
+char *transport = NULL;
+char *control = NULL;
+char *argv0 = NULL;
+int no_fork = 0;
+
+static char *ssh_args[6] = {NULL, NULL, NULL, NULL, NULL, NULL};
+static char remote_directory[1024] = "";
+
+void
+set_ssh_args(char *destination_host, char *ssh_port)
+{
+    ssh_args[0] = strdup(SSH_PATH);
+    ssh_args[1] = destination_host;
+    ssh_args[2] = NULL;
+    if (ssh_port != NULL) {
+	ssh_args[2] = "-p";
+	ssh_args[3] = ssh_port;
+	ssh_args[4] = NULL;
+    }
+}
+
+void
+set_remote_directory(const char *dir)
+{
+    strcpy(remote_directory, dir);
+}
+
+void
+usage(void)
 {
     printf("Usage:  %s <options> \n", argv0);
     printf("  Options:\n");
@@ -41,80 +57,6 @@ usage()
 
     exit(1);
 }
-
-#ifndef PARSE_EXTRA_ARGS
-#define PARSE_EXTRA_ARGS
-#endif
-
-#define PARSE_ARGS() \
-    argv0 = argv[0];\
-    while (argv[1] && (argv[1][0] == '-')) {\
-	if (strcmp(&argv[1][1], "control") == 0) {\
-	    control = argv[2];\
-	    argv++;\
-	    argc--;\
-	} else if (argv[1][1] == 'c') {\
-	    regression_master = 0;\
-	} else if (strcmp(&argv[1][1], "ssh") == 0) {\
-	    char *destination_host;\
-	    char *first_colon, *second_colon;\
-	    char *ssh_port = NULL;\
-	    if (!argv[2]) {\
-	        printf("Missing --ssh destination\n");\
-		usage();\
-	    }\
-	    first_colon = strchr(argv[2], ':');\
-	    if (first_colon) {\
-	        *first_colon = 0;\
-		second_colon = strchr(first_colon+1, ':');\
-	    } else {\
-	        second_colon = NULL;\
-	    }\
-	    destination_host = strdup(argv[2]);\
-	    if (first_colon) {\
-	        int ssh_port_int;\
-		if (second_colon) *second_colon = 0;\
-		if (sscanf(first_colon+1, "%d", &ssh_port_int) != 1) {\
-		    second_colon = first_colon;\
-		}  else {\
-		    ssh_port = first_colon + 1;\
-		}\
-	    }\
-	    if (second_colon) {\
-	        strcpy(remote_directory, second_colon+1);\
-	    }\
-	    if (strlen(SSH_PATH) == 0) {\
-		printf("SSH_PATH in config.h is empty!  Can't run ssh\n");\
-		exit(1);\
-	    }\
-	    ssh_args[0] = strdup(SSH_PATH);\
-	    ssh_args[1] = destination_host;\
-	    ssh_args[2] = NULL;\
-	    if (ssh_port != NULL) {\
-	        ssh_args[2] = "-p";\
-	        ssh_args[3] = ssh_port;\
-		ssh_args[4] = NULL;\
-	    }\
-	    argv++; argc--;\
-	PARSE_EXTRA_ARGS\
-	} else if (argv[1][1] == 's') {\
-	    regression_master = 0;\
-	} else if (argv[1][1] == 'q') {\
-	    quiet++;\
-	} else if (argv[1][1] == 'v') {\
-	    quiet--;\
-	} else if (argv[1][1] == 'n') {\
-	    regression = 0;\
-	    no_fork = 1;\
-	    quiet = -1;\
-	} else if (argv[1][1] == 't') {\
-	    transport = argv[2];\
-	    argv++;\
-	    argc--;\
-	}\
-	argv++;\
-	argc--;\
-    }
 
 #ifdef _MSC_VER
 static int inet_aton(const char* cp, struct in_addr* addr)
@@ -224,7 +166,7 @@ run_subprocess(char **args)
  * Returns: pid on success, 0 if non-blocking and child not exited, -1 on error.
  * exit_state is encoded like waitpid - use WIFEXITED/WEXITSTATUS/etc to analyze.
  */
-static pid_t
+pid_t
 wait_for_subprocess(pid_t proc, int *exit_state, int block)
 {
 #ifdef HAVE_WINDOWS_H
@@ -249,4 +191,3 @@ wait_for_subprocess(pid_t proc, int *exit_state, int block)
     return waitpid(proc, exit_state, block ? 0 : WNOHANG);
 #endif
 }
-

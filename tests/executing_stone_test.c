@@ -19,6 +19,7 @@
 #include <arpa/inet.h>
 #endif
 #include "evpath.h"
+#include "support.h"
 #ifdef HAVE_SYS_WAIT_H
 #include <sys/wait.h>
 #endif
@@ -89,7 +90,6 @@ static FMStructDescRec simple_format_list[] =
     {NULL, NULL}
 };
 
-int quiet = 1;
 
 EVsource source_handle[3];
 
@@ -112,10 +112,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
     return 0;
 }
 
-char *transport = NULL;
-char *control = NULL;
 
-#include "support.c"
 int regression_master, regression;  /* not used in this test */
 
 int
