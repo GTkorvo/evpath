@@ -2518,8 +2518,8 @@ timeout_conn(CManager cm, void *client_data)
      }
 
      if ((ssize_t)length < header_len + data_length + attr_length) {
-	 return header_len + data_length + attr_length -
-	     length;
+	 return (size_t)(header_len + data_length + attr_length -
+	     (ssize_t)length);
      }
      /* At this point, the message is accepted.  Determine processing */
      base = buffer + header_len;
@@ -2544,7 +2544,7 @@ timeout_conn(CManager cm, void *client_data)
 	 }
      }
      if (performance_msg) {
-	 CMdo_performance_response(conn, data_length, performance_func, byte_swap,
+	 CMdo_performance_response(conn, (size_t)data_length, performance_func, byte_swap,
 				   base);
 	 return 0;
      } else if (evcontrol_msg) {
@@ -2588,7 +2588,7 @@ timeout_conn(CManager cm, void *client_data)
 	 }
  #ifdef EV_INTERNAL_H	
 	 internal_cm_network_submit(cm, cm_buffer, attrs, conn, data_buffer,
-				    data_length, stone_id);
+				    (size_t)data_length, stone_id);
  #endif
 	 if (local) cm_return_data_buf(cm, local);
 	 free_attr_list(attrs);
@@ -2658,8 +2658,8 @@ timeout_conn(CManager cm, void *client_data)
 	     return 0;
 	 }
      } else {
-	 decoded_length = FFS_est_decode_length(cm->FFScontext, data_buffer, data_length);
-	 cm_decode_buf = cm_get_data_buf(cm, decoded_length);
+	 decoded_length = FFS_est_decode_length(cm->FFScontext, data_buffer, (size_t)data_length);
+	 cm_decode_buf = cm_get_data_buf(cm, (ssize_t)decoded_length);
 	 decode_buffer = cm_decode_buf->buffer;
 	 FFSdecode_to_buffer(cm->FFScontext, data_buffer, decode_buffer);
      }
