@@ -24,6 +24,8 @@ static int no_fork = 0;
 #ifndef WNOHANG
 #define WNOHANG 1
 #endif
+#else
+#include <sys/wait.h>
 #endif
 
 static void
