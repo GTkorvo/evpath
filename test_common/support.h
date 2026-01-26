@@ -8,6 +8,9 @@
 #ifdef _MSC_VER
 #define pid_t intptr_t
 #include <process.h>
+/* inet_aton is not available on Windows, provide our own */
+struct in_addr;
+extern int inet_aton(const char* cp, struct in_addr* addr);
 #endif
 
 #ifdef HAVE_WINDOWS_H

@@ -56,7 +56,7 @@ usage(void)
 }
 
 #ifdef _MSC_VER
-static int inet_aton(const char* cp, struct in_addr* addr)
+int inet_aton(const char* cp, struct in_addr* addr)
 {
     addr->s_addr = inet_addr(cp);
     return (addr->s_addr == INADDR_NONE) ? 0 : 1;
