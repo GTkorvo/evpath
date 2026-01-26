@@ -1,7 +1,17 @@
-static char *ssh_args[6]={NULL, NULL, NULL, NULL, NULL, NULL};
+/*
+ * Common test support functions used across EVPath test suites.
+ * This file consolidates functionality that was previously duplicated
+ * in tests/support.c and mtests/support.c.
+ *
+ * Usage: #include this file in test source files that need subprocess
+ * spawning and argument parsing functionality.
+ */
+
+static char *ssh_args[6] = {NULL, NULL, NULL, NULL, NULL, NULL};
 static char remote_directory[1024] = "";
 static char *argv0;
 static int no_fork = 0;
+
 #ifdef _MSC_VER
 #define pid_t intptr_t
 #include <process.h>
@@ -21,6 +31,8 @@ usage()
     exit(1);
 }
 
+/* Allow test files to extend argument parsing by defining PARSE_EXTRA_ARGS
+ * before including this file */
 #ifndef PARSE_EXTRA_ARGS
 #define PARSE_EXTRA_ARGS
 #endif
@@ -28,7 +40,11 @@ usage()
 #define PARSE_ARGS() \
     argv0 = argv[0];\
     while (argv[1] && (argv[1][0] == '-')) {\
-	if (argv[1][1] == 'c') {\
+	if (strcmp(&argv[1][1], "control") == 0) {\
+	    control = argv[2];\
+	    argv++;\
+	    argc--;\
+	} else if (argv[1][1] == 'c') {\
 	    regression_master = 0;\
 	} else if (strcmp(&argv[1][1], "ssh") == 0) {\
 	    char *destination_host;\
@@ -91,6 +107,14 @@ usage()
 	argc--;\
     }
 
+#ifdef _MSC_VER
+static int inet_aton(const char* cp, struct in_addr* addr)
+{
+    addr->s_addr = inet_addr(cp);
+    return (addr->s_addr == INADDR_NONE) ? 0 : 1;
+}
+#endif
+
 pid_t
 run_subprocess(char **args)
 {
@@ -112,7 +136,7 @@ run_subprocess(char **args)
       strcat(comm_line, args[i]);
       strcat(comm_line, " ");
       i++;
-      
+
     }
     if (!CreateProcess(module,
 		       comm_line,
@@ -121,12 +145,14 @@ run_subprocess(char **args)
         FALSE,          // Set handle inheritance to FALSE
         0,              // No creation flags
         NULL,           // Use parent's environment block
-        NULL,           // Use parent's starting directory 
+        NULL,           // Use parent's starting directory
         &si,            // Pointer to STARTUPINFO structure
-		       &pi ) 
-    ) 
+		       &pi )
+    )
     {
-        printf( "CreateProcess failed (%d).\n", GetLastError() );
+        printf( "CreateProcess failed (%lu).\n", GetLastError() );
+	printf("Args were argv[0] = %s\n", args[0]);
+	printf("Args were argv[1] = %s, argv[2] = %s\n", args[1], args[2]);
         return 0;
     }
     return (intptr_t) pi.hProcess;
@@ -145,7 +171,7 @@ run_subprocess(char **args)
 	}
 	if (remote_directory[0] != 0) {
 	  if (strrchr(argv0, '/')) argv0 = strrchr(argv0, '/') + 1;
-	  run_args[i] = malloc(strlen(remote_directory) + 
+	  run_args[i] = malloc(strlen(remote_directory) +
 			       strlen(argv0) + 4);
 	  strcpy(run_args[i], remote_directory);
 	  if (remote_directory[strlen(remote_directory)-1] != '/')
@@ -183,4 +209,3 @@ run_subprocess(char **args)
     return child;
 #endif
 }
-

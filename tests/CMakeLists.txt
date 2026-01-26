@@ -7,7 +7,7 @@ set (NO_INST_PROGS thin_client)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR}/test_common)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/evtests.tsts "" )
 foreach(T ${TESTS})
   add_executable(${T} ${T}.c)

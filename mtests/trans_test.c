@@ -196,9 +196,13 @@ trans_test_upcall(CManager cm, void *buffer, size_t length, int type, attr_list 
     }
 }
 
-static char *argv0;
 static pid_t subproc_proc = 0;
 static int timeout = 60;
+static int quiet = 1;
+static char *transport = NULL;
+static char *control = NULL;
+static int regression = 1;
+#include "support.c"
 
 static void
 fail_and_die(int signal)
@@ -214,37 +218,8 @@ fail_and_die(int signal)
     exit(1);
 }
 
-static
-pid_t
-run_subprocess(char **args)
-{
-#ifdef HAVE_WINDOWS_H
-    intptr_t child;
-    child = _spawnv(_P_NOWAIT, args[0], args);
-    if (child == -1) {
-	printf("failed for cmtest\n");
-	perror("spawnv");
-    }
-    return child;
-#else
-    pid_t child = fork();
-/*    int i = 0;
-    printf("Running : ");
-    while (args[i] != NULL) {
-	printf("%s ", args[i++]);
-	
-    }
-    printf("\n");*/
-    if (child == 0) {
-	/* I'm the child */
-	execv(args[0], args);
-    }
-    return child;
-#endif
-}
-
 static void
-usage()
+trans_test_usage()
 {
     printf("Usage:  trans_test <options> \n");
     printf("  Options:\n");
@@ -278,7 +253,6 @@ main(int argc, char **argv)
     int start_subproc_arg_count = 4; /* leave a few open at the beginning */
     char **subproc_args = calloc((argc + start_subproc_arg_count + 2), sizeof(argv[0]));
     int cur_subproc_arg = start_subproc_arg_count;
-    char *transport = NULL;
     char path[10240];
 #ifdef BUILD_WITH_MPI
     use_mpi = 1;
@@ -305,13 +279,13 @@ main(int argc, char **argv)
 	} else if (strcmp(&argv[1][1], "v") == 0) {
 	    verbose++;
 	} else if (strcmp(&argv[1][1], "h") == 0) {
-	    usage();
+	    trans_test_usage();
 	    MPI_Finalize();
 	    exit(0);
 	} else if (strcmp(&argv[1][1], "vectors") == 0) {
 	    if (!argv[2] || (sscanf(argv[2], "%d", &vec_count) != 1)) {
 		printf("Bad -vectors argument \"%s\"\n", argv[2]);
-		usage();
+		trans_test_usage();
 	    }
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
 	    argv++; argc--;
@@ -319,12 +293,12 @@ main(int argc, char **argv)
 	    char *endptr;
 	    if (!argv[2]) {
 		printf("No argument to -size\n");
-		usage();
+		trans_test_usage();
 	    }
 	    size = strtol(argv[2], &endptr, 10);
 	    if (endptr == argv[2]) {
 		printf("Bad -size argument \"%s\"\n", argv[2]);
-		usage();
+		trans_test_usage();
 	    }
 	    if ((strcmp(endptr, "k") == 0) || (strcmp(endptr, "K") == 0)) {
 		size *= 1000;
@@ -343,7 +317,7 @@ main(int argc, char **argv)
 	    char *destination_host;
 	    if (!argv[2]) {
 		printf("Missing --ssh destination\n");
-		usage();
+		trans_test_usage();
 	    }
 	    destination_host = strdup(argv[2]);
 	    start_subproc_arg_count-=2;
@@ -360,7 +334,7 @@ main(int argc, char **argv)
 	} else if (strcmp(&argv[1][1], "transport") == 0) {
 	    if (!argv[2]) {
 		printf("missing -transport\n");
-		usage();
+		trans_test_usage();
 	    }
 	    transport = strdup(argv[2]);
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
@@ -368,21 +342,21 @@ main(int argc, char **argv)
 	} else if (strcmp(&argv[1][1], "msg_count") == 0) {
 	    if (!argv[2] || (sscanf(argv[2], "%d", &msg_count) != 1)) {
 		printf("Bad -msg_count argument \"%s\"\n", argv[2]);
-		usage();
+		trans_test_usage();
 	    }
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
 	    argv++; argc--;
 	} else if (strcmp(&argv[1][1], "timeout") == 0) {
 	    if (!argv[2] || (sscanf(argv[2], "%d", &timeout) != 1)) {
 		printf("Bad -timeout argument \"%s\"\n", argv[2]);
-		usage();
+		trans_test_usage();
 	    }
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
 	    argv++; argc--;
 	} else if (strcmp(&argv[1][1], "reuse_write_buffers") == 0) {
 	    if (!argv[2] || (sscanf(argv[2], "%d", &reuse_write) != 1)) {
 		printf("Bad -reuse_write argument \"%s\"\n", argv[2]);
-		usage();
+		trans_test_usage();
 	    }
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
 	    argv++; argc--;
@@ -391,7 +365,7 @@ main(int argc, char **argv)
 	} else if (strcmp(&argv[1][1], "take_receive_buffer") == 0) {
 	    if (!argv[2] || (sscanf(argv[2], "%d", &take) != 1)) {
 		printf("Bad -take_receive_buffer argument \"%s\"\n", argv[2]);
-		usage();
+		trans_test_usage();
 	    }
 	    subproc_args[cur_subproc_arg++] = strdup(argv[2]);
 	    argv++; argc--;
@@ -409,7 +383,7 @@ main(int argc, char **argv)
 #endif
 	} else {
 	    printf("Argument not recognized, \"%s\"\n", argv[1]);
-	    usage();
+	    trans_test_usage();
 	}
 	argv++;
 	argc--;
@@ -552,7 +526,7 @@ main(int argc, char **argv)
 		if (contact_list == NULL) {
 		    printf("Remaining Argument \"%s\" not recognized as size or contact list\n",
 			   argv[i]);
-		    usage();
+		    trans_test_usage();
 		}
 	    }
 	} else {

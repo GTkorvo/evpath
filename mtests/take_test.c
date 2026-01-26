@@ -244,7 +244,8 @@ static char *transport = NULL;
 	    argv++;\
 	    argc--;\
 
-#include "support.c"
+static char *control = NULL;
+#include "support.c"  /* from test_common/ */
 
 int
 main(int argc, char **argv)

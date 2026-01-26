@@ -103,7 +103,8 @@ static int regression = 1;
 static atom_t CM_TRANSPORT;
 
 char *transport = NULL;
-#include "support.c"
+static char *control = NULL;
+#include "support.c"  /* from test_common/ */
 
 void
 do_master_stuff(CManager cm)

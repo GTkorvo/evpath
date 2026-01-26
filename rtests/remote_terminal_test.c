@@ -14,9 +14,6 @@
 #include <windows.h>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#define drand48() (((double)rand())/((double)RAND_MAX))
-#define lrand48() rand()
-#define srand48(x)
 #define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
 #else
 #include <sys/socket.h>
@@ -24,64 +21,7 @@
 #include <sys/wait.h>
 #endif
 
-typedef struct _complex_rec {
-    double r;
-    double i;
-} complex, *complex_ptr;
-
-typedef struct _nested_rec {
-    complex item;
-} nested, *nested_ptr;
-
-static FMField nested_field_list[] =
-{
-    {"item", "complex", sizeof(complex), FMOffset(nested_ptr, item)},
-    {NULL, NULL, 0, 0}
-};
-
-static FMField complex_field_list[] =
-{
-    {"r", "double", sizeof(double), FMOffset(complex_ptr, r)},
-    {"i", "double", sizeof(double), FMOffset(complex_ptr, i)},
-    {NULL, NULL, 0, 0}
-};
-
-typedef struct _simple_rec {
-    int integer_field;
-    short short_field;
-    long long_field;
-    nested nested_field;
-    double double_field;
-    char char_field;
-    int scan_sum;
-} simple_rec, *simple_rec_ptr;
-
-static FMField simple_field_list[] =
-{
-    {"integer_field", "integer",
-     sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
-    {"short_field", "integer",
-     sizeof(short), FMOffset(simple_rec_ptr, short_field)},
-    {"long_field", "integer",
-     sizeof(long), FMOffset(simple_rec_ptr, long_field)},
-    {"nested_field", "nested",
-     sizeof(nested), FMOffset(simple_rec_ptr, nested_field)},
-    {"double_field", "float",
-     sizeof(double), FMOffset(simple_rec_ptr, double_field)},
-    {"char_field", "char",
-     sizeof(char), FMOffset(simple_rec_ptr, char_field)},
-    {"scan_sum", "integer",
-     sizeof(int), FMOffset(simple_rec_ptr, scan_sum)},
-    {NULL, NULL, 0, 0}
-};
-
-static FMStructDescRec simple_format_list[] =
-{
-    {"simple", simple_field_list, sizeof(simple_rec), NULL},
-    {"complex", complex_field_list, sizeof(complex), NULL},
-    {"nested", nested_field_list, sizeof(nested), NULL},
-    {NULL, NULL}
-};
+#include "simple_rec.h"
 
 int quiet = 1;
 
@@ -178,7 +118,8 @@ handshake_with_parent(CManager cm, attr_list parent_contact_list)
 
 static int regression = 1;
 static char* transport = NULL;
-#include "../mtests/support.c"
+static char *control = NULL;
+#include "support.c"  /* from test_common/ */
 
 int
 main(int argc, char **argv)
