@@ -1,5 +1,6 @@
 #include "config.h"
 #include "support.h"
+#include "simple_rec.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -187,4 +188,19 @@ wait_for_subprocess(pid_t proc, int *exit_state, int block)
 #else
     return waitpid(proc, exit_state, block ? 0 : WNOHANG);
 #endif
+}
+
+int
+verify_simple_record(simple_rec_ptr event)
+{
+    long sum = 0;
+    sum += event->integer_field % 100;
+    sum += event->short_field % 100;
+    sum += event->long_field % 100;
+    sum += ((int) (event->nested_field.item.r * 100.0)) % 100;
+    sum += ((int) (event->nested_field.item.i * 100.0)) % 100;
+    sum += ((int) (event->double_field * 100.0)) % 100;
+    sum += event->char_field;
+    sum = sum % 100;
+    return (sum == event->scan_sum);
 }
