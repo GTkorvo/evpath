@@ -2412,8 +2412,8 @@ timeout_conn(CManager cm, void *client_data)
 	 }
      }
 
-     if (length < header_len) {
-	 return header_len - length;
+     if (length < (size_t)header_len) {
+	 return (size_t)header_len - length;
      }
      base = buffer + 4 + skip; /* skip used data */
      if (short_length) {
@@ -2529,15 +2529,15 @@ timeout_conn(CManager cm, void *client_data)
      }
      if (checksum != 0) {
 	 unsigned char calculated_checksum = 0;
-	 for (i=4; i < length; i++) {
-	     calculated_checksum += ((unsigned char *)buffer)[i];
+	 for (size_t ci=4; ci < length; ci++) {
+	     calculated_checksum += ((unsigned char *)buffer)[ci];
 	 }
 	 if (calculated_checksum != checksum) {
 	     printf("Discarding incoming message because of corruption.  Checksum mismatch got %x, expected %x\n",
 		    calculated_checksum, checksum);
 	     printf("Message was : ");
-	     for (i=0 ; i < length; i++) {
-		 printf(" %02x",  ((unsigned char *)buffer)[i]);
+	     for (size_t ci=0 ; ci < length; ci++) {
+		 printf(" %02x",  ((unsigned char *)buffer)[ci]);
 	     }
 	     printf("\n");
 	     return 0;
@@ -2919,7 +2919,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
  cm_wake_any_pending_write(CMConnection conn)
  {
      if (conn->write_callbacks) {
-	 int i = 0;
+	 size_t i = 0;
 	 CMConnHandlerListEntry callbacks[16];
 	 size_t callback_len = conn->write_callback_len;
 	 assert(conn->write_callback_len <= 16);
@@ -2929,7 +2929,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
 		 (callbacks[i].func)(conn->cm, conn, callbacks[i].client_data);
 	     }
 	 }
-	 CMtrace_out(conn->cm, CMTransportVerbose, "Completed pending write, did %d notifications\n", i);
+	 CMtrace_out(conn->cm, CMTransportVerbose, "Completed pending write, did %zu notifications\n", i);
      } else {
 	 CMtrace_out(conn->cm, CMTransportVerbose, "Completed pending write, No notifications\n");
      }
@@ -3072,7 +3072,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
  static void
  remove_pending_write_callback_by_id(CMConnection conn, SOCKET ids) {
      int id = (int)(intptr_t)ids;
-     assert(id < conn->write_callback_len && id >= 0);
+     assert((size_t)id < conn->write_callback_len && id >= 0);
      conn->write_callbacks[id].func = NULL;
  }
 
@@ -3090,7 +3090,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
  add_pending_write_callback(CMConnection conn, CMWriteCallbackFunc handler, 
 			    void* client_data)
  {
-     int count = 0;
+     size_t count = 0;
      while (conn->write_callbacks && count < conn->write_callback_len &&
 	    (conn->write_callbacks[count].func != NULL)) count++;
      if (count + 1 > conn->write_callback_len) {
@@ -3106,7 +3106,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
      }
      conn->write_callbacks[count].func = handler;
      conn->write_callbacks[count].client_data = client_data;
-     return count;
+     return (int)count;
  }
 
 
@@ -3169,7 +3169,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
  {
      size_t actual = 0;
      unsigned char checksum = 0;
-     int i, j, start;
+     int i, start;
      size_t count = 0;
      size_t length = 0;
      if (conn->closed || conn->failed) return 0;
@@ -3185,8 +3185,8 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
 	 /* do checksum for small messages */
 	 for (i=0; i < vec_count; i++) {
 	     count += full_vec[i].iov_len - start;
-	     for (j=start; j< full_vec[i].iov_len; j++) {
-		 checksum += ((unsigned char*)full_vec[i].iov_base)[j];
+	     for (size_t cj=(size_t)start; cj < full_vec[i].iov_len; cj++) {
+		 checksum += ((unsigned char*)full_vec[i].iov_base)[cj];
 	     }
 	     start = 0;
 	 }

@@ -604,7 +604,7 @@ INT_CMtest_transport(CMConnection conn, attr_list how)
 	    }
 	    for (count = 0; count < vecs; count++) {
 		/* for each vector, give it unique data */
-		int j;
+		size_t j;
 		for (j=0; j < ((each + repeat_count) /sizeof(int)); j++) {
 		    ((int*)tmp_vec[count+1].iov_base)[j] = rand();
 		}

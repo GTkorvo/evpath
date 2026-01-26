@@ -1017,7 +1017,7 @@ ssize_t
 writev(SOCKET fd, struct iovec *iov, size_t iovcnt)
 {
     ssize_t wrote = 0;
-    int i;
+    size_t i;
     for (i = 0; i < iovcnt; i++) {
 	size_t left = iov[i].iov_len;
 	ssize_t iget = 0;

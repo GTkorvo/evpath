@@ -122,8 +122,8 @@ trans_test_upcall(CManager cm, void *buffer, size_t length, int type, attr_list 
 	    } else {
 		buffer_list = realloc(buffer_list, (buffer_count+1)*sizeof(buffer_list[0]));
 	    }
-	    for(i=0; i < length/sizeof(int); i++) {
-		sum += ((int*)buffer)[i];
+	    for(size_t si=0; si < length/sizeof(int); si++) {
+		sum += ((int*)buffer)[si];
 	    }
 	    buffer_list[buffer_count].buffer = buffer;
 	    buffer_list[buffer_count].length = length;
@@ -152,9 +152,8 @@ trans_test_upcall(CManager cm, void *buffer, size_t length, int type, attr_list 
 	chr_timer_stop(&bandwidth_start_time);
 	for (buf = 0; buf < buffer_count; buf++) {
 	    int sum = 0;
-	    int i;
-	    for(i=0; i < buffer_list[buf].length/sizeof(int); i++) {
-		sum += ((int*)buffer_list[buf].buffer)[i];
+	    for(size_t si=0; si < buffer_list[buf].length/sizeof(int); si++) {
+		sum += ((int*)buffer_list[buf].buffer)[si];
 	    }
 	    if (buffer_list[buf].checksum != sum) {
 		printf("taken data corrupted, calc checksum %d, stored %d, first entry %d\n", sum, buffer_list[buf].checksum, ((int*)buffer_list[buf].buffer)[0]);

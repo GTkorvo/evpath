@@ -148,10 +148,10 @@ generate_record(simple_rec_ptr event)
 }
 
 static
-void 
+void
 free_record(simple_rec_ptr event)
 {
-    int i;
+    size_t i;
     for (i=0; i < event->vec_count; i++) {
       free(event->vecs[i].iov_base);
     }
