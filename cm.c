@@ -2300,7 +2300,7 @@ timeout_conn(CManager cm, void *client_data)
      int64_t data_length, decoded_length;
      int attr_length = 0, i;
      int header_len;
-     int stone_id;
+     int stone_id = 0;
      char *decode_buffer = NULL, *data_buffer;
      FFSTypeHandle local_format, original_format;
      CManager cm = conn->cm;

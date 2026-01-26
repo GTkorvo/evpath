@@ -219,7 +219,11 @@ run_subprocess(char **args)
  * Returns: pid on success, 0 if non-blocking and child not exited, -1 on error.
  * exit_state is encoded like waitpid - use WIFEXITED/WEXITSTATUS/etc to analyze.
  */
+#if defined(__GNUC__) || defined(__clang__)
+static pid_t __attribute__((unused))
+#else
 static pid_t
+#endif
 wait_for_subprocess(pid_t proc, int *exit_state, int block)
 {
 #ifdef HAVE_WINDOWS_H

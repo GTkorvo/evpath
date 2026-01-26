@@ -2470,7 +2470,6 @@ queue_master_msg(EVmaster master, void*vmsg, EVmaster_msg_type msg_type, CMConne
     }
 }
 
-static const char *msg_type_names[] = {"node_join", "deploy_ack", "shutdown_contrib", "conn_shutdown", "flush_reconfig"};
 static void
 dfg_master_msg_handler(CManager cm, CMConnection conn, void *vmsg,
 		       void *client_data, attr_list attrs)
