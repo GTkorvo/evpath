@@ -116,7 +116,6 @@ trans_test_upcall(CManager cm, void *buffer, size_t length, int type, attr_list 
 	}
 	if (take) {
 	    int sum = 0;
-	    int i;
 	    if (!buffer_list) {
 		buffer_list = malloc(sizeof(buffer_list[0]));
 	    } else {
