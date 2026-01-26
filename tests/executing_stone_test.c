@@ -24,7 +24,7 @@
 #include <sys/wait.h>
 #endif
 #ifdef HAVE_WINDOWS_H
-#include <windows.h>
+/* windows.h included via support.h */
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x)

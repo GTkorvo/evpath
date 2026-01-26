@@ -12,7 +12,7 @@
 #include "support.h"
 #include "revpath.h"
 #ifdef HAVE_WINDOWS_H
-#include <windows.h>
+/* windows.h included via support.h */
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))

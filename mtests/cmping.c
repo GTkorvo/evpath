@@ -11,7 +11,7 @@
 #include "evpath.h"
 #include "support.h"
 #ifdef HAVE_WINDOWS_H
-#include <windows.h>
+/* windows.h included via support.h */
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #define kill(x,y) TerminateProcess((HANDLE)(x), y)

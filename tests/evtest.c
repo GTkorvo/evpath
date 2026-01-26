@@ -9,10 +9,8 @@
 #include <string.h>
 #include <signal.h>
 #include "evpath.h"
+#include "support.h"
 #ifdef HAVE_WINDOWS_H
-#include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
 #define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
 #else
 #include <sys/socket.h>
@@ -20,7 +18,6 @@
 #endif
 
 #include "simple_rec.h"
-#include "support.h"
 
 #define generate_record generate_simple_record
 
