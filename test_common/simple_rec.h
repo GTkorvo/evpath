@@ -2,6 +2,7 @@
 #define SIMPLE_REC_H
 
 #include <string.h>
+#include "ffs.h"
 
 #ifdef HAVE_WINDOWS_H
 #define drand48() (((double)rand())/((double)RAND_MAX))
