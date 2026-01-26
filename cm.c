@@ -3368,7 +3368,7 @@ INT_CMregister_invalid_message_handler(CManager cm, CMUnregCMHandler handler)
 	 }
      } else {
 	 /* Long message format: use explicit high/low word order to match CMP */
-	 attr_long_header[1] = (int)(length >> 32);      /* high 32 bits */
+	 attr_long_header[1] = (int)((uint64_t)length >> 32);      /* high 32 bits */
 	 attr_long_header[2] = (int)(length & 0xffffffff); /* low 32 bits */
 	 header_ptr = &attr_long_header;
 	 header_len = sizeof(attr_long_header);
