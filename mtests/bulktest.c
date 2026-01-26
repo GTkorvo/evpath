@@ -9,6 +9,19 @@
 #include <string.h>
 #include <signal.h>
 #include "evpath.h"
+#define PARSE_EXTRA_ARGS } else if (strcmp(&argv[1][1], "size") == 0) {\
+	    if (sscanf(argv[2], "%zu", &size) != 1) {\
+		printf("Unparseable argument to -size, %s\n", argv[2]);\
+	    }\
+	    if (vecs == 0) { vecs = 1; printf("vecs not 1\n");}\
+	    argv++;\
+	    argc--;\
+	} else 	if (strcmp(&argv[1][1], "vecs") == 0) {\
+	    if (sscanf(argv[2], "%d", &vecs) != 1) {\
+		printf("Unparseable argument to -vecs, %s\n", argv[2]);\
+	    }\
+	    argv++;\
+	    argc--;
 #include "support.h"
 #ifdef HAVE_WINDOWS_H
 /* windows.h included via support.h */
@@ -225,20 +238,6 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
 
 static int do_regression_master_test();
 static atom_t CM_TRANSPORT;
-#define PARSE_EXTRA_ARGS } else if (strcmp(&argv[1][1], "size") == 0) {\
-	    if (sscanf(argv[2], "%zu", &size) != 1) {\
-		printf("Unparseable argument to -size, %s\n", argv[2]);\
-	    }\
-	    if (vecs == 0) { vecs = 1; printf("vecs not 1\n");}\
-	    argv++;\
-	    argc--;\
-	} else 	if (strcmp(&argv[1][1], "vecs") == 0) {\
-	    if (sscanf(argv[2], "%d", &vecs) != 1) {\
-		printf("Unparseable argument to -vecs, %s\n", argv[2]);\
-	    }\
-	    argv++;\
-	    argc--;
-
 
 int
 main(int argc, char **argv)
