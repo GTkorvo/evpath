@@ -11,6 +11,8 @@
 #endif
 
 #ifdef HAVE_WINDOWS_H
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 /* Define waitpid-style macros for Windows */
 #ifndef WIFEXITED

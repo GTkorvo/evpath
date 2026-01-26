@@ -5,10 +5,7 @@
 #include <unistd.h>
 #endif
 
-#ifdef HAVE_WINDOWS_H
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#endif
+/* winsock2.h and ws2tcpip.h are included via support.h for Windows */
 
 #ifdef HAVE_ARPA_INET_H
 #include <arpa/inet.h>

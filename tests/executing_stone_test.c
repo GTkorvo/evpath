@@ -113,7 +113,7 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 }
 
 
-int regression_master, regression;  /* not used in this test */
+int regression_master;  /* regression provided by support.c */
 
 int
 main(int argc, char **argv)
