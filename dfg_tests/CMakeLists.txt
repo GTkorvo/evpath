@@ -10,7 +10,7 @@ endif()
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_SOURCE_DIR}/test_common)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/dfg_tests.tsts "" )
 foreach(T ${TESTS})
   add_executable(dfg_${T} ${T}.c test_support.c)

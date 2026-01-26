@@ -1,35 +1,55 @@
-static char *ssh_args[6]={NULL, NULL, NULL, NULL, NULL, NULL};
-static char remote_directory[1024] = "";
-static char *argv0;
-static int no_fork = 0;
-#ifdef _MSC_VER
-#define pid_t intptr_t
-#include <process.h>
+#include "config.h"
+#include "support.h"
+#include "simple_rec.h"
+
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
+
+/* winsock2.h and ws2tcpip.h are included via support.h for Windows */
+
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
 #endif
 
 #ifdef HAVE_WINDOWS_H
-/* Define waitpid-style macros for Windows */
-#ifndef WIFEXITED
-#define WIFEXITED(s)    (((s) & 0x7f) == 0)
-#endif
-#ifndef WEXITSTATUS
-#define WEXITSTATUS(s)  (((s) >> 8) & 0xff)
-#endif
-#ifndef WIFSIGNALED
-#define WIFSIGNALED(s)  (((s) & 0x7f) != 0 && ((s) & 0x7f) != 0x7f)
-#endif
-#ifndef WTERMSIG
-#define WTERMSIG(s)     ((s) & 0x7f)
-#endif
-#ifndef WNOHANG
-#define WNOHANG 1
-#endif
-#else
-#include <sys/wait.h>
+#define drand48() (((double)rand())/((double)RAND_MAX))
+#define lrand48() rand()
+#define srand48(x)
 #endif
 
-static void
-usage()
+/* Global variables */
+int quiet = 1;
+int regression = 1;
+char *transport = NULL;
+char *control = NULL;
+char *argv0 = NULL;
+int no_fork = 0;
+
+static char *ssh_args[6] = {NULL, NULL, NULL, NULL, NULL, NULL};
+static char remote_directory[1024] = "";
+
+void
+set_ssh_args(char *destination_host, char *ssh_port)
+{
+    ssh_args[0] = strdup(SSH_PATH);
+    ssh_args[1] = destination_host;
+    ssh_args[2] = NULL;
+    if (ssh_port != NULL) {
+	ssh_args[2] = "-p";
+	ssh_args[3] = ssh_port;
+	ssh_args[4] = NULL;
+    }
+}
+
+void
+set_remote_directory(const char *dir)
+{
+    strcpy(remote_directory, dir);
+}
+
+void
+usage(void)
 {
     printf("Usage:  %s <options> \n", argv0);
     printf("  Options:\n");
@@ -42,77 +62,8 @@ usage()
     exit(1);
 }
 
-#define PARSE_ARGS() \
-    argv0 = argv[0];\
-    while (argv[1] && (argv[1][0] == '-')) {\
-	if (strcmp(&argv[1][1], "control") == 0) {	\
-	    control = argv[2];\
-	    argv++;\
-	    argc--;\
-	} else if (argv[1][1] == 'c') {		\
-	    regression_master = 0;\
-	} else if (strcmp(&argv[1][1], "ssh") == 0) {\
-	    char *destination_host;\
-	    char *first_colon, *second_colon;\
-	    char *ssh_port = NULL;\
-	    if (!argv[2]) {\
-	        printf("Missing --ssh destination\n");\
-		usage();\
-	    }\
-	    first_colon = strchr(argv[2], ':');\
-	    if (first_colon) {\
-	        *first_colon = 0;\
-		second_colon = strchr(first_colon+1, ':');\
-	    } else {\
-	        second_colon = NULL;\
-	    }\
-	    destination_host = strdup(argv[2]);\
-	    if (first_colon) {\
-	        int ssh_port_int;\
-		if (second_colon) *second_colon = 0;\
-		if (sscanf(first_colon+1, "%d", &ssh_port_int) != 1) {\
-		    second_colon = first_colon;\
-		}  else {\
-		    ssh_port = first_colon + 1;\
-		}\
-	    }\
-	    if (second_colon) {\
-	        strcpy(remote_directory, second_colon+1);\
-	    }\
-	    if (strlen(SSH_PATH) == 0) {\
-		printf("SSH_PATH in config.h is empty!  Can't run ssh\n");\
-		exit(1);\
-	    }\
-	    ssh_args[0] = strdup(SSH_PATH);\
-	    ssh_args[1] = destination_host;\
-	    ssh_args[2] = NULL;\
-	    if (ssh_port != NULL) {\
-	        ssh_args[2] = "-p";\
-	        ssh_args[3] = ssh_port;\
-		ssh_args[4] = NULL;\
-	    }\
-	    argv++; argc--;\
-	} else if (argv[1][1] == 's') {\
-	    regression_master = 0;\
-	} else if (argv[1][1] == 'q') {\
-	    quiet++;\
-	} else if (argv[1][1] == 'v') {\
-	    quiet--;\
-	} else if (argv[1][1] == 'n') {\
-	    regression = 0;\
-	    no_fork = 1;\
-	    quiet = -1;\
-	} else if (argv[1][1] == 't') {\
-	    transport = argv[2];\
-	    argv++;\
-	    argc--;\
-	}\
-	argv++;\
-	argc--;\
-    }
-
 #ifdef _MSC_VER
-static int inet_aton(const char* cp, struct in_addr* addr)
+int inet_aton(const char* cp, struct in_addr* addr)
 {
     addr->s_addr = inet_addr(cp);
     return (addr->s_addr == INADDR_NONE) ? 0 : 1;
@@ -122,6 +73,7 @@ static int inet_aton(const char* cp, struct in_addr* addr)
 pid_t
 run_subprocess(char **args)
 {
+    char **run_args = args;
 #ifdef HAVE_WINDOWS_H
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
@@ -139,7 +91,7 @@ run_subprocess(char **args)
       strcat(comm_line, args[i]);
       strcat(comm_line, " ");
       i++;
-      
+
     }
     if (!CreateProcess(module,
 		       comm_line,
@@ -148,10 +100,10 @@ run_subprocess(char **args)
         FALSE,          // Set handle inheritance to FALSE
         0,              // No creation flags
         NULL,           // Use parent's environment block
-        NULL,           // Use parent's starting directory 
+        NULL,           // Use parent's starting directory
         &si,            // Pointer to STARTUPINFO structure
-		       &pi ) 
-    ) 
+		       &pi )
+    )
     {
         printf( "CreateProcess failed (%lu).\n", GetLastError() );
 	printf("Args were argv[0] = %s\n", args[0]);
@@ -160,7 +112,6 @@ run_subprocess(char **args)
     }
     return (intptr_t) pi.hProcess;
 #else
-    char **run_args = args;
     pid_t child;
     if (quiet <=0) {printf("Forking subprocess\n");}
     if (ssh_args[0] != NULL) {
@@ -175,7 +126,7 @@ run_subprocess(char **args)
 	}
 	if (remote_directory[0] != 0) {
 	  if (strrchr(argv0, '/')) argv0 = strrchr(argv0, '/') + 1;
-	  run_args[i] = malloc(strlen(remote_directory) + 
+	  run_args[i] = malloc(strlen(remote_directory) +
 			       strlen(argv0) + 4);
 	  strcpy(run_args[i], remote_directory);
 	  if (remote_directory[strlen(remote_directory)-1] != '/')
@@ -219,11 +170,7 @@ run_subprocess(char **args)
  * Returns: pid on success, 0 if non-blocking and child not exited, -1 on error.
  * exit_state is encoded like waitpid - use WIFEXITED/WEXITSTATUS/etc to analyze.
  */
-#if defined(__GNUC__) || defined(__clang__)
-static pid_t __attribute__((unused))
-#else
-static pid_t
-#endif
+pid_t
 wait_for_subprocess(pid_t proc, int *exit_state, int block)
 {
 #ifdef HAVE_WINDOWS_H
@@ -249,3 +196,82 @@ wait_for_subprocess(pid_t proc, int *exit_state, int block)
 #endif
 }
 
+int
+verify_simple_record(simple_rec_ptr event)
+{
+    long sum = 0;
+    sum += event->integer_field % 100;
+    sum += event->short_field % 100;
+    sum += event->long_field % 100;
+    sum += ((int) (event->nested_field.item.r * 100.0)) % 100;
+    sum += ((int) (event->nested_field.item.i * 100.0)) % 100;
+    sum += ((int) (event->double_field * 100.0)) % 100;
+    sum += event->char_field;
+    sum = sum % 100;
+    return (sum == event->scan_sum);
+}
+
+FMField nested_field_list[] =
+{
+    {"item", "complex", sizeof(complex), FMOffset(nested_ptr, item)},
+    {NULL, NULL, 0, 0}
+};
+
+FMField complex_field_list[] =
+{
+    {"r", "double", sizeof(double), FMOffset(complex_ptr, r)},
+    {"i", "double", sizeof(double), FMOffset(complex_ptr, i)},
+    {NULL, NULL, 0, 0}
+};
+
+FMField simple_field_list[] =
+{
+    {"integer_field", "integer",
+     sizeof(int), FMOffset(simple_rec_ptr, integer_field)},
+    {"short_field", "integer",
+     sizeof(short), FMOffset(simple_rec_ptr, short_field)},
+    {"long_field", "integer",
+     sizeof(long), FMOffset(simple_rec_ptr, long_field)},
+    {"nested_field", "nested",
+     sizeof(nested), FMOffset(simple_rec_ptr, nested_field)},
+    {"double_field", "float",
+     sizeof(double), FMOffset(simple_rec_ptr, double_field)},
+    {"char_field", "char",
+     sizeof(char), FMOffset(simple_rec_ptr, char_field)},
+    {"scan_sum", "integer",
+     sizeof(int), FMOffset(simple_rec_ptr, scan_sum)},
+    {NULL, NULL, 0, 0}
+};
+
+FMStructDescRec simple_format_list[] =
+{
+    {"simple", simple_field_list, sizeof(simple_rec), NULL},
+    {"complex", complex_field_list, sizeof(complex), NULL},
+    {"nested", nested_field_list, sizeof(nested), NULL},
+    {NULL, NULL}
+};
+
+void
+generate_simple_record(simple_rec_ptr event)
+{
+    long sum = 0;
+    memset(event, 0, sizeof(*event));
+    event->integer_field = (int) lrand48() % 100;
+    sum += event->integer_field % 100;
+    event->short_field = ((short) lrand48());
+    sum += event->short_field % 100;
+    event->long_field = ((long) lrand48());
+    sum += event->long_field % 100;
+
+    event->nested_field.item.r = drand48();
+    sum += ((int) (event->nested_field.item.r * 100.0)) % 100;
+    event->nested_field.item.i = drand48();
+    sum += ((int) (event->nested_field.item.i * 100.0)) % 100;
+
+    event->double_field = drand48();
+    sum += ((int) (event->double_field * 100.0)) % 100;
+    event->char_field = lrand48() % 128;
+    sum += event->char_field;
+    sum = sum % 100;
+    event->scan_sum = (int) sum;
+}

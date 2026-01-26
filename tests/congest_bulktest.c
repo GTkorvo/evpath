@@ -11,8 +11,9 @@
 #include <signal.h>
 #include <arpa/inet.h>
 #include "evpath.h"
+#include "support.h"
 #ifdef HAVE_WINDOWS_H
-#include <windows.h>
+/* windows.h included via support.h */
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x)
@@ -105,7 +106,6 @@ static FMStructDescRec *simple_format_lists[] =
 
 static int size = 400;
 static int vecs = 20;
-int quiet = 1;
 
 static
 void 
@@ -182,7 +182,6 @@ simple_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 static atom_t CM_TRANSPORT;
 static atom_t CM_NETWORK_POSTFIX;
 static atom_t CM_MCAST_ADDR;
@@ -192,7 +191,6 @@ static const char *congest = "{\n\
 printf(\"In congestion handler\\n\"); return 0;\n\
 }";
 
-#include "support.h"
 
 int
 main(int argc, char **argv)

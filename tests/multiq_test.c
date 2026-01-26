@@ -13,8 +13,9 @@
 #include <signal.h>
 #include <time.h>
 #include "evpath.h"
+#include "support.h"
 #ifdef HAVE_WINDOWS_H
-#include <windows.h>
+/* windows.h included via support.h */
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x)
@@ -110,7 +111,6 @@ generate_b_record(rec_b_ptr event)
     event->sequence = sequence++;
 }
 
-int quiet = 1;
 static int repeat_count = 100;
 char *a_map = NULL;
 char *b_map = NULL;
@@ -146,7 +146,6 @@ output_handler(CManager cm, void *vevent, void *client_data, attr_list attrs)
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 static atom_t CM_TRANSPORT;
 static atom_t CM_NETWORK_POSTFIX;
 static atom_t CM_MCAST_ADDR;
@@ -189,9 +188,6 @@ data_free(void *event_data, void *client_data)
     free(event_data);
 }
 
-char *transport = NULL;
-char *control = NULL;
-#include "support.c"
 
 int
 main(int argc, char **argv)

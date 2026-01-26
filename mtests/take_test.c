@@ -9,8 +9,22 @@
 #include <string.h>
 #include <signal.h>
 #include "evpath.h"
+#define PARSE_EXTRA_ARGS } else if (strcmp(&argv[1][1], "size") == 0) {\
+	    if (sscanf(argv[2], "%zu", &size) != 1) {\
+		printf("Unparseable argument to -size, %s\n", argv[2]);\
+	    }\
+	    if (vecs == 0) { vecs = 1; printf("vecs not 1\n");}\
+	    argv++;\
+	    argc--;\
+	} else 	if (strcmp(&argv[1][1], "vecs") == 0) {\
+	    if (sscanf(argv[2], "%lu", &vecs) != 1) {\
+		printf("Unparseable argument to -vecs, %s\n", argv[2]);\
+	    }\
+	    argv++;\
+	    argc--;
+#include "support.h"
 #ifdef HAVE_WINDOWS_H
-#include <windows.h>
+/* windows.h included via support.h */
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x)
@@ -148,7 +162,6 @@ generate_record(simple_rec_ptr event)
     }
 }
 
-int quiet = 1;
 static int msg_count = 0;
 #define QUEUE_SIZE 10
 simple_rec_ptr queue[QUEUE_SIZE];
@@ -226,25 +239,7 @@ simple_handler(CManager cm, CMConnection conn, void *vevent, void *client_data,
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 static atom_t CM_TRANSPORT;
-static char *transport = NULL;
-
-#define PARSE_EXTRA_ARGS } else if (strcmp(&argv[1][1], "size") == 0) {\
-	    if (sscanf(argv[2], "%zu", &size) != 1) {\
-		printf("Unparseable argument to -size, %s\n", argv[2]);\
-	    }\
-	    if (vecs == 0) { vecs = 1; printf("vecs not 1\n");}\
-	    argv++;\
-	    argc--;\
-	} else 	if (strcmp(&argv[1][1], "vecs") == 0) {\
-	    if (sscanf(argv[2], "%lu", &vecs) != 1) {\
-		printf("Unparseable argument to -vecs, %s\n", argv[2]);\
-	    }\
-	    argv++;\
-	    argc--;\
-
-#include "support.c"
 
 int
 main(int argc, char **argv)

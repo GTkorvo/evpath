@@ -9,9 +9,10 @@
 #include <string.h>
 #include <signal.h>
 #include "evpath.h"
+#include "support.h"
 #include "revpath.h"
 #ifdef HAVE_WINDOWS_H
-#include <windows.h>
+/* windows.h included via support.h */
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -82,8 +83,6 @@ static FMStructDescRec simple_format_list[] =
     {"nested", nested_field_list, sizeof(nested), NULL},
     {NULL, NULL}
 };
-
-int quiet = 1;
 
 static int message_count = 0;
 
@@ -176,9 +175,6 @@ handshake_with_parent(CManager cm, attr_list parent_contact_list)
     return conn;
 }
 
-static int regression = 1;
-static char* transport = NULL;
-#include "../mtests/support.c"
 
 int
 main(int argc, char **argv)

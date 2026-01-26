@@ -26,6 +26,7 @@
 #include <arpa/inet.h>
 #endif
 #include "evpath.h"
+#include "support.h"
 
 #ifdef _MSC_VER
 #define drand48() (((double)rand())/((double)RAND_MAX))
@@ -49,7 +50,6 @@ static FMField msg_field_list[] =
     {NULL, NULL, 0, 0}
 };
 
-int quiet = 1;
 int im_the_master = 0;
 int master_success = 0;
 CMFormat msg_format = NULL;
@@ -98,12 +98,9 @@ msg_handler(CManager cm, CMConnection conn, void *vmsg, void *client_data,
 }
 
 static int do_regression_master_test();
-static int regression = 1;
 
 static atom_t CM_TRANSPORT;
 
-char *transport = NULL;
-#include "support.c"
 
 void
 do_master_stuff(CManager cm)

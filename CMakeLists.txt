@@ -115,13 +115,21 @@ elseif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
 add_library(EVPath
-  cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c 
+  cm.c cm_control.c cm_formats.c cm_util.c cm_transport.c
   cm_lock.c cm_perf.c cm_pbio.c cm_interface.c version.c
-  cm_threadio.c cm_evol.c evp.c response.c metrics.c 
+  cm_threadio.c cm_evol.c evp.c response.c metrics.c
   dlloader.c ip_config.c chr_time.c revpath.h revp_internal.h
   revp.c evp_compat.c thin_server.c evp_threads.c ev_dfg.c)
 add_library(EVPath::EVPath ALIAS EVPath)
 add_library(evpath ALIAS EVPath)
+
+# GCC 12-14 emit spurious -Warray-bounds warning in ev_dfg.c; update upper bound if needed
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "12" AND
+     CMAKE_C_COMPILER_VERSION VERSION_LESS "15")
+    set_source_files_properties(ev_dfg.c PROPERTIES COMPILE_FLAGS "-Wno-array-bounds")
+  endif()
+endif()
 
 # MSVC warning suppressions
 if(MSVC OR CMAKE_C_SIMULATE_ID MATCHES "MSVC")
@@ -208,8 +216,8 @@ cmake_dependent_option(EVPATH_TRANSPORT_MODULES
 )
 
 list(INSERT CMAKE_PREFIX_PATH 0 ${CMAKE_INSTALL_PREFIX})
-find_package(atl 2.2.1 REQUIRED)
-find_package(ffs 3.0.0 REQUIRED)
+find_package(atl 2.3.0 REQUIRED)
+find_package(ffs 3.2.0 REQUIRED)
 _pkg_get_target_prefix(atl::atl atl_PREFIX)
 _pkg_get_target_prefix(ffs::ffs ffs_PREFIX)
 list(APPEND _pkg_config_pfxs "${atl_PREFIX}" "${ffs_PREFIX}")
@@ -224,7 +232,7 @@ else()
   unset(CMAKE_REQUIRED_LIBRARIES)
 endif()
 if (HAVE_COD_H)
-   find_package(dill 3.0.0 REQUIRED)
+   find_package(dill 3.2.2 REQUIRED)
    target_link_libraries(EVPath PUBLIC atl::atl ffs::ffs PRIVATE dill::dill)
    _pkg_get_target_prefix(dill::dill dill_PREFIX)
    list(APPEND _pkg_config_private_reqs "dill >= ${dill_VERSION}")
