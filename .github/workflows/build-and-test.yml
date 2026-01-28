@@ -119,31 +119,22 @@ jobs:
       run: source/scripts/ci/gh-actions/run.sh configure
     - name: Build
       run: source/scripts/ci/gh-actions/run.sh build
-    - name: Stage DLLs (Windows)
+    - name: Add DLL paths (Windows)
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
-          # Copy dependency DLLs to build output directories so Windows can find them
+          # Add DLL directories to PATH so Windows can find them at runtime
           $buildType = "${{ matrix.buildtype }}"
           $configDir = if ($buildType -eq "release") { "Release" } else { "Debug" }
-          # Copy to bin directory (for evpath.dll and tools)
-          $destDir = "build/bin/$configDir"
-          if (Test-Path $destDir) {
-              Copy-Item -Path "atl/install/bin/*.dll" -Destination $destDir -Force -ErrorAction SilentlyContinue
-              Copy-Item -Path "dill/install/bin/*.dll" -Destination $destDir -Force -ErrorAction SilentlyContinue
-              Copy-Item -Path "ffs/install/bin/*.dll" -Destination $destDir -Force -ErrorAction SilentlyContinue
-              Write-Host "Copied DLLs to $destDir"
-              Get-ChildItem $destDir -Filter *.dll | ForEach-Object { Write-Host "  - $($_.Name)" }
-          }
-          # Copy to tests directory (for test executables)
-          $testDir = "build/tests/$configDir"
-          if (Test-Path $testDir) {
-              Copy-Item -Path "atl/install/bin/*.dll" -Destination $testDir -Force -ErrorAction SilentlyContinue
-              Copy-Item -Path "dill/install/bin/*.dll" -Destination $testDir -Force -ErrorAction SilentlyContinue
-              Copy-Item -Path "ffs/install/bin/*.dll" -Destination $testDir -Force -ErrorAction SilentlyContinue
-              Copy-Item -Path "build/bin/$configDir/*.dll" -Destination $testDir -Force -ErrorAction SilentlyContinue
-              Write-Host "Copied DLLs to $testDir"
-              Get-ChildItem $testDir -Filter *.dll | ForEach-Object { Write-Host "  - $($_.Name)" }
+          $paths = @(
+              "${{ github.workspace }}/atl/install/bin",
+              "${{ github.workspace }}/dill/install/bin",
+              "${{ github.workspace }}/ffs/install/bin",
+              "${{ github.workspace }}/build/bin/$configDir"
+          )
+          foreach ($p in $paths) {
+              Write-Host "Adding to PATH: $p"
+              echo $p >> $env:GITHUB_PATH
           }
     - name: Test
       run: source/scripts/ci/gh-actions/run.sh test
