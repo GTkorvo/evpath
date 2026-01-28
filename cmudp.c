@@ -644,7 +644,19 @@ libcmudp_LTX_writev_func(CMtrans_services svc, udp_conn_data_ptr ucd, struct iov
 	exit(1);
     }
 #else
-    // no reimplementation for windows currently
+    WSABUF wsa_bufs[IOV_MAX];
+    DWORD bytes_sent;
+    size_t i;
+    struct sockaddr_in addr = ucd->dest_addr;
+    for (i = 0; i < iovcnt && i < IOV_MAX; i++) {
+	wsa_bufs[i].buf = (char*)iov[i].iov_base;
+	wsa_bufs[i].len = (ULONG)iov[i].iov_len;
+    }
+    if (WSASendTo(fd, wsa_bufs, (DWORD)iovcnt, &bytes_sent, 0,
+		  (struct sockaddr*)&addr, sizeof(addr), NULL, NULL) == SOCKET_ERROR) {
+	fprintf(stderr, "WSASendTo failed: %d\n", WSAGetLastError());
+	exit(1);
+    }
 #endif
     return (int)iovcnt;
 }
