@@ -73,7 +73,6 @@ int inet_aton(const char* cp, struct in_addr* addr)
 pid_t
 run_subprocess(char **args)
 {
-    char **run_args = args;
 #ifdef HAVE_WINDOWS_H
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
@@ -92,6 +91,9 @@ run_subprocess(char **args)
       strcat(comm_line, " ");
       i++;
 
+    }
+    if (quiet <= 0) {
+        printf("Subproc arguments are: %s\n", comm_line);
     }
     if (!CreateProcess(module,
 		       comm_line,
@@ -113,6 +115,7 @@ run_subprocess(char **args)
     return (intptr_t) pi.hProcess;
 #else
     pid_t child;
+    char **run_args = args;
     if (quiet <=0) {printf("Forking subprocess\n");}
     if (ssh_args[0] != NULL) {
         int i=0, j=0;

@@ -11,7 +11,7 @@
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
-#define srand48(x)
+#define srand48(x) srand((unsigned int)(x))
 #else
 #include <sys/socket.h>
 #include <netdb.h>
