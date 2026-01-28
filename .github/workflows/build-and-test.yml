@@ -119,22 +119,24 @@ jobs:
       run: source/scripts/ci/gh-actions/run.sh configure
     - name: Build
       run: source/scripts/ci/gh-actions/run.sh build
-    - name: Add DLL paths (Windows)
+    - name: Stage DLLs (Windows)
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
-          # Add DLL directories to PATH so Windows can find them at runtime
           $buildType = "${{ matrix.buildtype }}"
           $configDir = if ($buildType -eq "release") { "Release" } else { "Debug" }
-          $paths = @(
-              "${{ github.workspace }}/atl/install/bin",
-              "${{ github.workspace }}/dill/install/bin",
-              "${{ github.workspace }}/ffs/install/bin",
-              "${{ github.workspace }}/build/bin/$configDir"
-          )
-          foreach ($p in $paths) {
-              Write-Host "Adding to PATH: $p"
-              echo $p >> $env:GITHUB_PATH
+          $srcDirs = @("atl/install/bin", "dill/install/bin", "ffs/install/bin", "build/bin/$configDir")
+          $testDirs = @("build/tests/$configDir", "build/mtests/$configDir", "build/dfg_tests/$configDir")
+          foreach ($testDir in $testDirs) {
+              if (Test-Path $testDir) {
+                  foreach ($srcDir in $srcDirs) {
+                      if (Test-Path "$srcDir/*.dll") {
+                          Copy-Item -Path "$srcDir/*.dll" -Destination $testDir -Force -ErrorAction SilentlyContinue
+                      }
+                  }
+                  Write-Host "DLLs in ${testDir}:"
+                  Get-ChildItem $testDir -Filter *.dll | ForEach-Object { Write-Host "  - $($_.Name)" }
+              }
           }
     - name: Test
       run: source/scripts/ci/gh-actions/run.sh test
