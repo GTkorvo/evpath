@@ -126,7 +126,7 @@ jobs:
           $buildType = "${{ matrix.buildtype }}"
           $configDir = if ($buildType -eq "release") { "Release" } else { "Debug" }
           $srcDirs = @("atl/install/bin", "dill/install/bin", "ffs/install/bin", "build/bin/$configDir", "build/lib/$configDir")
-          $testDirs = @("build/tests/$configDir", "build/mtests/$configDir", "build/dfg_tests/$configDir")
+          $testDirs = @("build/tests/$configDir", "build/mtests/$configDir", "build/dfg_tests/$configDir", "build/rtests/$configDir")
           foreach ($testDir in $testDirs) {
               if (Test-Path $testDir) {
                   foreach ($srcDir in $srcDirs) {
