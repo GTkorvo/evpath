@@ -7,7 +7,7 @@ string(APPEND dashboard_cache "
 # which point directly to the cmake config files
 set(ENV{atl_DIR} "${CMAKE_CURRENT_LIST_DIR}/../../../../atl/install/lib/cmake/atl")
 set(ENV{dill_DIR} "${CMAKE_CURRENT_LIST_DIR}/../../../../dill/install/lib/cmake/dill")
-set(ENV{ffs_DIR} "${CMAKE_CURRENT_LIST_DIR}/../../../../ffs/install/lib/cmake/ffs")
+set(ENV{ffs_DIR} "${CMAKE_CURRENT_LIST_DIR}/../../../../ffs/install/CMake")
 
 set(CTEST_BUILD_WARNINGS_AS_ERRORS FALSE)
 
