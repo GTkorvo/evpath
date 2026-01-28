@@ -896,7 +896,9 @@ pipe(SOCKET *filedes)
     sock_addr.sin_port = 0;
     if (bind(conn_sock, (struct sockaddr *) &sock_addr,
 	     sizeof sock_addr) == SOCKET_ERROR) {
-	fprintf(stderr, "Cannot bind INET socket\n");
+	int err = WSAGetLastError();
+	fprintf(stderr, "Cannot bind INET socket, WSA error %s\n", WSAerror_str(err));
+	closesocket(conn_sock);
 	return -1;
     }
     length = sizeof sock_addr;

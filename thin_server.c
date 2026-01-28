@@ -12,11 +12,21 @@
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x) srand((unsigned int)(x))
+static int winsock_initialized = 0;
+static void ensure_winsock_initialized(void) {
+    if (!winsock_initialized) {
+        WSADATA wsaData;
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0) {
+            winsock_initialized = 1;
+        }
+    }
+}
 #else
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#define ensure_winsock_initialized()
 #endif
 #include <string.h>
 #ifdef HAVE_UNISTD_H
@@ -35,6 +45,9 @@ extern void CMget_qual_hostname(CManager cm, char *buf, int len);
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
 #endif
+#ifndef INVALID_SOCKET
+#define INVALID_SOCKET -1
+#endif
 extern void
 CMget_port_range(CManager cm, int *high_bound, int *low_bound);
 
@@ -52,8 +65,9 @@ EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
     int high_bound, low_bound;
     CMget_port_range(cm, &high_bound, &low_bound);
 
+    ensure_winsock_initialized();
     conn_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (conn_sock == SOCKET_ERROR) {
+    if (conn_sock == INVALID_SOCKET) {
 	fprintf(stderr, "Cannot open INET socket\n");
 	return 0;
     }
@@ -252,7 +266,7 @@ static void
 socket_accept_thin_client(void *cmv, void * sockv)
 {
     CManager cm = (CManager) cmv;
-    SOCKET conn_sock = (int) (intptr_t)sockv;
+    SOCKET conn_sock = (SOCKET) (intptr_t)sockv;
     SOCKET sock;
     struct sockaddr sock_addr;
     socklen_t sock_len = sizeof(sock_addr);
@@ -267,7 +281,7 @@ socket_accept_thin_client(void *cmv, void * sockv)
 
     linger_val.l_onoff = 1;
     linger_val.l_linger = 60;
-    if ((sock = accept(conn_sock, (struct sockaddr *) 0, (socklen_t *) 0)) == SOCKET_ERROR) {
+    if ((sock = accept(conn_sock, (struct sockaddr *) 0, (socklen_t *) 0)) == INVALID_SOCKET) {
 	perror("Cannot accept socket connection");
 	CM_fd_remove_select(cm, conn_sock);
 	fprintf(stderr, "failure in CMsockets  removing socket connection\n");
