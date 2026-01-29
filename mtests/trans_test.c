@@ -1,4 +1,5 @@
 #include "config.h"
+#include "support.h"
 
 #include <stdio.h>
 #include <atl.h>
@@ -24,7 +25,6 @@
 #include <direct.h>
 #include <sys/timeb.h>
 #include <time.h>
-#define kill(x,y) TerminateProcess((HANDLE)(x), y)
 #define getcwd(x,y) _getcwd(x,y)
 #endif
 

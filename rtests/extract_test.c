@@ -18,7 +18,6 @@
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
 #define srand48(x) srand((unsigned int)(x))
-#define kill(x,y) TerminateProcess((HANDLE)(x), y)
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>
