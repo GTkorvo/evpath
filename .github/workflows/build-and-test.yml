@@ -123,16 +123,20 @@ jobs:
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
-          # Copy dependency DLLs to build output directory so Windows can find them
           $buildType = "${{ matrix.buildtype }}"
           $configDir = if ($buildType -eq "release") { "Release" } else { "Debug" }
-          $destDir = "build/bin/$configDir"
-          if (Test-Path $destDir) {
-              Copy-Item -Path "atl/install/bin/*.dll" -Destination $destDir -Force -ErrorAction SilentlyContinue
-              Copy-Item -Path "dill/install/bin/*.dll" -Destination $destDir -Force -ErrorAction SilentlyContinue
-              Copy-Item -Path "ffs/install/bin/*.dll" -Destination $destDir -Force -ErrorAction SilentlyContinue
-              Write-Host "Copied DLLs to $destDir"
-              Get-ChildItem $destDir -Filter *.dll | ForEach-Object { Write-Host "  - $($_.Name)" }
+          $srcDirs = @("atl/install/bin", "dill/install/bin", "ffs/install/bin", "build/bin/$configDir", "build/lib/$configDir")
+          $testDirs = @("build/tests/$configDir", "build/mtests/$configDir", "build/dfg_tests/$configDir", "build/rtests/$configDir")
+          foreach ($testDir in $testDirs) {
+              if (Test-Path $testDir) {
+                  foreach ($srcDir in $srcDirs) {
+                      if (Test-Path "$srcDir/*.dll") {
+                          Copy-Item -Path "$srcDir/*.dll" -Destination $testDir -Force -ErrorAction SilentlyContinue
+                      }
+                  }
+                  Write-Host "DLLs in ${testDir}:"
+                  Get-ChildItem $testDir -Filter *.dll | ForEach-Object { Write-Host "  - $($_.Name)" }
+              }
           }
     - name: Test
       run: source/scripts/ci/gh-actions/run.sh test

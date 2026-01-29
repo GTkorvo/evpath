@@ -165,7 +165,7 @@ run_subprocess(char **args)
 	printf("\n");
 	return 0;
     }
-    child = _spawnv(_P_NOWAIT, args[0], args);
+    child = _spawnv(_P_NOWAIT, args[0], (const char *const *)args);
     if (child == -1) {
 	printf("failed for %s\n", args[0]);
 	perror("spawnv");

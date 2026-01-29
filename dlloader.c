@@ -160,7 +160,9 @@ CMdlopen(void *CMTrace_filev, char *in_lib, int mode)
     if (!handle) return NULL;
     dlh = malloc(sizeof(*dlh));
     tmp = strrchr(lib, '/'); /* find name start */
-    if (!tmp) tmp = lib;
+    if (!tmp) tmp = strrchr(lib, '\\'); /* try Windows path separator */
+    if (tmp) tmp++; /* skip past the separator */
+    else tmp = lib;
 
     char *cm_lib_prefix;
     if(strlen(CM_LIBRARY_PREFIX) > 0 &&
