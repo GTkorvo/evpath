@@ -1,6 +1,7 @@
 #include "config.h"
 #include "support.h"
 #include "simple_rec.h"
+#include <atl.h>
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -25,9 +26,16 @@ char *transport = NULL;
 char *control = NULL;
 char *argv0 = NULL;
 int no_fork = 0;
+void (*on_exit_handler)(void) = NULL;
 
 static char *ssh_args[6] = {NULL, NULL, NULL, NULL, NULL, NULL};
 static char remote_directory[1024] = "";
+
+/* DFG test support variables */
+static pid_t *pid_list = NULL;
+static int start_subproc_arg_count = 0;
+static char **subproc_args = NULL;
+static int cur_subproc_arg = 0;
 
 void
 set_ssh_args(char *destination_host, char *ssh_port)
@@ -214,6 +222,36 @@ verify_simple_record(simple_rec_ptr event)
     return (sum == event->scan_sum);
 }
 
+extern int
+checksum_simple_record(simple_rec_ptr event, attr_list attrs, int quiet_level)
+{
+    long sum = 0, scan_sum = 0;
+    sum += event->integer_field % 100;
+    sum += event->short_field % 100;
+    sum += event->long_field % 100;
+    sum += ((int) (event->nested_field.item.r * 100.0)) % 100;
+    sum += ((int) (event->nested_field.item.i * 100.0)) % 100;
+    sum += ((int) (event->double_field * 100.0)) % 100;
+    sum += event->char_field;
+    sum = sum % 100;
+    scan_sum = event->scan_sum;
+    if (sum != scan_sum) {
+        printf("Received record checksum does not match. expected %d, got %d\n",
+               (int) sum, (int) scan_sum);
+    }
+    if ((quiet_level <= 0) || (sum != scan_sum)) {
+        printf("In the handler, event data is :\n");
+        printf("	integer_field = %d\n", event->integer_field);
+        printf("	short_field = %d\n", event->short_field);
+        printf("	long_field = %ld\n", event->long_field);
+        printf("	double_field = %g\n", event->double_field);
+        printf("	char_field = %c\n", event->char_field);
+        printf("Data was received with attributes : \n");
+        if (attrs) dump_attr_list(attrs);
+    }
+    return (sum == scan_sum);
+}
+
 FMField nested_field_list[] =
 {
     {"item", "complex", sizeof(complex), FMOffset(nested_ptr, item)},
@@ -277,4 +315,102 @@ generate_simple_record(simple_rec_ptr event)
     sum += event->char_field;
     sum = sum % 100;
     event->scan_sum = (int) sum;
+}
+
+/*
+ * DFG test support functions
+ */
+
+void
+set_subproc_args(int argc, char **argv)
+{
+    start_subproc_arg_count = 8; /* leave a few open at the beginning for ssh args */
+    subproc_args = calloc((argc + start_subproc_arg_count + 8), sizeof(argv[0]));
+    cur_subproc_arg = start_subproc_arg_count;
+
+    /* Set up the initial subprocess command (argv0) */
+    if (remote_directory[0] != 0) {
+        char *base = argv0;
+        if (strrchr(base, '/')) base = strrchr(base, '/') + 1;
+        if (strrchr(base, '\\')) base = strrchr(base, '\\') + 1;
+        subproc_args[cur_subproc_arg] = malloc(strlen(remote_directory) + strlen(base) + 4);
+        strcpy(subproc_args[cur_subproc_arg], remote_directory);
+        if (remote_directory[strlen(remote_directory)-1] != '/' &&
+            remote_directory[strlen(remote_directory)-1] != '\\')
+            strcat(subproc_args[cur_subproc_arg], "/");
+        strcat(subproc_args[cur_subproc_arg], base);
+    } else {
+        subproc_args[cur_subproc_arg] = argv0;
+    }
+    subproc_args[cur_subproc_arg+1] = NULL;
+    cur_subproc_arg++;
+}
+
+void
+test_fork_children(char **list, char *master_contact)
+{
+    char *args[20];
+    int i = 0;
+    int list_index = 1;
+    static int pid_index = 1;
+
+    if (!subproc_args) return;
+
+    /* assume that we are list[0] */
+    while(subproc_args[start_subproc_arg_count + i] != NULL) {
+        args[i] = subproc_args[start_subproc_arg_count+i];
+        i++;
+    }
+    if (quiet < 1) {
+        args[i++] = "-v";
+    }
+    args[i++] = "-c";
+    args[i+1] = master_contact;
+    args[i+2] = NULL;
+    if (!pid_list) pid_list = malloc(sizeof(pid_list[0]));
+    while(list[list_index] != NULL) {
+        args[i] = list[list_index];
+        pid_list[pid_index - 1] = run_subprocess(args);
+        list_index++;
+        pid_index++;
+        pid_list = realloc(pid_list, sizeof(pid_list[0]) * pid_index);
+    }
+    pid_list[pid_index - 1] = 0;
+}
+
+typedef void (*CMPollFunc)(void *cm, void *client_data);
+typedef void *CMTaskHandle;
+extern CMTaskHandle CMadd_delayed_task(void *cm, int secs, int usecs, CMPollFunc func, void *client_data);
+
+static void
+delay_fork_wrapper(void *cm, void *client_data)
+{
+    delay_struct *str = (delay_struct*)client_data;
+    (void) cm;
+    test_fork_children(str->list, str->master_contact);
+    free(str);
+}
+
+void
+delayed_fork_children(struct _CManager *cm, char **list, char *master_contact, int delay_seconds)
+{
+    delay_struct *str = malloc(sizeof(delay_struct));
+    str->list = list;
+    str->master_contact = master_contact;
+    CMTaskHandle handle = CMadd_delayed_task((void*)cm, delay_seconds, 0, delay_fork_wrapper, (void*) str);
+    (void) handle;
+}
+
+int
+wait_for_children(char **list)
+{
+    int i = 0, stat;
+    (void)list;
+    while(pid_list && pid_list[i] != 0) {
+        wait_for_subprocess(pid_list[i], &stat, 1);
+        i++;
+    }
+    free(pid_list);
+    pid_list = NULL;
+    return 0;
 }

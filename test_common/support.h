@@ -33,6 +33,7 @@ extern int inet_aton(const char* cp, struct in_addr* addr);
 #ifndef WNOHANG
 #define WNOHANG 1
 #endif
+#define kill(x,y) TerminateProcess((HANDLE)(x), y)
 #else
 #include <sys/wait.h>
 #endif
@@ -44,11 +45,24 @@ extern char *transport;
 extern char *control;
 extern char *argv0;
 extern int no_fork;
+extern void (*on_exit_handler)(void);
 
 /* Function prototypes */
 extern void usage(void);
 extern pid_t run_subprocess(char **args);
 extern pid_t wait_for_subprocess(pid_t proc, int *exit_state, int block);
+
+/* DFG test support - for tests that fork multiple children */
+struct _CManager;  /* forward declaration */
+typedef struct _delay_struct {
+    char **list;
+    char *master_contact;
+} delay_struct;
+
+extern void test_fork_children(char **list, char *master_contact);
+extern void delayed_fork_children(struct _CManager *cm, char **list, char *master_contact, int delay_seconds);
+extern int wait_for_children(char **list);
+extern void set_subproc_args(int argc, char **argv);
 
 #ifndef PARSE_EXTRA_ARGS
 #define PARSE_EXTRA_ARGS
