@@ -416,7 +416,7 @@ do_regression_master_test()
 	printf("Waiting for remote....\n");
     }
     while (!done) {
-	int result;
+	pid_t result;
 	if (quiet <= 0) {
 	    printf(",");
 	    fflush(stdout);

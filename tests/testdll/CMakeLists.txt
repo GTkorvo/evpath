@@ -2,6 +2,7 @@ add_library(foo MODULE foo.c)
 # Always use "lib" prefix since filter_test expects "libfoo.la" -> "libfoo.dll"
 # WINDOWS_EXPORT_ALL_SYMBOLS ensures filter/transform functions are exported
 set_target_properties(foo PROPERTIES
+  PREFIX ""
   OUTPUT_NAME libfoo
   WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
 
