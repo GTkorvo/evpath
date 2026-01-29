@@ -64,7 +64,24 @@
 #include "ev_select.h"
 #ifdef _MSC_VER
 #define getpid()	_getpid()
+#endif
+#ifdef HAVE_WINDOWS_H
 #define close(x) closesocket(x)
+
+static int winsock_initialized = 0;
+static void ensure_winsock_initialized(void) {
+    if (!winsock_initialized) {
+        WSADATA wsaData;
+        int err = WSAStartup(MAKEWORD(2, 2), &wsaData);
+        if (err != 0) {
+            fprintf(stderr, "cmselect: WSAStartup failed with error %d\n", err);
+        } else {
+            winsock_initialized = 1;
+        }
+    }
+}
+#else
+#define ensure_winsock_initialized()
 #endif
 #undef realloc
 #undef malloc
@@ -886,6 +903,7 @@ pipe(SOCKET *filedes)
     unsigned long block = TRUE;
     int delay_value = 1;
 
+    ensure_winsock_initialized();
     memset(&sock_addr, 0, sizeof(sock_addr));
     conn_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (conn_sock == INVALID_SOCKET) {
