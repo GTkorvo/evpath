@@ -1046,7 +1046,7 @@ dfg_ready_handler(CManager cm, CMConnection conn, void *vmsg,
     CManager_unlock(cm);
 }
 
-static void 
+static void
 handle_conn_shutdown(EVmaster master, EVmaster_msg_ptr msg)
 {
     int stone = msg->u.conn_shutdown.stone;
@@ -1055,10 +1055,16 @@ handle_conn_shutdown(EVmaster master, EVmaster_msg_ptr msg)
 
     /* this stone is automatically frozen by EVPath */
     reporting_stone->condition = EVstone_Frozen;
+
+    if (master->node_fail_handler == NULL) {
+	/* No handler to deal with connection shutdown, just log and return */
+	CMtrace_out(master->cm, EVdfgVerbose, "EVDFG conn_shutdown_handler - no node_fail_handler, ignoring\n");
+	return;
+    }
+
     master->state = DFG_Reconfiguring;
-    
     CMtrace_out(master->cm, EVdfgVerbose, "EVDFG conn_shutdown_handler -  master DFG state is now %s\n", str_state[master->state]);
-    if (master->node_fail_handler != NULL) {
+    {
 	int i;
 	int target_stone = -1;
 	char *failed_node = NULL;
