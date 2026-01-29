@@ -1,5 +1,9 @@
 if (HAVE_COD_H)
-  set (TESTS evtest bulktest http_test filter_test router_test router_test2 no_type_router_test filter2_test transform_test auto_test extract_test submit_test thin_test rawtest rawtest2 multi_thread multiq_test split_test executing_stone_test)
+  set (TESTS evtest bulktest http_test filter_test router_test router_test2 no_type_router_test filter2_test transform_test auto_test extract_test submit_test rawtest rawtest2 multi_thread multiq_test split_test executing_stone_test)
+  if (NOT WIN32)
+    # thin_test uses FFS over sockets which requires socket-aware I/O on Windows
+    list(APPEND TESTS thin_test)
+  endif()
 else()
   set (TESTS evtest bulktest http_test)
 endif()
