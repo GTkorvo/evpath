@@ -1,5 +1,4 @@
 #include "config.h"
-#include "support.h"
 
 #include <stdio.h>
 #include <atl.h>
@@ -26,6 +25,7 @@
 #include <sys/timeb.h>
 #include <time.h>
 #define getcwd(x,y) _getcwd(x,y)
+#define kill(x,y) TerminateProcess((HANDLE)(x), y)
 #endif
 
 static atom_t CM_TRANS_TEST_SIZE = 10240;
