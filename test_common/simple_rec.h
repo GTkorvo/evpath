@@ -39,4 +39,8 @@ extern void generate_simple_record(simple_rec_ptr event);
 
 extern int verify_simple_record(simple_rec_ptr event);
 
+/* checksum_simple_record - like verify but with verbose output */
+#include <atl.h>
+extern int checksum_simple_record(simple_rec_ptr event, attr_list attrs, int quiet);
+
 #endif /* SIMPLE_REC_H */

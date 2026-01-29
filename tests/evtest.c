@@ -11,7 +11,6 @@
 #include "evpath.h"
 #include "support.h"
 #ifdef HAVE_WINDOWS_H
-#define kill(x,y) TerminateProcess(OpenProcess(0,0,(DWORD)x),y)
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>

@@ -14,7 +14,6 @@
 /* windows.h included via support.h */
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#define kill(x,y) TerminateProcess((HANDLE)(x), y)
 #else
 #include <sys/socket.h>
 #include <arpa/inet.h>
