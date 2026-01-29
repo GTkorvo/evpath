@@ -879,15 +879,16 @@ WSAerror_str(int err)
 static int
 pipe(SOCKET *filedes)
 {
-    
+
     int length;
     struct sockaddr_in sock_addr;
     SOCKET sock1, sock2, conn_sock;
     unsigned long block = TRUE;
     int delay_value = 1;
-   
+
+    memset(&sock_addr, 0, sizeof(sock_addr));
     conn_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (conn_sock == SOCKET_ERROR) {
+    if (conn_sock == INVALID_SOCKET) {
 	fprintf(stderr, "Cannot open INET socket\n");
 	return -1;
     }
@@ -913,7 +914,8 @@ pipe(SOCKET *filedes)
     }
 
 /* send sock */
-    if ((sock1 = socket(AF_INET, SOCK_STREAM, 0)) == SOCKET_ERROR) {
+    if ((sock1 = socket(AF_INET, SOCK_STREAM, 0)) == INVALID_SOCKET) {
+	closesocket(conn_sock);
 	return -1;
     }
     sock_addr.sin_addr.s_addr = 0x0100007f;  /* loopback */
@@ -929,9 +931,12 @@ pipe(SOCKET *filedes)
 	}
     }
 
-    if ((sock2 = accept(conn_sock, (struct sockaddr *) 0, (int *) 0)) == SOCKET_ERROR) {
+    if ((sock2 = accept(conn_sock, (struct sockaddr *) 0, (int *) 0)) == INVALID_SOCKET) {
 	    int err = WSAGetLastError();
-	    printf("err was %s\n", WSAerror_str(err));
+	    printf("accept err was %s\n", WSAerror_str(err));
+	    closesocket(sock1);
+	    closesocket(conn_sock);
+	    return -1;
     }
     
     setsockopt(sock2, IPPROTO_TCP, TCP_NODELAY, (char *) &delay_value,

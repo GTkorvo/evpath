@@ -16,8 +16,11 @@ static int winsock_initialized = 0;
 static void ensure_winsock_initialized(void) {
     if (!winsock_initialized) {
         WSADATA wsaData;
-        if (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0) {
+        int err = WSAStartup(MAKEWORD(2, 2), &wsaData);
+        if (err == 0) {
             winsock_initialized = 1;
+        } else {
+            fprintf(stderr, "WSAStartup failed with error %d\n", err);
         }
     }
 }
