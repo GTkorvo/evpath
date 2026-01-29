@@ -1,10 +1,14 @@
 if (HAVE_COD_H)
-  set(TESTS evtest master_not_client multi_sink rawtest chain_test filter_test 
-    tree_test multi_test dchain_test fail_chain_test reconfig_chain_test 
-    anon_multi_test auto_tree_test router_test force_test self_reconfig_test 
-    source_split named_stones delayed_submit metrics_test)
+  set(TESTS evtest master_not_client multi_sink rawtest chain_test filter_test
+    tree_test multi_test dchain_test fail_chain_test reconfig_chain_test
+    anon_multi_test auto_tree_test router_test force_test self_reconfig_test
+    source_split named_stones delayed_submit)
+  if (NOT WIN32)
+    # metrics_test requires /proc filesystem, skip on Windows
+    list(APPEND TESTS metrics_test)
+  endif()
 else()
-  set(TESTS evtest master_not_client multi_sink rawtest 
+  set(TESTS evtest master_not_client multi_sink rawtest
     tree_test dchain_test fail_chain_test source_split)
 endif()
 
