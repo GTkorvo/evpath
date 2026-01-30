@@ -120,7 +120,7 @@ main(int argc, char **argv)
 {
     CManager cm;
     EVstone sink1, sink2, sink3;
-    simple_rec data;
+    simple_rec data = {0};
 
     PARSE_ARGS();
 

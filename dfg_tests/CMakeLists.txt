@@ -31,6 +31,9 @@ if(UNIX)
   endif()
 endif()
 
+# fail_chain_test needs longer timeout due to simulated failures
+set_tests_properties(dfg_fail_chain_test PROPERTIES TIMEOUT 300)
+
 if (HAVE_COD_H)
   add_test(NAME dfg_chain_test_one_proc  COMMAND dfg_chain_test 1)
 endif()

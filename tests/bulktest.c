@@ -160,7 +160,7 @@ generate_record(simple_rec_ptr event)
     if (quiet <= 0) printf("Sending %d vecs of size %d\n", vecs, size/vecs);
     for (i=0; i < vecs; i++) {
 	event->vecs[i].iov_len = size/vecs;
-	event->vecs[i].iov_base = malloc(event->vecs[i].iov_len);
+	event->vecs[i].iov_base = calloc(1, event->vecs[i].iov_len);
     }
 }
 
@@ -426,7 +426,7 @@ main(int argc, char **argv)
 	    EVassoc_bridge_action(cm, stone, contact_list, remote_stone);
 	    free_attr_list(contact_list);
 	}
-	data = malloc(sizeof(simple_rec));
+	data = calloc(1, sizeof(simple_rec));
 	generate_record(data);
 	attrs = create_attr_list();
 	CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");

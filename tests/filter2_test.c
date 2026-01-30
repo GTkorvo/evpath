@@ -394,14 +394,14 @@ main(int argc, char **argv)
 	while (count != 0) {
 	    long l = 0;
 	    if ((count % 2 ) == 1) {
-		simple_rec data;
+		simple_rec data = {0};
 		generate_record(&data);
 		if (quiet <=0) {printf("submitting %ld\n", data.long_field);}
 		EVsubmit(source_handle, &data, attrs);
 		free(data.string_field);
 		l = data.long_field;
 	    } else {
-		bigger_rec data;
+		bigger_rec data = {0};
 		generate_bigger_record(&data);
 		if (quiet <=0) {printf("submitting bigger %ld\n", data.long_field);}
 		EVsubmit(bigger_handle, &data, attrs);

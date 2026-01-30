@@ -135,7 +135,7 @@ main(int argc, char **argv)
 	atl_free(string_list);
 	CMsleep(cm, 120);
     } else {
-	simple_rec data;
+	simple_rec data = {0};
 	attr_list attrs, stone_attrs;
 	atom_t CMDEMO_TEST_ATOM;
 	int remote_stone, stone = 0;

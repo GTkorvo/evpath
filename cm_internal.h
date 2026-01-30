@@ -70,6 +70,21 @@ extern void win_thread_detach(HANDLE thread);
 #define thr_condition_free(c) win_condition_free(&c)
 #endif
 
+/*
+ * Portable atomic operations for reference counting.
+ * All macros return the NEW value after the operation.
+ */
+#ifdef _MSC_VER
+#define thr_atomic_dec(ptr) InterlockedDecrement((volatile long*)(ptr))
+#define thr_atomic_inc(ptr) InterlockedIncrement((volatile long*)(ptr))
+#define thr_atomic_read(ptr) InterlockedCompareExchange((volatile long*)(ptr), 0, 0)
+#else
+/* GCC/Clang __atomic builtins return the OLD value, so adjust */
+#define thr_atomic_dec(ptr) (__atomic_fetch_sub((ptr), 1, __ATOMIC_ACQ_REL) - 1)
+#define thr_atomic_inc(ptr) (__atomic_fetch_add((ptr), 1, __ATOMIC_ACQ_REL) + 1)
+#define thr_atomic_read(ptr) __atomic_load_n((ptr), __ATOMIC_ACQUIRE)
+#endif
+
 #include <ev_internal.h>
 
 

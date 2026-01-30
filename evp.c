@@ -1213,8 +1213,7 @@ extern void
 return_event(event_path_data evp, event_item *event)
 {
     (void)evp;
-    event->ref_count--;
-    if (event->ref_count == 0) {
+    if (thr_atomic_dec(&event->ref_count) == 0) {
 	/* return event memory */
 	switch (event->contents) {
 	case Event_CM_Owned:
@@ -1780,7 +1779,7 @@ process_events_stone(CManager cm, int s, action_class c)
 		    CMtrace_out(cm, EVerbose, "Encoding event prior to decode for conversion, action id %d\n", resp_id);
 		    old_data_event = reassign_memory_event(cm, event, 0);  /* reassign memory */
 		    return_event(evp, old_data_event);
-		    event->ref_count++;
+		    thr_atomic_inc(&event->ref_count);
 		}
 		CMtrace_out(cm, EVerbose, "Decoding event, action id %d\n", resp_id);
 		event_to_submit = decode_action(cm, event, resp);
@@ -3273,7 +3272,7 @@ INT_EVfree_source(EVsource source)
 static void
 reference_event(event_item *event)
 {
-    event->ref_count++;
+    thr_atomic_inc(&event->ref_count);
 }
 
 extern void
@@ -3366,7 +3365,7 @@ reassign_memory_event(CManager cm, event_item *event, int do_decode)
     void *decode_buffer;
 
     CMtrace_out(cm, EVerbose, "Doing deep copy to free up event before returning from EVsubmit()\n");
-    *tmp_event = *event;
+    EVENT_ITEM_COPY_FIELDS(tmp_event, event);
     tmp_event->ref_count = 1;   /* we're going to make sure the enqueued events don't reference anything that this does */
     tmp_event->attrs = CMadd_ref_attr_list(cm, event->attrs);
     event->free_func = NULL;   /* if these were present, no longer applicable */
@@ -3397,7 +3396,7 @@ reassign_memory_event(CManager cm, event_item *event, int do_decode)
 	event->event_encoded = 0;
 	free_FFSContext(tmp_context);
     }
-    event->ref_count--;   /* we've essentially split the event.  tmp_event will be dereferenced */
+    thr_atomic_dec(&event->ref_count);   /* we've essentially split the event.  tmp_event will be dereferenced */
     return tmp_event;
 }
 
@@ -3449,7 +3448,7 @@ INT_EVsubmit(EVsource source, void *data, attr_list attrs)
     event->attrs = CMadd_ref_attr_list(source->cm, attrs);
     internal_path_submit(source->cm, source->local_stone_id, event);
     while (process_local_actions(source->cm));
-    if (event->ref_count != 1 && (event->contents == Event_App_Owned)) {
+    if (thr_atomic_read(&event->ref_count) != 1 && (event->contents == Event_App_Owned)) {
 	event = reassign_memory_event(source->cm, event, 1);  /* reassign memory */
     }
     return_event(source->cm->evp, event);
