@@ -292,7 +292,7 @@ main(int argc, char **argv)
 	    }
 	    free_attr_list(contact_list);
 	}
-	data = malloc(sizeof(simple_rec));
+	data = calloc(1, sizeof(simple_rec));
 	format = CMregister_format(cm, simple_format_list);
 	done_format = CMregister_simple_format(cm, "done", done_field_list, sizeof(int));
 	CMregister_handler(done_format, done_handler, NULL);

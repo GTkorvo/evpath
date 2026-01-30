@@ -767,7 +767,6 @@ EVdfg_perform_act_on_state(EVdfg_configuration config, EVdfg_config_action act, 
 	if (!src) {
 	    return 0;
 	}
-	if (src->out_count <= act.u.link.port) return 0;
 	for (i=0; i < src->out_count; i++) {
 	    if (src->out_links[i] == dest->stone_id) {
 		/* remove this, move remaining down */

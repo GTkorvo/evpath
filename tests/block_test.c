@@ -114,7 +114,7 @@ int
 submit_thread(void *vrec)
 {
     struct thread_rec *rec = vrec;
-    simple_rec data;
+    simple_rec data = {0};
     attr_list attrs;
     int i;
     EVsource source_handle = EVcreate_submit_handle(rec->cm, rec->target, 
@@ -168,7 +168,7 @@ generate_record(simple_rec_ptr event)
     if (quiet <= 0) printf("Sending %d vecs of size %d\n", vecs, size/vecs);
     for (i=0; i < vecs; i++) {
 	event->vecs[i].iov_len = size/vecs;
-	event->vecs[i].iov_base = malloc(event->vecs[i].iov_len);
+	event->vecs[i].iov_base = calloc(1, event->vecs[i].iov_len);
     }
 }
 

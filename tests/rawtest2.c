@@ -213,7 +213,7 @@ main(int argc, char **argv)
 	CMsleep(cm, 120);
     } else {
 	static atom_t CMDEMO_TEST_ATOM;
-	simple_rec data;
+	simple_rec data = {0};
 	attr_list attrs;
 	int remote_stone, stone = 0;
 	EVsource source_handle;
@@ -271,7 +271,7 @@ do_regression_master_test()
     char *string_list;
     int message_count = 0, i;
     EVstone handle;
-    simple_rec data;
+    simple_rec data = {0};
     EVsource source_handle;
 #ifdef HAVE_WINDOWS_H
     SetTimer(NULL, 5, 300*1000, (TIMERPROC) fail_and_die);

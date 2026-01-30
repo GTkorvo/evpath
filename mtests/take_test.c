@@ -295,7 +295,7 @@ main(int argc, char **argv)
 	    }
 	    free_attr_list(contact_list);
 	}
-	data = malloc(sizeof(simple_rec));
+	data = calloc(1, sizeof(simple_rec));
 	format = CMregister_format(cm, simple_format_list);
 	attrs = create_attr_list();
 	CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");

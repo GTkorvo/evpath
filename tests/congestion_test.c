@@ -134,7 +134,7 @@ generate_record(simple_rec_ptr event)
     if (quiet <= 0) printf("Sending %d vecs of size %d\n", vecs, size/vecs);
     for (i=0; i < vecs; i++) {
 	event->vecs[i].iov_len = size/vecs;
-	event->vecs[i].iov_base = malloc(event->vecs[i].iov_len);
+	event->vecs[i].iov_base = calloc(1, event->vecs[i].iov_len);
     }
 }
 
@@ -299,7 +299,7 @@ main(int argc, char **argv)
 	    filter = create_multityped_action_spec(simple_format_lists, congest);
 	    EVassoc_congestion_action(cm, stone, filter, NULL);
 	}
-	data = malloc(sizeof(simple_rec));
+	data = calloc(1, sizeof(simple_rec));
 	generate_record(data);
 	attrs = create_attr_list();
 	CMDEMO_TEST_ATOM = attr_atom_from_string("CMdemo_test_atom");
@@ -307,7 +307,7 @@ main(int argc, char **argv)
 	source_handle = EVcreate_submit_handle_free(cm, stone, simple_format_list,
 						    data_free, NULL);
 	for (i=0; i < msg_limit; i++) {
-	    simple_rec_ptr new_data = malloc(sizeof(simple_rec));
+	    simple_rec_ptr new_data = calloc(1, sizeof(simple_rec));
 	    data->integer_field++;
 	    data->long_field--;
 	    memcpy(new_data, data, sizeof(simple_rec));

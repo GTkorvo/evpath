@@ -158,7 +158,7 @@ main(int argc, char **argv)
     CManager cm, cm2;
     int message_count = 0;
     EVstone target_stone, stone;
-    simple_rec data;
+    simple_rec data = {0};
     EVsource source_handle;
 
     while (argv[1] && (argv[1][0] == '-')) {

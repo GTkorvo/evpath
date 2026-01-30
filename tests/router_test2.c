@@ -257,7 +257,7 @@ main(int argc, char **argv)
 	printf("Contact list \"%d:%d:%d:%s\"\n", term0, term1, term2, string_list);
 	CMsleep(cm, 120);
     } else {
-	simple_rec data;
+	simple_rec data = {0};
 	attr_list attrs;
 	int remote_stone0, remote_stone1, remote_stone2, stone = 0;
 	EVstone term0 = -1, term1 = -1, term2 = -1;

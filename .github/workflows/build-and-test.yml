@@ -90,6 +90,82 @@ jobs:
         cd build
         ctest --output-on-failure --timeout 120
 
+  # ThreadSanitizer build to detect data races
+  tsan:
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    env:
+      CC: clang
+      CXX: clang++
+      TSAN_FLAGS: "-fsanitize=thread -fno-omit-frame-pointer"
+      TSAN_OPTIONS: "halt_on_error=1:second_deadlock_stack=1"
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        path: source
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y clang llvm cmake ninja-build git curl pkg-config
+
+    - name: Build atl with TSan
+      run: |
+        git clone --depth 1 https://github.com/GTkorvo/atl.git
+        cmake -G Ninja -S atl -B atl/build \
+          -DCMAKE_C_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_CXX_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_EXE_LINKER_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_SHARED_LINKER_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
+          -DCMAKE_BUILD_TYPE=Debug
+        ninja -C atl/build install
+
+    - name: Build dill with TSan
+      run: |
+        git clone --depth 1 https://github.com/GTkorvo/dill.git
+        cmake -G Ninja -S dill -B dill/build \
+          -DCMAKE_C_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_CXX_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_EXE_LINKER_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_SHARED_LINKER_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
+          -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install \
+          -DCMAKE_BUILD_TYPE=Debug
+        ninja -C dill/build install
+
+    - name: Build ffs with TSan
+      run: |
+        git clone --depth 1 https://github.com/GTkorvo/ffs.git
+        cmake -G Ninja -S ffs -B ffs/build \
+          -DCMAKE_C_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_CXX_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_EXE_LINKER_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_SHARED_LINKER_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/install \
+          -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install \
+          -DCMAKE_BUILD_TYPE=Debug
+        ninja -C ffs/build install
+
+    - name: Build EVPath with TSan
+      run: |
+        cmake -G Ninja -S source -B build \
+          -DCMAKE_C_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_CXX_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_EXE_LINKER_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_SHARED_LINKER_FLAGS="${TSAN_FLAGS}" \
+          -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DBUILD_TESTING=ON
+        ninja -C build
+
+    - name: Test with TSan
+      run: |
+        cd build
+        ctest --output-on-failure --timeout 120
+
   linux:
     # The jobs should run pretty quick; anything over 30m essentially means
     # someting is stuck somewhere
