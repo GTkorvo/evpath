@@ -7,6 +7,8 @@ on:
   pull_request:
     branches:
     - master
+  schedule:
+    - cron: '0 8 * * 1'  # Monday 8am UTC - weekly build to catch dependency issues
 
 concurrency:
   group: ${{ github.head_ref || github.run_id }}
@@ -15,6 +17,7 @@ concurrency:
 jobs:
   # MemorySanitizer build to detect uninitialized memory reads
   msan:
+    if: github.event_name != 'schedule' || github.repository == 'GTkorvo/EVPath'
     timeout-minutes: 45
     runs-on: ubuntu-24.04
     env:
@@ -92,6 +95,7 @@ jobs:
 
   # ThreadSanitizer build to detect data races
   tsan:
+    if: github.event_name != 'schedule' || github.repository == 'GTkorvo/EVPath'
     timeout-minutes: 45
     runs-on: ubuntu-24.04
     env:
@@ -167,6 +171,7 @@ jobs:
         ctest --output-on-failure --timeout 120
 
   linux:
+    if: github.event_name != 'schedule' || github.repository == 'GTkorvo/EVPath'
     # The jobs should run pretty quick; anything over 30m essentially means
     # someting is stuck somewhere
     timeout-minutes: 30
@@ -202,6 +207,13 @@ jobs:
           source/scripts/ci/setup/install-atl.sh ${{ matrix.buildtype }}
           source/scripts/ci/setup/install-dill.sh ${{ matrix.buildtype }}
           source/scripts/ci/setup/install-ffs.sh ${{ matrix.buildtype }}
+    - name: Cache CMake build
+      uses: actions/cache@v4
+      with:
+        path: build
+        key: ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.buildtype }}-${{ hashFiles('source/CMakeLists.txt', 'source/**/*.cmake') }}
+        restore-keys: |
+          ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.buildtype }}-
     - name: Update
       run: source/scripts/ci/gh-actions/run.sh update
     - name: Configure
@@ -212,6 +224,7 @@ jobs:
       run: source/scripts/ci/gh-actions/run.sh test
 
   mac_and_windows:
+    if: github.event_name != 'schedule' || github.repository == 'GTkorvo/EVPath'
     # The jobs should run pretty quick; anything over 30m essentially means
     # something is stuck somewhere
     timeout-minutes: 30
