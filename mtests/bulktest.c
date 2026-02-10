@@ -446,6 +446,7 @@ do_regression_master_test()
 	int i = 10;
 	while ((i >= 0) && (msg_count != MSG_COUNT)) {
 	    CMsleep(cm, 1);
+	    i--;
 	}
     }
     atl_free(string_list);
