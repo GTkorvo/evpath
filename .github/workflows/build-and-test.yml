@@ -208,7 +208,7 @@ jobs:
           source/scripts/ci/setup/install-dill.sh ${{ matrix.buildtype }}
           source/scripts/ci/setup/install-ffs.sh ${{ matrix.buildtype }}
     - name: Cache CMake build
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: build
         key: ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.buildtype }}-${{ hashFiles('source/CMakeLists.txt', 'source/**/*.cmake') }}
