@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 
-# The directory label is used for CDash to treat EVPath as a subproject of
+# The directory label is used for CDash to treat EVPath as a subproject of a
 # GTKorvo
 set(CMAKE_DIRECTORY_LABELS EVPath)
 
