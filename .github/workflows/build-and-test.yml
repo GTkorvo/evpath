@@ -223,6 +223,60 @@ jobs:
     - name: Test
       run: source/scripts/ci/gh-actions/run.sh test
 
+  linux-arm64:
+    if: github.event_name != 'schedule' || github.repository == 'GTkorvo/EVPath'
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        buildtype: [ release, debug ]
+        compiler: [ gcc, clang ]
+    env:
+      CC: ${{ matrix.compiler }}
+      CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build bison flex \
+          ${{ matrix.compiler }} ${{ matrix.compiler == 'gcc' && 'g++' || 'clang' }}
+    - name: Build and install atl
+      run: |
+        git clone --depth 1 https://github.com/GTKorvo/atl.git /tmp/atl
+        cmake -G Ninja -S /tmp/atl -B /tmp/atl/build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.buildtype }} -DBUILD_TESTING=OFF \
+          -DCMAKE_INSTALL_PREFIX=/tmp/deps
+        ninja -C /tmp/atl/build install
+    - name: Build and install dill
+      run: |
+        git clone --depth 1 https://github.com/GTKorvo/dill.git /tmp/dill
+        cmake -G Ninja -S /tmp/dill -B /tmp/dill/build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.buildtype }} -DBUILD_TESTING=OFF \
+          -DCMAKE_INSTALL_PREFIX=/tmp/deps
+        ninja -C /tmp/dill/build install
+    - name: Build and install ffs
+      run: |
+        git clone --depth 1 https://github.com/GTKorvo/ffs.git /tmp/ffs
+        cmake -G Ninja -S /tmp/ffs -B /tmp/ffs/build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.buildtype }} -DBUILD_TESTING=OFF \
+          -DCMAKE_PREFIX_PATH=/tmp/deps \
+          -DCMAKE_INSTALL_PREFIX=/tmp/deps
+        ninja -C /tmp/ffs/build install
+    - name: Configure
+      run: |
+        cmake -G Ninja -S . -B build \
+          -DCMAKE_BUILD_TYPE=${{ matrix.buildtype }} \
+          -DCMAKE_PREFIX_PATH=/tmp/deps \
+          -DBUILD_TESTING=ON
+    - name: Build
+      run: ninja -C build
+    - name: Test
+      run: ctest --test-dir build --output-on-failure
+      env:
+        LD_LIBRARY_PATH: /tmp/deps/lib
+
   mac_and_windows:
     if: github.event_name != 'schedule' || github.repository == 'GTkorvo/EVPath'
     # The jobs should run pretty quick; anything over 30m essentially means
