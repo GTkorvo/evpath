@@ -28,7 +28,7 @@ jobs:
       MSAN_OPTIONS: "halt_on_error=1:print_stats=1"
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ github.event.pull_request.head.sha }}
         path: source
@@ -105,7 +105,7 @@ jobs:
       TSAN_OPTIONS: "halt_on_error=1:second_deadlock_stack=1"
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ github.event.pull_request.head.sha }}
         path: source
@@ -197,7 +197,7 @@ jobs:
           container: ubuntu:22.04
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ github.event.pull_request.head.sha }}
         path: source
@@ -236,7 +236,7 @@ jobs:
       CC: ${{ matrix.compiler }}
       CXX: ${{ matrix.compiler == 'gcc' && 'g++' || 'clang++' }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install dependencies
       run: |
         sudo apt-get update
@@ -315,7 +315,7 @@ jobs:
         shell: bash
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ github.event.pull_request.head.sha }}
         path: source
