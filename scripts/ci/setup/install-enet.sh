@@ -3,7 +3,7 @@
 echo
 echo
 echo "****************************************"
-echo "  Installing ATL"
+echo "  Installing ENet"
 echo "****************************************"
 
 # Determine architecture flag for Windows builds
@@ -13,15 +13,15 @@ if [[ "${GH_YML_JOBNAME}" == *"win32"* ]]; then
 elif [[ "${GH_YML_JOBNAME}" == *"windows"* ]]; then
   arch_flag="-A x64"
 fi
-# Static jobs link a static ATL, as ADIOS2's static builds do
-shared_flag=""
-if [[ "${GH_YML_JOBNAME}" == *"static"* ]]; then
-  shared_flag="-DBUILD_SHARED_LIBS=OFF"
+# Only the static jobs use ENet, to build EVPath's enet transport as ADIOS2 does
+if [[ "${GH_YML_JOBNAME}" != *"static"* ]]; then
+  exit 0
 fi
+shared_flag="-DBUILD_SHARED_LIBS=OFF"
 
-mkdir atl
-cd atl
-git clone https://github.com/GTKorvo/atl.git source
+mkdir enet
+cd enet
+git clone https://github.com/GTKorvo/enet.git source
 mkdir build
 cd build
 cmake ${arch_flag} ${shared_flag} \

@@ -1,6 +1,9 @@
 # Client maintainer: eisen@cc.gatech.edu
 
 # windows-2025 runner image ships Visual Studio 2026; needs CMake >= 4.2
+# Library and transport warnings are errors, as in ADIOS2's Windows CI
+string(APPEND dashboard_cache "EVPATH_WARNINGS_AS_ERRORS:BOOL=ON
+")
 set(CTEST_CMAKE_GENERATOR "Visual Studio 18 2026")
 set(CTEST_CMAKE_GENERATOR_PLATFORM x64)
 
