@@ -486,7 +486,10 @@ enet_service_network(CManager cm, void *void_trans)
 	    enet_conn_data_ptr enet_conn_data = (enet_conn_data_ptr) event.peer->data;
 	    svc->trace_out(cm, "Got a disconnect on connection %p\n", event.peer->data);
 
-            enet_conn_data = (enet_conn_data_ptr) event.peer->data;
+            if (enet_conn_data == NULL) {
+		/* already shut down, nothing left to fail */
+		break;
+	    }
 	    enet_conn_data->read_buffer_len = -1;
             if (enet_conn_data->conn) {
                 svc->connection_fail(enet_conn_data->conn);
@@ -645,6 +648,12 @@ extern
 void
 INTERFACE_NAME(shutdown_conn)(CMtrans_services svc, enet_conn_data_ptr scd)
 {
+    if (scd->peer) {
+	/* ENet can still deliver events for this peer after we're gone, so
+	 * don't leave it pointing at the struct we're about to free. */
+	scd->peer->data = NULL;
+	scd->peer = NULL;
+    }
     svc->connection_deref(scd->conn);
     if (scd->remote_host) free(scd->remote_host);
     free(scd);
