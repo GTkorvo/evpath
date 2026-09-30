@@ -300,7 +300,7 @@ sub gen_handler {
     print REVP "    response.condition_var = request->condition_var;\n";
     print REVP "    CMwrite(conn, f, &response);\n";
   switch:for ($return_type{$subr}) {
-      /attr_list/ && do {print REVP "    free(response.ret);\n"; last;};
+      /attr_list/ && do {print REVP "    atl_free(response.ret);\n"; last;};
   }
     print REVP "}\n";
 }
