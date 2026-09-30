@@ -1516,7 +1516,11 @@ INTERFACE_NAME(initialize)(CManager cm, CMtrans_services svc,
 			 transport_entry trans, attr_list attrs)
 {
     static int atom_init = 0;
+#ifdef HAVE_WINDOWS_H
+    SOCKET filedes[2];	/* our pipe() replacement returns sockets */
+#else
     int filedes[2];
+#endif
     char *env = getenv("ENET_HOST_SERVICE_WARN_INTERVAL");
 
     enet_client_data_ptr enet_data;
@@ -1564,8 +1568,8 @@ INTERFACE_NAME(initialize)(CManager cm, CMtrans_services svc,
 	perror("Pipe for wake not created.  ENET wake mechanism inoperative.");
 	return NULL;
     }
-    enet_data->wake_read_fd = filedes[0];
-    enet_data->wake_write_fd = filedes[1];
+    enet_data->wake_read_fd = (int)filedes[0];
+    enet_data->wake_write_fd = (int)filedes[1];
     svc->add_shutdown_task(cm, shutdown_enet_thread, (void *) enet_data, SHUTDOWN_TASK);
     svc->add_shutdown_task(cm, free_enet_data, (void *) enet_data, FREE_TASK);
     return (void *) enet_data;
