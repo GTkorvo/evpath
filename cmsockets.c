@@ -757,7 +757,9 @@ libcmsockets_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transpor
 		return NULL;
 	    }
 	} else {
-	    long seedval = (long) time(NULL) + getpid();
+	    /* time + pid repeats when pid N starts a second after pid N+1, so mix */
+	    long seedval = (long)((unsigned long)time(NULL) * 2654435761UL ^ (unsigned long)getpid() ^
+				  (unsigned long)(size_t)cm ^ (unsigned long)clock());
 	    /* port num is free.  Constrain to range to standards */
 	    int size = port_range_high - port_range_low;
 	    int tries = 30;
@@ -773,7 +775,7 @@ libcmsockets_LTX_non_blocking_listen(CManager cm, CMtrans_services svc, transpor
 		if (result != SOCKET_ERROR) tries = 0;
 		if (tries%5 == 4) {
 		    /* try reseeding in case we're in sync with another process */
-		    srand((int)time(NULL) + (int)getpid());
+		    srand((unsigned int)(seedval ^ (long)clock()));
 		}
 		if (tries == 20) {
 		    /* damn, tried a lot, increase the range (This might violate specified range) */
