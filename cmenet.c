@@ -283,6 +283,7 @@ INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
 static void
 IntENET_lock(enet_client_data_ptr ecd, char *file, int line)
 {
+    (void)file; (void)line;
 //    if (file) printf("(PID %lx, TID %lx) Trying ENET Lock at %s, line %d\n", (long) getpid(), (long)gettid(), file, line);
     thr_mutex_lock(ecd->enet_lock);
 //    if (file) printf("GOT ENET Lock at %s, line %d\n", file, line);
@@ -292,6 +293,7 @@ IntENET_lock(enet_client_data_ptr ecd, char *file, int line)
 static void
 IntENET_unlock(enet_client_data_ptr ecd, char *file, int line)
 {
+    (void)file; (void)line;
 //    if (file) printf("(PID %lx, TID %lx) ENET Unlock at %s, line %d\n", (long) getpid(), (long)gettid(), file, line);
     ecd->enet_locked--;
     thr_mutex_unlock(ecd->enet_lock);
@@ -833,6 +835,7 @@ CMConnection
 INTERFACE_NAME(finalize_conn_nonblocking)(CManager cm, CMtrans_services svc,
                                           transport_entry trans, void *client_data, int result)
 {
+    (void)cm;
     enet_client_data_ptr ecd = (enet_client_data_ptr) trans->trans_data;
     enet_conn_data_ptr final_conn_data = (enet_conn_data_ptr) client_data;
     enet_conn_data_ptr last = NULL, enet_conn_data = ecd->pending_connections;
@@ -1089,7 +1092,7 @@ INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
 	    fprintf(stderr, "Requested port number %d is invalid\n", attr_port_num);
 	    return NULL;
 	}
-	port_num = attr_port_num;
+	port_num = (u_short)attr_port_num;
     }
 
     svc->trace_out(cm, "CMEnet begin listen, requested port %d", attr_port_num);
@@ -1162,7 +1165,7 @@ INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
             tries = 10;
             while (tries > 0) {
                 int target = low_bound + (int)(size * drand48());
-                address.port = target;
+                address.port = (enet_uint16)target;
                 
                 svc->trace_out(cm, "CMEnet trying to bind port %d", target);
                 
@@ -1223,6 +1226,7 @@ INTERFACE_NAME(read_block_func)(CMtrans_services svc,
                                 enet_conn_data_ptr conn_data, ssize_t *actual_len,
                                 ssize_t *offset_ptr)
 {
+    (void)svc;
     CMbuffer cb;
 
     if (conn_data->read_buffer_len == -1) return NULL;
@@ -1355,8 +1359,7 @@ shutdown_enet_thread
 
 #ifdef HAVE_WINDOWS_H
 static char*
-WSAerror_str(err)
-int err;
+WSAerror_str(int err)
 {
     switch(err) {
     case WSAEINTR: return "WSAEINTR";
@@ -1418,13 +1421,11 @@ int err;
  */
 
 static int
-pipe(filedes)
-SOCKET filedes[2];
+pipe(SOCKET filedes[2])
 {
     
     int length;
     struct sockaddr_in sock_addr;
-    int sock_opt_val = 1;
     SOCKET sock1, sock2, conn_sock;
     unsigned long block = TRUE;
     int delay_value = 1;
@@ -1515,6 +1516,7 @@ void *
 INTERFACE_NAME(initialize)(CManager cm, CMtrans_services svc,
 			 transport_entry trans, attr_list attrs)
 {
+    (void)trans;
     static int atom_init = 0;
 #ifdef HAVE_WINDOWS_H
     SOCKET filedes[2];	/* our pipe() replacement returns sockets */

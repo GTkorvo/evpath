@@ -44,7 +44,7 @@
 #include <stdlib.h>
 #include <string.h>
 #define assert(e)  \
-    ((void) ((e) ? 0 : __assert (#e, __FILE__, __LINE__)))
+    ((void) ((e) ? (void)0 : __assert (#e, __FILE__, __LINE__)))
 #define __assert(e, file, line) \
     ((void)printf ("%s:%u: failed assertion `%s'\n", file, line, e), abort())
 #ifdef HAVE_MEMORY_H
@@ -112,6 +112,9 @@ select_malloc(size_t size)
 
 #ifndef SOCKET_ERROR
 #define SOCKET_ERROR -1
+#endif
+#ifndef INVALID_SOCKET
+#define INVALID_SOCKET -1
 #endif
 #if defined (__INTEL_COMPILER)
 #  pragma warning (disable: 869)
@@ -182,8 +185,8 @@ init_select_data(CMtrans_services svc, select_data_ptr *sdp, CManager cm)
     
     sd->periodic_task_list = NULL;
     sd->select_consistency_number = 0;
-    sd->wake_read_fd = -1;
-    sd->wake_write_fd = -1;
+    sd->wake_read_fd = INVALID_SOCKET;
+    sd->wake_write_fd = INVALID_SOCKET;
     if (cm != NULL) {
 	sd->cm = cm;
     }
@@ -785,6 +788,7 @@ remove_periodic_task(select_data_ptr sd, periodic_task_handle handle)
 extern void
 libcmselect_LTX_remove_periodic(CMtrans_services svc, select_data_ptr *sdp, periodic_task_handle handle)
 {
+    (void)svc;
     select_data_ptr sd = *((select_data_ptr *)sdp);
     if (sd == NULL) return;
     if (remove_periodic_task(sd, handle) == 0) {
@@ -814,11 +818,12 @@ shutdown_wake_mechanism(select_data_ptr sd)
     if (sd->wake_read_fd == -1) return;
     close(sd->wake_read_fd);
     close(sd->wake_write_fd);
-    sd->wake_read_fd = sd->wake_write_fd = -1;
+    sd->wake_read_fd = sd->wake_write_fd = INVALID_SOCKET;
 }
 
 static void read_wake_fd(void *fd_as_ptr, void *junk)
 {
+    (void)junk;
     char buffer;
     SOCKET fd = (SOCKET) (intptr_t)fd_as_ptr;
 #ifdef HAVE_WINDOWS_H
@@ -1014,6 +1019,7 @@ setup_wake_mechanism(CMtrans_services svc, select_data_ptr *sdp)
 extern void
 libcmselect_LTX_wake_function(CMtrans_services svc, select_data_ptr *sdp)
 {
+    (void)svc;
     if (*sdp != NULL) {
 	wake_server_thread(*sdp);
     }
@@ -1075,6 +1081,7 @@ libcmselect_LTX_select_initialize(CMtrans_services svc, CManager cm, void *clien
 extern void
 libcmselect_LTX_select_shutdown(CMtrans_services svc, CManager cm, void *client_data)
 {
+    (void)cm;
     select_data_ptr *sdp = client_data;
     select_data_ptr sd = *sdp;
 
@@ -1088,6 +1095,7 @@ libcmselect_LTX_select_shutdown(CMtrans_services svc, CManager cm, void *client_
 extern void
 libcmselect_LTX_select_free(CMtrans_services svc, CManager cm, void *client_data)
 {
+    (void)cm;
     select_data_ptr *sdp = client_data;
     select_data_ptr sd = *sdp;
 
@@ -1103,6 +1111,7 @@ libcmselect_LTX_select_free(CMtrans_services svc, CManager cm, void *client_data
 extern void
 libcmselect_LTX_select_stop(CMtrans_services svc, void *client_data)
 {
+    (void)svc;
     if (*((select_data_ptr *)client_data) != NULL) {
 	(*((select_data_ptr*)client_data))->closed = 1;
     }

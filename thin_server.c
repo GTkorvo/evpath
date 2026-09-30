@@ -91,7 +91,7 @@ EVthin_socket_listen(CManager cm,  char **hostname_p, int *port_p)
 	srand48(seedval);
 	while (tries > 0) {
 	    int target = low_bound + (int)(size * drand48());
-	    sock_addr.sin_port = htons(target);
+	    sock_addr.sin_port = htons((u_short)target);
 	    CMtrace_out(cm, CMConnectionVerbose, "CMSocket trying to bind port %d", target);
 	    result = bind(conn_sock, (struct sockaddr *) &sock_addr,
 			  sizeof sock_addr);
