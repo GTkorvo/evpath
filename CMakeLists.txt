@@ -768,6 +768,16 @@ FOREACH(tgt ${EVPATH_TRANSPORT_TARGETS})
    TARGET_COMPILE_DEFINITIONS(${tgt} PRIVATE EVPATH_MODULE_BUILD_DIR="$<TARGET_FILE_DIR:${tgt}>")
 ENDFOREACH()
 
+option(EVPATH_WARNINGS_AS_ERRORS
+  "Treat compiler warnings as errors in the EVPath library and transports (not tests)" OFF)
+mark_as_advanced(EVPATH_WARNINGS_AS_ERRORS)
+if(EVPATH_WARNINGS_AS_ERRORS)
+  if(CMAKE_VERSION VERSION_LESS 3.24)
+    message(FATAL_ERROR "EVPATH_WARNINGS_AS_ERRORS requires CMake 3.24 or newer")
+  endif()
+  set_target_properties(EVPath ${EVPATH_TRANSPORT_TARGETS} PROPERTIES COMPILE_WARNING_AS_ERROR ON)
+endif()
+
 set(config_suffix)
 get_property(multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(multi_config)
