@@ -61,7 +61,7 @@
 #include <windows.h>
 #define drand48() (((double)rand())/((double)RAND_MAX))
 #define lrand48() rand()
-#define srand48(x)
+#define srand48(x) srand((unsigned int)(x))
 #include <ws2tcpip.h>
 #endif
 #ifdef HAVE_UNISTD_H
@@ -1158,7 +1158,9 @@ INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
             /* port num is free.  Constrain to range 26000 : 26100 */
             int size;
             int tries;
-            srand48(time(NULL) + getpid());
+            /* time + pid repeats when pid N starts a second after pid N+1, so mix */
+            srand48((long)((unsigned long)time(NULL) * 2654435761UL ^ (unsigned long)getpid() ^
+                           (unsigned long)(size_t)ecd ^ (unsigned long)clock()));
 
         restart:
             size = high_bound - low_bound;
@@ -1180,7 +1182,8 @@ INTERFACE_NAME(non_blocking_listen)(CManager cm, CMtrans_services svc,
                 if (server != NULL) tries = 0;
                 if (tries == 5) {
                     /* try reseeding in case we're in sync with another process */
-                    srand48(time(NULL) + getpid());
+                    srand48((long)((unsigned long)time(NULL) * 2654435761UL ^ (unsigned long)getpid() ^
+                                   (unsigned long)(size_t)ecd ^ (unsigned long)clock()));
                 }
             }
             if (server == NULL) {
