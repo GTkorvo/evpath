@@ -101,9 +101,6 @@ extern transport_entry cmib_add_static_transport(CManager cm, CMtrans_services s
 #ifdef EVPATH_HAS_ENET
 extern transport_entry cmenet_add_static_transport(CManager cm, CMtrans_services svc);
 #endif
-#ifdef EVPATH_HAS_ZPL_ENET
-extern transport_entry cmzplenet_add_static_transport(CManager cm, CMtrans_services svc);
-#endif
 #ifdef EVPATH_HAS_UDT4
 extern transport_entry cmudt4_add_static_transport(CManager cm, CMtrans_services svc);
 #endif
@@ -270,16 +267,6 @@ load_transport(CManager cm, const char *trans_name, int quiet)
 #ifdef EVPATH_HAS_ENET
     if (strcmp(trans_name, "enet") == 0) {
 	transport = cmenet_add_static_transport(cm, &CMstatic_trans_svcs);
-	transport->data_available = CMDataAvailable;	/* callback
-							 * pointer */
-	transport->write_possible = CMWriteQueuedData;	/* callback
-							 * pointer */
-	(void) add_transport_to_cm(cm, transport);
-    }
-#endif
-#ifdef EVPATH_HAS_ZPL_ENET
-    if (strcmp(trans_name, "zplenet") == 0) {
-	transport = cmzplenet_add_static_transport(cm, &CMstatic_trans_svcs);
 	transport->data_available = CMDataAvailable;	/* callback
 							 * pointer */
 	transport->write_possible = CMWriteQueuedData;	/* callback
