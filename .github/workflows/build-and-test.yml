@@ -326,6 +326,7 @@ jobs:
           source/scripts/ci/setup/install-atl.sh ${{ matrix.buildtype }}
           source/scripts/ci/setup/install-dill.sh ${{ matrix.buildtype }}
           source/scripts/ci/setup/install-ffs.sh ${{ matrix.buildtype }}
+          source/scripts/ci/setup/install-enet.sh ${{ matrix.buildtype }}
     - name: Setup
       if: ${{ runner.os == 'macOS' }}
       run: |
