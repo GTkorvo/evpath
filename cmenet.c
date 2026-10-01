@@ -330,9 +330,11 @@ static enet_conn_data_ptr
 create_enet_conn_data(CMtrans_services svc)
 {
     enet_conn_data_ptr enet_conn_data = (enet_conn_data_ptr) svc->malloc_func(sizeof(struct enet_connection_data));
-    enet_conn_data->remote_host = NULL;
+    /* zero everything first.  conn in particular is tested before use from
+     * the ENet event loop, which can see this struct (via peer->data) before
+     * the connection is established, and stale heap contents pass that test. */
+    memset(enet_conn_data, 0, sizeof(struct enet_connection_data));
     enet_conn_data->remote_contact_port = -1;
-    enet_conn_data->read_buffer = NULL;
     enet_conn_data->read_buffer_len = 1;
     return enet_conn_data;
 }
