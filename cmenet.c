@@ -125,76 +125,11 @@
 #define thr_condition_free(c) 
 #endif
 
-#ifdef USE_ZPL_ENET
-#define ENET_IMPLEMENTATION
-#define USE_IPV6
-#define MAX_CLIENTS 4095
-#include <netinet/in.h>
-#include <zpl-enet/include/enet.h>
-    /*  extra function to access the UDP socket FD */
-    ENET_API enet_uint32 enet_host_get_sock_fd(ENetHost *);
-    enet_uint32 enet_host_get_sock_fd(ENetHost *host) {
-        return host->socket;
-    }
-
-extern void ZPLENETdummy() {  // for warning suppression
-     (void) enet_initialize_with_callbacks(0, NULL);
-     (void) enet_deinitialize() ;
-     (void) enet_linked_version() ;
-     (void) enet_socket_listen(0, 0) ;
-     (void) enet_socket_accept(0, NULL) ;
-     (void) enet_socket_connect(0, NULL) ;
-     (void) enet_socket_get_option(0, (ENetSocketOption) 1, NULL) ;
-     (void) enet_socket_shutdown(0, (ENetSocketShutdown) 1) ;
-     (void) enet_socketset_select(0, NULL, NULL, 0) ;
-     (void) enet_address_get_host(NULL, NULL, 0 ) ;
-     (void) enet_host_get_peers_count( NULL) ;
-     (void) enet_host_get_packets_sent(NULL) ;
-     (void) enet_host_get_packets_received(NULL) ;
-     (void) enet_host_get_bytes_sent(NULL) ;
-     (void) enet_host_get_bytes_received(NULL) ;
-     (void) enet_host_get_received_data(NULL, NULL) ;
-     (void) enet_host_get_mtu(NULL) ;
-     (void) enet_peer_get_id(NULL) ;
-     (void) enet_peer_get_ip(NULL, NULL, 0) ;
-     (void) enet_peer_get_port(NULL) ;
-     (void) enet_peer_get_rtt(NULL) ;
-     (void) enet_peer_get_packets_sent(NULL) ;
-     (void) enet_peer_get_packets_lost(NULL) ;
-     (void) enet_peer_get_bytes_sent(NULL) ;
-     (void) enet_peer_get_bytes_received(NULL) ;
-     (void) enet_peer_get_state(NULL) ;
-     (void) enet_peer_get_data(NULL) ;
-     (void) enet_peer_set_data(NULL, NULL) ;
-     (void) enet_packet_get_data(NULL) ;
-     (void) enet_packet_get_length(NULL) ;
-     (void) enet_packet_set_free_callback(NULL, NULL) ;
-     (void) enet_packet_create_offset(NULL, 0, 0, 0) ;
-     (void) enet_crc32(NULL, 0) ;
-     (void) enet_host_check_events(NULL, NULL);
-     (void) enet_host_send_raw(NULL, NULL, NULL, 0) ;
-     (void) enet_host_send_raw_ex(NULL, NULL, NULL, 0, 0) ;
-     (void) enet_host_set_intercept(NULL, NULL) ;
-     (void) enet_host_broadcast(NULL, 0, NULL) ;
-     (void) enet_host_compress(NULL, NULL);
-     (void) enet_host_channel_limit(NULL, 0);
-     (void) enet_host_bandwidth_limit(NULL, 0,0);
-     (void) enet_peer_ping_interval(NULL, 0) ;
-     (void) enet_peer_disconnect_now(NULL, 0) ;
-     (void) enet_peer_disconnect_later(NULL, 0) ;
-     (void) enet_peer_throttle_configure(NULL, 0, 0, 0) ;
-}
-
-#define TPORT "CMZplEnet"
-#define TRANSPORT_STRING "zplenet"
-#define INTERFACE_NAME(NAME) libcmzplenet_LTX_ ## NAME
-#else
 #define TPORT "CMEnet"
 #define MAX_CLIENTS 0
 #define TRANSPORT_STRING "enet"
 #define INTERFACE_NAME(NAME) libcmenet_LTX_ ## NAME
 #include <enet/enet.h>
-#endif
 #include <time.h>
 #ifdef HAVE_SYS_TIME_H
 #include <sys/time.h>
@@ -481,9 +416,6 @@ enet_service_network(CManager cm, void *void_trans)
             }
             break;
 	}           
-#ifdef USE_ZPL_ENET
-        case ENET_EVENT_TYPE_DISCONNECT_TIMEOUT:
-#endif
         case ENET_EVENT_TYPE_DISCONNECT: {
 	    enet_conn_data_ptr enet_conn_data = (enet_conn_data_ptr) event.peer->data;
 	    svc->trace_out(cm, "Got a disconnect on connection %p\n", event.peer->data);
@@ -1548,9 +1480,7 @@ INTERFACE_NAME(initialize)(CManager cm, CMtrans_services svc,
 	    fprintf (stderr, "An error occurred while initializing ENet.\n");
 	    //return EXIT_FAILURE;
 	}
-#ifndef USE_ZPL_ENET
-        enet_time_set(0);   /* rollover in 50 days, old ENET only */
-#endif
+        enet_time_set(0);   /* rollover in 50 days */
     }
     if (atom_init == 0) {
 	CM_ENET_HOSTNAME = attr_atom_from_string("CM_ENET_HOST");
@@ -1591,20 +1521,12 @@ INTERFACE_NAME(initialize)(CManager cm, CMtrans_services svc,
     return (void *) enet_data;
 }
 
-#ifdef USE_ZPL_ENET
-extern transport_entry cmzplenet_add_static_transport(CManager cm, CMtrans_services svc)
-#else
 extern transport_entry cmenet_add_static_transport(CManager cm, CMtrans_services svc)
-#endif
 {
     transport_entry transport;
     transport = (transport_entry) svc->malloc_func(sizeof(struct _transport_item));
     memset(transport, 0, sizeof(*transport));
-#ifndef USE_ZPL_ENET
     transport->trans_name = strdup("enet");
-#else
-    transport->trans_name = strdup("zplenet");
-#endif
     transport->cm = cm;
     transport->transport_init = (CMTransport_func)INTERFACE_NAME(initialize);
     transport->listen = (CMTransport_listen_func)INTERFACE_NAME(non_blocking_listen);

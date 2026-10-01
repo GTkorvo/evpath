@@ -14,9 +14,6 @@
 /* Define to 1 if the enet transport is built */
 #cmakedefine EVPATH_HAS_ENET
 
-/* Define to 1 if the ZPL ENET transport is built */
-#cmakedefine EVPATH_HAS_ZPL_ENET
-
 /* Define to 1 if the udt4 transport is built */
 #cmakedefine EVPATH_HAS_UDT4
 
