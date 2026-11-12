@@ -510,8 +510,9 @@ libcmepoll_LTX_add_select(CMtrans_services svc, select_data_ptr *sdp, int fd, se
     ep_event.data.fd = fd;
     if(epoll_ctl(sd->epfd, EPOLL_CTL_ADD, fd, &ep_event) < 0) {
     	if(errno == EEXIST) {
-    		/* This is fd is already armed for read */
-    		ep_event.events = EPOLLIN | EPOLLOUT;
+    		/* fd is already registered; keep write interest only if armed for write */
+    		ep_event.events = EPOLLIN;
+    		if (sd->write_items[fd].func != NULL) ep_event.events |= EPOLLOUT;
     		if (epoll_ctl(sd->epfd, EPOLL_CTL_MOD, fd, &ep_event) < 0) {
     			fprintf(stderr, "Something bad in %s. %d\n", __func__, errno);
     		}
